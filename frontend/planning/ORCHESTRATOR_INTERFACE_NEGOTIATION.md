@@ -426,3 +426,31 @@ refusal, the short Unix-socket repair, and the retained code-signing failure:
 This round does not freeze event subscriptions, cross-platform installed
 transports, durable general audit, plugin administration, handler/command
 registries, or the reusable picker surface.
+
+
+## Windows development projection — 2026-09-29
+
+**GIVEN:** the owner authorized direct Shadow checkout development and a native
+Windows navigation slice, preserving the existing component boundaries and
+truthful unavailable states.
+
+**OBSERVED:** the frontend now consumes the separately owned C++ client's
+Windows build through the unchanged `fileman::orchestrator_client` API. That
+client explicitly reports live transport unavailable. The frontend does not
+replace bootstrap, settings, service state, or search with successful fixtures.
+Canonical fixtures remain limited to tests. Useful local browsing is independent
+of that unavailable augmentation.
+
+**OBSERVED:** GUI.Forms consumption uses the development manifest
+`gui-forms-shadow-windows-x64-2026-09-29`, its installed public Application API,
+and the added wake/drain callbacks for frontend-owned worker completion. The
+macOS native host branch remains to preserve its existing titlebar/drag-region
+projection. No new Orchestrator wire payload, capability ID, or provider authority
+is introduced by the private Windows file/path/launch adapters.
+
+The existing C++ picker source package must be rebuilt with this model: its
+`ObjectIdentity` additionally retains the upper 64 bits of a Windows file ID.
+This is a source-package layout change, not a frozen cross-process ABI or a new
+filesystem identity authority. Windows live IPC and installed service readiness
+remain Orchestrator-owned gates. See the native frontend evidence receipt under
+`../results/2026-09-29-shadow-windows/`.

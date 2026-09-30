@@ -6,13 +6,14 @@
 
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace gui_forms {
 
 // Retained viewport over an owned GUI.Drawing bitmap. Applications own tools,
 // document history, and selection state; RasterCanvas owns presentation,
 // coordinate transforms, resource synchronization, and local invalidation.
-class RasterCanvas final : public Control {
+class RasterCanvas : public Control {
 public:
     explicit RasterCanvas(StableId stable_id);
 
@@ -67,12 +68,18 @@ protected:
     void on_dispose() noexcept override;
 
 private:
+    struct Tile final {
+        ImageId image;
+        gui_drawing::RectI content;
+        gui_drawing::RectI storage;
+    };
     [[nodiscard]] bool publish_full_bitmap();
+    void release_tiles(Window& owner) noexcept;
     [[nodiscard]] Rect damage_to_client(gui_drawing::RectI pixels) const noexcept;
     void paint_transparency_grid(Painter& painter, Rect bounds) const;
 
     std::shared_ptr<gui_drawing::Bitmap> bitmap_;
-    ImageId image_{};
+    std::vector<Tile> tiles_;
     std::uint64_t presented_generation_{};
     double zoom_{1.0};
     gui_drawing::PointF view_origin_{};

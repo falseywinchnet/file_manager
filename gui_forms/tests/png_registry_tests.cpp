@@ -310,6 +310,39 @@ void owned_pixel_surface_contract() {
             "failed bounded BGRA patch was not atomic");
 }
 
+void bounded_patch_stride_and_revision_contract() {
+    ImageRegistry registry;
+    const std::array<std::byte, 24> original{};
+    const ImageLoadResult loaded = registry.load_bgra32_premultiplied(2, 3, 8, original);
+    require(static_cast<bool>(loaded), "stride fixture load failed");
+    const std::uint64_t initial_revision = registry.snapshot().revision;
+    const std::uint64_t initial_stamp = (*registry.find(loaded.image)).content_hash;
+    const std::array<std::byte, 4> short_patch{};
+    require(registry.patch_bgra32_premultiplied(
+                loaded.image, 0, 0, 1, 3, std::uint64_t{1} << 63U, short_patch).error ==
+                ImageResourceError::dimension_limit_exceeded,
+            "overflowing patch stride was accepted");
+    require(registry.snapshot().revision == initial_revision &&
+                (*registry.find(loaded.image)).content_hash == initial_stamp,
+            "rejected stride changed registry state");
+
+    // Two rows with padding between them, but no padding after the final row.
+    std::array<std::byte, 12> padded_patch{};
+    padded_patch[0] = std::byte{9};
+    padded_patch[8] = std::byte{17};
+    const ImageLoadResult patched = registry.patch_bgra32_premultiplied(
+        loaded.image, 1, 1, 1, 2, 8, padded_patch);
+    require(static_cast<bool>(patched), "patch required nonexistent final-row padding");
+    const ImageResourceView view = *registry.find(patched.image);
+    require(view.content_hash != initial_stamp && !registry.find(loaded.image),
+            "patch failed to invalidate the renderer cache identity");
+    for (std::size_t index = 0; index < view.encoded.size(); ++index) {
+        const std::byte expected = index == 12U ? std::byte{9} :
+                                  index == 20U ? std::byte{17} : std::byte{0};
+        require(view.encoded[index] == expected, "patch changed pixels outside its rectangle");
+    }
+}
+
 void window_thread_boundary() {
     std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("resource.root"));
     Window window(root, {32.0, 32.0});
@@ -372,6 +405,7 @@ int main() {
     ownership_and_quota_contract();
     deterministic_mutation_oracle();
     owned_pixel_surface_contract();
+    bounded_patch_stride_and_revision_contract();
     window_thread_boundary();
     scoped_window_replacement_damage();
     return 0;

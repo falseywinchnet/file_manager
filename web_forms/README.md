@@ -124,6 +124,10 @@ Web.Forms does not copy or execute it at runtime.
 
 ## Dogfood commands
 
+For the Windows PowerShell toolchain, installed Chromium-family browser
+discovery, and measured validation scope, see
+[`experiments/WINDOWS_VALIDATION_001.md`](experiments/WINDOWS_VALIDATION_001.md).
+
 ```sh
 python3 web_forms/tools/webforms.py check \
   web_forms/boards/widgets/breadcrumb/breadcrumb.wf.html --quiet

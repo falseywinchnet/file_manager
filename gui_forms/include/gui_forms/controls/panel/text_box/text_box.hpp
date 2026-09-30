@@ -46,6 +46,23 @@ public:
     void set_placeholder_text(std::string text);
     [[nodiscard]] bool read_only() const noexcept { return read_only_; }
     void set_read_only(bool read_only);
+    // Opt-in plain-text document editing. Existing single-line behavior remains
+    // the default. Stored line endings are preserved; Enter inserts LF.
+    [[nodiscard]] bool multiline() const noexcept { return multiline_; }
+    void set_multiline(bool enabled);
+    [[nodiscard]] bool word_wrap() const noexcept { return word_wrap_; }
+    void set_word_wrap(bool enabled);
+    [[nodiscard]] std::string_view newline_sequence() const noexcept { return newline_; }
+    void set_newline_sequence(std::string sequence);
+    [[nodiscard]] bool accepts_tab() const noexcept { return accepts_tab_; }
+    void set_accepts_tab(bool enabled);
+    // Multiline documents are bounded independently of TextStore's capacity.
+    static constexpr std::size_t maximum_multiline_bytes = 1024U * 1024U;
+    static constexpr std::size_t maximum_multiline_line_bytes = 4096U;
+    [[nodiscard]] std::size_t visual_line_count();
+    [[nodiscard]] Point scroll_offset() const noexcept {
+        return {horizontal_offset_, vertical_offset_};
+    }
     [[nodiscard]] std::size_t maximum_length() const noexcept {
         return maximum_length_;
     }
@@ -105,6 +122,23 @@ protected:
     void on_detached_from_window() noexcept override;
 
 private:
+    struct VisualRun final {
+        std::size_t start{}, end{};
+        double x{};
+    };
+    struct VisualLine final {
+        std::vector<std::size_t> offsets;
+        std::vector<double> positions;
+        std::vector<VisualRun> runs;
+    };
+    void ensure_multiline_layout();
+    void paint_multiline(Painter& painter);
+    void reveal_multiline_caret();
+    [[nodiscard]] std::size_t caret_line() const;
+    [[nodiscard]] Utf8Offset multiline_position_at(double x, double y);
+    [[nodiscard]] Utf8Offset position_in_line(std::size_t line, double x) const;
+    [[nodiscard]] double multiline_boundary_x(std::size_t line, Utf8Offset offset) const;
+
     [[nodiscard]] BindingValue text_property_value() const;
 
     struct Snapshot final {
@@ -135,6 +169,21 @@ private:
     std::vector<std::uint64_t> layout_offsets_;
     double layout_text_scale_{};
     double horizontal_offset_{};
+    bool multiline_{};
+    bool word_wrap_{};
+    bool accepts_tab_{};
+    std::string newline_{"\n"};
+    bool reveal_pending_{true};
+    double vertical_offset_{};
+    double preferred_x_{-1.0};
+    double line_height_{14.4};
+    double line_ascent_{12.0};
+    double document_width_{};
+    std::vector<VisualLine> visual_lines_;
+    std::uint64_t multiline_revision_{};
+    FontSpec multiline_font_{};
+    double multiline_width_{-1.0};
+    const TextMetricsProvider* multiline_provider_{};
     std::size_t maximum_length_{};
     bool read_only_{};
     char32_t password_character_{};

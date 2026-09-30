@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/event.hpp"
+#include "gui_forms/host/image/host_image.hpp"
 #include "gui_forms/events.hpp"
 #include "gui_forms/host/types/host_capabilities/host_capabilities.hpp"
 #include "gui_forms/host/types/host_lifecycle_phase/host_lifecycle_phase.hpp"
@@ -128,6 +129,22 @@ struct HostClipboardTextResult final {
     std::string text_utf8;
     std::uint64_t generation{};
     bool has_text{};
+};
+
+struct HostClipboardImageResult final {
+    HostServiceStatus status;
+    HostImage image;
+    std::uint64_t generation{};
+    bool has_image{};
+};
+
+// File-manager copies carry local file references as well as optional icon
+// bitmaps. Consumers choose their own codecs and must prefer these references
+// when their command imports the file's contents.
+struct HostClipboardFilesResult final {
+    HostServiceStatus status;
+    std::vector<std::string> paths_utf8;
+    std::uint64_t generation{};
 };
 
 enum class HostDialogOutcome : std::uint8_t {
@@ -299,6 +316,10 @@ struct HostDisplayEvent final {
 struct HostCloseRequest final {
     HostCloseReason reason{HostCloseReason::user};
     bool cancel{};
+    // Adapter policy: an accepted request hides a reusable window while its
+    // session remains attached. Observers can cancel; changing this policy
+    // during notification does not change the adapter's action.
+    bool hide_on_accept{};
 };
 
 struct HostClosedEvent final {

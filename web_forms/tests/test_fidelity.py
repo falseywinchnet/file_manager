@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import copy
+import os
 from pathlib import Path
+import tempfile
 import unittest
+from unittest.mock import patch
 
 
 WEB_FORMS_ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +16,7 @@ from web_forms_compiler.diagnostics import WebFormsError
 from web_forms_compiler.fidelity import (
     FidelityTolerance,
     SNAPSHOT_SCHEMA,
+    _chrome_path,
     capture_browser_snapshot,
     compare_fidelity_snapshots,
     normalize_native_snapshot,
@@ -21,12 +25,38 @@ from web_forms_compiler.fidelity import (
 
 
 class FidelityTest(unittest.TestCase):
+    def test_explicit_browser_path_with_spaces_is_preserved(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="browser path ") as temporary:
+            executable = Path(temporary) / "browser.exe"
+            executable.touch()
+            self.assertEqual(executable, _chrome_path(executable))
+
+    def test_invalid_explicit_browser_does_not_silently_select_another(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(WebFormsError) as captured:
+                _chrome_path(Path(temporary) / "missing.exe")
+            self.assertEqual("WFV004", captured.exception.diagnostics[0].code)
+
+    @unittest.skipUnless(os.name == "nt", "Windows installation discovery")
+    def test_windows_brave_installation_discovery_without_path(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="browser root ") as temporary:
+            executable = Path(temporary) / "BraveSoftware/Brave-Browser/Application/brave.exe"
+            executable.parent.mkdir(parents=True)
+            executable.touch()
+            with patch.dict(os.environ, {"PROGRAMFILES": temporary,
+                                         "PROGRAMFILES(X86)": "", "LOCALAPPDATA": ""}):
+                with patch("web_forms_compiler.fidelity.shutil.which", return_value=None):
+                    self.assertEqual(executable, _chrome_path())
+
     def test_real_chromium_capture_has_exact_viewport_loaded_fonts_and_stable_ids(self) -> None:
         source = WEB_FORMS_ROOT / "boards/controls/button/button.wf.html"
         snapshot = capture_browser_snapshot(source, viewport=(800, 600))
         self.assertEqual(SNAPSHOT_SCHEMA, snapshot["schema"])
         self.assertEqual([800, 600], snapshot["environment"]["viewport"])
         self.assertEqual("loaded", snapshot["environment"]["font_status"])
+        self.assertTrue(snapshot["environment"]["browser"])
+        self.assertTrue(Path(snapshot["environment"]["browser_executable"]).is_file())
+        self.assertIn("protocolVersion", snapshot["environment"]["browser_version"])
         self.assertEqual("button-study", snapshot["root_id"])
         self.assertEqual(7, len(snapshot["nodes"]))
         primary = next(

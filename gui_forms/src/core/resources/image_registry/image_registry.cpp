@@ -626,11 +626,11 @@ ImageLoadResult ImageRegistry::patch_bgra32_premultiplied(
         source_row_bytes > std::numeric_limits<std::size_t>::max()) {
         return ImageLoadResult::failure(ImageResourceError::dimension_limit_exceeded);
     }
-    const std::uint64_t required =
-        static_cast<std::uint64_t>(height - 1U) * source_row_bytes +
-        patch_row_bytes;
-    if (required > std::numeric_limits<std::size_t>::max() ||
-        pixels.size() < static_cast<std::size_t>(required)) {
+    // Check the available span before multiplying an untrusted stride. The
+    // last row needs only its pixels; trailing padding is deliberately optional.
+    if (patch_row_bytes > pixels.size() ||
+        static_cast<std::uint64_t>(height - 1U) >
+            (pixels.size() - patch_row_bytes) / source_row_bytes) {
         return ImageLoadResult::failure(ImageResourceError::dimension_limit_exceeded);
     }
 
@@ -647,9 +647,11 @@ ImageLoadResult ImageRegistry::patch_bgra32_premultiplied(
                             static_cast<std::size_t>(slot.row_bytes));
     }
     slot.generation = next_generation(slot.generation);
-    slot.content_hash = hash_bytes(slot.encoded) ^
-        ((static_cast<std::uint64_t>(slot.metadata.width) << 32U) |
-         slot.metadata.height);
+    // This is an opaque cache revision, as in the full-surface update path.
+    // A bounded patch must not scan the rest of a potentially large canvas.
+    slot.content_hash = slot.content_hash ==
+            std::numeric_limits<std::uint64_t>::max()
+        ? 1U : slot.content_hash + 1U;
     ++revision_;
     return ImageLoadResult::success(make_image_id(slot_index, slot.generation));
 }

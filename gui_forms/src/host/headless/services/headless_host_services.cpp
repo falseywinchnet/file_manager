@@ -1,4 +1,5 @@
 #include "headless_host_services.hpp"
+#include "../../../core/host/image/clipboard_image_wire.hpp"
 
 #include <sstream>
 
@@ -42,6 +43,8 @@ HostClipboardTextResult HeadlessHostServices::read_clipboard_text_impl() {
 HostServiceStatus HeadlessHostServices::write_clipboard_text_impl(
     std::string_view text_utf8) {
     clipboard_text_.assign(text_utf8);
+    clipboard_image_ = {};
+    clipboard_has_image_ = false;
     clipboard_has_text_ = true;
     ++clipboard_generation_;
     return {};
@@ -53,6 +56,20 @@ void HeadlessHostServices::queue_dialog_result(HostDialogResult result) {
 
 void HeadlessHostServices::set_dialog_handler(DialogHandler handler) {
     dialog_handler_ = std::move(handler);
+}
+
+HostClipboardImageResult HeadlessHostServices::read_clipboard_image_impl() {
+    return {{}, clipboard_image_, clipboard_generation_, clipboard_has_image_};
+}
+
+HostServiceStatus HeadlessHostServices::write_clipboard_image_impl(HostImageView image) {
+    HostImage owned = gui_forms::detail::copy_host_image(image);
+    clipboard_image_ = std::move(owned);
+    clipboard_text_.clear();
+    clipboard_has_text_ = false;
+    clipboard_has_image_ = true;
+    ++clipboard_generation_;
+    return {};
 }
 
 HostDialogResult HeadlessHostServices::show_dialog_impl(
@@ -100,6 +117,8 @@ HostServiceStatus HeadlessHostServices::play_sound_cue_impl(
 void HeadlessHostServices::shutdown_impl() noexcept {
     clipboard_text_.clear();
     clipboard_has_text_ = false;
+    clipboard_image_ = {};
+    clipboard_has_image_ = false;
     dialog_results_.clear();
     sound_trace_.clear();
 }

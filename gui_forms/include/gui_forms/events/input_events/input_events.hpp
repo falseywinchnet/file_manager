@@ -116,9 +116,20 @@ struct PhysicalKey final {
     static constexpr std::uint32_t backspace = 0x2AU;
     static constexpr std::uint32_t tab = 0x2BU;
     static constexpr std::uint32_t space = 0x2CU;
+    static constexpr std::uint32_t minus = 0x2DU;
+    static constexpr std::uint32_t equal = 0x2EU;
     static constexpr std::uint32_t f1 = 0x3AU;
     static constexpr std::uint32_t f2 = 0x3BU;
+    static constexpr std::uint32_t f3 = 0x3CU;
     static constexpr std::uint32_t f4 = 0x3DU;
+    static constexpr std::uint32_t f5 = 0x3EU;
+    static constexpr std::uint32_t f6 = 0x3FU;
+    static constexpr std::uint32_t f7 = 0x40U;
+    static constexpr std::uint32_t f8 = 0x41U;
+    static constexpr std::uint32_t f9 = 0x42U;
+    static constexpr std::uint32_t f10 = 0x43U;
+    static constexpr std::uint32_t f11 = 0x44U;
+    static constexpr std::uint32_t f12 = 0x45U;
     static constexpr std::uint32_t home = 0x4AU;
     static constexpr std::uint32_t page_up = 0x4BU;
     static constexpr std::uint32_t end = 0x4DU;
@@ -128,6 +139,8 @@ struct PhysicalKey final {
     static constexpr std::uint32_t left = 0x50U;
     static constexpr std::uint32_t down = 0x51U;
     static constexpr std::uint32_t up = 0x52U;
+    static constexpr std::uint32_t keypad_minus = 0x56U;
+    static constexpr std::uint32_t keypad_plus = 0x57U;
 };
 
 struct TextInputEvent {

@@ -48,6 +48,47 @@ import, and export profiles without linking the File Manager executable.
 Ordinary picker browsing does not require Engine; acceptance revalidates both
 the filesystem observation and the Orchestrator selection-session state.
 
+Native Windows development build (Shadow, 2026-09-29):
+
+```powershell
+./tools/Build-Windows.ps1 -Component Toolkit -Jobs 2 -Test
+./tools/Build-Windows.ps1 -Component Frontend -Jobs 2 -Test
+```
+
+Run `frontend/.build/shadow-windows/File Manager.exe` from the resulting
+build directory. CMake stages the GUI.Forms DLL, its MinGW runtime dependency
+closure, fonts, and dependency notices beside the executable. This is a
+local development layout, not an installer or a release-ready distribution.
+The current ergonomic changes and native verification record are in
+[`planning/DAILY_BROWSING_2026-09-29.md`](planning/DAILY_BROWSING_2026-09-29.md).
+The measured Windows performance repair is staged separately at
+`frontend/.build/shadow-windows-latency/File Manager.exe` so an already-running
+older build can remain open. See
+[`results/2026-09-29-shadow-windows/LATENCY.md`](results/2026-09-29-shadow-windows/LATENCY.md)
+for the same-application before/after results and remaining performance limits.
+The Windows manifest is
+`gui-forms-shadow-windows-x64-2026-09-29`; the original macOS snapshot remains
+separate. The application version remains `0.001-alpha`, while the independently
+consumed Document Picker CMake package retains its existing 1.0 contract version.
+
+The Windows adapter uses the profile directory for Home and exposes actual
+fixed-drive roots. Paths cross the UI boundary as UTF-8 and the OS boundary as
+UTF-16. File identity retains the Windows volume identifier and all 128 file-ID
+bits; reparse routes are refused by bounded reads and navigation. Default Open
+uses the Windows association API. Terminal Here opens Command Prompt with
+AutoRun disabled and the selected directory supplied as the process working
+directory, without inserting a path into shell command text. Open/terminal
+launch-plan tests do not establish native handler or terminal workflow acceptance.
+
+Windows Orchestrator IPC is still unavailable and remains visibly degraded;
+browsing does not substitute a successful bootstrap. Read-only remains the
+default and the existing protected mutation profile remains explicit opt-in.
+The authored Web.Forms controls and retained GUI.Forms composition are preserved;
+Windows currently uses its standard native outer frame. Native visual and
+accessibility parity, removable-drive handling, and daily mutation promotion
+remain outstanding. Detailed evidence and exclusions are in
+[`results/2026-09-29-shadow-windows/README.md`](results/2026-09-29-shadow-windows/README.md).
+
 Build on the M4 after installing the named GUI.Forms package:
 
 ```sh

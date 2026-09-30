@@ -37,7 +37,7 @@ bool DispatchOperation::cancel() noexcept {
     const bool cancelled = (*work_).state.compare_exchange_strong(
         expected, DispatchOperationState::cancelled,
         std::memory_order_acq_rel, std::memory_order_acquire);
-    if (cancelled) (*work_).completion.notify_all();
+    if (cancelled) (*work_).state.notify_all();
     return cancelled;
 }
 
@@ -52,12 +52,13 @@ void DispatchOperation::wait_and_rethrow() const {
         throw std::logic_error(
             "GUI.Forms cannot wait for an invalid dispatch operation");
     }
-    {
-        std::unique_lock lock((*work_).completion_mutex);
-        while (!dispatch_terminal(
-            (*work_).state.load(std::memory_order_acquire))) {
-            (*work_).completion.wait(lock);
-        }
+    DispatchOperationState observed = (*work_).state.load(std::memory_order_acquire);
+    while (!dispatch_terminal(observed)) {
+        // Wait on the state itself: completion can occur between the check
+        // and sleeping. An unrelated condition variable could lose that wake
+        // because publishers did not hold the waiter's completion mutex.
+        (*work_).state.wait(observed, std::memory_order_acquire);
+        observed = (*work_).state.load(std::memory_order_acquire);
     }
     const DispatchOperationState final_state = state();
     if (final_state == DispatchOperationState::completed) return;

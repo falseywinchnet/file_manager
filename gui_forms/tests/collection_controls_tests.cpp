@@ -45,8 +45,9 @@ public:
         lines.emplace_back(from, to);
         paint_order.push_back('L');
     }
-    void draw_text_utf8(Point origin, std::string_view text, FontSpec, Color) override {
+    void draw_text_utf8(Point origin, std::string_view text, FontSpec font, Color) override {
         texts.emplace_back(text);
+        fonts.push_back(font);
         text_origins.push_back(origin);
         paint_order.push_back('T');
     }
@@ -62,6 +63,7 @@ public:
     std::vector<Rect> fills;
     std::vector<Rect> strokes;
     std::vector<std::string> texts;
+    std::vector<FontSpec> fonts;
     std::vector<Point> text_origins;
     std::vector<std::pair<Point, Point>> lines;
     std::vector<char> paint_order;
@@ -250,6 +252,43 @@ void test_breadcrumb_identity_overflow_edit_and_input() {
     }
     require(duplicate_rejected,
             "BreadcrumbTrail must reject duplicate caller identities");
+}
+
+void test_breadcrumb_readable_raised_geometry() {
+    const std::shared_ptr<BreadcrumbTrail> trail = make_control<BreadcrumbTrail>(StableId("raised.trail"));
+    (*trail).set_requested_bounds({0, 0, 500, 32});
+    (*trail).set_segments({{"root", "Home", {}}, {"leaf", "Documents", {}}});
+    Window window(trail, {500, 32});
+    window.perform_layout();
+    const double original_width = (*trail).semantic_virtual_children().front().bounds.width;
+    (*trail).editor()->set_text("draft path");
+    (*trail).set_font({FontRole::content, 13, 400, false});
+    (*trail).set_appearance(BreadcrumbAppearance::raised);
+    window.perform_layout();
+    const std::vector<SemanticNode> nodes = (*trail).semantic_virtual_children();
+    require(nodes.front().bounds.width > original_width &&
+            (*trail).editor()->font().size == 13 && (*trail).editor()->text() == "draft path",
+            "larger breadcrumb type must expand hit geometry and preserve the inline editor draft");
+    std::string activated;
+    SubscriptionToken token = (*trail).segment_activated().subscribe(test_support::RecordValue<std::string>(activated));
+    const Rect first = nodes.front().bounds;
+    const Point nose{first.x + first.width - 2.0, first.y + first.height * 0.5};
+    static_cast<void>(window.dispatch_pointer({PointerAction::down, PointerButton::primary, nose}));
+    static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, nose}));
+    require(activated == "root", "a chevron's pointed nose must activate its own segment, not the next one");
+    const Point next_face{first.x + first.width - 2.0, first.y + 2.0};
+    static_cast<void>(window.dispatch_pointer({PointerAction::down, PointerButton::primary, next_face}));
+    static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, next_face}));
+    require(activated == "leaf", "the area above a chevron tip must belong to the following visible face");
+    ImageRecordingPainter painter;
+    window.paint(painter, {0, 0, 500, 32});
+    require(!painter.fonts.empty() && painter.fonts.back().size == 13 &&
+            std::count(painter.paint_order.begin(), painter.paint_order.end(), 'G') > 3,
+            "raised segments must render authored type and depth rather than flat separator text");
+    bool rejected{};
+    try { (*trail).set_font({FontRole::content, -1, 400, false}); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    require(rejected && (*trail).font().size == 13, "invalid breadcrumb font must leave the last valid metrics intact");
 }
 
 void test_tree_visibility_identity_and_navigation() {
@@ -907,6 +946,7 @@ void test_correspondence_background_pointer_contract() {
 int main() {
     try {
         test_breadcrumb_identity_overflow_edit_and_input();
+        test_breadcrumb_readable_raised_geometry();
         test_tree_visibility_identity_and_navigation();
         test_tree_model_validation();
         test_tree_and_object_view_consume_keyed_image_list();

@@ -43,7 +43,7 @@ body {
   padding: 0;
   color: var(--ink);
   font-family: "Carlito", sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.2;
   background-color: var(--chrome);
 }
@@ -51,7 +51,7 @@ body {
 button {
   color: var(--ink);
   font-family: "Carlito", sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.1;
   background-color: var(--chrome);
   border: 1px solid #8fa4be;
@@ -135,21 +135,21 @@ button {
 .title-copy small {
   overflow: hidden;
   color: #e1edff;
-  font-size: 10px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
 .service-state {
   padding: 0 6px;
   color: #f5f9ff;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
 }
 
 .menu-bar {
-  height: 24px;
-  min-height: 24px;
+  height: 28px;
+  min-height: 28px;
   padding: 0 6px;
   display: flex;
   align-items: stretch;
@@ -161,7 +161,7 @@ button {
 
 .menu-command {
   min-width: 44px;
-  height: 23px;
+  height: 27px;
   padding: 0 9px;
   background-color: transparent;
   border: 1px solid transparent;
@@ -177,8 +177,8 @@ button {
 }
 
 .command-shelf {
-  height: 66px;
-  min-height: 66px;
+  height: 72px;
+  min-height: 72px;
   padding: 3px 8px 0;
   display: flex;
   align-items: stretch;
@@ -192,7 +192,7 @@ button {
 }
 
 .command-group {
-  height: 60px;
+  height: 66px;
   min-width: 176px;
   padding: 2px 5px 0;
   display: flex;
@@ -205,7 +205,7 @@ button {
 .command-group.arrange-group { min-width: 306px; }
 
 .command-actions {
-  height: 44px;
+  height: 48px;
   display: flex;
   align-items: stretch;
   gap: 3px;
@@ -213,10 +213,10 @@ button {
 }
 
 .command-group-label {
-  height: 13px;
+  height: 16px;
   padding-top: 1px;
   color: #536681;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.45px;
   text-align: center;
@@ -224,7 +224,7 @@ button {
 
 .shelf-command {
   position: relative;
-  height: 43px;
+  height: 47px;
   min-width: 72px;
   padding: 3px 7px 2px;
   display: flex;
@@ -232,7 +232,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 1px;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1;
   background-color: transparent;
   border: 1px solid transparent;
@@ -269,8 +269,8 @@ button {
 .properties-icon { color: #2c6c94; }
 
 .location-row {
-  height: 40px;
-  min-height: 40px;
+  height: 42px;
+  min-height: 42px;
   padding: 5px 7px;
   display: flex;
   align-items: stretch;
@@ -293,7 +293,7 @@ button {
 
 .nav-command {
   width: 30px;
-  height: 28px;
+  height: 30px;
   padding: 0;
   color: #234e73;
   font-size: 17px;
@@ -310,7 +310,7 @@ button {
 .path-host,
 .search-host {
   min-width: 0;
-  height: 28px;
+  height: 30px;
   display: flex;
   align-items: stretch;
   background-color: var(--paper);
@@ -387,7 +387,7 @@ button {
   width: 100%;
   padding: 7px 14px 0 7px;
   color: #263c5e;
-  font-size: 9px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -399,7 +399,7 @@ button {
   display: flex;
   align-items: center;
   color: #263c5e;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.35px;
   background-color: #d6dfeb;
@@ -411,7 +411,7 @@ button {
 .pane-caption span {
   flex: 1;
   color: #667892;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 400;
   letter-spacing: 0;
   text-align: right;
@@ -456,9 +456,9 @@ button {
 }
 
 .heading-copy { min-width: 0; flex: 1; display: flex; align-items: center; gap: 8px; }
-.eyebrow { margin: 0; color: #536783; font-size: 8px; font-weight: 700; letter-spacing: 0.4px; }
-.heading-copy h1 { margin: 0; font-size: 11px; font-weight: 700; }
-.object-count { color: var(--muted); font-size: 10px; }
+.eyebrow { margin: 0; color: #536783; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; }
+.heading-copy h1 { margin: 0; font-size: 13px; font-weight: 700; }
+.object-count { color: var(--muted); font-size: 12px; }
 .more-results { height: 22px; margin-left: 8px; }
 
 .object-host {
@@ -482,7 +482,7 @@ button {
 .preview-name {
   height: 21px;
   overflow: hidden;
-  font-size: 12px;
+  font-size: 13px;
   white-space: nowrap;
 }
 
@@ -507,7 +507,7 @@ button {
 .preview-kind {
   min-height: 18px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .property-caption {
@@ -516,7 +516,7 @@ button {
   margin: 5px 0 0;
   padding: 7px 8px 0;
   color: #304b70;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.45px;
   background-color: #e4ebf2;
@@ -543,7 +543,7 @@ button {
   border-bottom: 1px solid #c5d0de;
 }
 
-.fact-line b { color: #526783; font-size: 10px; font-weight: 400; }
+.fact-line b { color: #526783; font-size: 12px; font-weight: 400; }
 .fact-line span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .settings-workspace {
@@ -567,7 +567,7 @@ button {
 
 .settings-heading-copy { min-width: 0; flex: 1; }
 .settings-heading h1 { margin: 3px 0 0; font-size: 18px; }
-.settings-revision { color: var(--muted); font-size: 10px; }
+.settings-revision { color: var(--muted); font-size: 12px; }
 
 .settings-body {
   min-height: 0;
@@ -639,8 +639,8 @@ button {
 .settings-action.selected { color: #ffffff; background-color: var(--accent); border-color: #274d83; }
 
 .status-bar {
-  height: 24px;
-  min-height: 24px;
+  height: 26px;
+  min-height: 26px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   color: #f1f5f6;

@@ -27,6 +27,13 @@ struct DocumentTypeFilter final {
     std::vector<std::string> extensions;
 };
 
+// The local-host projection selects paths only, never grants file I/O or plugin authority.
+enum class DocumentPickerAuthority : std::uint8_t {
+    unavailable,
+    orchestrator_session,
+    trusted_local_host,
+};
+
 struct DocumentPickerRequest final {
     DocumentPickerProfile profile{DocumentPickerProfile::open_file};
     std::filesystem::path protected_root;
@@ -36,11 +43,16 @@ struct DocumentPickerRequest final {
     bool show_hidden{};
     bool allow_create_folder{};
     bool allow_native_fallback{};
-    bool orchestrator_session_valid{true};
+    bool orchestrator_session_valid{};
     std::vector<DocumentTypeFilter> filters;
     std::string active_filter_id;
     std::string suggested_name;
     std::string default_extension;
+    // Additional roots from the same host policy/session; never inferred by the view.
+    std::vector<std::filesystem::path> admitted_roots;
+    std::filesystem::path home_location;
+    bool allow_hidden_toggle{true};
+    DocumentPickerAuthority authority{DocumentPickerAuthority::unavailable};
 };
 
 struct DocumentSelectionObservation final {
@@ -84,7 +96,10 @@ public:
     [[nodiscard]] const std::string& active_filter_id() const noexcept;
     [[nodiscard]] const std::string& last_error() const noexcept;
     [[nodiscard]] bool show_hidden() const noexcept;
+    [[nodiscard]] bool session_valid() const noexcept;
 
+    [[nodiscard]] bool set_name_filter(std::string pattern);
+    [[nodiscard]] const std::string& name_filter() const noexcept;
     [[nodiscard]] bool navigate(const std::filesystem::path& location);
     [[nodiscard]] bool refresh();
     [[nodiscard]] bool set_selection(std::vector<std::string> stable_ids);
@@ -92,6 +107,7 @@ public:
     [[nodiscard]] bool set_active_filter(std::string filter_id);
     [[nodiscard]] bool set_show_hidden(bool show_hidden);
     void set_orchestrator_session_valid(bool valid) noexcept;
+    void set_authority_valid(bool valid) noexcept;
 
     [[nodiscard]] DocumentPickerResult accept(
         bool overwrite_confirmed = false) const;
@@ -110,11 +126,14 @@ private:
     DirectorySnapshot browser_;
     std::vector<std::string> selected_ids_;
     std::string filename_;
+    std::string name_filter_;
     std::string active_filter_id_;
     std::string last_error_;
     bool show_hidden_{};
     bool orchestrator_session_valid_{};
     std::uint64_t generation_{};
+    ObjectIdentity location_identity_;
+    mutable std::optional<DocumentSelectionObservation> pending_overwrite_;
 };
 
 } // namespace file_manager

@@ -34,6 +34,8 @@ func main() {
 func run(args []string, input io.Reader, output io.Writer) error {
 	if len(args) != 0 {
 		switch args[0] {
+		case "create-windows-manifest", "serve-windows":
+			return windowsCommand(args[0], args[1:], output)
 		case "serve-launchd":
 			return runLaunchd(args[1:])
 		case "create-macos-manifest":

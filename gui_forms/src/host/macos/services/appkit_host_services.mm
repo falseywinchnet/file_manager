@@ -4,6 +4,7 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #include "macos_host.hpp"
+#include "appkit_clipboard_image.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
 #include "../../../render/skia/raster/skia_raster.hpp"
 
@@ -96,6 +97,22 @@ NSCursor* native_cursor(CursorKind cursor) {
     case CursorKind::resize_vertical: return [NSCursor resizeUpDownCursor];
     case CursorKind::wait: return [NSCursor arrowCursor];
     case CursorKind::forbidden: return [NSCursor operationNotAllowedCursor];
+    case CursorKind::resize_diagonal_down:
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 150000
+        if (@available(macOS 15.0, *)) {
+            return [NSCursor frameResizeCursorFromPosition:NSCursorFrameResizePositionTopLeft
+                                             inDirections:NSCursorFrameResizeDirectionsAll];
+        }
+#endif
+        return [NSCursor crosshairCursor];
+    case CursorKind::resize_diagonal_up:
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 150000
+        if (@available(macOS 15.0, *)) {
+            return [NSCursor frameResizeCursorFromPosition:NSCursorFrameResizePositionTopRight
+                                             inDirections:NSCursorFrameResizeDirectionsAll];
+        }
+#endif
+        return [NSCursor crosshairCursor];
     }
     return [NSCursor arrowCursor];
 }
@@ -242,6 +259,42 @@ protected:
         return {};
     }
 
+    HostServiceStatus set_custom_cursor_impl(const gui_forms::CursorImagesPtr& images,
+                                              const gui_forms::CursorImage& selected) override {
+        for (const CursorEntry& entry : cursors_) {
+            if (entry.images == images && entry.scale == selected.scale) {
+                [entry.native set];
+                return {};
+            }
+        }
+        const gui_forms::CursorImage& first = (*images).images().front();
+        const NSSize size = NSMakeSize(first.width / first.scale, first.height / first.scale);
+        NSImage* image = [[NSImage alloc] initWithSize:size];
+        for (const gui_forms::CursorImage& pixels : (*images).images()) {
+            NSBitmapImageRep* rep = [[NSBitmapImageRep alloc]
+                initWithBitmapDataPlanes:nullptr pixelsWide:pixels.width pixelsHigh:pixels.height
+                bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO
+                colorSpaceName:NSDeviceRGBColorSpace bitmapFormat:NSBitmapFormatAlphaNonpremultiplied
+                bytesPerRow:pixels.width * 4 bitsPerPixel:32];
+            if (rep == nil || rep.bitmapData == nullptr) return {HostServiceError::backend_failure};
+            unsigned char* bytes = rep.bitmapData;
+            for (std::size_t i = 0; i < pixels.rgba.size(); ++i) {
+                const gui_forms::Color color = pixels.rgba[i];
+                bytes[i * 4] = color.red; bytes[i * 4 + 1] = color.green;
+                bytes[i * 4 + 2] = color.blue; bytes[i * 4 + 3] = color.alpha;
+            }
+            rep.size = size;
+            [image addRepresentation:rep];
+        }
+        NSCursor* cursor = [[NSCursor alloc] initWithImage:image hotSpot:NSMakePoint(
+            (*images).normalized_x() * size.width, (*images).normalized_y() * size.height)];
+        if (cursor == nil) return {HostServiceError::backend_failure};
+        [cursor set];
+        if (cursors_.size() >= 32) cursors_.erase(cursors_.begin());
+        cursors_.push_back({images, selected.scale, cursor});
+        return {};
+    }
+
     HostServiceStatus set_pointer_capture_impl(bool, std::uint64_t) override {
         // AppKit owns mouse-drag delivery from mouseDown through mouseUp. This
         // acknowledgment keeps that native sequence synchronized with the
@@ -286,6 +339,38 @@ protected:
         return [pasteboard_ setString:value forType:NSPasteboardTypeString]
                    ? HostServiceStatus{}
                    : HostServiceStatus{HostServiceError::backend_failure};
+    }
+
+    gui_forms::HostClipboardFilesResult read_clipboard_files_impl() override {
+        gui_forms::HostClipboardFilesResult result;
+        if (pasteboard_ == nil) {
+            result.status.error = HostServiceError::backend_failure;
+            return result;
+        }
+        result.generation = static_cast<std::uint64_t>(pasteboard_.changeCount);
+        NSArray<NSURL*>* urls = [pasteboard_ readObjectsForClasses:@[NSURL.class]
+            options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
+        if (urls.count > maximum_dialog_paths) {
+            result.status.error = HostServiceError::too_large;
+            return result;
+        }
+        for (NSURL* url in urls) {
+            if (url.isFileURL && url.path != nil) {
+                result.paths_utf8.push_back(utf8_string(url.path));
+            }
+        }
+        if (static_cast<std::uint64_t>(pasteboard_.changeCount) != result.generation) {
+            result.status.error = HostServiceError::backend_failure;
+        }
+        return result;
+    }
+
+    gui_forms::HostClipboardImageResult read_clipboard_image_impl() override {
+        return gui_forms::host::detail::read_appkit_clipboard_image(pasteboard_);
+    }
+
+    HostServiceStatus write_clipboard_image_impl(gui_forms::HostImageView image) override {
+        return gui_forms::host::detail::write_appkit_clipboard_image(pasteboard_, image);
     }
 
     HostDialogResult show_dialog_impl(const HostDialogRequest& request) override {
@@ -486,10 +571,20 @@ protected:
     }
 
     void shutdown_impl() noexcept override {
+        for (const CursorEntry& entry : cursors_) {
+            if ([NSCursor currentCursor] == entry.native) [[NSCursor arrowCursor] set];
+        }
+        cursors_.clear();
         pasteboard_ = nil;
     }
 
 private:
+    struct CursorEntry final {
+        gui_forms::CursorImagesPtr images;
+        double scale;
+        __strong NSCursor* native;
+    };
+    std::vector<CursorEntry> cursors_;
     __strong NSPasteboard* pasteboard_{};
     bool cancel_dialogs_for_testing_{};
 };

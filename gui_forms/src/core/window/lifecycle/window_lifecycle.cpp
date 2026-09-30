@@ -19,8 +19,12 @@
 namespace gui_forms {
 
 Window::Window(Control::Ptr root, Size client_size)
+    : Window(std::move(root), client_size, ImageRegistryLimits{}) {}
+
+Window::Window(Control::Ptr root, Size client_size, ImageRegistryLimits image_limits)
     : root_(std::move(root)), client_size_(client_size),
       theme_(default_theme()),
+      image_resources_(image_limits),
       lifetime_(std::make_shared<detail::WindowLifetime>()),
       ui_thread_(std::this_thread::get_id()),
       dispatcher_state_(std::make_shared<detail::DispatcherState>(ui_thread_)) {

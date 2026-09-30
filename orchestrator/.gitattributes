@@ -1,0 +1,6 @@
+# Release provenance embeds these exact bytes; Windows checkouts must match Unix.
+spec/CONTRACT_REGISTRY.md text eol=lf
+spec/contracts/COMMON.md text eol=lf
+spec/contracts/FRONTEND_AND_GUI_FORMS.md text eol=lf
+# Fixture generation and conformance comparisons also use canonical LF bytes.
+conformance/fixtures/**/*.json text eol=lf

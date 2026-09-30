@@ -2,10 +2,12 @@
 #include "gui_forms/container_controls.hpp"
 #include "gui_forms/window.hpp"
 #include "support/named_callbacks.hpp"
+#include "support/typography_painter.hpp"
 
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -475,6 +477,76 @@ void test_menu_mnemonics_strip_markers_and_popup_activation() {
             "UseMnemonic false must leave the ampersand literal and revoke activation");
 }
 
+class MenuFontMetrics final : public TextMetricsProvider {
+public:
+    [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(
+        std::string_view text, FontSpec font) override {
+        ResolvedTextLayout result = estimate_text_layout_utf8(text, font);
+        result.logical_size = {
+            static_cast<double>(text.size()) * (font.size + font.letter_spacing),
+            font.size * 1.5};
+        return result;
+    }
+};
+
+void test_menu_font_controls_geometry_paint_and_hit_testing() {
+    MenuFontMetrics metrics;
+    const std::shared_ptr<MenuStrip> strip = make_control<MenuStrip>(StableId("font.menu"));
+    const std::shared_ptr<Command> command = std::make_shared<Command>("font.open", "Open");
+    (*strip).set_items({
+        {"font.first", "First", {{"first.open", MenuItemKind::command, command}}},
+        {"font.second", "Second", {{"second.open", MenuItemKind::command, command}}},
+    });
+    require((*strip).font() == FontSpec{FontRole::control, 10.5, 400, false, 0.12},
+            "menu font must retain its existing default");
+    Window window(strip, {600.0, 80.0});
+    window.set_text_metrics_provider(&metrics);
+    window.perform_layout();
+    const double old_width = (*strip).semantic_virtual_children().front().bounds.width;
+    const FontSpec chosen{FontRole::content, 20.0, 800, true, 1.0};
+    (*strip).set_font(chosen);
+    (*strip).set_selected_item_id("font.first");
+    window.perform_layout();
+    const std::vector<SemanticNode> nodes = (*strip).semantic_virtual_children();
+    require((*strip).font() == chosen && nodes.front().bounds.width == 127.0 &&
+                nodes.front().bounds.width > old_width &&
+                (*strip).measure({600.0, 100.0}).height == 40.0,
+            "menu measurement and semantic bounds must use the chosen font metrics");
+    test_support::TypographyPainter painter;
+    (*strip).on_paint(painter, {0.0, 0.0, 600.0, 80.0});
+    const test_support::PaintedText* first = painter.find("First");
+    const test_support::PaintedText* second = painter.find("Second");
+    require(first && second && (*first).font == chosen && (*second).font == chosen,
+            "selected and normal menu labels must preserve the chosen heavier weight and typography");
+    require(window.dispatch_pointer({PointerAction::down, PointerButton::primary,
+                                     {old_width + 2.0, 12.0}}) &&
+                (*strip).active_index() == 0U,
+            "font-expanded menu area must hit the same first item painted there");
+    (*strip).close();
+    window.set_text_scale(1.5);
+    window.perform_layout();
+    require((*strip).semantic_virtual_children().front().bounds.width > nodes.front().bounds.width,
+            "menu geometry must also follow the effective text scale");
+    const double invalid[] = {0.0, -1.0, std::numeric_limits<double>::infinity(),
+                              std::numeric_limits<double>::quiet_NaN()};
+    for (const double size : invalid) {
+        FontSpec malformed = chosen;
+        malformed.size = size;
+        bool rejected{};
+        try { (*strip).set_font(malformed); }
+        catch (const std::invalid_argument&) { rejected = true; }
+        require(rejected && (*strip).font() == chosen,
+                "invalid menu font sizes must preserve the previous typography");
+    }
+    FontSpec malformed = chosen;
+    malformed.letter_spacing = std::numeric_limits<double>::quiet_NaN();
+    bool rejected{};
+    try { (*strip).set_font(malformed); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    require(rejected && (*strip).font() == chosen,
+            "invalid menu tracking must be rejected without mutation");
+}
+
 } // namespace
 
 int main() {
@@ -483,6 +555,7 @@ int main() {
         test_context_menu_scroll_and_validation_bounds();
         test_menu_strip_retained_switching_commands_and_semantics();
         test_menu_mnemonics_strip_markers_and_popup_activation();
+        test_menu_font_controls_geometry_paint_and_hit_testing();
         std::cout << "gui_forms_menu_controls_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

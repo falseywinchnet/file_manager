@@ -30,7 +30,7 @@ struct PlatformCommandResult final {
     int exit_status{};
 };
 
-// Produces an argv-only macOS launch plan. No shell command, interpolation,
+// Produces a fixed native launch plan. No shell command, interpolation,
 // environment injection, elevation, or repository command is admitted.
 [[nodiscard]] PlatformCommandResult make_platform_command_plan(
     PlatformCommandKind kind,
@@ -39,7 +39,7 @@ struct PlatformCommandResult final {
     const ObjectIdentity& expected_identity,
     PlatformCommandPlan& plan);
 
-// Revalidates the exact path revision immediately before spawning /usr/bin/open.
+// Revalidates the exact path revision immediately before native launch.
 [[nodiscard]] PlatformCommandResult execute_platform_command(
     const PlatformCommandPlan& plan);
 

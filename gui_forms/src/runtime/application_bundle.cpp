@@ -1,4 +1,4 @@
-#include "gui_forms/platform/macos_host.hpp"
+#include "gui_forms/application.hpp"
 
 namespace gui_forms::host {
 

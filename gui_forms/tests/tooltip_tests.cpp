@@ -253,8 +253,8 @@ void test_maximum_width_is_bounded_and_shapes_overlay() {
         "A deliberately long tooltip sentence that must wrap into multiple lines");
     tips.show(fixture.button, 0ms);
     fixture.window.perform_layout();
-    const SemanticNode* tip = find_role(
-        fixture.window.semantic_snapshot().roots, SemanticRole::tool_tip);
+    const SemanticSnapshot snapshot = fixture.window.semantic_snapshot();
+    const SemanticNode* tip = find_role(snapshot.roots, SemanticRole::tool_tip);
     require(tip && (*tip).bounds.width <= 140.0,
             "ToolTip bubble must honor maximum text width plus chrome");
 }

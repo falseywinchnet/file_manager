@@ -1,3 +1,4 @@
+#include "file_manager/platform_paths.hpp"
 #include "file_manager/document_picker.hpp"
 
 #include <algorithm>
@@ -23,11 +24,6 @@ std::string normalize_extension(std::string extension) {
     return lower(std::move(extension));
 }
 
-bool valid_basename(const std::string_view value) {
-    return !value.empty() && value != "." && value != ".." &&
-        value.size() <= 255U && value.find('/') == std::string_view::npos &&
-        value.find('\0') == std::string_view::npos;
-}
 
 } // namespace
 
@@ -36,7 +32,10 @@ FileSelectionController::FileSelectionController(DocumentPickerRequest request)
       filename_(request_.suggested_name),
       active_filter_id_(request_.active_filter_id),
       show_hidden_(request_.show_hidden),
-      orchestrator_session_valid_(request_.orchestrator_session_valid) {
+      orchestrator_session_valid_(request_.orchestrator_session_valid ||
+          request_.authority == DocumentPickerAuthority::trusted_local_host) {
+    if (request_.authority == DocumentPickerAuthority::unavailable && request_.orchestrator_session_valid)
+        request_.authority = DocumentPickerAuthority::orchestrator_session;
     if (request_.owner_application_id.empty()) {
         throw std::invalid_argument("picker owner application ID is empty");
     }
@@ -51,6 +50,12 @@ FileSelectionController::FileSelectionController(DocumentPickerRequest request)
             supplied_initial.lexically_relative(supplied_root);
     }
     request_.initial_location = std::move(supplied_initial);
+    if (request_.admitted_roots.size() > 32) throw std::invalid_argument("picker root bound is 32");
+    for (auto& root : request_.admitted_roots) root = canonical_existing_directory(root);
+    if (std::find(request_.admitted_roots.begin(), request_.admitted_roots.end(), request_.protected_root) == request_.admitted_roots.end()) {
+        request_.admitted_roots.push_back(request_.protected_root);
+    }
+    if (request_.home_location.empty()) request_.home_location = user_home_directory();
     if (request_.maximum_selection == 0U ||
         request_.maximum_selection > 32U) {
         throw std::invalid_argument("picker selection bound must be 1..32");
@@ -109,6 +114,10 @@ const std::string& FileSelectionController::last_error() const noexcept {
     return last_error_;
 }
 
+bool FileSelectionController::session_valid() const noexcept {
+    return orchestrator_session_valid_;
+}
+
 bool FileSelectionController::show_hidden() const noexcept {
     return show_hidden_;
 }
@@ -126,6 +135,20 @@ bool FileSelectionController::profile_saves() const noexcept {
 bool FileSelectionController::entry_visible(const DirectoryEntry& entry) const {
     if (entry.directory) return true;
     if (request_.profile == DocumentPickerProfile::select_folder) return false;
+    if (!name_filter_.empty()) {
+        // Bounded ASCII-insensitive glob, '*' and '?' only; directories stay navigable.
+        const auto text = lower(entry.name);
+        const auto pattern = lower(name_filter_);
+        std::size_t t = 0, p = 0, star = std::string::npos, retry = 0;
+        while (t < text.size()) {
+            if (p < pattern.size() && (pattern[p] == '?' || pattern[p] == text[t])) { ++p; ++t; }
+            else if (p < pattern.size() && pattern[p] == '*') { star = p++; retry = t; }
+            else if (star != std::string::npos) { p = star + 1; t = ++retry; }
+            else return false;
+        }
+        while (p < pattern.size() && pattern[p] == '*') ++p;
+        if (p != pattern.size()) return false;
+    }
     if (active_filter_id_.empty()) return true;
     const auto filter = std::find_if(
         request_.filters.begin(), request_.filters.end(),
@@ -133,17 +156,23 @@ bool FileSelectionController::entry_visible(const DirectoryEntry& entry) const {
             return candidate.id == active_filter_id_;
         });
     if (filter == request_.filters.end() || filter->extensions.empty()) return true;
-    const auto extension = normalize_extension(entry.path.extension().string());
+    const auto extension = normalize_extension(path_utf8(entry.path.extension()));
     return std::find(filter->extensions.begin(), filter->extensions.end(),
                      extension) != filter->extensions.end();
 }
 
 bool FileSelectionController::navigate(
     const std::filesystem::path& location) {
+    const auto target = resolve_navigation_target(request_.admitted_roots,
+        browser_.location, request_.home_location, location);
+    if (!target) { last_error_ = "Location is outside the admitted roots"; return false; }
     const auto previous = request_.initial_location;
-    request_.initial_location = location;
+    const auto previous_root = request_.protected_root;
+    request_.initial_location = target->path;
+    request_.protected_root = target->root;
     if (!refresh()) {
         request_.initial_location = previous;
+        request_.protected_root = previous_root;
         return false;
     }
     return true;
@@ -167,6 +196,7 @@ bool FileSelectionController::refresh() {
                            return !entry_visible(entry);
                        }),
         snapshot.entries.end());
+    location_identity_ = observe_identity(snapshot.location);
     browser_ = std::move(snapshot);
     selected_ids_.erase(
         std::remove_if(selected_ids_.begin(), selected_ids_.end(),
@@ -202,8 +232,6 @@ bool FileSelectionController::set_selection(
         }
         if (request_.profile == DocumentPickerProfile::select_folder) {
             if (!entry->directory) return false;
-        } else if (!profile_saves() && entry->directory) {
-            return false;
         }
     }
     selected_ids_ = std::move(stable_ids);
@@ -235,7 +263,19 @@ bool FileSelectionController::set_active_filter(std::string filter_id) {
     return false;
 }
 
+const std::string& FileSelectionController::name_filter() const noexcept { return name_filter_; }
+
+bool FileSelectionController::set_name_filter(std::string pattern) {
+    if (pattern.size() > 255) return false;
+    const auto previous = name_filter_;
+    name_filter_ = std::move(pattern);
+    if (refresh()) return true;
+    name_filter_ = previous;
+    return false;
+}
+
 bool FileSelectionController::set_show_hidden(const bool show_hidden) {
+    if (!request_.allow_hidden_toggle && show_hidden != show_hidden_) return false;
     const auto previous = show_hidden_;
     show_hidden_ = show_hidden;
     if (refresh()) return true;
@@ -245,7 +285,14 @@ bool FileSelectionController::set_show_hidden(const bool show_hidden) {
 
 void FileSelectionController::set_orchestrator_session_valid(
     const bool valid) noexcept {
-    orchestrator_session_valid_ = valid;
+    if (request_.authority != DocumentPickerAuthority::trusted_local_host) {
+        request_.authority = DocumentPickerAuthority::orchestrator_session;
+        orchestrator_session_valid_ = valid;
+    }
+}
+
+void FileSelectionController::set_authority_valid(const bool valid) noexcept {
+    orchestrator_session_valid_ = valid && request_.authority != DocumentPickerAuthority::unavailable;
 }
 
 DocumentPickerResult FileSelectionController::selection_error(
@@ -258,37 +305,68 @@ DocumentPickerResult FileSelectionController::accept(
     const bool overwrite_confirmed) const {
     if (!orchestrator_session_valid_) {
         return {DocumentPickerTerminal::unavailable, "session-unavailable",
-                "Orchestrator selection session must be revalidated before acceptance",
+                "Selection authority must be revalidated before acceptance",
                 {}, request_.allow_native_fallback};
     }
     if (!browser_.available()) {
         return {DocumentPickerTerminal::unavailable, "location-unavailable",
                 browser_.error, {}, request_.allow_native_fallback};
     }
+    const auto current_location = observe_identity(browser_.location);
+    if (!current_location.available() || current_location != location_identity_ ||
+        path_route_has_symlink(request_.protected_root, browser_.location)) {
+        return selection_error("location-changed", "Current folder changed; refresh before selecting");
+    }
     if (profile_saves()) {
-        if (!valid_basename(filename_)) {
+        if (!show_hidden_ && !filename_.empty() && filename_.front() == '.') {
+            return selection_error("hidden-destination", "Enable Show hidden to select a hidden destination");
+        }
+        if (!valid_platform_basename(filename_)) {
             return selection_error("invalid-filename",
                                    "save filename must be one valid basename");
         }
         auto name = filename_;
-        const auto extension = normalize_extension(request_.default_extension);
+        auto extension = normalize_extension(request_.default_extension);
+        const auto filter = std::find_if(request_.filters.begin(), request_.filters.end(),
+            [this](const DocumentTypeFilter& value) { return value.id == active_filter_id_; });
+        if (filter != request_.filters.end() && !filter->extensions.empty() &&
+            std::find(filter->extensions.begin(), filter->extensions.end(), extension) == filter->extensions.end()) {
+            extension = filter->extensions.front();
+        }
         if (!extension.empty() &&
-            lower(std::filesystem::path(name).extension().string()) != extension) {
+            lower(path_utf8(path_from_utf8(name).extension())) != extension) {
             name += extension;
         }
-        const auto destination = (browser_.location / name).lexically_normal();
+        if (!valid_platform_basename(name)) {
+            return selection_error("invalid-filename", "Final filename including extension is invalid");
+        }
+        const auto destination = (browser_.location / path_from_utf8(name)).lexically_normal();
         if (!path_is_within(request_.protected_root, destination) ||
             path_route_has_symlink(request_.protected_root, destination)) {
             return selection_error("destination-refused",
                                    "save destination failed protected-root policy");
         }
+        std::error_code destination_error;
+        const auto destination_status = std::filesystem::symlink_status(destination, destination_error);
+        if (destination_error && destination_error != std::errc::no_such_file_or_directory) {
+            return selection_error("destination-unavailable", destination_error.message());
+        }
         const auto identity = observe_identity(destination);
+        if (destination_status.type() != std::filesystem::file_type::not_found && !identity.available()) {
+            return selection_error("destination-unavailable", "Destination identity is unavailable");
+        }
+        if (overwrite_confirmed && (!pending_overwrite_ || pending_overwrite_->path != destination ||
+            !pending_overwrite_->identity.same_revision(identity))) {
+            pending_overwrite_.reset();
+            return selection_error("destination-changed", "Destination changed; request overwrite confirmation again");
+        }
         if (identity.available()) {
             if (identity.type != std::filesystem::file_type::regular) {
                 return selection_error("destination-not-file",
                                        "save destination is not a regular file");
             }
             if (!overwrite_confirmed) {
+                pending_overwrite_ = DocumentSelectionObservation{destination, identity, true};
                 return {DocumentPickerTerminal::overwrite_confirmation_required,
                         "overwrite-confirmation-required",
                         "existing destination requires an explicit overwrite decision",

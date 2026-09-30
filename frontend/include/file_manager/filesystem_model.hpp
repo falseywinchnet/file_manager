@@ -28,7 +28,9 @@ struct ObjectIdentity final {
     std::uint64_t modified_nanoseconds{};
     std::filesystem::file_type type{std::filesystem::file_type::none};
 
-    [[nodiscard]] bool available() const noexcept { return inode != 0; }
+    std::uint64_t inode_high{}; // Upper 64 bits of Windows FILE_ID_128; zero on POSIX.
+
+    [[nodiscard]] bool available() const noexcept { return inode != 0 || inode_high != 0; }
     [[nodiscard]] bool same_revision(const ObjectIdentity& other) const noexcept {
         return *this == other && size == other.size &&
             modified_nanoseconds == other.modified_nanoseconds;
@@ -36,6 +38,7 @@ struct ObjectIdentity final {
     friend bool operator==(const ObjectIdentity& left,
                            const ObjectIdentity& right) noexcept {
         return left.device == right.device && left.inode == right.inode &&
+            left.inode_high == right.inode_high &&
             left.type == right.type;
     }
 };
@@ -97,5 +100,6 @@ rebase_path_from_equivalent_root(
     const CancellationCheck& cancelled = {},
     bool show_hidden = false);
 [[nodiscard]] std::string format_bytes(std::uintmax_t bytes);
+[[nodiscard]] std::string format_modified_time(std::filesystem::file_time_type time);
 
 } // namespace file_manager

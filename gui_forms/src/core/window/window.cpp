@@ -940,10 +940,24 @@ FocusScopeId Window::begin_focus_scope(const Control::Ptr& root,
         if (!(*current).active) {
             continue;
         }
-        if ((*current).options.contain_focus &&
-            !contains_control((*current).root.lock(), root)) {
-            throw std::logic_error(
-                "GUI.Forms nested focus scope must remain inside its containing scope");
+        if ((*current).options.contain_focus) {
+            const Control::Ptr containing_root = (*current).root.lock();
+            bool contained = contains_control(containing_root, root);
+            // Window-owned popup roots are outside the layout tree. They belong
+            // to a containing scope only through their registered live owner.
+            // This permits a ComboBox inside a dialog without allowing unrelated
+            // controls or arbitrary overlays to escape modal focus containment.
+            for (const std::shared_ptr<detail::PopupAttachment>& popup : popups_) {
+                if (contains_control((*popup).popup(), root) &&
+                    contains_control(containing_root, (*popup).owner())) {
+                    contained = true;
+                    break;
+                }
+            }
+            if (!contained) {
+                throw std::logic_error(
+                    "GUI.Forms nested focus scope must remain inside its containing scope");
+            }
         }
         break;
     }
@@ -968,6 +982,7 @@ FocusScopeId Window::begin_focus_scope(const Control::Ptr& root,
     state.root_id = (*root).runtime_id();
     state.options = options;
     focus_scopes_.push_back(state);
+    ++semantic_generation_;
 
     const std::size_t depth = focus_scope_depth();
     metrics_.record_focus_scope_opened(depth);
@@ -1055,6 +1070,7 @@ bool Window::end_focus_scope(FocusScopeId scope,
 
     const std::size_t depth = focus_scope_depth();
     metrics_.record_focus_scope_closed(restored, depth);
+    ++semantic_generation_;
     FocusScopeChange change;
     change.scope = closed_id;
     change.root_id = closed_root_id;
@@ -2090,15 +2106,18 @@ SemanticSnapshot Window::semantic_snapshot() {
         SemanticSnapshot snapshot;
         snapshot.generation = generation;
         const Control::Ptr focused = focused_.lock();
-        std::vector<Control::Ptr> roots{root_};
+        const Control::Ptr scoped = focus_allowed_by_active_scope(root_) ? Control::Ptr{} : active_focus_scope_root();
+        std::vector<Control::Ptr> roots{scoped ? scoped : root_};
         roots.reserve(1U + popups_.size());
-        for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) roots.push_back((*popup).popup());
+        for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+            if (!scoped || contains_control(scoped, (*popup).owner())) { roots.push_back((*popup).popup()); }
+        }
         for (const Control::Ptr& root : roots) {
             if (!root || !(*root).is_alive() || (*root).window_ != this ||
-                (*root).parent()) {
+                (root != scoped && (*root).parent())) {
                 continue;
             }
-            append_semantic_nodes(root, nullptr, this, focused, snapshot.roots,
+            append_semantic_nodes(root, root == scoped ? (*root).parent().get() : nullptr, this, focused, snapshot.roots,
                                   snapshot.node_count);
         }
         if (generation == semantic_generation_) {
@@ -2120,13 +2139,16 @@ bool Window::perform_semantic_action(std::string_view stable_id,
             std::string(stable_id), action, std::string(value)}});
     }
     const Control::Ptr control = find(stable_id);
+    const Control::Ptr scoped = focus_allowed_by_active_scope(root_) ? Control::Ptr{} : active_focus_scope_root();
     if (!control) {
-        if (dispatch_semantic_child_action(root_, stable_id, action, value)) {
+        if (dispatch_semantic_child_action(scoped ? scoped : root_, stable_id, action, value)) {
             return true;
         }
         ControlList popup_roots;
         popup_roots.reserve(popups_.size());
-        for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) popup_roots.push_back((*popup).popup());
+        for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+            if (!scoped || contains_control(scoped, (*popup).owner())) { popup_roots.push_back((*popup).popup()); }
+        }
         for (ControlList::reverse_iterator popup = popup_roots.rbegin();
              popup != popup_roots.rend();
              ++popup) {
@@ -2136,6 +2158,14 @@ bool Window::perform_semantic_action(std::string_view stable_id,
         return false;
     }
     if (!eligible(control)) return false;
+    if (!focus_allowed_by_active_scope(control)) {
+        bool closes_active_popup = false;
+        for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+            if (action == SemanticAction::collapse && (*popup).owner() == control &&
+                contains_control((*popup).popup(), scoped)) { closes_active_popup = true; break; }
+        }
+        if (!closes_active_popup) return false;
+    }
     if (action == SemanticAction::focus) {
         set_focus_cue_visible(true);
         return request_focus(control);
@@ -2190,6 +2220,13 @@ void Window::mark_subtree_dirty(Control& control, Dirty requested_dirty) {
                 }
             }
         }
+    }
+    // Subtree mutation has the same semantic-generation contract as a
+    // single-control mutation. Cached native accessibility trees must retire
+    // hidden descendants even when their arranged geometry is unchanged.
+    if (has_dirty(requested_dirty, Dirty::semantics)) {
+        ++semantic_generation_;
+        if (semantic_generation_ == 0U) ++semantic_generation_;
     }
     metrics_.record_mutation();
     if (has_dirty(requested_dirty, Dirty::layout)) {

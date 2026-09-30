@@ -11,7 +11,9 @@
 #include "fileman_orchestrator/client.hpp"
 
 #include "gui_forms/gui_forms.hpp"
+#if defined(__APPLE__)
 #include "gui_forms/platform/macos_host.hpp"
+#endif
 
 #include <atomic>
 #include <condition_variable>
@@ -55,6 +57,7 @@ public:
 
 private:
     friend class ApplicationInteractionProbe;
+    friend class ApplicationLatencyProbe;
 
     using NativeForm = web_forms_generated_file_manager_sapphire::NativeForm;
 
@@ -64,6 +67,11 @@ private:
     void install_command_surfaces();
     void install_accelerators();
     void install_handlers();
+    void update_adaptive_layout(gui_forms::Rect bounds);
+    void update_adaptive_preview();
+    bool focus_search_accelerator();
+    void focus_search_command();
+    void focus_location_command();
     std::shared_ptr<gui_forms::Command> make_command(
         std::string id, std::string text, std::string description,
         std::function<void()> action);
@@ -204,6 +212,9 @@ private:
     [[nodiscard]] bool mutation_scope_active() const;
     [[nodiscard]] bool engine_search_available() const;
     void set_status(std::string text, std::string summary);
+    void update_browsing_status();
+    bool focus_location_accelerator();
+    bool refresh_accelerator();
 
     std::filesystem::path protected_root_;
     std::filesystem::path home_root_;
@@ -274,6 +285,11 @@ private:
 
     NativeForm form_;
     std::shared_ptr<gui_forms::MenuStrip> menu_strip_;
+    std::vector<gui_forms::MenuStripItemSpec> expanded_menu_items_;
+    bool compact_menu_{};
+    bool compact_search_active_{};
+    bool adapting_layout_{};
+    gui_forms::Size adaptive_viewport_{};
     std::shared_ptr<gui_forms::SplitContainer> workspace_split_;
     std::shared_ptr<gui_forms::SplitContainer> selection_split_;
     std::shared_ptr<gui_forms::Panel> content_surface_;
@@ -322,6 +338,8 @@ private:
     std::shared_ptr<gui_forms::ContextMenu> object_menu_;
     std::shared_ptr<gui_forms::ContextMenu> background_menu_;
     std::shared_ptr<gui_forms::Command> command_open_;
+    std::shared_ptr<gui_forms::Command> command_focus_search_;
+    std::shared_ptr<gui_forms::Command> command_focus_location_;
     std::shared_ptr<gui_forms::Command> command_choose_open_;
     std::shared_ptr<gui_forms::Command> command_new_folder_;
     std::shared_ptr<gui_forms::Command> command_copy_;

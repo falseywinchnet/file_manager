@@ -1,0 +1,4 @@
+caption_benchmark pass=0 labels=100 frames=5 ms_per_frame=20.2375
+caption_benchmark pass=1 labels=100 frames=5 ms_per_frame=8.4735
+caption_benchmark pass=2 labels=100 frames=5 ms_per_frame=8.459
+caption_benchmark pass=3 labels=100 frames=5 ms_per_frame=8.89104

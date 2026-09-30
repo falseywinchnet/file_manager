@@ -1,6 +1,13 @@
 # Local filesystem metadata.
 .DS_Store
 
+# Per-platform compiler outputs, installed development SDKs and local receipts.
+.build/
+
+# Python build-tool bytecode is generated locally.
+__pycache__/
+*.pyc
+
 # Local diagnostic output.
 /gui_forms/backtrac*.txt
 /gui_forms/crash.txt

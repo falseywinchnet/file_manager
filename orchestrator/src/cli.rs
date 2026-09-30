@@ -23,11 +23,15 @@ pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<(), String> {
     let runtime_directory = remove_option(&mut arguments, "--runtime-dir")?;
     let settings_directory = remove_option(&mut arguments, "--settings-dir")?;
     let engine_options = remove_engine_options(&mut arguments)?;
+    let engine_runtime = remove_option(&mut arguments, "--engine-runtime-dir")?.map(PathBuf::from);
     let Some(command) = arguments.first().map(String::as_str) else {
         print_help();
         return Ok(());
     };
 
+    if engine_runtime.is_some() && (command != "serve-local" || engine_options.is_some()) {
+        return Err("--engine-runtime-dir requires serve-local without development Engine options".to_owned());
+    }
     match command {
         "serve-local" => {
             if json_output || arguments.len() != 1 {
@@ -37,7 +41,7 @@ pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<(), String> {
             }
             let runtime = resolve_runtime_directory(runtime_directory)?;
             let settings = settings_directory.map(PathBuf::from);
-            return serve_local(&runtime, engine_options, settings.as_deref());
+            return serve_local(&runtime, engine_options, settings.as_deref(), engine_runtime.as_deref());
         }
         "call-local" => {
             if engine_options.is_some() {
@@ -497,18 +501,22 @@ mod tests {
 
     #[test]
     fn engine_provider_options_are_atomic() {
+        let temporary = std::env::temp_dir();
         let mut incomplete = vec!["--engine-binary".to_owned(), "/tmp/engine".to_owned()];
         assert!(remove_engine_options(&mut incomplete).is_err());
 
         let mut complete = vec![
             "--engine-binary".to_owned(),
-            "/tmp/engine".to_owned(),
+            temporary.join("engine").to_string_lossy().into_owned(),
             "--engine-sandbox-root".to_owned(),
-            "/tmp/sandbox".to_owned(),
+            temporary.join("sandbox").to_string_lossy().into_owned(),
             "--engine-root-id".to_owned(),
             "docs".to_owned(),
             "--engine-root-path".to_owned(),
-            "/tmp/sandbox/source".to_owned(),
+            temporary
+                .join("sandbox/source")
+                .to_string_lossy()
+                .into_owned(),
         ];
         assert!(
             remove_engine_options(&mut complete)

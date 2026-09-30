@@ -1803,11 +1803,31 @@ void Control::set_hit_test_transparent(bool transparent) {
 
 void Control::set_cursor(std::optional<CursorKind> cursor) {
     require_mutable();
-    if (cursor_ == cursor) {
+    if (cursor_ == cursor && !cursor_images_) {
         return;
     }
+    cursor_images_.reset();
     cursor_ = cursor;
     invalidate(Dirty::semantics);
+}
+
+void Control::set_custom_cursor(CursorImagesPtr images, CursorKind fallback) {
+    require_mutable();
+    if (cursor_images_ == images && cursor_ == fallback) return;
+    cursor_images_ = std::move(images);
+    cursor_ = fallback;
+    invalidate(Dirty::semantics);
+}
+
+CursorImagesPtr Control::effective_cursor_images() const noexcept {
+    const Control* current = this;
+    Ptr owner;
+    while (current != nullptr) {
+        if ((*current).cursor_.has_value()) return (*current).cursor_images_;
+        owner = (*current).parent_.lock();
+        current = owner.get();
+    }
+    return {};
 }
 
 void Control::set_accessible_name(std::string name) {

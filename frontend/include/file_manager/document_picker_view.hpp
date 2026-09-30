@@ -27,11 +27,16 @@ public:
         noexcept;
 
     void set_orchestrator_session_valid(bool valid);
+    void set_authority_valid(bool valid);
+    void cancel();
     void confirm_overwrite();
+    // Call after constructing the host-owned Window, and on each presentation.
+    void attach_dialog(gui_forms::Window& window);
     void present(const std::filesystem::path& initial_location);
 
 private:
     void reload();
+    void update_status();
     void navigate_path(std::filesystem::path path);
     void accept(bool overwrite_confirmed = false);
     void publish(DocumentPickerResult result);
@@ -45,6 +50,8 @@ private:
     std::shared_ptr<gui_forms::Button> back_to_root_;
     std::shared_ptr<gui_forms::Button> up_;
     std::shared_ptr<gui_forms::TextBox> path_;
+    std::shared_ptr<gui_forms::ComboBox> locations_;
+    std::shared_ptr<gui_forms::TextBox> name_filter_;
     std::shared_ptr<gui_forms::ObjectView> objects_;
     std::shared_ptr<gui_forms::ComboBox> filter_;
     std::shared_ptr<gui_forms::CheckBox> hidden_;
@@ -54,6 +61,8 @@ private:
     std::shared_ptr<gui_forms::Button> cancel_;
     std::vector<gui_forms::SubscriptionToken> subscriptions_;
     gui_forms::Event<const DocumentPickerResult&> completed_;
+    bool reloading_{};
+    bool finished_{};
 };
 
 } // namespace file_manager

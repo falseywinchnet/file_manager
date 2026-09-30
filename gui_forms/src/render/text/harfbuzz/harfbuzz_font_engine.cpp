@@ -4,6 +4,7 @@
 #include FT_FREETYPE_H
 #include <hb-ft.h>
 #include <hb.h>
+#include <SheenBidi/SheenBidi.h>
 
 #include <algorithm>
 #include <cmath>
@@ -17,6 +18,46 @@ namespace {
 constexpr std::size_t maximum_face_bytes = 64U * 1024U * 1024U;
 constexpr std::size_t maximum_faces = 64U;
 constexpr FT_Long maximum_glyphs = 1'000'000L;
+
+struct BidiOwner final {
+    SBAlgorithmRef algorithm = nullptr;
+    SBParagraphRef paragraph = nullptr;
+    SBLineRef line = nullptr;
+    ~BidiOwner() {
+        if (line) { SBLineRelease(line); }
+        if (paragraph) { SBParagraphRelease(paragraph); }
+        if (algorithm) { SBAlgorithmRelease(algorithm); }
+    }
+    void clear_line() {
+        if (line) { SBLineRelease(line); line = nullptr; }
+        if (paragraph) { SBParagraphRelease(paragraph); paragraph = nullptr; }
+    }
+};
+struct DirectionRun final { Utf8Range range; bool rtl; };
+std::vector<DirectionRun> visual_direction_runs(std::string_view utf8) {
+    std::vector<DirectionRun> runs;
+    const SBCodepointSequence sequence{SBStringEncodingUTF8, utf8.data(), utf8.size()};
+    BidiOwner owner;
+    owner.algorithm = SBAlgorithmCreate(&sequence);
+    if (!owner.algorithm) { throw std::bad_alloc(); }
+    std::size_t offset = 0;
+    while (offset < utf8.size()) {
+        owner.paragraph = SBAlgorithmCreateParagraph(owner.algorithm, offset, utf8.size() - offset, SBLevelDefaultLTR);
+        if (!owner.paragraph) { throw std::bad_alloc(); }
+        const std::size_t length = SBParagraphGetLength(owner.paragraph);
+        if (length == 0 || length > utf8.size() - offset) { throw std::runtime_error("Invalid bidi paragraph length"); }
+        owner.line = SBParagraphCreateLine(owner.paragraph, offset, length);
+        if (!owner.line) { throw std::bad_alloc(); }
+        const SBRun* values = SBLineGetRunsPtr(owner.line);
+        const std::size_t count = SBLineGetRunCount(owner.line);
+        for (std::size_t i = 0; i < count; ++i) {
+            runs.push_back({{Utf8Offset(values[i].offset), Utf8Offset(values[i].offset + values[i].length)}, (values[i].level & 1) != 0});
+        }
+        offset += length;
+        owner.clear_line();
+    }
+    return runs;
+}
 
 struct LibraryOwner final {
     FT_Library value{};
@@ -78,13 +119,13 @@ public:
         bool italic{};
         bool fallback{};
         std::string family;
-        std::vector<std::byte> encoded;
+        std::shared_ptr<const void> encoded;
         FT_Face face{};
 
         Face(FontFaceId id_value, std::optional<FontRole> role_value,
              std::uint16_t weight_value, bool italic_value,
              bool fallback_value, std::string family_value,
-             std::vector<std::byte> bytes, FT_Face face_value)
+             std::shared_ptr<const void> bytes, FT_Face face_value)
             : id(id_value), role(role_value), weight(weight_value),
               italic(italic_value), fallback(fallback_value),
               family(std::move(family_value)), encoded(std::move(bytes)),
@@ -167,16 +208,16 @@ public:
 
     [[nodiscard]] std::optional<FontFaceId> register_face(
         std::optional<FontRole> role, std::uint16_t weight, bool italic,
-        std::span<const std::byte> encoded, std::uint32_t face_index) {
-        if (encoded.empty() || encoded.size() > maximum_face_bytes ||
+        std::span<const std::byte> bytes, std::shared_ptr<const void> owned,
+        std::uint32_t face_index) {
+        if (!owned || bytes.empty() || bytes.size() > maximum_face_bytes ||
             faces.size() >= maximum_faces || face_index > 255U) {
             return std::nullopt;
         }
-        std::vector<std::byte> owned(encoded.begin(), encoded.end());
         FT_Face native{};
         const FT_Error opened = FT_New_Memory_Face(
-            library.value, reinterpret_cast<const FT_Byte*>(owned.data()),
-            static_cast<FT_Long>(owned.size()), static_cast<FT_Long>(face_index),
+            library.value, reinterpret_cast<const FT_Byte*>(bytes.data()),
+            static_cast<FT_Long>(bytes.size()), static_cast<FT_Long>(face_index),
             &native);
         if (opened != 0 || native == nullptr || (*native).num_glyphs <= 0 ||
             (*native).num_glyphs > maximum_glyphs ||
@@ -195,7 +236,7 @@ public:
 
     void append_run(ShapedText& result, Face& face, std::string_view utf8,
                     Utf8Range range, FontSpec font, double run_origin,
-                    bool add_trailing_spacing) {
+                    bool add_trailing_spacing, bool rtl) {
         const FT_F26Dot6 size = static_cast<FT_F26Dot6>(
             std::llround(std::clamp(font.size, 1.0, 4096.0) * 64.0));
         if (FT_Set_Char_Size(face.face, 0, size, 72U, 72U) != 0) return;
@@ -213,6 +254,7 @@ public:
                            static_cast<unsigned>(range.start.value()),
                            static_cast<int>(range.end.value() -
                                             range.start.value()));
+        hb_buffer_set_direction(buffer, rtl ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
         hb_buffer_guess_segment_properties(buffer);
         hb_shape(hb_font, buffer, nullptr, 0U);
 
@@ -226,6 +268,7 @@ public:
         run.glyphs.reserve(count);
         double pen_x = run_origin;
         double pen_y{};
+        double ink_ascent = font.size * 0.8, ink_descent = font.size * 0.2;
         for (unsigned index = 0U; index < count; ++index) {
             const float offset_x = positions[index].x_offset / 64.0F;
             const float offset_y = -positions[index].y_offset / 64.0F;
@@ -241,16 +284,26 @@ public:
                                   static_cast<float>(pen_x) + offset_x,
                                   static_cast<float>(pen_y) + offset_y,
                                   advance_x, advance_y});
+            hb_glyph_extents_t extents{};
+            if (!face.role && hb_font_get_glyph_extents(hb_font, infos[index].codepoint, &extents)) {
+                const double top = pen_y + offset_y - extents.y_bearing / 64.0;
+                const double bottom = top - extents.height / 64.0;
+                ink_ascent = std::max(ink_ascent, -top);
+                ink_descent = std::max(ink_descent, bottom);
+            }
             pen_x += advance_x;
             pen_y += advance_y;
         }
         result.width = std::max(result.width, pen_x);
         if ((*face.face).size != nullptr) {
-            const double ascent = (*(*face.face).size).metrics.ascender / 64.0;
-            const double descent = -(*(*face.face).size).metrics.descender / 64.0;
+            // Fallback families reserve space for every mark in their repertoire.
+            // Use the actual shaped ink (including positioned marks) so an Arabic
+            // or CJK fallback does not double a compact control's line box.
+            const double ascent = face.role ? (*(*face.face).size).metrics.ascender / 64.0 : ink_ascent;
+            const double descent = face.role ? -(*(*face.face).size).metrics.descender / 64.0 : ink_descent;
             result.ascent = std::max(result.ascent, ascent);
             result.descent = std::max(result.descent, descent);
-            result.height = std::max(result.height, ascent + descent);
+            result.height = result.ascent + result.descent;
         }
         result.runs.push_back(std::move(run));
         hb_buffer_destroy(buffer);
@@ -261,17 +314,38 @@ public:
 HarfBuzzFontEngine::HarfBuzzFontEngine() : impl_(std::make_unique<Impl>()) {}
 HarfBuzzFontEngine::~HarfBuzzFontEngine() = default;
 
+std::optional<FontFaceId> HarfBuzzFontEngine::register_shared_typeface(
+    std::optional<FontRole> role, std::uint16_t weight, bool italic,
+    std::shared_ptr<const std::vector<std::byte>> encoded, std::uint32_t face_index) {
+    if (!encoded) return std::nullopt;
+    const std::span<const std::byte> bytes(*encoded);
+    return register_owned_typeface(role, weight, italic, bytes, std::move(encoded), face_index);
+}
+
+std::optional<FontFaceId> HarfBuzzFontEngine::register_owned_typeface(
+    std::optional<FontRole> role, std::uint16_t weight, bool italic,
+    std::span<const std::byte> encoded, std::shared_ptr<const void> owner,
+    std::uint32_t face_index) {
+    return (*impl_).register_face(role, weight, italic, encoded, std::move(owner), face_index);
+}
+
 std::optional<FontFaceId> HarfBuzzFontEngine::register_typeface(
     FontRole role, std::uint16_t weight, bool italic,
     std::span<const std::byte> encoded, std::uint32_t face_index) {
-    return (*impl_).register_face(role, weight, italic, encoded, face_index);
+    if (encoded.empty() || encoded.size() > maximum_face_bytes ||
+        (*impl_).faces.size() >= maximum_faces || face_index > 255U) return std::nullopt;
+    return register_shared_typeface(role, weight, italic,
+        std::make_shared<const std::vector<std::byte>>(encoded.begin(), encoded.end()), face_index);
 }
 
 std::optional<FontFaceId> HarfBuzzFontEngine::register_fallback_typeface(
     std::uint16_t weight, bool italic, std::span<const std::byte> encoded,
     std::uint32_t face_index) {
-    return (*impl_).register_face(
-        std::nullopt, weight, italic, encoded, face_index);
+    if (encoded.empty() || encoded.size() > maximum_face_bytes ||
+        (*impl_).faces.size() >= maximum_faces || face_index > 255U) return std::nullopt;
+    return register_shared_typeface(
+        std::nullopt, weight, italic,
+        std::make_shared<const std::vector<std::byte>>(encoded.begin(), encoded.end()), face_index);
 }
 
 ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
@@ -314,12 +388,28 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
         }
     }
 
+    // Unicode bidi ordering is independent of font fallback. Reorder whole
+    // directional runs, then shape font fragments with the resolved direction;
+    // never reverse UTF-8 bytes or reorder stored application text.
+    const std::vector<DirectionRun> directions = visual_direction_runs(utf8);
+    struct VisualSegment final { Impl::Face* face; Utf8Range range; bool rtl; };
+    std::vector<VisualSegment> visual;
+    for (const DirectionRun& direction : directions) {
+        std::vector<VisualSegment> parts;
+        for (const Segment& segment : segments) {
+            const std::size_t start = std::max(segment.range.start.value(), direction.range.start.value());
+            const std::size_t end = std::min(segment.range.end.value(), direction.range.end.value());
+            if (start < end) { parts.push_back({segment.face, {Utf8Offset(start), Utf8Offset(end)}, direction.rtl}); }
+        }
+        if (direction.rtl) { std::reverse(parts.begin(), parts.end()); }
+        visual.insert(visual.end(), parts.begin(), parts.end());
+    }
     double origin{};
-    for (std::size_t index = 0U; index < segments.size(); ++index) {
-        const Segment& segment = segments[index];
+    for (std::size_t index = 0U; index < visual.size(); ++index) {
+        const VisualSegment& segment = visual[index];
         const double before = result.width;
         (*impl_).append_run(result, *segment.face, utf8, segment.range, font, origin,
-                          index + 1U != segments.size());
+                          index + 1U != visual.size(), segment.rtl);
         origin += std::max(0.0, result.width - before);
     }
     return result;

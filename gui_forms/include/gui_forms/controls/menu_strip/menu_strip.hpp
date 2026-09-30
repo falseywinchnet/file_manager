@@ -49,6 +49,8 @@ public:
     void set_use_mnemonic(bool value);
     [[nodiscard]] double item_padding() const noexcept { return item_padding_; }
     void set_item_padding(double padding);
+    [[nodiscard]] FontSpec font() const noexcept { return font_; }
+    void set_font(FontSpec font);
     [[nodiscard]] std::optional<std::size_t> active_index() const noexcept {
         return active_index_;
     }
@@ -86,6 +88,7 @@ protected:
 
 private:
     [[nodiscard]] std::vector<Rect> item_bounds() const;
+    [[nodiscard]] double preferred_height() const;
     [[nodiscard]] std::optional<std::size_t> index_at(Point window_point) const;
     [[nodiscard]] std::optional<std::size_t> next_enabled(
         std::size_t start, int direction) const;
@@ -104,6 +107,7 @@ private:
     bool switching_{};
     bool use_mnemonic_{true};
     double item_padding_{11.0};
+    FontSpec font_{FontRole::control, 10.5, 400, false, 0.12};
     SubscriptionToken popup_invoked_;
     SubscriptionToken popup_changed_;
     Event<const MenuStripInvocation&> item_invoked_;

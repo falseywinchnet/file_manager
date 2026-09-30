@@ -23,12 +23,6 @@ using menu_detail::validate_specs;
 namespace {
 
 constexpr double menu_strip_height = 24.0;
-constexpr double menu_strip_character_width = 7.35;
-
-double menu_strip_item_width(std::string_view text, double padding) noexcept {
-    return std::max(42.0, padding * 2.0 +
-        static_cast<double>(text.size()) * menu_strip_character_width);
-}
 
 std::uint64_t menu_virtual_runtime_id(std::string_view id) noexcept {
     std::uint64_t hash = 1469598103934665603ULL;
@@ -166,6 +160,18 @@ bool MenuStrip::open(std::size_t index) {
     return true;
 }
 
+void MenuStrip::set_font(FontSpec font) {
+    require_mutable();
+    if (!valid_font_spec(font)) {
+        throw std::invalid_argument("MenuStrip font specification is invalid");
+    }
+    if (font_ == font) return;
+    close();
+    font_ = font;
+    invalidate(Dirty::measure | Dirty::arrange | Dirty::paint |
+               Dirty::hit_test | Dirty::semantics);
+}
+
 void MenuStrip::close() noexcept {
     if (!popup_) return;
     (*popup_).close();
@@ -176,22 +182,35 @@ bool MenuStrip::is_open() const noexcept {
 }
 
 Size MenuStrip::measure(Size available) {
-    return {available.width, std::min(available.height,
-                                     menu_strip_height * effective_text_scale())};
+    return {available.width, std::min(available.height, preferred_height())};
+}
+
+double MenuStrip::preferred_height() const {
+    FontSpec font = effective_font(font_);
+    font.weight = std::max<std::uint16_t>(font.weight, 700U);
+    const double text_height = resolve_text_layout_utf8("Mg", font).logical_size.height;
+    return std::max(menu_strip_height * effective_text_scale(),
+                    text_height + 10.0 * effective_text_scale());
 }
 
 std::vector<Rect> MenuStrip::item_bounds() const {
     std::vector<Rect> result(items_.size());
+    const FontSpec normal_font = effective_font(font_);
+    FontSpec selected_font = normal_font;
+    selected_font.weight = std::max<std::uint16_t>(selected_font.weight, 700U);
+    const double scale = effective_text_scale();
+    const double height = std::max(preferred_height(), committed_arranged_bounds().height);
     double x{};
     for (std::size_t index = 0; index < items_.size(); ++index) {
         if (!items_[index].visible) continue;
         const std::string display = use_mnemonic_
             ? menu_display_text(items_[index].text) : items_[index].text;
-        const double width = menu_strip_item_width(display, item_padding_) *
-            effective_text_scale();
-        result[index] = {x, 0.0, width,
-                         std::max(menu_strip_height * effective_text_scale(),
-                                  committed_arranged_bounds().height)};
+        const double text_width = std::max(
+            resolve_text_layout_utf8(display, normal_font).logical_size.width,
+            resolve_text_layout_utf8(display, selected_font).logical_size.width);
+        const double width = std::max(42.0 * scale,
+            item_padding_ * 2.0 * scale + text_width);
+        result[index] = {x, 0.0, width, height};
         x += width;
     }
     return result;
@@ -283,10 +302,10 @@ void MenuStrip::on_paint(Painter& painter, Rect) {
                 item_recipe.material);
         }
         const Color ink = item_recipe.text;
-        const FontSpec font = effective_font({FontRole::control, 10.5,
-                            static_cast<std::uint16_t>(active || selected
-                                ? 700U : 400U),
-                            false, 0.12});
+        FontSpec font = effective_font(font_);
+        if (active || selected) {
+            font.weight = std::max<std::uint16_t>(font.weight, 700U);
+        }
         painter.draw_text_utf8({item.x + item_padding_ *
                                              effective_text_scale(),
                                 item.y + std::max(font.size,

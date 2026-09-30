@@ -1,46 +1,146 @@
 #include "application.hpp"
 #include "about_view.hpp"
 #include "file_manager/document_picker_view.hpp"
+#include "file_manager/platform_paths.hpp"
+#include "gui_forms/application.hpp"
+
+#if defined(__APPLE__)
+#include "gui_forms/platform/macos_host.hpp"
+#endif
 
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
+#include <functional>
 #include <iostream>
 #include <optional>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <shellapi.h>
+#endif
+
 namespace {
 
+// Main owns these models until the native loop returns. Callbacks borrow this
+// record; they neither prolong its lifetime nor form model ownership cycles.
+struct Runtime final {
+    std::shared_ptr<file_manager::Application> application;
+    std::shared_ptr<file_manager::DocumentPickerView> picker;
+    std::shared_ptr<file_manager::AboutView> about;
+    std::function<void()> show_picker;
+    std::function<void()> hide_picker;
+    std::function<void()> show_about;
+    std::function<void()> hide_about;
+    std::function<void()> wake;
+    gui_forms::ApplicationWindowHandle primary_handle;
+
+    ~Runtime() { if (application) (*application).stop(); }
+
+    void present_picker(const std::filesystem::path& location) {
+        (*picker).present(location);
+        if (show_picker) show_picker();
+    }
+    void present_about() { if (show_about) show_about(); }
+    void dismiss_about() { if (hide_about) hide_about(); }
+    void picker_completed(const file_manager::DocumentPickerResult& result) {
+        (*application).document_picker_completed(result);
+        if (result.terminal == file_manager::DocumentPickerTerminal::accepted ||
+            result.terminal == file_manager::DocumentPickerTerminal::cancelled) {
+            if (hide_picker) hide_picker();
+        }
+    }
+    void drain() { (*application).drain_ui(); }
+    void stop() { (*application).stop(); }
+    void close_primary() { (void)primary_handle.request_close(); }
+    void accept_wake(std::function<void()> value) { wake = std::move(value); }
+    void primary_ready(gui_forms::Window&, gui_forms::ApplicationWindowHandle handle) {
+        primary_handle = handle;
+        (*application).bind_host(wake, std::bind_front(&Runtime::close_primary, this));
+    }
+    void picker_visibility(std::function<void()> show, std::function<void()> hide) {
+        show_picker = std::move(show);
+        hide_picker = std::move(hide);
+    }
+    void about_visibility(std::function<void()> show, std::function<void()> hide) {
+        show_about = std::move(show);
+        hide_about = std::move(hide);
+    }
+    void picker_ready(gui_forms::Window&, gui_forms::ApplicationWindowHandle handle) {
+        show_picker = std::bind_front(&gui_forms::ApplicationWindowHandle::show, handle);
+        hide_picker = std::bind_front(&gui_forms::ApplicationWindowHandle::hide, handle);
+    }
+    void about_ready(gui_forms::Window&, gui_forms::ApplicationWindowHandle handle) {
+        show_about = std::bind_front(&gui_forms::ApplicationWindowHandle::show, handle);
+        hide_about = std::bind_front(&gui_forms::ApplicationWindowHandle::hide, handle);
+    }
+#if defined(__APPLE__)
+    void mac_ready(std::function<void()> host_wake, std::function<void()> close,
+        std::function<gui_forms::HostDialogResult(const gui_forms::HostDialogRequest&)>,
+        std::function<gui_forms::HostServiceStatus(const gui_forms::HostTooltipRequest&)>,
+        std::function<void()>, std::function<gui_forms::HostClipboardTextResult()>,
+        std::function<gui_forms::HostServiceStatus(std::string_view)>) {
+        (*application).bind_host(std::move(host_wake), std::move(close));
+    }
+#endif
+};
+
 std::filesystem::path default_root() {
-    if (const char* configured = std::getenv("FILE_MANAGER_ROOT")) {
-        return configured;
+#if defined(_WIN32)
+    const wchar_t* const configured = _wgetenv(L"FILE_MANAGER_ROOT");
+#else
+    const char* const configured = std::getenv("FILE_MANAGER_ROOT");
+#endif
+    if (configured != nullptr && *configured != 0) return configured;
+    return file_manager::user_home_directory();
+}
+
+std::vector<std::string> command_arguments(const int argc, char** const argv) {
+    std::vector<std::string> result;
+#if defined(_WIN32)
+    (void)argc;
+    (void)argv;
+    int count{};
+    LPWSTR* const values = CommandLineToArgvW(GetCommandLineW(), &count);
+    if (values == nullptr) throw std::runtime_error("cannot read Windows command line");
+    for (int index = 1; index < count; ++index) {
+        result.push_back(file_manager::path_utf8(std::filesystem::path(values[index])));
     }
-    if (const char* home = std::getenv("HOME")) {
-        return home;
-    }
-    return std::filesystem::current_path();
+    LocalFree(values);
+#else
+    for (int index = 1; index < argc; ++index) result.emplace_back(argv[index]);
+#endif
+    return result;
 }
 
 } // namespace
 
 int main(const int argc, char** argv) {
     try {
-        auto root = default_root();
+        std::filesystem::path root = default_root();
         std::optional<std::filesystem::path> quarantine;
         std::string engine_root_id;
         bool allow_mutations = false;
-        for (int index = 1; index < argc; ++index) {
-            const std::string_view argument(argv[index]);
-            if (argument == "--root" && index + 1 < argc) {
-                root = argv[++index];
-            } else if (argument == "--quarantine" && index + 1 < argc) {
-                quarantine = argv[++index];
+        const std::vector<std::string> arguments = command_arguments(argc, argv);
+        for (std::size_t index = 0; index < arguments.size(); ++index) {
+            const std::string_view argument(arguments[index]);
+            if (argument == "--root" && index + 1 < arguments.size()) {
+                ++index;
+                root = file_manager::path_from_utf8(arguments[index]);
+            } else if (argument == "--quarantine" && index + 1 < arguments.size()) {
+                ++index;
+                quarantine = file_manager::path_from_utf8(arguments[index]);
             } else if (argument == "--allow-mutations") {
                 allow_mutations = true;
-            } else if (argument == "--engine-root-id" && index + 1 < argc) {
-                engine_root_id = argv[++index];
+            } else if (argument == "--engine-root-id" && index + 1 < arguments.size()) {
+                ++index;
+                engine_root_id = arguments[index];
             } else {
                 std::cerr << "usage: File Manager [--root DIRECTORY] "
                              "[--engine-root-id ID] "
@@ -53,129 +153,105 @@ int main(const int argc, char** argv) {
             return 2;
         }
 
-        auto application = std::make_shared<file_manager::Application>(
+        Runtime runtime;
+        runtime.application = std::make_shared<file_manager::Application>(
             root, quarantine, allow_mutations, std::move(engine_root_id));
-
         file_manager::DocumentPickerRequest picker_request;
         picker_request.profile = file_manager::DocumentPickerProfile::open_file;
         picker_request.protected_root = root;
         picker_request.initial_location = root;
         picker_request.owner_application_id = "file-manager";
         picker_request.maximum_selection = 1;
-        auto picker = std::make_shared<file_manager::DocumentPickerView>(
-            std::move(picker_request));
-        auto about = std::make_shared<file_manager::AboutView>();
-
-        auto show_picker = std::make_shared<std::function<void()>>();
-        auto hide_picker = std::make_shared<std::function<void()>>();
-        auto show_about = std::make_shared<std::function<void()>>();
-        auto hide_about = std::make_shared<std::function<void()>>();
-        application->bind_secondary_surfaces(
-            [picker, show_picker](const std::filesystem::path& location) {
-                picker->present(location);
-                if (*show_picker) (*show_picker)();
-            },
-            [show_about] {
-                if (*show_about) (*show_about)();
-            });
-        about->bind_hide([hide_about] {
-            if (*hide_about) (*hide_about)();
-        });
+        runtime.picker = std::make_shared<file_manager::DocumentPickerView>(std::move(picker_request));
+        runtime.about = std::make_shared<file_manager::AboutView>();
+        (*runtime.application).bind_secondary_surfaces(
+            std::bind_front(&Runtime::present_picker, &runtime),
+            std::bind_front(&Runtime::present_about, &runtime));
+        (*runtime.about).bind_hide(std::bind_front(&Runtime::dismiss_about, &runtime));
         const gui_forms::SubscriptionToken picker_completed =
-            picker->completed().subscribe(
-                [application, hide_picker](
-                    const file_manager::DocumentPickerResult& result) {
-                    application->document_picker_completed(result);
-                    if (result.terminal ==
-                            file_manager::DocumentPickerTerminal::accepted ||
-                        result.terminal ==
-                            file_manager::DocumentPickerTerminal::cancelled) {
-                        if (*hide_picker) (*hide_picker)();
-                    }
-                });
+            (*runtime.picker).completed().subscribe(
+                std::bind_front(&Runtime::picker_completed, &runtime));
 
-        gui_forms::host::MacApplicationWindow primary;
+#if defined(__APPLE__)
+        using NativeWindow = gui_forms::host::MacApplicationWindow;
+#else
+        using NativeWindow = gui_forms::ApplicationWindow;
+#endif
+        NativeWindow primary;
         primary.stable_id = "file-manager.window";
-        primary.model = application->make_window();
+        primary.model = (*runtime.application).make_window();
         primary.options.title = "File Manager";
         primary.options.initial_size = {1340, 850};
         primary.options.minimum_size = {150, 150};
-        primary.options.titlebar_presentation =
-            gui_forms::host::MacTitlebarPresentation::
-                transparent_full_size_content;
-        for (const std::string_view stable_id :
-             web_forms_generated_file_manager_sapphire::NativeForm::
-                 window_drag_region_ids) {
-            primary.options.window_drag_region_ids.emplace_back(stable_id);
-        }
         primary.options.print_metrics_on_close = true;
-        primary.options.host_ready = [application](std::function<void()> wake,
-                                           std::function<void()> request_close,
-                                           auto, auto, auto, auto, auto) {
-            application->bind_host(std::move(wake), std::move(request_close));
-        };
-        primary.options.dispatch_pending =
-            [application] { application->drain_ui(); };
-        primary.options.closed = [application] { application->stop(); };
-
-        gui_forms::host::MacApplicationWindow picker_window;
+        primary.options.dispatch_pending = std::bind_front(&Runtime::drain, &runtime);
+        primary.options.closed = std::bind_front(&Runtime::stop, &runtime);
+#if defined(__APPLE__)
+        primary.options.titlebar_presentation = gui_forms::host::MacTitlebarPresentation::transparent_full_size_content;
+        for (const std::string_view id : web_forms_generated_file_manager_sapphire::NativeForm::window_drag_region_ids) {
+            primary.options.window_drag_region_ids.emplace_back(id);
+        }
+        primary.options.host_ready = std::bind_front(&Runtime::mac_ready, &runtime);
+#else
+        primary.options.wake_ready = std::bind_front(&Runtime::accept_wake, &runtime);
+        primary.options.ready = std::bind_front(&Runtime::primary_ready, &runtime);
+#endif
+        NativeWindow picker_window;
         picker_window.stable_id = "file-manager.open-picker";
         picker_window.owner_id = primary.stable_id;
         picker_window.model = std::make_unique<gui_forms::Window>(
-            picker->root_control(), gui_forms::Size{760, 560});
+            (*runtime.picker).root_control(), gui_forms::Size{760, 560});
         picker_window.options.title = "Open — File Manager";
         picker_window.options.initial_size = {760, 560};
         picker_window.options.minimum_size = {620, 460};
-        picker_window.options.titlebar_presentation =
-            gui_forms::host::MacTitlebarPresentation::
-                transparent_full_size_content;
-        picker_window.options.window_drag_region_id =
-            "file-manager.picker.title";
         picker_window.options.initially_visible = false;
         picker_window.options.hide_on_close = true;
         picker_window.options.minimizable = false;
         picker_window.options.print_metrics_on_close = false;
-        picker_window.options.visibility_ready =
-            [show_picker, hide_picker](std::function<void()> show,
-                                       std::function<void()> hide) {
-                *show_picker = std::move(show);
-                *hide_picker = std::move(hide);
-            };
-        picker_window.tool_window = false;
-
-        gui_forms::host::MacApplicationWindow about_window;
+#if defined(__APPLE__)
+        picker_window.options.titlebar_presentation = gui_forms::host::MacTitlebarPresentation::transparent_full_size_content;
+        picker_window.options.window_drag_region_id = "file-manager.picker.title";
+        picker_window.options.visibility_ready = std::bind_front(&Runtime::picker_visibility, &runtime);
+#else
+        picker_window.options.ready = std::bind_front(&Runtime::picker_ready, &runtime);
+#endif
+        NativeWindow about_window;
         about_window.stable_id = "file-manager.about-window";
         about_window.owner_id = primary.stable_id;
         about_window.model = std::make_unique<gui_forms::Window>(
-            about->root_control(), gui_forms::Size{540, 330});
+            (*runtime.about).root_control(), gui_forms::Size{540, 330});
         about_window.options.title = "About File Manager";
         about_window.options.initial_size = {540, 330};
         about_window.options.minimum_size = {500, 300};
-        about_window.options.titlebar_presentation =
-            gui_forms::host::MacTitlebarPresentation::
-                transparent_full_size_content;
-        about_window.options.window_drag_region_id =
-            "file-manager.about.title";
         about_window.options.initially_visible = false;
         about_window.options.hide_on_close = true;
         about_window.options.minimizable = false;
         about_window.options.print_metrics_on_close = false;
-        about_window.options.visibility_ready =
-            [show_about, hide_about](std::function<void()> show,
-                                     std::function<void()> hide) {
-                *show_about = std::move(show);
-                *hide_about = std::move(hide);
-            };
-        about_window.tool_window = false;
-
-        std::vector<gui_forms::host::MacApplicationWindow> windows;
+#if defined(__APPLE__)
+        about_window.options.titlebar_presentation = gui_forms::host::MacTitlebarPresentation::transparent_full_size_content;
+        about_window.options.window_drag_region_id = "file-manager.about.title";
+        about_window.options.visibility_ready = std::bind_front(&Runtime::about_visibility, &runtime);
+#else
+        about_window.options.ready = std::bind_front(&Runtime::about_ready, &runtime);
+#endif
+        std::vector<NativeWindow> windows;
         windows.push_back(std::move(primary));
         windows.push_back(std::move(picker_window));
         windows.push_back(std::move(about_window));
-        const int result =
-            gui_forms::host::run_macos_application(std::move(windows));
         static_cast<void>(picker_completed);
+#if defined(__APPLE__)
+        const int result = gui_forms::host::run_macos_application(std::move(windows));
         return result;
+#else
+        const gui_forms::ApplicationResult result = gui_forms::Application::run(std::move(windows));
+        (*runtime.application).stop();
+        if (result.callback_exception) std::rethrow_exception(result.callback_exception);
+        if (!result.accepted()) {
+            std::cerr << "File Manager: native host failed (" << static_cast<int>(result.error) << ")\n";
+            return 1;
+        }
+        return result.native_exit_code;
+#endif
     } catch (const std::exception& error) {
         std::cerr << "File Manager: " << error.what() << '\n';
         return 1;

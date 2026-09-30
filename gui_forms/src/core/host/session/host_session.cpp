@@ -261,10 +261,11 @@ void HostSession::DispatchVisitor::operator()(
             after.rejected_capacity > before.rejected_capacity;
     } else if constexpr (std::is_same_v<Payload, HostCloseRequest>) {
         ++(*session).snapshot_.close_requests;
+        const bool hide_on_accept = payload.hide_on_accept;
         (*session).closing_.emit(payload);
         (*result).close_allowed = !payload.cancel;
         (*session).snapshot_.close_cancellations += payload.cancel ? 1U : 0U;
-        if (!payload.cancel) {
+        if (!payload.cancel && !hide_on_accept) {
             (*session).snapshot_.phase = HostLifecyclePhase::close_authorized;
         }
     } else if constexpr (std::is_same_v<Payload, HostClosedEvent>) {

@@ -4,7 +4,6 @@
 #include "gui_forms/dispatcher.hpp"
 
 #include <atomic>
-#include <condition_variable>
 #include <deque>
 #include <functional>
 #include <mutex>
@@ -23,8 +22,6 @@ struct DispatchWork final {
     bool synchronous{};
     std::weak_ptr<DispatcherState> dispatcher;
     mutable std::mutex fault_mutex;
-    mutable std::mutex completion_mutex;
-    mutable std::condition_variable completion;
     std::exception_ptr fault;
 };
 

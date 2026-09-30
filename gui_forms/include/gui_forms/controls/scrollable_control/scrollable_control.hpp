@@ -92,6 +92,9 @@ public:
                                   std::string_view value) override;
 
 protected:
+    // Layout containers supply their measured content rather than authored child
+    // coordinates. This keeps viewport, bars and hit-test clipping in one owner.
+    void arrange_scroll_viewport(Size client_size, Size measured_content);
     virtual void adjust_scrollbars(bool display_scrollbars);
     [[nodiscard]] virtual Point scroll_to_control(const Control& control) const;
     void set_display_rect_location(Point location);

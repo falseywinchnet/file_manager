@@ -1,0 +1,50 @@
+{
+  "schema": {
+    "family": "gui-forms.consumption-manifest",
+    "major": 1,
+    "minor": 0
+  },
+  "identity": {
+    "id": "gui-forms-shadow-windows-x64-2026-09-29",
+    "provider": "gui-forms",
+    "profile": "file-manager-windows-development",
+    "state": "development",
+    "source_base_revision": "7ce5cf4",
+    "target": "x86_64-w64-mingw32"
+  },
+  "public_surface": {
+    "cmake_package": "GUIForms 0.1",
+    "targets": [
+      "GUIForms::Application",
+      "GUIForms::Controls",
+      "GUIForms::Core",
+      "GUIForms::Drawing"
+    ],
+    "native_application_library": "libgui_forms_application.dll",
+    "native_application_sha256": "e89cf95f7c5599c0f3718589f456847f5bdfdaae13ba2586a7e6d42a5ff11b9b",
+    "host_protocol": 7,
+    "runtime_font_locator": "GUIForms_FONT_DIR"
+  },
+  "lifecycle": {
+    "model": "retained",
+    "ui_thread": "host-owned Windows message-loop thread",
+    "application_entry": "gui_forms::Application::run",
+    "cross_thread_rule": "worker wake while owner lives; UI-thread dispatch_pending; workers stop before closed",
+    "shutdown": "host close negotiation and deterministic retained teardown"
+  },
+  "validation": {
+    "configure": "passed on Shadow Windows with GCC 16.2.0, CMake 4.4.3, Ninja 1.13.2",
+    "application_library_build": "passed",
+    "installed_sdk": "passed",
+    "full_ctest": "64/64 passed natively on Shadow Windows after font/shaping caches, scanline kernels and bounded material cache, 6.99 seconds; scalar pixel reference, multilingual cold/cache equality, DPI and resource-lifetime regressions passed",
+    "frontend_runtime": "Final performance SDK staged side-by-side at frontend/.build/shadow-windows-latency; 11/11 native Windows frontend tests passed in 2.31 seconds. Actual test-owned File Manager window steady full repaint26.638\u201329.243ms and toolbar partial0.325\u20130.522ms at2xDPI, zero injected input/callback faults, self-close. Native ergonomic visual/workflow acceptance remains pending; existing user application untouched. Evidence frontend/results/2026-09-29-shadow-windows/LATENCY.md.",
+    "macos_linux_rebuild": "not performed"
+  },
+  "limits": [
+    "development consumption only; not a replacement for the historical macOS FM0 ready artifact",
+    "Windows GDI profile; Skia and HarfBuzz disabled",
+    "MSAA adapter; full UI Automation not provided",
+    "custom titlebar/drag presentation remains macOS-specific"
+  ],
+  "backport_provenance": "plan-paint-backport-2026-09-29.json"
+}

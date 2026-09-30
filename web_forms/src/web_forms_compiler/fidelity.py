@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from contextlib import contextmanager
 from dataclasses import dataclass
 import hashlib
 import html as html_module
@@ -857,18 +858,54 @@ def _wait_for_debug_target(profile: Path) -> tuple[int, str]:
 
 
 def _chrome_path(explicit: Path | None = None) -> Path:
+    if explicit is not None:
+        if explicit.is_file():
+            return explicit
+        fail("WFV004", "explicit Chromium executable does not exist", str(explicit))
     candidates = [
-        explicit,
         Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
         Path("/Applications/Chromium.app/Contents/MacOS/Chromium"),
-        Path(shutil.which("google-chrome") or ""),
-        Path(shutil.which("chromium") or ""),
+        Path("/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"),
     ]
+    if os.name == "nt":
+        for variable in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
+            root = os.environ.get(variable)
+            if root:
+                candidates.extend(Path(root) / relative for relative in (
+                    "Google/Chrome/Application/chrome.exe",
+                    "Chromium/Application/chrome.exe",
+                    "BraveSoftware/Brave-Browser/Application/brave.exe",
+                    "Microsoft/Edge/Application/msedge.exe",
+                ))
+    for name in ("google-chrome", "chromium", "chromium-browser", "brave-browser",
+                 "chrome", "brave", "msedge"):
+        found = shutil.which(name)
+        if found:
+            candidates.append(Path(found))
     for candidate in candidates:
         if candidate is not None and str(candidate) and candidate.is_file():
             return candidate
     fail("WFV004", "no Chromium executable was found", "<browser>")
     raise AssertionError("unreachable")
+
+
+@contextmanager
+def _capture_directory():
+    directory = tempfile.TemporaryDirectory(prefix="web-forms-fidelity-")
+    try:
+        yield Path(directory.name)
+    finally:
+        # Windows browser children can release profile handles shortly after
+        # the parent exits. Retry only that sharing failure, never ignore it.
+        deadline = time.monotonic() + 5.0
+        while True:
+            try:
+                directory.cleanup()
+                break
+            except PermissionError:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.05)
 
 
 def capture_browser_snapshot(
@@ -939,8 +976,7 @@ def capture_browser_snapshot(
         fail("WFV005", "interaction state is outside the fidelity vocabulary", str(source))
     if interaction != "reference" and not interaction_target:
         fail("WFV005", "interactive fidelity state requires a target stable ID", str(source))
-    with tempfile.TemporaryDirectory(prefix="web-forms-fidelity-") as temporary_name:
-        temporary = Path(temporary_name)
+    with _capture_directory() as temporary:
         instrumented = temporary / "specimen.html"
         instrumented.write_text(source_text, encoding="utf-8")
         profile = temporary / "profile"
@@ -975,6 +1011,7 @@ def capture_browser_snapshot(
         try:
             port, websocket_path = _wait_for_debug_target(profile)
             connection = _CdpConnection("127.0.0.1", port, websocket_path)
+            browser_version = connection.call("Browser.getVersion")
             connection.call("Page.enable")
             connection.call("DOM.enable")
             connection.call("CSS.enable")
@@ -1108,17 +1145,24 @@ def capture_browser_snapshot(
             fail("WFV006", f"Chromium capture failed: {error}", str(source))
         finally:
             if connection is not None:
+                try:
+                    connection.call("Browser.close")
+                except (OSError, RuntimeError, ValueError):
+                    # Some Chromium builds close the socket before replying.
+                    pass
                 connection.close()
-            process.terminate()
             try:
                 process.wait(timeout=2.0)
             except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=2.0)
-    version = subprocess.run(
-        [str(executable), "--version"], text=True, capture_output=True, check=False
-    )
-    snapshot["environment"]["browser"] = version.stdout.strip()
+                process.terminate()
+                try:
+                    process.wait(timeout=2.0)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=2.0)
+    snapshot["environment"]["browser"] = browser_version["product"]
+    snapshot["environment"]["browser_executable"] = str(executable.resolve())
+    snapshot["environment"]["browser_version"] = browser_version
     snapshot["environment"]["requested_viewport"] = [width, height]
     validate_fidelity_snapshot(snapshot, str(source))
     return snapshot

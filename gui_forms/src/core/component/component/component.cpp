@@ -16,7 +16,11 @@ struct ExpiredRevocable final {
 
 } // namespace
 
-Component::~Component() = default;
+Component::~Component() {
+    // Natural C++ destruction ends subscriptions just as explicit disposal
+    // does. Do not call virtual disposal hooks after derived members are gone.
+    revoke_owned_work();
+}
 
 void Component::dispose() {
     if (state_ != ComponentState::alive) {

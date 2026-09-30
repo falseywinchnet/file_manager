@@ -11,6 +11,8 @@ enum class DropDownButtonMode : std::uint8_t {
     split,
 };
 
+enum class DropDownButtonEdge : std::uint8_t { right, bottom };
+
 // Retained desktop command button with an explicit disclosure actuator.
 // Menu mode routes the whole button to the owned popup. Split mode retains a
 // primary Click region and a bounded disclosure region at the trailing edge.
@@ -23,10 +25,14 @@ public:
         return mode_;
     }
     void set_drop_down_mode(DropDownButtonMode mode);
+    // Disclosure extent on the selected edge; setters move the reserved
+    // content inset with it. Author primary-content padding after these setters.
     [[nodiscard]] double drop_down_width() const noexcept {
         return drop_down_width_;
     }
     void set_drop_down_width(double width);
+    [[nodiscard]] DropDownButtonEdge drop_down_edge() const noexcept { return edge_; }
+    void set_drop_down_edge(DropDownButtonEdge edge);
     [[nodiscard]] bool drop_down_open() const noexcept {
         return drop_down_open_;
     }
@@ -53,6 +59,7 @@ private:
     [[nodiscard]] bool point_in_drop_down(Point window_point) const noexcept;
 
     DropDownButtonMode mode_{DropDownButtonMode::menu};
+    DropDownButtonEdge edge_{DropDownButtonEdge::right};
     double drop_down_width_{16.0};
     bool drop_down_open_{};
     bool pointer_drop_down_{};

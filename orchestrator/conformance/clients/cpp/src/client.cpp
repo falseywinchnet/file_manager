@@ -1475,24 +1475,6 @@ bool BootstrapSnapshot::orchestrator_gate_ready() const noexcept {
     return bootstrap != availability.end();
 }
 
-const SettingValue* SettingsSnapshotInfo::find(
-    const std::string_view id) const noexcept {
-    const auto found = std::find_if(values.begin(), values.end(),
-                                    [id](const auto& entry) {
-                                        return entry.id == id;
-                                    });
-    return found == values.end() ? nullptr : &found->value;
-}
-
-const ServiceInfo* ServicesSnapshotInfo::find(
-    const std::string_view id) const noexcept {
-    const auto found = std::find_if(services.begin(), services.end(),
-                                    [id](const auto& service) {
-                                        return service.id == id;
-                                    });
-    return found == services.end() ? nullptr : &*found;
-}
-
 void Client::shutdown() {
     (void)call("orchestrator.shutdown", "ORC-LIF-001", 1, 0);
     ::close(std::exchange(socket_, -1));
@@ -1543,8 +1525,6 @@ ServiceCommandResultInfo Client::service_command(std::string, std::string,
                                                   std::optional<std::string>) {
     throw ClientError("unsupported platform");
 }
-const SettingValue* SettingsSnapshotInfo::find(std::string_view) const noexcept { return nullptr; }
-const ServiceInfo* ServicesSnapshotInfo::find(std::string_view) const noexcept { return nullptr; }
 bool BootstrapSnapshot::orchestrator_gate_ready() const noexcept { return false; }
 void Client::shutdown() { throw ClientError("unsupported platform"); }
 std::string Client::call(std::string_view, std::string_view, std::uint16_t, std::uint16_t, std::string_view, bool) {
@@ -1554,3 +1534,21 @@ std::string Client::call(std::string_view, std::string_view, std::uint16_t, std:
 }  // namespace fileman::orchestrator
 
 #endif
+
+namespace fileman::orchestrator {
+
+const SettingValue* SettingsSnapshotInfo::find(const std::string_view id) const noexcept {
+    for (const SettingValueInfo& entry : values) {
+        if (entry.id == id) return &entry.value;
+    }
+    return nullptr;
+}
+
+const ServiceInfo* ServicesSnapshotInfo::find(const std::string_view id) const noexcept {
+    for (const ServiceInfo& service : services) {
+        if (service.id == id) return &service;
+    }
+    return nullptr;
+}
+
+}  // namespace fileman::orchestrator

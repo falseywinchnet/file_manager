@@ -222,9 +222,9 @@ private:
 
 class AttachChildOnce final {
 public:
-    AttachChildOnce(Control& parent, const Control::Ptr& child,
+    AttachChildOnce(Control& parent, Control::Ptr child,
                     bool& invoked) noexcept
-        : parent_(parent), child_(child), invoked_(invoked) {}
+        : parent_(parent), child_(std::move(child)), invoked_(invoked) {}
 
     void operator()() const {
         if (invoked_) return;
@@ -234,7 +234,7 @@ public:
 
 private:
     Control& parent_;
-    const Control::Ptr& child_;
+    Control::Ptr child_;
     bool& invoked_;
 };
 
@@ -257,8 +257,8 @@ private:
 class ReplaceChildOnce final {
 public:
     ReplaceChildOnce(Control& parent, Control& removed,
-                     const Control::Ptr& added, bool& invoked) noexcept
-        : parent_(parent), removed_(removed), added_(added), invoked_(invoked) {}
+                     Control::Ptr added, bool& invoked) noexcept
+        : parent_(parent), removed_(removed), added_(std::move(added)), invoked_(invoked) {}
 
     void operator()() const {
         if (invoked_) return;
@@ -270,7 +270,7 @@ public:
 private:
     Control& parent_;
     Control& removed_;
-    const Control::Ptr& added_;
+    Control::Ptr added_;
     bool& invoked_;
 };
 

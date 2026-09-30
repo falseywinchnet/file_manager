@@ -35,8 +35,13 @@ elif ! git -C "$skia_dir" apply --reverse --check "$script_dir/skia_windows_ming
   echo "Skia Windows MinGW source patch does not apply cleanly." >&2
   exit 1
 fi
-"$skia_dir/bin/fetch-gn"
-"$skia_dir/bin/fetch-ninja"
+if [ "${GUI_FORMS_SYSTEM_BUILD_TOOLS:-0}" = 1 ]; then
+  command -v gn >/dev/null
+  command -v ninja >/dev/null
+else
+  "$skia_dir/bin/fetch-gn"
+  "$skia_dir/bin/fetch-ninja"
+fi
 mkdir -p "$skia_dir/third_party/externals"
 fetch_revision "$skia_dir/third_party/externals/libpng" \
   https://skia.googlesource.com/third_party/libpng.git "$libpng_revision"

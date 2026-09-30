@@ -33,6 +33,28 @@ fn human_status_is_concise() {
     assert!(stdout.contains("user-scoped, lazy, no GUI"));
 }
 
+#[cfg(not(unix))]
+#[test]
+fn local_transport_is_explicitly_unavailable_without_publishing_an_endpoint() {
+    let runtime = std::env::temp_dir().join(format!(
+        "fileman-unavailable-endpoint-{}",
+        std::process::id()
+    ));
+    assert!(!runtime.exists());
+    for arguments in [vec!["serve-local"], vec!["call-local", "status"]] {
+        let output = Command::new(env!("CARGO_BIN_EXE_orchestrator"))
+            .args(arguments)
+            .arg("--runtime-dir")
+            .arg(&runtime)
+            .output()
+            .expect("run unavailable transport");
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("not implemented"));
+        assert!(output.stdout.is_empty());
+        assert!(!runtime.exists());
+    }
+}
+
 #[test]
 fn core_release_is_machine_readable_and_ready_after_all_evidence_passes() {
     let output = Command::new(env!("CARGO_BIN_EXE_orchestrator"))

@@ -8,6 +8,8 @@ mod stdio;
 
 #[cfg(unix)]
 mod local;
+#[cfg(windows)]
+pub(crate) mod windows;
 
 #[cfg(target_os = "macos")]
 mod launchd;
@@ -30,20 +32,23 @@ pub(crate) struct EngineProviderConfig {
 
 #[cfg(unix)]
 pub(crate) use local::{call_local, serve_local};
+#[cfg(windows)]
+pub(crate) use windows::{call_local, serve_local};
 
-#[cfg(not(unix))]
+#[cfg(not(any(unix, windows)))]
 pub(crate) fn serve_local(
     _runtime_directory: &std::path::Path,
     _engine_options: Option<EngineProviderConfig>,
     _settings_directory: Option<&std::path::Path>,
+    _engine_runtime: Option<&std::path::Path>,
 ) -> Result<(), String> {
     Err("serve-local is not implemented on this platform".to_owned())
 }
 
-#[cfg(not(unix))]
+#[cfg(not(any(unix, windows)))]
 pub(crate) fn call_local(
     _runtime_directory: &std::path::Path,
-    _request: crate::Request,
+    _request: &crate::Request,
 ) -> Result<crate::Response, String> {
     Err("call-local is not implemented on this platform".to_owned())
 }

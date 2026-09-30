@@ -56,6 +56,29 @@ remain unavailable, deferred, negotiating, or stubbed.
 | ORC-FED-001 | Machine/network catalogue and federated-query envelope | Orchestrator | remote Orchestrator/engine adapter | Orchestrator query broker | authenticated optional wire | deferred paper |
 | ORC-AUD-001 | Local audit, provenance inspection, redacted export | Orchestrator | audit service | frontend, CLI | local API | outline |
 
+## Windows development consumption receipt (2026-09-29)
+
+**GIVEN:** the current Windows recovery tranche may build the additive public
+GUI.Forms Application projection carried by Plan Paint source `64248bcc06a1`
+and its six locked patches. This is an `ORC-GUI-001` development consumption
+projection with host protocol 7; the canonical GUI.Forms checkout owns the
+backport and its installed SDK. Parent coordination records SDK build and
+runtime evidence separately; no Windows SDK acceptance is claimed here yet.
+
+The named macOS FM0 snapshot and its readiness manifest remain unchanged.
+Windows installed Orchestrator discovery, authentication, local transport,
+supervision and end-to-end frontend bootstrap remain unavailable. A compiled
+C++ client with explicit unavailable errors does not satisfy those gates.
+
+### Development presentation additions — 2026-09-29
+
+The File Manager ergonomics slice consumes additive public GUI.Forms C++ font
+metrics for MenuStrip, BreadcrumbTrail and PropertyList, PropertyList row height,
+and an opt-in raised breadcrumb appearance. The owner explicitly directed
+practical UI improvement using the Paint toolkit. Provider negotiation and
+validation live in GUI.Forms/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md. These
+in-process presentation settings add no wire operation, service authority or
+stable ABI promise; existing Windows service availability remains unchanged.
 ## Explicitly forbidden edges
 
 - plugin worker → Go engine writable/index API;

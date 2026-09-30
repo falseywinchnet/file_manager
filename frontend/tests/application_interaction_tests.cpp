@@ -1,3 +1,5 @@
+#include "file_manager/platform_paths.hpp"
+#include "fixture_links.hpp"
 #include "application.hpp"
 
 #include "gui_forms/gui_forms.hpp"
@@ -137,9 +139,18 @@ public:
 
 namespace {
 
+class ApplicationStopGuard final {
+public:
+    explicit ApplicationStopGuard(file_manager::Application& application) : application_(application) {}
+    ~ApplicationStopGuard() { application_.stop(); }
+private:
+    file_manager::Application& application_;
+};
+
+
 using namespace std::chrono_literals;
 
-void require(const bool condition, const char* message) {
+void require(const bool condition, const std::string& message) {
     if (!condition) throw std::runtime_error(message);
 }
 
@@ -314,6 +325,7 @@ void test_application_controls_navigate_real_directories() {
     TemporaryTree tree_fixture;
     auto application = std::make_shared<file_manager::Application>(
         tree_fixture.root(), std::nullopt, false, std::string{});
+    ApplicationStopGuard stop_guard(*application);
     std::unique_ptr<gui_forms::Window> window = application->make_window();
     application->bind_host([] {}, [] {});
 
@@ -338,6 +350,25 @@ void test_application_controls_navigate_real_directories() {
                     tree_fixture.root().filename().string(),
             "application path host must retain one trail/editor identity rather than rebuilding buttons");
 
+    const gui_forms::Control::Ptr empty_preview = window->find(
+        "file-manager-app.shell.workspace.selection.inspector.facts.preview.surface");
+    const gui_forms::Control::Ptr empty_properties = window->find("fm.selection.properties");
+    require(empty_preview && empty_properties && !empty_preview->visible() &&
+                !empty_properties->visible(),
+            "no selection must retain a compact prompt without an empty preview or editable facts");
+    const std::shared_ptr<gui_forms::MenuStrip> readable_menu =
+        std::dynamic_pointer_cast<gui_forms::MenuStrip>(window->find("fm.application.menu"));
+    const std::shared_ptr<gui_forms::PropertyList> readable_properties =
+        std::dynamic_pointer_cast<gui_forms::PropertyList>(empty_properties);
+    require(readable_menu && readable_menu->font().size == 13.0 &&
+                readable_properties && readable_properties->font().size == 13.0 &&
+                readable_properties->row_height() >= 30.0 &&
+                breadcrumb->font().size == 13.0 &&
+                breadcrumb->appearance() == gui_forms::BreadcrumbAppearance::raised &&
+                tree->font().size == 13.0 && tree->item_height() >= 26.0 &&
+                objects->font().size == 13.0 && objects->details_row_height() >= 28.0,
+            "folder content must use readable fonts and row targets");
+
     const auto admitted_root = tree_item(
         *tree, tree_fixture.root().filename().string());
     const auto initial_documents = tree_item(*tree, "Documents");
@@ -360,7 +391,7 @@ void test_application_controls_navigate_real_directories() {
     window->perform_layout();
     require(root_mode &&
                 root_mode->text() ==
-                    tree_fixture.root().filename().string() + "-rooted",
+                    tree_fixture.root().filename().string(),
             "tree header must expose the active honest root mode");
     const auto tree_header = window->find(
         "file-manager-app.shell.workspace.sidebar.header");
@@ -390,12 +421,20 @@ void test_application_controls_navigate_real_directories() {
             rect_text(tree_header) + " caption=" + rect_text(tree_caption) +
             " mode=" + rect_text(root_mode));
     }
+#if defined(_WIN32)
+    const std::string volume_menu_id = "fm.navigation.root-mode-menu.popup.row.admitted.0";
+    const std::string launch_menu_id = "fm.navigation.root-mode-menu.popup.row.admitted." +
+        std::to_string(file_manager::local_volume_roots().size());
+#else
+    const std::string volume_menu_id = "fm.navigation.root-mode-menu.popup.row.volumes";
+    const std::string launch_menu_id = "fm.navigation.root-mode-menu.popup.row.admitted.0";
+#endif
     require(window->perform_semantic_action(
                 "fm.navigation.root-mode", gui_forms::SemanticAction::press) &&
                 window->find(
                     "fm.navigation.root-mode-menu.popup.row.home") != nullptr &&
                 window->find(
-                    "fm.navigation.root-mode-menu.popup.row.volumes") != nullptr,
+                    volume_menu_id) != nullptr,
             "tree root mode menu must keep Home and Volumes immediately available");
     require(window->perform_semantic_action(
                 "fm.navigation.root-mode-menu.popup.row.home",
@@ -404,13 +443,13 @@ void test_application_controls_navigate_real_directories() {
     require_eventually(*application,
         [&] {
             const auto home = tree_item(*tree, "Home");
-            return home && home->depth == 0U && root_mode->text() == "Home-rooted";
+            return home && home->depth == 0U && root_mode->text() == "Home";
         },
         "Home mode switch must expose one honest Home-rooted tree");
     require(window->perform_semantic_action(
                 "fm.navigation.root-mode", gui_forms::SemanticAction::press) &&
                 window->perform_semantic_action(
-                    "fm.navigation.root-mode-menu.popup.row.admitted.0",
+                    launch_menu_id,
                     gui_forms::SemanticAction::press),
             "explicit protected root must remain an immediate honest mode");
     require_eventually(*application,
@@ -580,7 +619,20 @@ void test_application_controls_navigate_real_directories() {
                 breadcrumb->edit_stable_id(),
                 gui_forms::SemanticAction::press),
             "path editor must reopen after pointer completion rollback");
+#if defined(_WIN32)
+    const DWORD drive_mask = GetLogicalDrives();
+    std::string unadmitted_path;
+    for (int drive = 25; drive >= 0; --drive) {
+        if ((drive_mask & (1UL << drive)) == 0) {
+            unadmitted_path = std::string(1, static_cast<char>('A' + drive)) + ":/unadmitted-file-manager-root";
+            break;
+        }
+    }
+    require(!unadmitted_path.empty(), "fixture needs one unused drive letter");
+    path_editor->set_text(unadmitted_path);
+#else
     path_editor->set_text("/definitely/not/an/admitted/file-manager/root");
+#endif
     require_eventually(*application,
         [&] {
             const auto preview = std::dynamic_pointer_cast<gui_forms::Label>(
@@ -727,6 +779,7 @@ void test_application_command_surfaces_and_house_mark() {
     TemporaryTree tree_fixture;
     auto application = std::make_shared<file_manager::Application>(
         tree_fixture.root(), std::nullopt, false, std::string{});
+    ApplicationStopGuard stop_guard(*application);
     std::unique_ptr<gui_forms::Window> window = application->make_window();
     window->perform_layout();
 
@@ -768,7 +821,7 @@ void test_application_command_surfaces_and_house_mark() {
     require(objects != nullptr, "application object field must exist");
     const auto tree = std::dynamic_pointer_cast<gui_forms::TreeView>(
         window->find("fm.navigation.tree"));
-    require(objects->icon_cell_size() == gui_forms::Size{86.0, 78.0} &&
+    require(objects->icon_cell_size() == gui_forms::Size{104.0, 86.0} &&
                 objects->image_list() &&
                 objects->image_list()->image_size() ==
                     gui_forms::Size{42.0, 42.0} &&
@@ -860,19 +913,19 @@ void test_application_command_surfaces_and_house_mark() {
     const auto arrange_caption_bounds =
         arrange_caption->committed_arranged_bounds();
     const bool office_pearl_geometry =
-                shelf_bounds.height == 66.0 &&
+                shelf_bounds.height == 72.0 &&
                 selection_bounds.width >= 176.0 &&
-                selection_bounds.height == 63.0 &&
+                selection_bounds.height == 69.0 &&
                 arrange_bounds.width >= 306.0 &&
-                arrange_bounds.height == 63.0 &&
-                selection_actions_bounds.height == 44.0 &&
-                arrange_actions_bounds.height == 44.0 &&
-                move_copy_bounds.height == 44.0 &&
-                delete_bounds.height == 44.0 &&
-                view_bounds.height == 44.0 &&
-                sort_bounds.height == 44.0 &&
-                selection_caption_bounds.height == 13.0 &&
-                arrange_caption_bounds.height == 13.0 &&
+                arrange_bounds.height == 69.0 &&
+                selection_actions_bounds.height == 48.0 &&
+                arrange_actions_bounds.height == 48.0 &&
+                move_copy_bounds.height == 48.0 &&
+                delete_bounds.height == 48.0 &&
+                view_bounds.height == 48.0 &&
+                sort_bounds.height == 48.0 &&
+                selection_caption_bounds.height == 16.0 &&
+                arrange_caption_bounds.height == 16.0 &&
                 selection_caption_bounds.y >=
                     selection_actions_bounds.y +
                         selection_actions_bounds.height &&
@@ -1081,28 +1134,13 @@ void test_application_command_surfaces_and_house_mark() {
 
     window->resize({150.0, 150.0});
     window->perform_layout();
-    const auto minimum_more_bounds = more->absolute_bounds();
-    const bool minimum_commands_inside =
-        window->client_size() == gui_forms::Size{150.0, 150.0} &&
-        more->effectively_visible() && minimum_more_bounds.width >= 44.0 &&
-        minimum_more_bounds.height >= 24.0 && minimum_more_bounds.x >= 0.0 &&
-        minimum_more_bounds.y >= 0.0 &&
-        minimum_more_bounds.x + minimum_more_bounds.width <= 150.0 &&
-        minimum_more_bounds.y + minimum_more_bounds.height <= 150.0;
-    if (!minimum_commands_inside) {
-        const auto local = more->committed_arranged_bounds();
-        throw std::runtime_error(
-            "150 by 150 Commands escape: client=" +
-            std::to_string(window->client_size().width) + "," +
-            std::to_string(window->client_size().height) + " absolute=" +
-            std::to_string(minimum_more_bounds.x) + "," +
-            std::to_string(minimum_more_bounds.y) + "," +
-            std::to_string(minimum_more_bounds.width) + "," +
-            std::to_string(minimum_more_bounds.height) + " committed=" +
-            std::to_string(local.x) + "," + std::to_string(local.y) + "," +
-            std::to_string(local.width) + "," +
-            std::to_string(local.height));
-    }
+    const std::shared_ptr<gui_forms::MenuStrip> minimum_menu =
+        std::dynamic_pointer_cast<gui_forms::MenuStrip>(window->find("fm.application.menu"));
+    require(minimum_menu && minimum_menu->effectively_visible() &&
+                minimum_menu->items().size() == 1U &&
+                minimum_menu->items().front().stable_id == "fm.menu.compact" &&
+                !more->effectively_visible(),
+            "minimum window must preserve the complete compact menu while collapsing secondary shelf chrome");
 
     window->resize({1340.0, 850.0});
     window->perform_layout();
@@ -1115,8 +1153,8 @@ void test_application_command_surfaces_and_house_mark() {
                 sort_button->text() == "Sort: Kind" &&
                 selection_group->committed_arranged_bounds().width >= 176.0 &&
                 arrange_group->committed_arranged_bounds().width >= 306.0 &&
-                move_copy_button->committed_arranged_bounds().height == 44.0 &&
-                sort_button->committed_arranged_bounds().height == 44.0 &&
+                move_copy_button->committed_arranged_bounds().height == 48.0 &&
+                sort_button->committed_arranged_bounds().height == 48.0 &&
                 arrange_group->committed_arranged_bounds().x >=
                     selection_group->committed_arranged_bounds().x +
                         selection_group->committed_arranged_bounds().width + 4.0,
@@ -1144,11 +1182,12 @@ void test_application_command_surfaces_and_house_mark() {
 void test_application_command_truth_across_files_search_and_settings() {
     TemporaryTree tree_fixture;
     std::filesystem::create_directories(tree_fixture.root() / "Empty");
-    std::filesystem::create_symlink(
+    const bool symlink_available = create_fixture_link(
         tree_fixture.root() / "root.txt",
         tree_fixture.root() / "root-link.txt");
     auto application = std::make_shared<file_manager::Application>(
         tree_fixture.root(), tree_fixture.quarantine(), true, "fixture-root");
+    ApplicationStopGuard stop_guard(*application);
     std::unique_ptr<gui_forms::Window> window = application->make_window();
     std::size_t close_requests{};
     application->bind_host([] {}, [&] { ++close_requests; });
@@ -1162,6 +1201,8 @@ void test_application_command_truth_across_files_search_and_settings() {
             window->find("fm.search.correspondence"));
     auto search = std::dynamic_pointer_cast<gui_forms::TextBox>(
         window->find("fm.search.current-folder"));
+    const std::shared_ptr<gui_forms::TextBox> path_editor =
+        std::dynamic_pointer_cast<gui_forms::TextBox>(window->find("fm.path.editor"));
     auto rename = std::dynamic_pointer_cast<gui_forms::TextBox>(
         window->find("fm.operations.rename"));
     auto status_ready = std::dynamic_pointer_cast<gui_forms::Label>(
@@ -1222,7 +1263,7 @@ void test_application_command_truth_across_files_search_and_settings() {
         [&] { return has_object_named(*objects, "root.txt") &&
                      has_object_named(*objects, "Documents") &&
                      has_object_named(*objects, "Empty") &&
-                     has_object_named(*objects, "root-link.txt"); },
+                     (!symlink_available || has_object_named(*objects, "root-link.txt")); },
         "command truth fixture must enumerate the protected root");
     require_unique_semantic_ids(*window);
     require(icons_command->state().enabled &&
@@ -1243,11 +1284,44 @@ void test_application_command_truth_across_files_search_and_settings() {
                 objects->selected_ids().size() == objects->items().size(),
             "the advertised primary-modifier+A gesture must execute Select All through the visible folder surface");
 
+    require(status_ready->text().starts_with(std::to_string(objects->items().size()) + " selected") &&
+                status_summary->text().starts_with(file_manager::path_utf8(tree_fixture.root())),
+            "ordinary selection status must count objects and retain the exact current folder");
+    require(window->dispatch_key({gui_forms::KeyAction::down,
+                                  gui_forms::PhysicalKey::l, primary}) &&
+                window->focused_control() == path_editor && path_editor->visible() &&
+                path_editor->text() == file_manager::path_utf8(tree_fixture.root()),
+            "primary-modifier+L must focus the exact editable folder path");
+    path_editor->set_text("unfinished folder draft");
+    require(window->dispatch_key({gui_forms::KeyAction::down,
+                                  gui_forms::PhysicalKey::l, primary}) &&
+                path_editor->selected_text() == "unfinished folder draft",
+            "repeating primary-modifier+L must select the existing draft without replacing it");
+    window->dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::f5});
+    require(path_editor->text() == "unfinished folder draft" && path_editor->visible(),
+            "F5 must preserve an active path draft");
+    const std::uint64_t before_refresh = file_manager::ApplicationInteractionProbe::applied_generation(*application);
+    require(window->dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::escape}) &&
+                window->request_focus(objects) &&
+                window->dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::f5}),
+            "F5 must execute Refresh from the ordinary folder surface");
+    struct RefreshApplied final {
+        file_manager::Application& application;
+        std::uint64_t before;
+        bool operator()() const {
+            return file_manager::ApplicationInteractionProbe::applied_generation(application) > before;
+        }
+    };
+    require_eventually(*application, RefreshApplied{*application, before_refresh},
+                       "F5 must publish a fresh directory enumeration");
+
     const std::string root_file = object_id(*objects, "root.txt");
     auto selection_properties = std::dynamic_pointer_cast<gui_forms::PropertyList>(
         window->find("fm.selection.properties"));
     require(!root_file.empty() && window->perform_semantic_action(
                 root_file, gui_forms::SemanticAction::select) &&
+                status_ready->text() == "1 selected · " +
+                    file_manager::format_bytes(std::filesystem::file_size(tree_fixture.root() / "root.txt")) + " in files" &&
                 checksum_command->state().enabled &&
                 checksum_command->state().availability_reason.empty() &&
                 terminal_command->state().enabled &&
@@ -1376,13 +1450,19 @@ void test_application_command_truth_across_files_search_and_settings() {
         file_manager::PlatformCommandKind::open_terminal_here,
         tree_fixture.root(), file_terminal_target.path,
         file_terminal_target.identity, file_terminal_plan);
+#if defined(_WIN32)
+    const std::vector<std::string> expected_terminal_arguments{"/D"};
+    const bool terminal_executable_matches = file_terminal_plan.executable.filename() == L"cmd.exe";
+#else
     const std::vector<std::string> expected_terminal_arguments{
         "/usr/bin/open", "-a", "Terminal",
         file_terminal_plan.selected_path.string()};
+    const bool terminal_executable_matches = file_terminal_plan.executable == "/usr/bin/open";
+#endif
     std::error_code terminal_equivalence_error;
     if (file_terminal_target.path != tree_fixture.root() ||
         !file_terminal_target.directory || file_terminal_result.code != "ok" ||
-        file_terminal_plan.executable != "/usr/bin/open" ||
+        !terminal_executable_matches ||
         file_terminal_plan.arguments != expected_terminal_arguments ||
         !std::filesystem::equivalent(file_terminal_plan.selected_path,
                                      tree_fixture.root(),
@@ -1564,6 +1644,7 @@ void test_application_command_truth_across_files_search_and_settings() {
         [&] { return has_object_named(*objects, "root.txt"); },
         "returning to the root must restore nonempty folder commands");
 
+    if (symlink_available) {
     const std::string symlink = object_id(*objects, "root-link.txt");
     require(!symlink.empty() && window->perform_semantic_action(
                 symlink, gui_forms::SemanticAction::select),
@@ -1596,6 +1677,7 @@ void test_application_command_truth_across_files_search_and_settings() {
                 command_trace.size() == invocation_count &&
                 has_object_named(*objects, "root-link.txt"),
             "semantic symlink activation must remain visible but cannot bypass the disabled canonical Open command");
+    }
 
     const auto synthetic_generation =
         file_manager::ApplicationInteractionProbe::show_search_results(
@@ -1753,16 +1835,18 @@ void test_application_command_truth_across_files_search_and_settings() {
                 close_requests == 0U,
             "nonempty Files must restore the same actionable Select All command without spuriously closing the window");
 
-    require(window->perform_semantic_action(
-                "fm.menu.help", gui_forms::SemanticAction::expand) &&
-                window->perform_semantic_action(
-                    "fm.application.menu.menu.popup.row.help.about",
-                    gui_forms::SemanticAction::press) &&
+    require((*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::escape}),
+            "Edit popup must dismiss before moving semantic focus to Help");
+    const bool help_opened = (*window).perform_semantic_action(
+        "fm.menu.help", gui_forms::SemanticAction::expand);
+    const bool about_invoked = (*window).perform_semantic_action(
+        "fm.application.menu.menu.popup.row.help.about", gui_forms::SemanticAction::press);
+    require(help_opened && about_invoked &&
                 status_ready->text() ==
                     "File Manager · 0.001-alpha development build" &&
                 status_summary->text() ==
                     "local filesystem authority · GUI.Forms + Web.Forms",
-            "Help About row must publish the exact development version and local authority even without a dialog backend");
+            "Help About row must publish the exact development version and local authority even without a dialog backend; ready=" + status_ready->text() + "; summary=" + status_summary->text() + "; help=" + std::to_string(help_opened) + "; about=" + std::to_string(about_invoked));
     require(window->perform_semantic_action(
                 "fm.menu.file", gui_forms::SemanticAction::expand) &&
                 window->perform_semantic_action(
@@ -1778,6 +1862,7 @@ void test_criteria_virtual_folder_is_retained_exact_and_catalogue_only() {
     TemporaryTree tree_fixture;
     auto application = std::make_shared<file_manager::Application>(
         tree_fixture.root(), std::nullopt, false, "fixture-root");
+    ApplicationStopGuard stop_guard(*application);
     std::unique_ptr<gui_forms::Window> window = application->make_window();
     application->bind_host([] {}, [] {});
 
@@ -1925,6 +2010,7 @@ void test_settings_tabs_and_transaction_actions_are_truthful() {
     TemporaryTree tree_fixture;
     auto application = std::make_shared<file_manager::Application>(
         tree_fixture.root(), std::nullopt, false, std::string{});
+    ApplicationStopGuard stop_guard(*application);
     std::unique_ptr<gui_forms::Window> window = application->make_window();
 
     fileman::orchestrator::SettingsSchemaInfo schema;
@@ -2032,6 +2118,7 @@ void test_property_name_rename_is_protected_and_collision_safe() {
     TemporaryTree tree_fixture;
     auto application = std::make_shared<file_manager::Application>(
         tree_fixture.root(), tree_fixture.quarantine(), true, std::string{});
+    ApplicationStopGuard stop_guard(*application);
     std::unique_ptr<gui_forms::Window> window = application->make_window();
     application->bind_host([] {}, [] {});
 
@@ -2134,6 +2221,88 @@ void test_property_name_rename_is_protected_and_collision_safe() {
     application->stop();
 }
 
+void adaptive_noop() {}
+
+void require_inside(const gui_forms::Control::Ptr& control, const gui_forms::Size viewport,
+                    const double minimum_height, const std::string& label) {
+    const gui_forms::Rect rectangle = control->absolute_bounds();
+    require(control->effectively_visible() && rectangle.x >= -0.01 && rectangle.y >= -0.01 &&
+                rectangle.width >= 60.0 && rectangle.height >= minimum_height &&
+                rectangle.x + rectangle.width <= viewport.width + 0.01 &&
+                rectangle.y + rectangle.height <= viewport.height + 0.01,
+            label + " must fit the viewport with usable dimensions: " +
+                std::to_string(rectangle.x) + "," + std::to_string(rectangle.y) + "," +
+                std::to_string(rectangle.width) + "," + std::to_string(rectangle.height));
+}
+
+void test_adaptive_layout_preserves_fields_commands_and_selection() {
+    TemporaryTree fixture;
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(fixture.root(), std::nullopt, false, std::string{});
+    ApplicationStopGuard stop_guard(*application);
+    const std::unique_ptr<gui_forms::Window> window = application->make_window();
+    application->bind_host(adaptive_noop, adaptive_noop);
+    const std::shared_ptr<gui_forms::ObjectView> objects =
+        std::dynamic_pointer_cast<gui_forms::ObjectView>(window->find("fm.objects.current-folder"));
+    require_eventually(*application, std::bind_front(has_object_named, std::cref(*objects), std::string_view("root.txt")),
+                       "adaptive fixture must enumerate");
+    const gui_forms::Control::Ptr path_host = window->find("file-manager-app.shell.location.path-host");
+    const gui_forms::Control::Ptr search_host = window->find("file-manager-app.shell.location.search-host");
+    const gui_forms::Control::Ptr preview = window->find("file-manager-app.shell.workspace.selection.inspector.facts.preview.surface");
+    const std::shared_ptr<gui_forms::TextBox> path =
+        std::dynamic_pointer_cast<gui_forms::TextBox>(window->find("fm.path.editor"));
+    const std::shared_ptr<gui_forms::TextBox> search =
+        std::dynamic_pointer_cast<gui_forms::TextBox>(window->find("fm.search.current-folder"));
+    const std::shared_ptr<gui_forms::MenuStrip> menu =
+        std::dynamic_pointer_cast<gui_forms::MenuStrip>(window->find("fm.application.menu"));
+    const std::string selected = object_id(*objects, "root.txt");
+    require(window->perform_semantic_action(selected, gui_forms::SemanticAction::select), "adaptive fixture selection");
+#if defined(__APPLE__)
+    constexpr gui_forms::Modifier primary = gui_forms::Modifier::meta;
+#else
+    constexpr gui_forms::Modifier primary = gui_forms::Modifier::control;
+#endif
+    for (const double scale : {1.0, 1.5, 2.0}) {
+        window->set_scale(scale);
+        for (const gui_forms::Size size : {gui_forms::Size{150,150}, {360,260}, {540,620}, {800,320}, {1340,850}, {1920,1080}}) {
+            window->resize(size);
+            window->perform_layout();
+            require_inside(objects, size, 64.0, "content");
+            require_inside(path_host, size, 28.0, "location field");
+            if (size.width >= 420 && size.height >= 360) require_inside(search_host, size, 28.0, "search field");
+            if (size.width == 540) require(search_host->absolute_bounds().y >= path_host->absolute_bounds().y + 30.0,
+                                          "medium viewport must stack distinct path and query fields");
+            require(objects->selected_id() == selected, "resize/DPI transitions must preserve exact selection");
+            require(objects->font().size == 13.0 && menu->font().size == 13.0,
+                    "adaptation must not shrink readable fonts");
+            if (size.height < 560) require(!preview->effectively_visible(), "short inspector must compact preview");
+        }
+    }
+    window->resize({150,150});
+    window->perform_layout();
+    require(menu->items().size() == 1U && menu->items().front().items.size() == 7U,
+            "compact menu must retain every original menu category");
+    require(window->request_focus(objects) && window->dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::f, primary}),
+            "Ctrl/Command+F must reveal and focus search at minimum size");
+    window->perform_layout();
+    require_inside(search_host, {150,150}, 28.0, "minimum search field");
+    require(window->focused_control() == search && !path_host->effectively_visible(), "minimum search uses its own retained field");
+    require(window->dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::l, primary}),
+            "Ctrl/Command+L must return to exact location from minimum search");
+    window->perform_layout();
+    require_inside(path_host, {150,150}, 28.0, "minimum path editor");
+    require(window->focused_control() == path && !search_host->effectively_visible(), "path and search remain distinct controls");
+    path->set_text("uncommitted location draft");
+    window->resize({540,620});
+    window->perform_layout();
+    require(path->text() == "uncommitted location draft" && window->focused_control() == path,
+            "reflow must preserve the path draft and focus");
+    window->resize({1340,850});
+    window->perform_layout();
+    require(menu->items().size() == 7U && preview->effectively_visible() && objects->selected_id() == selected,
+            "wide restoration must recover menu geography, preview and exact selection");
+}
+
 void test_installed_criteria_route_when_requested() {
     const char* root_value = std::getenv("FILE_MANAGER_INSTALLED_CRITERIA_ROOT");
     const char* root_id_value =
@@ -2144,6 +2313,7 @@ void test_installed_criteria_route_when_requested() {
 
     auto application = std::make_shared<file_manager::Application>(
         root_value, std::nullopt, false, root_id_value);
+    ApplicationStopGuard stop_guard(*application);
     std::unique_ptr<gui_forms::Window> window = application->make_window();
     application->bind_host([] {}, [] {});
     auto objects = std::dynamic_pointer_cast<gui_forms::ObjectView>(
@@ -2354,6 +2524,7 @@ void test_installed_daily_navigation_when_requested() {
 
     auto application = std::make_shared<file_manager::Application>(
         home, std::nullopt, false, std::string{});
+    ApplicationStopGuard stop_guard(*application);
     std::unique_ptr<gui_forms::Window> window = application->make_window();
     application->bind_host([] {}, [] {});
     auto breadcrumb = std::dynamic_pointer_cast<gui_forms::BreadcrumbTrail>(
@@ -2374,7 +2545,7 @@ void test_installed_daily_navigation_when_requested() {
                        *application) > 0U &&
                 file_manager::ApplicationInteractionProbe::location(
                     *application) == home &&
-                root_mode->text() == "Home-rooted";
+                root_mode->text() == "Home";
         },
         "installed daily startup must settle at the real user Home");
     window->perform_layout();
@@ -2438,7 +2609,7 @@ void test_installed_daily_navigation_when_requested() {
         [&] {
             const auto volumes = tree_item(*tree, "Volumes");
             return volumes && volumes->depth == 0U &&
-                root_mode->text() == "Volumes-rooted";
+                root_mode->text() == "Volumes";
         },
         "installed daily Volumes mode must retain the real root row");
     require(window->perform_semantic_action(
@@ -2473,6 +2644,7 @@ int main() {
         test_criteria_virtual_folder_is_retained_exact_and_catalogue_only();
         test_settings_tabs_and_transaction_actions_are_truthful();
         test_property_name_rename_is_protected_and_collision_safe();
+        test_adaptive_layout_preserves_fields_commands_and_selection();
         test_installed_criteria_route_when_requested();
         test_installed_daily_navigation_when_requested();
         std::cout << "file manager application interaction tests passed\n";

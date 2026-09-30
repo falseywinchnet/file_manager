@@ -24,6 +24,12 @@ struct WindowsHostOptions final {
     bool close_after_launch_for_testing{};
     bool quit_thread_on_close{true};
     bool popup_window{};
+    bool initially_visible{true};
+    bool hide_on_close{};
+    bool minimizable{true};
+    std::function<void(std::function<void()> show,
+                       std::function<void()> hide)> visibility_ready;
+    std::function<void(std::function<void()> toggle)> full_screen_ready;
     Point initial_position{};
     std::function<std::shared_ptr<Control>(std::string_view)> automation_resolve;
     std::function<void(HostCloseRequest&)> close_request;

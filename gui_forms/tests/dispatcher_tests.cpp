@@ -588,6 +588,36 @@ void test_synchronous_invoke_host_and_shutdown_guards() {
             "wake removal/shutdown must not strand a synchronous waiter");
 }
 
+class RepeatedInvokeWorker final {
+public:
+    RepeatedInvokeWorker(Window& window, std::atomic<unsigned>& completed) noexcept
+        : window_(window), completed_(completed) {}
+    void operator()() const {
+        for (unsigned index = 0U; index < 2000U; ++index) {
+            window_.invoke(do_nothing);
+            completed_.fetch_add(1U, std::memory_order_release);
+        }
+    }
+private:
+    Window& window_;
+    std::atomic<unsigned>& completed_;
+};
+
+void test_completion_races_with_wait_entry() {
+    const Control::Ptr root = make_control<Control>(StableId("dispatcher.wait.race"));
+    Window window(root, {200.0, 100.0});
+    host::HeadlessHost host(window);
+    std::atomic<unsigned> completed{0U};
+    std::thread worker(RepeatedInvokeWorker(window, completed));
+    while (completed.load(std::memory_order_acquire) != 2000U) {
+        static_cast<void>(host.pump_dispatcher());
+        std::this_thread::yield();
+    }
+    worker.join();
+    require(window.dispatcher_snapshot().invoked == 2000U,
+            "every synchronous completion must release its waiter");
+}
+
 void test_concurrent_producer_fifo_and_turn_bound() {
     std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("dispatcher.stress.root"));
     Window window(root, {320.0, 180.0});
@@ -747,6 +777,7 @@ int main() {
         test_cross_thread_post_and_headless_pump();
         test_synchronous_invoke_inline_marshal_fault_and_owner_cancel();
         test_synchronous_invoke_host_and_shutdown_guards();
+        test_completion_races_with_wait_entry();
         test_concurrent_producer_fifo_and_turn_bound();
         test_dispatch_order_against_input_timer_layout_and_paint();
         test_bounds_and_shutdown_revocation();

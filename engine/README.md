@@ -78,6 +78,10 @@ the implementation.
 Go 1.24 or newer is required because metadata scanning uses `os.Root` to keep
 filesystem traversal beneath the explicit sandbox even during symlink races.
 
+The [2026-09-29 Windows validation receipt](results/WINDOWS_TOOLCHAIN_VALIDATION_2026-09-29.md)
+records the verified user-local Go toolchain, PowerShell build/test/race commands,
+native fixture results, and remaining Windows platform gates.
+
 ```sh
 go test ./...
 go test -race ./...

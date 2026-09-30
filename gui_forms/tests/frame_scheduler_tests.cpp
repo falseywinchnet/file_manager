@@ -108,9 +108,9 @@ private:
 
 class SchedulePaintOffThread final {
 public:
-    SchedulePaintOffThread(Window& window, const Control::Ptr& root,
+    SchedulePaintOffThread(Window& window, Control::Ptr root,
                            std::atomic<bool>& rejected)
-        : window_(window), root_(root), rejected_(rejected) {}
+        : window_(window), root_(std::move(root)), rejected_(rejected) {}
 
     void operator()() const {
         try {
@@ -122,7 +122,7 @@ public:
 
 private:
     Window& window_;
-    const Control::Ptr& root_;
+    Control::Ptr root_;
     std::atomic<bool>& rejected_;
 };
 

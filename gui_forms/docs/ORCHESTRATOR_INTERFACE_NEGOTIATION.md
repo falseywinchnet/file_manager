@@ -253,3 +253,44 @@ presentation facts. A non-None local result does not authorize an Orchestrator
 operation, and native modal closure is still owned by the presenting host.
 Evidence:
 `../experiments/M12P8_COMMAND_ARBITRATION_AND_NATIVE_CALLBACKS.md`.
+
+## Shadow Windows development consumption — 2026-09-29
+
+Status: **MEASURED Windows development build/install and 64/64 native tests passed**.
+
+The current owner directed shared-toolchain Windows compilation and reuse of
+Plan Paint's mature GUI.Forms behavior while preserving File Manager styling.
+The hash-verified source and six-patch provenance is in
+`../manifests/plan-paint-backport-2026-09-29.json`; implementation scope is in
+`PLAN_PAINT_BACKPORT_2026-09-29.md`.
+
+The development installed package exposes the existing portable targets plus
+GUIForms::Application on Windows MinGW, with host protocol 7. This does not
+replace the frozen historical macOS FM0 artifact or promote Windows release
+readiness. Orchestrator reconciliation records a separate development entry.
+
+File Manager additionally requires portable wake publication and UI-thread
+pending-result dispatch. ApplicationWindowOptions now names those callbacks,
+contains callback exceptions, and specifies worker shutdown before window
+closure. Native tests cover worker wake and dispatch exception containment.
+These are local presentation mechanics, not permission to call services or
+change cross-process scheduling/authority. macOS custom titlebar controls remain
+adapter-specific; no unsupported portable chrome capability is advertised.
+
+## Daily browsing typography and breadcrumb presentation — 2026-09-29
+
+Status: **GIVEN consumer need; development C++ projection, not a frozen ABI**.
+
+The owner requests a practical File Manager interface closer to its prototype,
+including materially rendered chevron segments. File Manager requests public
+font metrics for MenuStrip, BreadcrumbTrail and PropertyList, plus PropertyList
+row height. These are retained presentation values, not domain/service policy.
+Changes must invalidate layout and semantic hit geometry, preserve active editor
+values, and use the same text metrics for rendering and hit testing.
+
+BreadcrumbTrail additionally offers an opt-in raised appearance; plain remains
+the default. Rich faces retain stable segment identities, same-row editing,
+overflow, semantic activation and keyboard navigation. Pointer ownership follows
+the visible chevron nose instead of an overlapping rectangular approximation.
+This API is consumed through the development Windows SDK. Cross-platform source
+availability does not replace native platform evidence.

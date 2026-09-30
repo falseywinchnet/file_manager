@@ -840,6 +840,14 @@ void test_label_multiline_wrapping_and_alignment() {
     require(rejected && (*label).line_spacing() == 1.25,
             "Label must reject invalid line spacing without mutation");
 
+    (*label).set_text("画布工具可以使用键盘调整坐标并绘制连续线条");
+    RecordingPainter cjk;
+    window.paint(cjk, {0.0, 0.0, 120.0, 80.0});
+    require(cjk.texts.size() > 1, "unspaced CJK paragraphs wrap instead of overflowing");
+    std::string joined;
+    for (const std::string& line : cjk.texts) { joined += line; }
+    require(joined == (*label).text(), "CJK wrapping preserves every UTF-8 character");
+
     (*label).set_text("Visual source");
     (*label).set_text_wrapping(TextWrapping::no_wrap);
     (*label).set_text_case_transform(TextCaseTransform::uppercase_ascii);
@@ -1252,8 +1260,8 @@ void test_drop_down_button_routes_pointer_keyboard_and_semantics() {
 
     RecordingPainter painter;
     menu->on_paint(painter, menu->absolute_bounds());
-    require(painter.lines >= 3U,
-            "open drop-down paint must include a chevron and bounded open edge");
+    require(painter.lines >= 1U && painter.fills >= 4U,
+            "open drop-down paint includes a filled indicator and bounded open edge");
 
     menu->set_enabled(false);
     require(!menu->perform_drop_down() && menu_requests == 3U,
@@ -1267,6 +1275,39 @@ void test_drop_down_button_routes_pointer_keyboard_and_semantics() {
     }
     require(width_rejected && split->drop_down_width() == 16.0,
             "drop-down width must reject invalid geometry without mutation");
+}
+
+void test_bottom_disclosure_and_multiline_button_content() {
+    std::shared_ptr<DropDownButton> button = make_control<DropDownButton>(StableId("ribbon.paste"), "Paste", DropDownButtonMode::split);
+    (*button).set_text("Clipboard image");
+    (*button).set_font({FontRole::control,24,400,false});
+    const Size right_size = (*button).measure({500, 500});
+    (*button).set_drop_down_edge(DropDownButtonEdge::bottom);
+    const Size bottom_size = (*button).measure({500, 500});
+    require(bottom_size.width == right_size.width - 16 && bottom_size.height == right_size.height + 16,
+        "bottom disclosure must move its content reservation to the vertical axis");
+    (*button).set_font({FontRole::control,12,400,false});
+    (*button).set_text("Paste");
+    (*button).set_requested_bounds({0, 0, 64, 80});
+    Window window(button, {64, 80});
+    window.perform_layout();
+    std::size_t clicks = 0, menus = 0;
+    SubscriptionToken click_token = (*button).clicked().subscribe(callbacks::IncrementCounter<std::size_t, ButtonBase&>(clicks));
+    SubscriptionToken menu_token = (*button).drop_down_requested().subscribe(callbacks::IncrementCounter<std::size_t, DropDownButton&>(menus));
+    static_cast<void>(window.dispatch_pointer({PointerAction::down, PointerButton::primary, {32, 25}}));
+    static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, {32, 25}}));
+    static_cast<void>(window.dispatch_pointer({PointerAction::down, PointerButton::primary, {32, 75}}));
+    static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, {32, 75}}));
+    require(clicks == 1 && menus == 1, "bottom split region must preserve primary and menu command ownership");
+    (*button).set_text("Edit\ncolors");
+    (*button).set_use_mnemonic(false);
+    (*button).set_text_alignment(ContentAlignment::middle_center);
+    RecordingPainter painter;
+    (*button).on_paint(painter, {0,0,64,80});
+    require(painter.texts.size() == 2 && painter.texts[0] == "Edit" && painter.texts[1] == "colors" &&
+        painter.text_origins[1].y > painter.text_origins[0].y && painter.text_origins[0].x > painter.text_origins[1].x,
+        "multiline button must paint separately measured and centered lines above disclosure");
+    require(painter.text_origins[1].y < 64, "multiline label must fit above the disclosure strip");
 }
 
 void test_image_list_state_density_ownership_and_button_layout() {
@@ -1390,6 +1431,7 @@ int main() {
         test_button_selected_state();
         test_drop_down_button_routes_pointer_keyboard_and_semantics();
         test_image_list_state_density_ownership_and_button_layout();
+        test_bottom_disclosure_and_multiline_button_content();
         std::cout << "gui_forms_basic_controls_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

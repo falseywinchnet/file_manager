@@ -7,6 +7,8 @@ class WindowsHostServices final : public HostServices {
 public:
     WindowsHostServices() : HostServices(windows_capabilities()) {}
 
+    ~WindowsHostServices() override { shutdown(); }
+
     void bind_owner(HWND owner) noexcept { owner_ = owner; }
 
 protected:
@@ -25,6 +27,35 @@ protected:
         return apply_system_cursor(cursor)
             ? HostServiceStatus{}
             : HostServiceStatus{HostServiceError::backend_failure};
+    }
+
+    HostServiceStatus set_custom_cursor_impl(const CursorImagesPtr& images,
+                                              const CursorImage& image) override {
+        for (const CursorEntry& entry : cursors_) {
+            if (entry.images == images && entry.scale == image.scale) {
+                SetCursor(entry.native);
+                return {};
+            }
+        }
+        if (cursors_.capacity() < 32) cursors_.reserve(32);
+        HCURSOR cursor = windows_detail::create_image_cursor(*images, image);
+        if (cursor == nullptr) return {HostServiceError::backend_failure};
+        SetCursor(cursor);
+        if (cursors_.size() >= 32) {
+            DestroyCursor(cursors_.front().native);
+            cursors_.erase(cursors_.begin());
+        }
+        cursors_.push_back({images, image.scale, cursor});
+        return {};
+    }
+
+    void shutdown_impl() noexcept override {
+        for (const CursorEntry& entry : cursors_) {
+            if (GetCursor() == entry.native) apply_system_cursor(CursorKind::arrow);
+            DestroyCursor(entry.native);
+        }
+        cursors_.clear();
+        owner_ = nullptr;
     }
 
     HostServiceStatus set_pointer_capture_impl(bool captured,
@@ -95,6 +126,48 @@ protected:
         return {};
     }
 
+    HostClipboardFilesResult read_clipboard_files_impl() override {
+        HostClipboardFilesResult result;
+        if (!IsClipboardFormatAvailable(CF_HDROP)) return result;
+        if (!OpenClipboard(owner_)) {
+            result.status.error = HostServiceError::backend_failure;
+            return result;
+        }
+        struct ClipboardScope {
+            ~ClipboardScope() { CloseClipboard(); }
+        } scope;
+        result.generation = static_cast<std::uint64_t>(GetClipboardSequenceNumber());
+        const HDROP files = static_cast<HDROP>(GetClipboardData(CF_HDROP));
+        const UINT count = files == nullptr ? 0 : DragQueryFileW(files, 0xFFFFFFFFU, nullptr, 0);
+        if (files == nullptr || count > maximum_dialog_paths) {
+            result.status.error = files == nullptr ? HostServiceError::backend_failure
+                                                   : HostServiceError::too_large;
+        } else {
+            for (UINT index = 0; index < count; ++index) {
+                const UINT length = DragQueryFileW(files, index, nullptr, 0);
+                if (length == 0 || length > maximum_dialog_text_bytes) {
+                    result.status.error = HostServiceError::too_large;
+                    break;
+                }
+                std::vector<wchar_t> path(static_cast<std::size_t>(length) + 1U);
+                if (DragQueryFileW(files, index, path.data(), length + 1U) != length) {
+                    result.status.error = HostServiceError::backend_failure;
+                    break;
+                }
+                result.paths_utf8.push_back(utf8_from_wide(path.data()));
+            }
+        }
+        return result;
+    }
+
+    HostClipboardImageResult read_clipboard_image_impl() override {
+        return gui_forms::host::detail::read_windows_clipboard_image(owner_);
+    }
+
+    HostServiceStatus write_clipboard_image_impl(HostImageView image) override {
+        return gui_forms::host::detail::write_windows_clipboard_image(owner_, image);
+    }
+
     HostDialogResult show_dialog_impl(const HostDialogRequest& request) override {
         if (std::holds_alternative<HostMessageDialogRequest>(request.payload)) {
             return native_message_dialog(
@@ -135,9 +208,14 @@ protected:
                                  : HostServiceStatus{HostServiceError::backend_failure};
     }
 
-    void shutdown_impl() noexcept override { owner_ = nullptr; }
 
 private:
+    struct CursorEntry final {
+        CursorImagesPtr images;
+        double scale;
+        HCURSOR native;
+    };
+    std::vector<CursorEntry> cursors_;
     static BOOL CALLBACK collect_monitor(HMONITOR monitor, HDC, LPRECT,
                                          LPARAM context) {
         std::vector<HostMonitor>& monitors =

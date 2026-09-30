@@ -53,9 +53,12 @@ struct EventStatistics {
     std::uint64_t callbacks_emitted{};
 };
 
-// Emission uses a registration-order snapshot. Handlers added during an
+// Emission fixes a registration-order boundary. Handlers added during an
 // emission wait for the next emission. A handler disconnected before its turn
-// is skipped. Each snapshot member can therefore run at most once.
+// is skipped. Nested emissions establish their own boundary. Slots remain in
+// place until the outermost emission finishes, avoiding a heap snapshot for
+// each notification. The emission retains State, not the Event object: a
+// callback may destroy the event owner without invalidating dispatch.
 template <typename... Arguments>
 class Event final {
 public:
@@ -85,22 +88,30 @@ public:
     }
 
     void emit(Arguments... arguments) {
-        const std::vector<std::shared_ptr<Slot>> snapshot = (*state_).slots;
-        for (const std::shared_ptr<Slot>& slot : snapshot) {
+        const std::shared_ptr<State> state = state_;
+        const std::size_t boundary = (*state).slots.size();
+        EmissionScope emission(state);
+        for (std::size_t index = 0; index < boundary; ++index) {
+            // A callback can grow the slots vector or disconnect this slot.
+            // Keep one slot alive without retaining an iterator into the vector.
+            const std::shared_ptr<Slot> slot = (*state).slots[index];
             if (!(*slot).connected_) {
                 continue;
             }
-            ++(*state_).statistics.callbacks_emitted;
+            ++(*state).statistics.callbacks_emitted;
             (*slot).invoke(arguments...);
         }
-        compact();
     }
 
     void disconnect_all() noexcept {
-        for (const std::shared_ptr<Slot>& slot : (*state_).slots) {
+        const std::shared_ptr<State> state = state_;
+        const std::size_t boundary = (*state).slots.size();
+        EmissionScope emission(state);
+        for (std::size_t index = 0; index < boundary; ++index) {
+            // Releasing an owning callback can itself run application teardown.
+            const std::shared_ptr<Slot> slot = (*state).slots[index];
             (*slot).disconnect();
         }
-        compact();
     }
 
     [[nodiscard]] EventStatistics statistics() const noexcept {
@@ -161,6 +172,24 @@ private:
     struct State final {
         std::vector<std::shared_ptr<Slot>> slots;
         EventStatistics statistics;
+        std::size_t emission_depth{};
+    };
+
+    class EmissionScope final {
+    public:
+        explicit EmissionScope(std::shared_ptr<State> state) noexcept
+            : state_(std::move(state)) {
+            ++(*state_).emission_depth;
+        }
+        ~EmissionScope() {
+            --(*state_).emission_depth;
+            compact(*state_);
+        }
+        EmissionScope(const EmissionScope&) = delete;
+        EmissionScope& operator=(const EmissionScope&) = delete;
+
+    private:
+        std::shared_ptr<State> state_;
     };
 
     [[nodiscard]] SubscriptionToken subscribe_impl(Component* owner, Callback callback) {
@@ -199,8 +228,9 @@ private:
         }
     };
 
-    void compact() noexcept {
-        std::vector<std::shared_ptr<Slot>>& slots = (*state_).slots;
+    static void compact(State& state) noexcept {
+        if (state.emission_depth != 0U) return;
+        std::vector<std::shared_ptr<Slot>>& slots = state.slots;
         slots.erase(std::remove_if(slots.begin(), slots.end(),
                                    SlotDisconnected{}),
                     slots.end());

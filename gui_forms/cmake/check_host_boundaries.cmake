@@ -11,8 +11,15 @@ foreach(path IN ITEMS "${CORE_LIBRARY}" "${HEADLESS_LIBRARY}")
     endif()
 endforeach()
 
+if(NOT NM_TOOL)
+    find_program(NM_TOOL NAMES nm REQUIRED)
+endif()
+if(NOT TARGET_SYSTEM_NAME)
+    set(TARGET_SYSTEM_NAME "${CMAKE_HOST_SYSTEM_NAME}")
+endif()
+
 execute_process(
-    COMMAND nm -gU "${CORE_LIBRARY}"
+    COMMAND ${NM_TOOL} -g "${CORE_LIBRARY}"
     RESULT_VARIABLE core_nm_result
     OUTPUT_VARIABLE core_symbols
     ERROR_VARIABLE core_nm_error
@@ -22,7 +29,7 @@ if(NOT core_nm_result EQUAL 0)
 endif()
 
 execute_process(
-    COMMAND nm -gU "${HEADLESS_LIBRARY}"
+    COMMAND ${NM_TOOL} -g "${HEADLESS_LIBRARY}"
     RESULT_VARIABLE headless_nm_result
     OUTPUT_VARIABLE headless_symbols
     ERROR_VARIABLE headless_nm_error
@@ -61,18 +68,31 @@ if(DEFINED HEADLESS_TEST_BINARY)
     if(NOT EXISTS "${HEADLESS_TEST_BINARY}")
         message(FATAL_ERROR "Headless test binary is absent: ${HEADLESS_TEST_BINARY}")
     endif()
+    if(TARGET_SYSTEM_NAME STREQUAL "Darwin")
+        set(dependency_command otool -L)
+    elseif(TARGET_SYSTEM_NAME STREQUAL "Windows")
+        if(NOT OBJDUMP_TOOL)
+            find_program(OBJDUMP_TOOL NAMES objdump REQUIRED)
+        endif()
+        set(dependency_command ${OBJDUMP_TOOL} -p)
+    else()
+        find_program(READELF_TOOL NAMES readelf llvm-readelf REQUIRED)
+        set(dependency_command ${READELF_TOOL} -d)
+    endif()
     execute_process(
-        COMMAND otool -L "${HEADLESS_TEST_BINARY}"
-        RESULT_VARIABLE otool_result
+        COMMAND ${dependency_command} "${HEADLESS_TEST_BINARY}"
+        RESULT_VARIABLE dependency_result
         OUTPUT_VARIABLE dependencies
-        ERROR_VARIABLE otool_error
+        ERROR_VARIABLE dependency_error
     )
-    if(NOT otool_result EQUAL 0)
-        message(FATAL_ERROR "otool failed for headless test: ${otool_error}")
+    if(NOT dependency_result EQUAL 0)
+        message(FATAL_ERROR "Dependency inspection failed for headless test: ${dependency_error}")
     endif()
     foreach(pattern IN ITEMS "AppKit.framework" "CoreGraphics.framework"
                              "CoreText.framework" "ImageIO.framework"
-                             "Metal.framework" "OpenGL.framework" "WebKit.framework")
+                             "Metal.framework" "OpenGL.framework" "WebKit.framework"
+                             "libgtk" "libgdk" "libcairo" "libpango" "libvulkan"
+                             "libGL\\.so" "[Uu][Ss][Ee][Rr]32\\.dll" "[Gg][Dd][Ii]32\\.dll")
         if(dependencies MATCHES "${pattern}")
             message(FATAL_ERROR
                 "Headless host conformance binary contains platform/render dependency: ${pattern}")

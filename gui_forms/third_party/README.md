@@ -24,3 +24,12 @@ policy patch, not a claim about an upstream-supported preset.
 
 The fetched tree may contain excluded source. The build must not compile, link,
 initialize, probe, or expose it. No Skia type may leave `src/render/skia/`.
+
+For the X11 Linux host, use `GUI_FORMS_SYSTEM_BUILD_TOOLS=1` when fetching
+Skia to retain the builder's native GN/Ninja tools (including musl builders),
+then run `build_skia_cpu_linux.sh`. This selects the existing CPU renderer
+with bundled FreeType instead of the macOS font host; GPU features and
+non-PNG toolkit decoders remain disabled. See `docs/LINUX_HOST.md` for the
+installed Application target and its runtime contracts.
+
+SheenBidi 2.9.0 is vendored under `sheenbidi/` for Unicode bidirectional ordering in the private text adapter. Its Headers and Source are unchanged from the pinned commit in PROVENANCE.md; Apache License 2.0 is included. Linux accessibility dynamically links the system ATK/AT-SPI bridge (LGPL 2.1 or later); it does not use GTK widgets.

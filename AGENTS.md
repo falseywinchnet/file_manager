@@ -104,8 +104,23 @@ relevance model, and a relevance model is not an identity store.
 
 ## M4 Mac mini remote build and GUI operation
 
-The Neo checkout is the authoritative working tree. From anywhere inside this
-repository, use the passwordless `m4mini-awdl` SSH alias for direct inspection
+### Current Shadow desktop bring-up (2026-09-29 owner direction)
+
+The active Windows checkout is now `C:\Users\Shadow\file_manager`. Work in this
+checkout directly; isolated worktrees are not required. Borrow the adjacent
+Plan Paint compilation toolchain read-only and keep File Manager build outputs
+under its own `.build/` directories. The owner authorized visible sibling chats
+for staged work and prohibited worker/subagent creation. Coordinate directory
+ownership before edits. Native tools are selected by
+`tools/Enter-WindowsToolchain.ps1`; see the Windows bring-up record for results.
+
+The Neo/AWDL instructions below are historical remote-build guidance. Do not
+assume that their absolute helper path or SSH alias exists on Shadow. Confirm
+the remote route before using it. Ordinary real-world development is authorized;
+fault-injection tests continue to use their own generated fixture data.
+
+For the historical Neo workflow, the Neo checkout is the authoritative working
+tree. From that configured host, use the passwordless `m4mini-awdl` SSH alias for direct inspection
 and `/Users/ultimussecundai/.local/bin/m4build` for compute work. `m4build`
 rsyncs the local tree to a deterministic directory below the Mini's
 `$HOME/Developer/CodexBuilds/`, prints that resolved directory, and then runs the

@@ -337,22 +337,15 @@ static bool register_bundle_typeface(SkiaRaster& raster,
                                      gui_forms::FontRole role,
                                      std::uint16_t weight,
                                      bool italic = false,
-                                     NSString* extension = @"ttf") {
+                                     NSString* extension = @"ttf",
+                                     bool optional = false) {
     NSURL* url = [[NSBundle mainBundle] URLForResource:resource_name
                                         withExtension:extension
                                          subdirectory:@"fonts"];
     if (url == nil) {
-        return false;
+        return optional;
     }
-    NSData* data = [NSData dataWithContentsOfURL:url
-                                        options:NSDataReadingMappedIfSafe
-                                          error:nil];
-    if (data == nil || data.length == 0) {
-        return false;
-    }
-    const std::byte* bytes = static_cast<const std::byte*>(data.bytes);
-    return raster.register_typeface(role, weight, italic,
-                                    std::span<const std::byte>(bytes, data.length));
+    return raster.register_typeface_file(role, weight, italic, url.fileSystemRepresentation);
 }
 
 static bool register_bundle_fallback_typeface(SkiaRaster& raster,
@@ -363,14 +356,8 @@ static bool register_bundle_fallback_typeface(SkiaRaster& raster,
     NSURL* url = [[NSBundle mainBundle] URLForResource:resource_name
                                         withExtension:extension
                                          subdirectory:@"fonts"];
-    if (url == nil) return false;
-    NSData* data = [NSData dataWithContentsOfURL:url
-                                        options:NSDataReadingMappedIfSafe
-                                          error:nil];
-    if (data == nil || data.length == 0) return false;
-    const std::byte* bytes = static_cast<const std::byte*>(data.bytes);
-    return raster.register_fallback_typeface(
-        weight, italic, std::span<const std::byte>(bytes, data.length));
+    if (url == nil) return true;
+    return raster.register_fallback_typeface_file(weight, italic, url.fileSystemRepresentation);
 }
 
 namespace {
@@ -438,6 +425,7 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     std::uint64_t _nextHostSequence;
     BOOL _hostAttached;
     SkiaRaster _raster;
+    BOOL _rasterHasContent;
     DamageRegion _pendingDamage;
     NSMutableAttributedString* _markedText;
     NSRange _selectedRange;
@@ -465,7 +453,7 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 - (void)installCloseRequestHandler:(std::function<void(HostCloseRequest&)>)handler;
 - (HostDispatchResult)dispatchHostPayload:(HostEventPayload)payload
                          timestampNanoseconds:(std::uint64_t)timestamp;
-- (BOOL)requestClose;
+- (BOOL)requestCloseHiding:(BOOL)hiding;
 - (void)notifyClosed;
 - (void)notifyActivation:(BOOL)active;
 - (void)notifyOcclusion:(BOOL)occluded;
@@ -839,19 +827,29 @@ private:
             register_bundle_typeface(_raster, @"Cousine-Regular",
                                      gui_forms::FontRole::monospace, 400) &&
             register_bundle_typeface(_raster, @"Cousine-Bold",
-                                     gui_forms::FontRole::monospace, 700) &&
+                                     gui_forms::FontRole::monospace, 700, false, @"ttf", true) &&
             register_bundle_typeface(_raster, @"Cousine-Italic",
-                                     gui_forms::FontRole::monospace, 400, true) &&
+                                     gui_forms::FontRole::monospace, 400, true, @"ttf", true) &&
             register_bundle_typeface(_raster, @"Cousine-BoldItalic",
-                                     gui_forms::FontRole::monospace, 700, true) &&
+                                     gui_forms::FontRole::monospace, 700, true, @"ttf", true) &&
             register_bundle_fallback_typeface(
                 _raster, @"NotoSansCJKjp-Regular", @"otf") &&
+            register_bundle_fallback_typeface(
+                _raster, @"NotoSansArabic-Regular", @"ttf") &&
+            register_bundle_fallback_typeface(
+                _raster, @"NotoSansHebrew-Regular", @"ttf") &&
+            register_bundle_fallback_typeface(
+                _raster, @"NotoSansDevanagari-Regular", @"ttf") &&
+            register_bundle_fallback_typeface(
+                _raster, @"NotoSansBengali-Regular", @"ttf") &&
+            register_bundle_fallback_typeface(
+                _raster, @"NotoSansGurmukhi-Regular", @"ttf") &&
             register_bundle_fallback_typeface(
                 _raster, @"NotoEmoji-Regular", @"ttf");
         (*_model).set_text_metrics_provider(fonts_ready ? &_raster : nullptr);
         (*_model).metrics().set_renderer(
             fonts_ready
-                ? "Skia CPU m152 · HarfBuzz 14.2.1 · FreeType 2.14.2 · bundled fonts + CJK/emoji fallback"
+                ? "Skia CPU m152 · HarfBuzz 14.2.1 · FreeType 2.14.2 · bundled fonts (optional Unicode fallback)"
                 : "Skia CPU m152 · incomplete bundled font pack",
             true);
         [[NSNotificationCenter defaultCenter]
@@ -900,10 +898,10 @@ private:
     return (*_hostSession).dispatch(std::move(event));
 }
 
-- (BOOL)requestClose {
+- (BOOL)requestCloseHiding:(BOOL)hiding {
     if (_hostAttached == NO) return NO;
     const HostDispatchResult result = [self dispatchHostPayload:
-        HostCloseRequest{HostCloseReason::user, false}
+        HostCloseRequest{HostCloseReason::user, false, hiding == YES}
                                            timestampNanoseconds:host_now_nanoseconds()];
     return result.accepted() && result.close_allowed;
 }
@@ -919,6 +917,7 @@ private:
     static_cast<void>([self dispatchHostPayload:HostActivationEvent{active == YES}
                                timestampNanoseconds:host_now_nanoseconds()]);
     [self collectDamage];
+    if (active == YES) [self setNeedsDisplay:YES];
 }
 
 - (void)notifyOcclusion:(BOOL)occluded {
@@ -931,6 +930,9 @@ private:
         [self armWakeTimer];
     } else {
         [self collectDamage];
+        // AppKit may consume a display request while our model is still hidden.
+        // Rearm native presentation even when no new model damage was produced.
+        [self setNeedsDisplay:YES];
         [self startDisplayLinkIfNeeded];
     }
 }
@@ -1187,7 +1189,7 @@ private:
         [self removeTrackingArea:_trackingArea];
     }
     const NSTrackingAreaOptions options = NSTrackingMouseEnteredAndExited |
-        NSTrackingMouseMoved | NSTrackingActiveInKeyWindow | NSTrackingInVisibleRect;
+        NSTrackingMouseMoved | NSTrackingCursorUpdate | NSTrackingActiveInKeyWindow | NSTrackingInVisibleRect;
     _trackingArea = [[NSTrackingArea alloc] initWithRect:NSZeroRect
                                                  options:options
                                                    owner:self
@@ -1430,12 +1432,11 @@ private:
     const double scale = self.window == nil ? 1.0 : self.window.backingScaleFactor;
     const GFSize logicalSize{self.bounds.size.width, self.bounds.size.height};
     if (_raster.resize(logicalSize, scale)) {
+        _rasterHasContent = NO;
         _pendingDamage.add(GFRect{0.0, 0.0, logicalSize.width, logicalSize.height});
     }
-    if (_pendingDamage.empty() && _pendingLivePresentations.empty()) {
-        _pendingDamage.add(GFRect{dirtyRect.origin.x, dirtyRect.origin.y,
-                                dirtyRect.size.width, dirtyRect.size.height});
-    }
+    _pendingDamage.add(GFRect{dirtyRect.origin.x, dirtyRect.origin.y,
+                             dirtyRect.size.width, dirtyRect.size.height});
 
     static_cast<void>(_raster.synchronize_images((*_model).image_resources()));
     DamageRegion frameDamage = _pendingDamage;
@@ -1455,9 +1456,13 @@ private:
     }
     _raster.end_frame();
 
+    if (receipt) _rasterHasContent = YES;
     bool presented = false;
     const void* pixels = _raster.pixels();
-    if ((receipt || !_pendingLivePresentations.empty()) && pixels != nullptr) {
+    // Native exposure/snapshot callbacks can precede unocclusion. The model
+    // intentionally declines painting then; the last complete raster is still
+    // valid and must be copied into AppKit's newly supplied backing context.
+    if (_rasterHasContent == YES && pixels != nullptr) {
         CGDataProviderRef provider = CGDataProviderCreateWithData(
             nullptr, pixels, _raster.byte_size(), nullptr);
         CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
@@ -1520,15 +1525,27 @@ private:
     const GFPoint position = input.position;
     static_cast<void>([self dispatchHostPayload:std::move(input)
                                timestampNanoseconds:host_event_nanoseconds(event)]);
-    if (_hostServices != nullptr) {
-        const gui_forms::Control::Ptr target = (*_model).hit_test(position);
-        static_cast<void>((*_hostServices).set_cursor(
-            target ? (*target).effective_cursor() : CursorKind::arrow));
-    }
+    [self updateCursorAtPoint:position];
     [self collectDamage];
 }
 
+- (void)updateCursorAtPoint:(GFPoint)position {
+    if (_hostServices != nullptr) {
+        const gui_forms::Control::Ptr captured = (*_model).captured_control();
+        const gui_forms::Control::Ptr target = captured ? captured : (*_model).hit_test(position);
+        static_cast<void>((*_hostServices).set_custom_cursor(
+            target ? (*target).effective_cursor_images() : gui_forms::CursorImagesPtr{},
+            self.window.backingScaleFactor,
+            target ? (*target).effective_cursor() : CursorKind::arrow));
+    }
+}
+
+- (void)cursorUpdate:(NSEvent*)event {
+    [self updateCursorAtPoint:[self modelPointForEvent:event]];
+}
+
 - (void)mouseExited:(NSEvent*)event {
+    if (_model && (*_model).captured_control()) return;
     if (_hostServices != nullptr) {
         static_cast<void>((*_hostServices).set_cursor(CursorKind::arrow));
     }
@@ -1803,7 +1820,7 @@ private:
     return self;
 }
 - (BOOL)windowShouldClose:(NSWindow*)sender {
-    if (_view != nil && ![_view requestClose]) return NO;
+    if (_view != nil && ![_view requestCloseHiding:_hideOnClose]) return NO;
     if (_hideOnClose) {
         [sender orderOut:nil];
         return NO;
@@ -1844,6 +1861,9 @@ private:
     const BOOL visible = (window.occlusionState & NSWindowOcclusionStateVisible) != 0;
     [_view notifyOcclusion:!visible];
 }
+- (void)windowDidDeminiaturize:(NSNotification*)notification {
+    [_view setNeedsDisplay:YES];
+}
 - (void)windowDidChangeBackingProperties:(NSNotification*)notification {
     [_view notifyScaleChanged];
 }
@@ -1879,6 +1899,7 @@ HostCapabilities macos_capabilities() {
                 HostCapability::pointer_capture |
                 HostCapability::cursor |
                 HostCapability::clipboard |
+                HostCapability::clipboard_images |
                 HostCapability::typed_drag_destination |
                 HostCapability::dialogs |
                 HostCapability::sound_cues};
@@ -1935,6 +1956,17 @@ public:
         });
     }
 
+private:
+    NSWindow* window_;
+};
+
+class RequestNativeFullScreen final {
+public:
+    explicit RequestNativeFullScreen(NSWindow* window) noexcept : window_(window) {}
+    void operator()() const {
+        NSWindow* window = window_;
+        dispatch_async(dispatch_get_main_queue(), ^{ [window toggleFullScreen:nil]; });
+    }
 private:
     NSWindow* window_;
 };
@@ -2089,7 +2121,7 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
             [nativeWindow setTitlebarAppearsTransparent:YES];
             [nativeWindow setTitleVisibility:NSWindowTitleHidden];
         }
-        [nativeWindow setMinSize:NSMakeSize(options.minimum_size.width,
+        [nativeWindow setContentMinSize:NSMakeSize(options.minimum_size.width,
                                             options.minimum_size.height)];
         [nativeWindow setContentView:view];
         [nativeWindow center];
@@ -2110,6 +2142,7 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
                 ReadNativeClipboard(view),
                 WriteNativeClipboard(view));
         }
+        if (options.full_screen_ready) options.full_screen_ready(RequestNativeFullScreen(nativeWindow));
         if (options.visibility_ready) {
             options.visibility_ready(RequestNativeShow(nativeWindow),
                                      RequestNativeHide(nativeWindow));
@@ -2252,7 +2285,7 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
                 [nativeWindow setTitlebarAppearsTransparent:YES];
                 [nativeWindow setTitleVisibility:NSWindowTitleHidden];
             }
-            [nativeWindow setMinSize:NSMakeSize(entry.options.minimum_size.width,
+            [nativeWindow setContentMinSize:NSMakeSize(entry.options.minimum_size.width,
                                                 entry.options.minimum_size.height)];
             [nativeWindow setContentView:view];
             [nativeWindows addObject:nativeWindow];
@@ -2318,6 +2351,7 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
                     ReadNativeClipboard(view),
                     WriteNativeClipboard(view));
             }
+            if (entry.options.full_screen_ready) entry.options.full_screen_ready(RequestNativeFullScreen(nativeWindow));
             if (entry.options.visibility_ready) {
                 entry.options.visibility_ready(
                     RequestNativeShow(nativeWindow),

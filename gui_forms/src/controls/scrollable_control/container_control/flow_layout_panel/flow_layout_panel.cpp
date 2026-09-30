@@ -304,6 +304,9 @@ Size FlowLayoutPanel::layout_children(Size available, bool assign) {
                 main_origin += vertical_extent(item.margin) + assigned_main;
             }
             if (assign && is_current_layout_child(item.control)) {
+                const Point offset = scroll_position();
+                slot.x -= offset.x;
+                slot.y -= offset.y;
                 set_child_layout(item.control, slot);
             }
         }
@@ -350,7 +353,23 @@ Size FlowLayoutPanel::measure(Size available) {
 
 void FlowLayoutPanel::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
-    static_cast<void>(layout_children({final_bounds.width, final_bounds.height}, true));
+    const Size client{final_bounds.width, final_bounds.height};
+    Size available = client;
+    // A vertical bar can cause another wrapped row. Re-measure against the
+    // viewport until the two scrollbar decisions settle (at most three passes).
+    for (int pass = 0; pass < 3; ++pass) {
+        Size content = layout_children(available, false);
+        if (!is_alive()) return;
+        const Size extra = auto_scroll_margin();
+        content.width += extra.width;
+        content.height += extra.height;
+        arrange_scroll_viewport(client, content);
+        const Rect viewport = scroll_snapshot().viewport_rectangle;
+        const Size next{viewport.width, viewport.height};
+        if (next == available) break;
+        available = next;
+    }
+    static_cast<void>(layout_children(available, true));
 }
 
 SemanticDescriptor FlowLayoutPanel::semantic_descriptor() const {

@@ -49,11 +49,9 @@ RasterCanvas::RasterCanvas(StableId stable_id) : Control(std::move(stable_id)) {
 void RasterCanvas::set_bitmap(std::shared_ptr<gui_drawing::Bitmap> bitmap) {
     require_mutable();
     if (bitmap_ == bitmap) return;
-    if (Window* owner = window(); image_.value != 0U && owner != nullptr) {
-        static_cast<void>((*owner).remove_image(image_));
-    }
+    if (Window* owner = window()) release_tiles(*owner);
     bitmap_ = std::move(bitmap);
-    image_ = {};
+    tiles_.clear();
     presented_generation_ = 0U;
     last_resource_error_ = ImageResourceError::none;
     if (bitmap_ && window()) static_cast<void>(publish_full_bitmap());
@@ -131,77 +129,122 @@ bool RasterCanvas::publish_full_bitmap() {
     Window* owner = window();
     if (!bitmap_ || owner == nullptr) return false;
     const gui_drawing::ImageSnapshot snapshot = (*bitmap_).snapshot();
-    ImageLoadResult loaded;
-    if (snapshot.pixel_format == gui_drawing::PixelFormat::bgra32_premultiplied) {
-        loaded = (*owner).load_bgra32_premultiplied(
-            snapshot.width, snapshot.height, snapshot.row_bytes(),
-            snapshot.pixels());
-    } else {
-        const std::vector<std::byte> converted = rgba_to_bgra(
-            snapshot.pixels(), snapshot.row_bytes(), snapshot.width,
-            snapshot.height);
-        loaded = (*owner).load_bgra32_premultiplied(
-            snapshot.width, snapshot.height,
-            static_cast<std::uint64_t>(snapshot.width) * 4U, converted);
+    // Tiles use the existing image resource/cache path. A one-pixel gutter
+    // preserves bilinear samples across the 512-pixel content boundaries.
+    constexpr std::int32_t side = 512;
+    const std::int32_t width = static_cast<std::int32_t>(snapshot.width);
+    const std::int32_t height = static_cast<std::int32_t>(snapshot.height);
+    const std::size_t count = static_cast<std::size_t>((width + side - 1) / side) *
+                              static_cast<std::size_t>((height + side - 1) / side);
+    tiles_.reserve(count);
+    try {
+        for (std::int32_t y = 0; y < height; y += side) {
+            for (std::int32_t x = 0; x < width; x += side) {
+                const gui_drawing::RectI content{x, y, std::min(side, width - x),
+                                                       std::min(side, height - y)};
+                const std::int32_t left = std::max(0, x - 1);
+                const std::int32_t top = std::max(0, y - 1);
+                const gui_drawing::RectI storage{left, top,
+                    std::min(width, x + content.width + 1) - left,
+                    std::min(height, y + content.height + 1) - top};
+                const std::size_t offset = static_cast<std::size_t>(storage.y) * snapshot.row_bytes() +
+                    static_cast<std::size_t>(storage.x) * 4U;
+                const std::size_t bytes = static_cast<std::size_t>(storage.height - 1) * snapshot.row_bytes() +
+                    static_cast<std::size_t>(storage.width) * 4U;
+                std::span<const std::byte> pixels(snapshot.pixels().data() + offset, bytes);
+                std::vector<std::byte> converted;
+                std::uint64_t stride = snapshot.row_bytes();
+                if (snapshot.pixel_format == gui_drawing::PixelFormat::rgba32_premultiplied) {
+                    converted = rgba_to_bgra(pixels, snapshot.row_bytes(),
+                        static_cast<std::uint32_t>(storage.width), static_cast<std::uint32_t>(storage.height));
+                } else {
+                    // A load owns complete, tightly packed rows. The source is
+                    // a subrectangle of the document with its larger stride.
+                    const std::size_t tight_row = static_cast<std::size_t>(storage.width) * 4U;
+                    converted.resize(tight_row * static_cast<std::size_t>(storage.height));
+                    for (std::int32_t row = 0; row < storage.height; ++row) {
+                        std::copy_n(pixels.data() + static_cast<std::size_t>(row) * snapshot.row_bytes(),
+                                    tight_row, converted.data() + static_cast<std::size_t>(row) * tight_row);
+                    }
+                }
+                pixels = converted;
+                stride = static_cast<std::uint64_t>(storage.width) * 4U;
+                const ImageLoadResult loaded = (*owner).load_bgra32_premultiplied(
+                    static_cast<std::uint32_t>(storage.width), static_cast<std::uint32_t>(storage.height),
+                    stride, pixels);
+                last_resource_error_ = loaded.error;
+                if (!loaded) {
+                    release_tiles(*owner);
+                    return false;
+                }
+                tiles_.push_back({loaded.image, content, storage});
+            }
+        }
+    } catch (...) {
+        release_tiles(*owner);
+        throw;
     }
-    last_resource_error_ = loaded.error;
-    if (!loaded) return false;
-    image_ = loaded.image;
     presented_generation_ = snapshot.generation;
     return true;
+}
+
+void RasterCanvas::release_tiles(Window& owner) noexcept {
+    for (std::size_t index = 0; index < tiles_.size(); ++index) {
+        try { static_cast<void>(owner.remove_image(tiles_[index].image)); }
+        catch (...) {}
+    }
+    tiles_.clear();
+    presented_generation_ = 0;
 }
 
 bool RasterCanvas::synchronize_bitmap() {
     require_mutable();
     if (!bitmap_) return true;
-    if (!window()) return false;
-    if (image_.value == 0U) {
+    Window* owner = window();
+    if (!owner) return false;
+    for (std::size_t index = 0; index < tiles_.size(); ++index) {
+        if (!(*owner).image_resources().find(tiles_[index].image)) {
+            release_tiles(*owner);
+            break;
+        }
+    }
+    if (tiles_.empty()) {
         const bool published = publish_full_bitmap();
         if (published) invalidate(Dirty::paint | Dirty::semantics);
         return published;
     }
 
-    const gui_drawing::BitmapDamageSnapshot changes =
-        (*bitmap_).changes_since(presented_generation_);
+    const gui_drawing::BitmapDamageSnapshot changes = (*bitmap_).changes_since(presented_generation_);
     if (changes.empty()) return true;
     const gui_drawing::ImageSnapshot snapshot = (*bitmap_).snapshot();
-    for (const gui_drawing::RectI rect : changes.rectangles) {
-        const std::size_t source_offset =
-            static_cast<std::size_t>(rect.y) * snapshot.row_bytes() +
-            static_cast<std::size_t>(rect.x) * 4U;
-        const std::size_t required =
-            static_cast<std::size_t>(rect.height - 1) * snapshot.row_bytes() +
-            static_cast<std::size_t>(rect.width) * 4U;
-        std::span<const std::byte> patch(
-            snapshot.pixels().data() + source_offset, required);
-        std::vector<std::byte> converted;
-        std::uint64_t source_row_bytes = snapshot.row_bytes();
-        if (snapshot.pixel_format == gui_drawing::PixelFormat::rgba32_premultiplied) {
-            converted = rgba_to_bgra(
-                patch, snapshot.row_bytes(),
-                static_cast<std::uint32_t>(rect.width),
-                static_cast<std::uint32_t>(rect.height));
-            patch = converted;
-            source_row_bytes = static_cast<std::uint64_t>(rect.width) * 4U;
-        }
-        const ImageLoadResult updated = (*window()).patch_bgra32_premultiplied(
-            image_, static_cast<std::uint32_t>(rect.x),
-            static_cast<std::uint32_t>(rect.y),
-            static_cast<std::uint32_t>(rect.width),
-            static_cast<std::uint32_t>(rect.height), source_row_bytes, patch,
-            *this, damage_to_client(rect));
-        last_resource_error_ = updated.error;
-        if (!updated) {
-            if (updated.error == ImageResourceError::stale_image_id) {
-                image_ = {};
-                presented_generation_ = 0U;
-                const bool recovered = publish_full_bitmap();
-                if (recovered) invalidate(Dirty::paint | Dirty::semantics);
-                return recovered;
+    for (std::size_t change = 0; change < changes.rectangles.size(); ++change) {
+        const gui_drawing::RectI dirty = changes.rectangles[change];
+        for (std::size_t index = 0; index < tiles_.size(); ++index) {
+            Tile& tile = tiles_[index];
+            const gui_drawing::RectI rect = gui_drawing::RectI::intersection(dirty, tile.storage);
+            if (rect.empty()) continue;
+            const std::size_t source_offset = static_cast<std::size_t>(rect.y) * snapshot.row_bytes() +
+                static_cast<std::size_t>(rect.x) * 4U;
+            const std::size_t required = static_cast<std::size_t>(rect.height - 1) * snapshot.row_bytes() +
+                static_cast<std::size_t>(rect.width) * 4U;
+            std::span<const std::byte> patch(snapshot.pixels().data() + source_offset, required);
+            std::vector<std::byte> converted;
+            std::uint64_t source_row_bytes = snapshot.row_bytes();
+            if (snapshot.pixel_format == gui_drawing::PixelFormat::rgba32_premultiplied) {
+                converted = rgba_to_bgra(patch, snapshot.row_bytes(),
+                    static_cast<std::uint32_t>(rect.width), static_cast<std::uint32_t>(rect.height));
+                patch = converted;
+                source_row_bytes = static_cast<std::uint64_t>(rect.width) * 4U;
             }
-            return false;
+            const ImageLoadResult updated = (*owner).patch_bgra32_premultiplied(
+                tile.image, static_cast<std::uint32_t>(rect.x - tile.storage.x),
+                static_cast<std::uint32_t>(rect.y - tile.storage.y),
+                static_cast<std::uint32_t>(rect.width), static_cast<std::uint32_t>(rect.height),
+                source_row_bytes, patch, *this, damage_to_client(dirty));
+            last_resource_error_ = updated.error;
+            if (!updated) return false;
+            tile.image = updated.image;
         }
-        image_ = updated.image;
     }
     presented_generation_ = snapshot.generation;
     return true;
@@ -271,17 +314,23 @@ void RasterCanvas::paint_transparency_grid(Painter& painter, Rect bounds) const 
 void RasterCanvas::on_paint(Painter& painter, Rect) {
     const Rect bounds = client_rectangle();
     painter.fill_rect(bounds, background_);
-    if (!bitmap_ || image_.value == 0U) return;
-    const gui_drawing::RectF source = visible_bitmap_bounds();
-    if (source.empty()) return;
-    const Rect destination{
-        (source.x - view_origin_.x) * zoom_,
-        (source.y - view_origin_.y) * zoom_,
-        source.width * zoom_, source.height * zoom_};
+    if (!bitmap_ || tiles_.empty()) return;
+    const gui_drawing::RectF visible = visible_bitmap_bounds();
+    if (visible.empty()) return;
+    const Rect destination{(visible.x - view_origin_.x) * zoom_,
+        (visible.y - view_origin_.y) * zoom_, visible.width * zoom_, visible.height * zoom_};
     if (transparency_grid_) paint_transparency_grid(painter, destination);
-    painter.draw_image_region_sampled(
-        image_, {source.x, source.y, source.width, source.height},
-        destination, sampling_, 1.0);
+    for (std::size_t index = 0; index < tiles_.size(); ++index) {
+        const Tile& tile = tiles_[index];
+        const Rect clip = Rect::intersection(bitmap_to_client(tile.content), destination);
+        if (clip.empty()) continue;
+        painter.save();
+        painter.clip_rect(clip);
+        painter.draw_image_region_sampled(tile.image,
+            {0, 0, static_cast<double>(tile.storage.width), static_cast<double>(tile.storage.height)},
+            bitmap_to_client(tile.storage), sampling_, 1.0);
+        painter.restore();
+    }
 }
 
 SemanticDescriptor RasterCanvas::semantic_descriptor() const {
@@ -302,29 +351,24 @@ SemanticDescriptor RasterCanvas::semantic_descriptor() const {
 void RasterCanvas::on_attached_to_window() {
     if (bitmap_ && !publish_full_bitmap()) {
         throw std::runtime_error(
-            "RasterCanvas could not publish its bitmap resource");
+            std::string("RasterCanvas could not publish its bitmap resource: ") +
+            std::string(image_resource_error_name(last_resource_error_)));
     }
 }
 
 void RasterCanvas::on_detaching_from_window(Window& former_window) noexcept {
-    if (image_.value != 0U) {
-        try {
-            static_cast<void>(former_window.remove_image(image_));
-        } catch (...) {
-        }
-    }
-    image_ = {};
-    presented_generation_ = 0U;
+    release_tiles(former_window);
 }
 
 void RasterCanvas::on_detached_from_window() noexcept {
-    image_ = {};
+    tiles_.clear();
     presented_generation_ = 0U;
 }
 
 void RasterCanvas::on_dispose() noexcept {
+    if (Window* owner = window()) release_tiles(*owner);
     bitmap_.reset();
-    image_ = {};
+    tiles_.clear();
     presented_generation_ = 0U;
     Control::on_dispose();
 }

@@ -150,6 +150,15 @@ The crate's declared minimum Rust version is 1.87. The lockfile is
 authoritative for dependency reproduction. Build products stay under ignored
 component-local trees.
 
+The Windows GNU development build can be verified with
+`./orchestrator/tools/verify_windows.ps1`, supplying `-MingwBin` and `-RustBin`
+when needed. It builds the native Rust CLI/laboratory and C++ source client.
+Windows local daemon transport, installed supervision, and durable settings
+remain unavailable; this does not promote Windows to Core 1.0 readiness.
+The release manifest's `first_platform: macos` remains historical macOS
+evidence, not an assertion about the host running a development CLI.
+See [the Shadow verification receipt](conformance/evidence/SHADOW_WINDOWS_2026-09-29.md).
+
 The internal `AtomicBatchPool` is an available synchronous compute primitive,
 not the blocking local-session host and not a plugin authority. Its hardened
 C11/C++20 sibling is independently consumable from

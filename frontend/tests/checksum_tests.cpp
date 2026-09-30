@@ -1,3 +1,4 @@
+#include "fixture_links.hpp"
 #include "file_manager/checksum.hpp"
 
 #include <cstdlib>
@@ -87,13 +88,15 @@ int main() {
                 result.code == "selection-changed" && result.digest_hex.empty(),
             "stale selected revisions must fail before reading");
 
-    std::filesystem::create_symlink("abc.txt", root.path() / "abc-link");
+    if (create_fixture_link("abc.txt", root.path() / "abc-link")) {
+
     result = file_manager::checksum_sha256(
         root.path(), root.path() / "abc-link",
         file_manager::observe_identity(root.path() / "abc-link"));
     require(result.terminal == file_manager::ChecksumTerminal::refused &&
                 result.code == "symlink-refused",
             "checksum must never follow the selected symbolic link");
+    }
 
     result = file_manager::checksum_sha256(
         root.path(), root.path().parent_path(), {});

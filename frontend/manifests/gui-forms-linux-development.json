@@ -1,0 +1,12 @@
+{
+  "schema": {"family": "gui-forms.consumption-manifest", "major": 1, "minor": 0},
+  "identity": {
+    "id": "gui-forms-linux-development-2026-09-29",
+    "provider": "gui-forms",
+    "profile": "file-manager-linux-development",
+    "state": "development"
+  },
+  "public_surface": {"cmake_package": "GUIForms 0.1", "targets": ["GUIForms::Application"], "host_protocol": 7},
+  "validation": {"native_build": "pending; per-build receipt is authoritative"},
+  "limits": ["X11 host; no native Wayland host", "Development build admission is not platform promotion", "Service availability comes from live Orchestrator negotiation"]
+}

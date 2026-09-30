@@ -113,7 +113,7 @@ DispatchDrainResult Window::drain_posted_work(std::size_t maximum_callbacks) {
             (*work).callback = {};
             (*work).state.store(DispatchOperationState::cancelled,
                               std::memory_order_release);
-            (*work).completion.notify_all();
+            (*work).state.notify_all();
             ++result.cancelled;
             continue;
         }
@@ -123,7 +123,7 @@ DispatchDrainResult Window::drain_posted_work(std::size_t maximum_callbacks) {
             callback();
             (*work).state.store(DispatchOperationState::completed,
                               std::memory_order_release);
-            (*work).completion.notify_all();
+            (*work).state.notify_all();
             ++result.invoked;
         } catch (...) {
             {
@@ -133,7 +133,7 @@ DispatchDrainResult Window::drain_posted_work(std::size_t maximum_callbacks) {
             (*work).callback = {};
             (*work).state.store(DispatchOperationState::faulted,
                               std::memory_order_release);
-            (*work).completion.notify_all();
+            (*work).state.notify_all();
             ++result.faulted;
         }
         metrics_.record_callback_emitted();
@@ -250,7 +250,7 @@ void Window::shutdown_dispatcher() noexcept {
                 expected, DispatchOperationState::cancelled,
                 std::memory_order_acq_rel, std::memory_order_acquire)) {
             (*work).callback = {};
-            (*work).completion.notify_all();
+            (*work).state.notify_all();
             ++cancelled;
         }
     }

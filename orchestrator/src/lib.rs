@@ -13,7 +13,7 @@ pub mod common;
 pub mod contract;
 pub mod engine_contract;
 pub mod engine_jsonl;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub mod engine_local;
 pub mod engine_port;
 pub mod kernel;
@@ -27,6 +27,8 @@ pub mod runtime_health;
 mod service;
 pub mod settings;
 pub mod worker_pool;
+#[cfg(windows)]
+mod windows_local;
 
 pub use common::{ApiError, ApiErrorCode, Request, Response, TerminalStatus};
 pub use kernel::Kernel;

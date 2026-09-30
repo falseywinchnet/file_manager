@@ -100,6 +100,8 @@ struct ImageResourceView final {
     PngMetadata metadata{};
     std::span<const std::byte> encoded{};
     std::uint64_t row_bytes{};
+    // Opaque cache revision paired with ImageId. Initial loads may seed this
+    // from pixel bytes; updates advance it. It is not a content digest.
     std::uint64_t content_hash{};
 };
 

@@ -1,0 +1,81 @@
+name: File Manager development builds
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    name: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-26
+            platform: macos-arm64
+          - runner: ubuntu-24.04
+            platform: linux-x64
+          - runner: windows-2022
+            platform: windows-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: engine/go.mod
+          cache: false
+      - name: Install Rust
+        shell: bash
+        run: rustup toolchain install stable --profile minimal
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install cmake ninja
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang generate-ninja pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev xvfb xauth
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: MINGW64
+          update: true
+          path-type: inherit
+          install: >-
+            mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja mingw-w64-x86_64-python git
+      - name: Build Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: python tools/build_native.py --jobs 2
+      - name: Build macOS
+        if: runner.os == 'macOS'
+        run: python3 tools/build_native.py --jobs 2
+      - name: Build Linux with test display
+        if: runner.os == 'Linux'
+        run: xvfb-run -a python3 tools/build_native.py --jobs 2
+      - name: Upload verified development archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-manager-${{ matrix.platform }}
+          path: |
+            .build/native-${{ matrix.platform }}/dist/*.zip
+            .build/native-${{ matrix.platform }}/dist/*.tar.gz
+            .build/native-${{ matrix.platform }}/dist/*.sha256
+          if-no-files-found: error
+      - name: Preserve build/test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-evidence-${{ matrix.platform }}
+          path: |
+            .build/native-${{ matrix.platform }}/**/Testing/Temporary/LastTest.log
+            .build/native-${{ matrix.platform }}/**/CMakeConfigureLog.yaml
+            .build/native-${{ matrix.platform }}/package-check.json
+          if-no-files-found: ignore

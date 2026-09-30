@@ -425,6 +425,12 @@ impl SettingsService {
     /// neither primary nor previous document is valid, or initial/recovery
     /// publication cannot be made durable.
     pub fn open(directory: impl Into<PathBuf>) -> Result<Self, String> {
+        // The admitted durable adapter relies on Unix ownership, no-follow
+        // opens, and directory fsync. Refuse before touching the filesystem
+        // until another platform can preserve those guarantees.
+        if !cfg!(unix) {
+            return Err("persistent settings are unavailable on this platform: private no-follow durable storage is not implemented".to_owned());
+        }
         let directory = directory.into();
         prepare_private_directory(&directory)?;
         remove_orphan_temps(&directory)?;
@@ -1015,6 +1021,7 @@ mod tests {
         assert_eq!(unchanged["values"]["search.result_limit"], 100);
     }
 
+    #[cfg(unix)]
     #[test]
     fn persistent_commit_reloads_and_reset_uses_same_transaction() {
         let parent = temporary_directory("persist");
@@ -1048,6 +1055,7 @@ mod tests {
         fs::remove_dir_all(parent).expect("remove test tree");
     }
 
+    #[cfg(unix)]
     #[test]
     fn corrupt_primary_recovers_verified_previous_and_preserves_corruption() {
         let parent = temporary_directory("recovery");
@@ -1102,6 +1110,25 @@ mod tests {
             1
         );
         assert_eq!(service.snapshot_result().expect("snapshot")["revision"], 1);
+    }
+
+    #[cfg(not(unix))]
+    #[test]
+    fn unavailable_persistent_store_does_not_touch_the_filesystem() {
+        let parent = temporary_directory("unsupported");
+        let store = parent.join("store");
+        let error = SettingsService::open(&store).expect_err("unsupported durable adapter");
+        assert!(error.contains("unavailable"));
+        assert!(!store.exists());
+        fs::create_dir(&store).expect("create existing store");
+        let primary = store.join("settings-v1.json");
+        fs::write(&primary, b"existing evidence").expect("write existing document");
+        SettingsService::open(&store).expect_err("existing store also unavailable");
+        assert_eq!(
+            fs::read(primary).expect("preserved document"),
+            b"existing evidence"
+        );
+        fs::remove_dir_all(parent).expect("remove test tree");
     }
 
     #[cfg(unix)]

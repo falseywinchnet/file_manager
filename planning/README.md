@@ -12,6 +12,8 @@ GUI framework, index store, semantic pipeline, or plugin ABI.
 
 | File | Purpose |
 |---|---|
+| `WINDOWS_BRINGUP_2026-09-29.md` | Shared Plan Paint toolchain, user-local Go/Rust, Windows build commands, component evidence and remaining platform limits |
+| `REASSESSMENT_2026-09-29.md` | Shadow-desktop source review, Plan Paint toolkit comparison, status conflicts, and candidate recovery/dogfood sequence; not a new ADR |
 | `PREPLAN_CHARTER.md` | Stages and exit gates for creating the actual plan |
 | `PROGRAM_MAP.md` | Accepted component ownership, repository permissions, contract authority, and delivery order |
 | `APPLICATION_BACKBONE_AND_DOCUMENT_PICKER.md` | Paint/Text Editor first-party backbone, reusable file chooser, app-scoped hidden policy, help ownership, and transfer candidates |

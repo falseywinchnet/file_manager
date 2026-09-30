@@ -44,6 +44,66 @@ bool shaped_text_uses_face(const ShapedText& shaped, FontFaceId id) {
     return false;
 }
 
+void test_mixed_direction_text() {
+    HarfBuzzFontEngine engine;
+    require(engine.register_typeface(FontRole::control, 400, false,
+        read_file(GUI_FORMS_TEST_CARLITO_REGULAR)).has_value(), "Latin primary registers");
+    require(engine.register_fallback_typeface(400, false,
+        read_file(GUI_FORMS_TEST_NOTO_ARABIC_REGULAR)).has_value(), "Arabic fallback registers");
+    require(engine.register_fallback_typeface(400, false,
+        read_file(GUI_FORMS_TEST_NOTO_HEBREW_REGULAR)).has_value(), "Hebrew fallback registers");
+    const std::string text = "שלום ABC 123";
+    const ShapedText shaped = engine.shape(text, {FontRole::control, 18, 400, false});
+    require(shaped.missing_clusters == 0 && shaped.runs.size() >= 2, "mixed Hebrew Latin and digits have complete glyphs");
+    // The LTR island belongs to the left of the Hebrew word. Stored offsets
+    // remain offsets into the original UTF-8 string, suitable for hit testing.
+    require(shaped.runs.front().source_range.start.value() >= 8 &&
+            shaped.runs.back().source_range.start.value() == 0,
+            "Unicode visual run order differs from logical source order");
+    const ShapedFontRun& hebrew = shaped.runs.back();
+    require(hebrew.glyphs.front().cluster.value() > hebrew.glyphs.back().cluster.value(),
+            "Hebrew glyph clusters progress right to left");
+    const ShapedText arabic = engine.shape("اللون 123 (RGB)", {FontRole::control, 18, 400, false});
+    require(arabic.missing_clusters == 0 && arabic.width > 0, "Arabic with a number and Latin abbreviation shapes");
+}
+
+void test_shared_font_lifetime() {
+    std::weak_ptr<const std::vector<std::byte>> weak;
+    {
+        HarfBuzzFontEngine engine;
+        std::shared_ptr<const std::vector<std::byte>> bytes =
+            std::make_shared<const std::vector<std::byte>>(read_file(GUI_FORMS_TEST_CARLITO_REGULAR));
+        weak = bytes;
+        require(engine.register_shared_typeface(FontRole::content, 400, false, bytes).has_value(),
+                "shared immutable font registers");
+        require(bytes.use_count() == 2, "font engine shares caller bytes without a copy");
+        bytes.reset();
+        require(!weak.expired() && engine.shape("office", {FontRole::content, 16, 400, false}).width > 0,
+                "shared font remains valid after caller releases ownership");
+    }
+    require(weak.expired(), "font storage releases after the final owner is destroyed");
+}
+
+void test_owned_font_view_lifetime() {
+    struct FontOwner final { std::vector<std::byte> bytes; };
+    std::weak_ptr<const FontOwner> weak;
+    {
+        HarfBuzzFontEngine engine;
+        std::shared_ptr<const FontOwner> owner = std::make_shared<const FontOwner>(
+            FontOwner{read_file(GUI_FORMS_TEST_CARLITO_REGULAR)});
+        weak = owner;
+        require(!engine.register_owned_typeface(FontRole::content, 400, false,
+                    (*owner).bytes, {}).has_value(), "borrowed bytes require a lifetime owner");
+        require(engine.register_owned_typeface(FontRole::content, 400, false,
+                    (*owner).bytes, owner).has_value(), "owned immutable view registers");
+        require(owner.use_count() == 2, "engine retains owner without copying the font");
+        owner.reset();
+        require(!weak.expired() && engine.shape("office", {FontRole::content, 16, 400, false}).width > 0,
+                "owned view stays valid after the caller drops it");
+    }
+    require(weak.expired(), "font mapping owner releases with the last face");
+}
+
 void test_owned_registration_style_selection_and_ligatures() {
     HarfBuzzFontEngine engine;
     std::vector<std::byte> regular = read_file(GUI_FORMS_TEST_CARLITO_REGULAR);
@@ -322,6 +382,9 @@ void test_public_resolution_record_names_actual_bundled_runs() {
 
 int main() {
     try {
+        test_shared_font_lifetime();
+        test_owned_font_view_lifetime();
+        test_mixed_direction_text();
         test_owned_registration_style_selection_and_ligatures();
         test_cluster_fallback_is_bounded_and_absolute();
         test_control_navigation_symbols_stay_in_rapids();

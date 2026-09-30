@@ -8,7 +8,7 @@
 namespace gui_forms {
 
 struct HostCapabilities final {
-    static constexpr std::uint32_t current_protocol_version = 5;
+    static constexpr std::uint32_t current_protocol_version = 7;
 
     std::uint32_t protocol_version{current_protocol_version};
     std::string platform{"unknown"};

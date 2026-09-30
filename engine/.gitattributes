@@ -1,0 +1,2 @@
+# Golden protocol and format fixtures have byte-exact LF encodings.
+/testdata/** text eol=lf

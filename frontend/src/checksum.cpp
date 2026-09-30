@@ -1,13 +1,11 @@
 #include "file_manager/checksum.hpp"
+#include "native_file.hpp"
 
 #include <array>
 #include <cerrno>
 #include <cstring>
-#include <fcntl.h>
 #include <iomanip>
 #include <sstream>
-#include <sys/stat.h>
-#include <unistd.h>
 
 namespace file_manager {
 namespace {
@@ -149,27 +147,6 @@ private:
     std::size_t total_bytes_{};
 };
 
-ObjectIdentity identity_from_stat(const struct stat& observed) noexcept {
-    const auto modified_nanoseconds =
-#if defined(__APPLE__)
-        static_cast<std::uint64_t>(observed.st_mtimespec.tv_sec) *
-            1'000'000'000ULL +
-        static_cast<std::uint64_t>(observed.st_mtimespec.tv_nsec);
-#else
-        static_cast<std::uint64_t>(observed.st_mtim.tv_sec) *
-            1'000'000'000ULL +
-        static_cast<std::uint64_t>(observed.st_mtim.tv_nsec);
-#endif
-    const auto type = S_ISREG(observed.st_mode)
-        ? std::filesystem::file_type::regular
-        : (S_ISDIR(observed.st_mode) ? std::filesystem::file_type::directory
-                                     : std::filesystem::file_type::unknown);
-    return {static_cast<std::uint64_t>(observed.st_dev),
-            static_cast<std::uint64_t>(observed.st_ino),
-            static_cast<std::uint64_t>(observed.st_size),
-            modified_nanoseconds, type};
-}
-
 ChecksumResult failure(ChecksumTerminal terminal, std::string code,
                        std::string message,
                        const std::filesystem::path& path) {
@@ -189,17 +166,6 @@ std::string hex_digest(const std::array<std::uint8_t, 32>& bytes) {
     }
     return stream.str();
 }
-
-class Descriptor final {
-public:
-    explicit Descriptor(const int value) noexcept : value_(value) {}
-    ~Descriptor() { if (value_ >= 0) ::close(value_); }
-    Descriptor(const Descriptor&) = delete;
-    Descriptor& operator=(const Descriptor&) = delete;
-    [[nodiscard]] int get() const noexcept { return value_; }
-private:
-    int value_{};
-};
 
 } // namespace
 
@@ -236,24 +202,21 @@ ChecksumResult checksum_sha256(
                        "checksum never follows a symbolic link", path);
     }
 
-    const Descriptor descriptor(::open(path.c_str(), O_RDONLY | O_CLOEXEC |
-                                                   O_NOFOLLOW));
-    if (descriptor.get() < 0) {
+    NativeReadFile descriptor(path);
+    if (!descriptor.available()) {
         return failure(ChecksumTerminal::unavailable, "open-failed",
-                       std::string("cannot open file: ") + std::strerror(errno),
+                       std::string("cannot open file: ") + descriptor.error_message(),
                        path);
     }
-    struct stat before_stat {};
-    if (::fstat(descriptor.get(), &before_stat) != 0) {
+    const ObjectIdentity before = descriptor.identity();
+    if (!before.available()) {
         return failure(ChecksumTerminal::unavailable, "inspect-failed",
-                       std::string("cannot inspect opened file: ") +
-                           std::strerror(errno), path);
+                       "cannot inspect opened file", path);
     }
-    if (!S_ISREG(before_stat.st_mode)) {
+    if (before.type != std::filesystem::file_type::regular) {
         return failure(ChecksumTerminal::refused, "not-regular-file",
                        "checksum accepts one regular file", path);
     }
-    const auto before = identity_from_stat(before_stat);
     if (expected_identity.available() &&
         !expected_identity.same_revision(before)) {
         return failure(ChecksumTerminal::changed, "selection-changed",
@@ -272,11 +235,10 @@ ChecksumResult checksum_sha256(
             result.bytes_read = bytes_read;
             return result;
         }
-        const auto count = ::read(descriptor.get(), buffer.data(), buffer.size());
+        const std::ptrdiff_t count = descriptor.read(buffer.data(), buffer.size());
         if (count < 0) {
-            if (errno == EINTR) continue;
             auto result = failure(ChecksumTerminal::unavailable, "read-failed",
-                std::string("cannot read file: ") + std::strerror(errno), path);
+                std::string("cannot read file: ") + descriptor.error_message(), path);
             result.identity = before;
             result.bytes_read = bytes_read;
             return result;
@@ -290,15 +252,14 @@ ChecksumResult checksum_sha256(
         }
     }
 
-    struct stat after_stat {};
-    if (::fstat(descriptor.get(), &after_stat) != 0) {
-        auto result = failure(ChecksumTerminal::unavailable,
+    const ObjectIdentity after = descriptor.identity();
+    if (!after.available()) {
+        ChecksumResult result = failure(ChecksumTerminal::unavailable,
             "post-inspect-failed", "cannot revalidate opened file", path);
         result.identity = before;
         result.bytes_read = bytes_read;
         return result;
     }
-    const auto after = identity_from_stat(after_stat);
     const auto path_after = observe_identity(path);
     if (!before.same_revision(after) || !after.same_revision(path_after) ||
         bytes_read != after.size) {

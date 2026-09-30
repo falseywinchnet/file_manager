@@ -15,6 +15,23 @@
 
 namespace gui_forms {
 
+namespace {
+std::vector<std::string_view> button_text_lines(std::string_view text) {
+    std::vector<std::string_view> result;
+    if (text.empty()) return result;
+    std::size_t start = 0;
+    for (;;) {
+        const std::size_t end = text.find('\n', start);
+        std::string_view line = text.substr(start, end == std::string_view::npos ? end : end - start);
+        if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
+        result.push_back(line);
+        if (end == std::string_view::npos) break;
+        start = end + 1;
+    }
+    return result;
+}
+}
+
 ButtonBase::ButtonBase(StableId stable_id, std::string text)
     : Control(std::move(stable_id)), text_(std::move(text)) {
     set_focusable(true);
@@ -352,10 +369,12 @@ Size ButtonBase::measure(Size available) {
     const Rect requested = requested_bounds();
     const FontSpec font = effective_font(font_);
     const std::string display = display_text();
-    const double text_width = display.empty() ? 0.0
-                                               : estimated_text_width(display, font);
-    const double text_height = display.empty()
-        ? 0.0 : font.size * text_line_spacing_;
+    const std::vector<std::string_view> lines = button_text_lines(display);
+    double text_width = 0.0;
+    for (const std::string_view line : lines) {
+        text_width = std::max(text_width, estimated_text_width(line, font));
+    }
+    const double text_height = static_cast<double>(lines.size()) * font.size * text_line_spacing_;
     Size image_size{};
     if (image_.value != 0U) {
         if (window() != nullptr) {
@@ -483,12 +502,15 @@ void ButtonBase::paint_button_content(Painter& painter, Rect bounds,
                           content_padding_.bottom)};
     if (content.empty()) return;
     const FontSpec font = effective_font(font_);
-    const Size measured = text.empty() ? Size{}
-                                       : painter.measure_text_utf8(text, font);
-    const Size text_size{text.empty() ? 0.0 : std::max(0.0, measured.width),
-                         text.empty() ? 0.0
-                                      : std::max(font.size * text_line_spacing_,
-                                                 measured.height)};
+    const std::vector<std::string_view> lines = button_text_lines(text);
+    double text_width = 0.0;
+    double line_height = font.size * text_line_spacing_;
+    for (const std::string_view line : lines) {
+        const Size measured = painter.measure_text_utf8(line, font);
+        text_width = std::max(text_width, measured.width);
+        line_height = std::max(line_height, measured.height);
+    }
+    const Size text_size{text_width, static_cast<double>(lines.size()) * line_height};
     const ImageListResolution image = resolved_button_image(selected);
     Size image_size{};
     if (image) {
@@ -554,10 +576,23 @@ void ButtonBase::paint_button_content(Painter& painter, Rect bounds,
                            opacity);
     }
     if (has_text && !text_rect.empty()) {
-        painter.draw_text_utf8(
-            {text_rect.x + offset.x,
-             text_rect.y + offset.y + std::max(font.size, text_rect.height * 0.82)},
-            text, font, foreground);
+        for (std::size_t index = 0; index < lines.size(); ++index) {
+            const Size measured = painter.measure_text_utf8(lines[index], font);
+            double x = text_rect.x;
+            if (text_alignment_ == ContentAlignment::top_center ||
+                text_alignment_ == ContentAlignment::middle_center ||
+                text_alignment_ == ContentAlignment::bottom_center) {
+                x += (text_rect.width - measured.width) * 0.5;
+            } else if (text_alignment_ == ContentAlignment::top_right ||
+                       text_alignment_ == ContentAlignment::middle_right ||
+                       text_alignment_ == ContentAlignment::bottom_right) {
+                x += text_rect.width - measured.width;
+            }
+            painter.draw_text_utf8(
+                {x + offset.x, text_rect.y + offset.y + static_cast<double>(index) * line_height +
+                    std::max(font.size, line_height * 0.82)},
+                lines[index], font, foreground);
+        }
     }
 }
 

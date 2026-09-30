@@ -27,6 +27,11 @@ public:
     [[nodiscard]] bool register_fallback_typeface(
         std::uint16_t weight, bool italic,
         std::span<const std::byte> encoded);
+    // Bundled files remain read-only mappings shared with the text shaper.
+    [[nodiscard]] bool register_typeface_file(
+        FontRole role, std::uint16_t weight, bool italic, const char* path);
+    [[nodiscard]] bool register_fallback_typeface_file(
+        std::uint16_t weight, bool italic, const char* path);
     [[nodiscard]] bool synchronize_images(const ImageRegistry& registry);
     [[nodiscard]] const void* pixels() const noexcept;
     [[nodiscard]] std::size_t row_bytes() const noexcept;

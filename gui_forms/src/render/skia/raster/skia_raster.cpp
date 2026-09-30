@@ -39,6 +39,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -156,6 +157,29 @@ public:
     std::uint64_t image_registry_revision{std::numeric_limits<std::uint64_t>::max()};
     bool image_registry_synchronized{true};
 
+    [[nodiscard]] bool register_font_data(std::optional<FontRole> role,
+                                          std::uint16_t weight, bool italic,
+                                          sk_sp<SkData> data) {
+        if (!data || (*data).isEmpty() || (*data).size() > 64U * 1024U * 1024U) return false;
+        sk_sp<SkTypeface> face = (*fonts).makeFromData(data);
+        if (!face) return false;
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+        const std::span<const std::byte> bytes(
+            static_cast<const std::byte*>((*data).data()), (*data).size());
+        const std::shared_ptr<const sk_sp<SkData>> owner =
+            std::make_shared<const sk_sp<SkData>>(std::move(data));
+        const std::optional<FontFaceId> text_face = text_engine.register_owned_typeface(
+            role, weight, italic, bytes, owner);
+        if (!text_face) return false;
+        registered_typefaces.push_back(
+            {role.value_or(FontRole::content), weight, italic, !role, std::move(face), *text_face});
+#else
+        registered_typefaces.push_back(
+            {role.value_or(FontRole::content), weight, italic, !role, std::move(face)});
+#endif
+        return true;
+    }
+
     [[nodiscard]] SkCanvas* canvas() const noexcept {
         return surface ? (*surface).getCanvas() : nullptr;
     }
@@ -266,48 +290,28 @@ public:
 SkiaRaster::SkiaRaster() : impl_(std::make_unique<Impl>()) {}
 SkiaRaster::~SkiaRaster() = default;
 
-bool SkiaRaster::register_typeface(FontRole role,
-                                   std::uint16_t weight,
-                                   bool italic,
-                                   std::span<const std::byte> encoded) {
-    if (encoded.empty()) {
-        return false;
-    }
-    sk_sp<SkData> data = SkData::MakeWithCopy(encoded.data(), encoded.size());
-    sk_sp<SkTypeface> face = (*(*impl_).fonts).makeFromData(std::move(data));
-    if (!face) {
-        return false;
-    }
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
-    const std::optional<FontFaceId> text_face =
-        (*impl_).text_engine.register_typeface(role, weight, italic, encoded);
-    if (!text_face) return false;
-    (*impl_).registered_typefaces.push_back(
-        {role, weight, italic, false, std::move(face), *text_face});
-#else
-    (*impl_).registered_typefaces.push_back(
-        {role, weight, italic, false, std::move(face)});
-#endif
-    return true;
+bool SkiaRaster::register_typeface(FontRole role, std::uint16_t weight,
+                                   bool italic, std::span<const std::byte> encoded) {
+    if (encoded.empty() || encoded.size() > 64U * 1024U * 1024U) return false;
+    return (*impl_).register_font_data(role, weight, italic,
+        SkData::MakeWithCopy(encoded.data(), encoded.size()));
 }
 
 bool SkiaRaster::register_fallback_typeface(
     std::uint16_t weight, bool italic, std::span<const std::byte> encoded) {
-    if (encoded.empty()) return false;
-    sk_sp<SkData> data = SkData::MakeWithCopy(encoded.data(), encoded.size());
-    sk_sp<SkTypeface> face = (*(*impl_).fonts).makeFromData(std::move(data));
-    if (!face) return false;
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
-    const std::optional<FontFaceId> text_face =
-        (*impl_).text_engine.register_fallback_typeface(weight, italic, encoded);
-    if (!text_face) return false;
-    (*impl_).registered_typefaces.push_back(
-        {FontRole::content, weight, italic, true, std::move(face), *text_face});
-#else
-    (*impl_).registered_typefaces.push_back(
-        {FontRole::content, weight, italic, true, std::move(face)});
-#endif
-    return true;
+    if (encoded.empty() || encoded.size() > 64U * 1024U * 1024U) return false;
+    return (*impl_).register_font_data(std::nullopt, weight, italic,
+        SkData::MakeWithCopy(encoded.data(), encoded.size()));
+}
+
+bool SkiaRaster::register_typeface_file(FontRole role, std::uint16_t weight,
+                                        bool italic, const char* path) {
+    return (*impl_).register_font_data(role, weight, italic, SkData::MakeFromFileName(path));
+}
+
+bool SkiaRaster::register_fallback_typeface_file(
+    std::uint16_t weight, bool italic, const char* path) {
+    return (*impl_).register_font_data(std::nullopt, weight, italic, SkData::MakeFromFileName(path));
 }
 
 bool SkiaRaster::resize(Size logical_size, double scale) {
@@ -859,7 +863,10 @@ void SkiaRaster::draw_image_region_sampled(
     if (!image_bounds.contains(source)) return;
     SkPaint paint;
     paint.setAlphaf(static_cast<float>(std::clamp(opacity, 0.0, 1.0)));
-    paint.setAntiAlias(true);
+    // Sampling filters pixels; rectangle coverage must stay hard-edged.
+    // Coverage AA attenuates a tile edge even through a disjoint hard clip
+    // when its one-pixel sampling gutter is subpixel after minification.
+    paint.setAntiAlias(false);
     (*canvas).drawImageRect((*found).second.image.get(), to_sk_rect(source),
                           to_sk_rect(destination),
                           SkSamplingOptions(sampling == ImageSampling::nearest

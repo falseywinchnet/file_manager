@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <type_traits>
@@ -112,6 +113,82 @@ private:
     int& total_;
 };
 
+class EventOwnerDestruction final {
+public:
+    std::unique_ptr<Event<int>> event{std::make_unique<Event<int>>()};
+    int calls{};
+    void destroy(int) {
+        ++calls;
+        event.reset();
+    }
+    void must_not_run(int) { calls += 100; }
+};
+
+class ScopedSubscriber final : public Component {
+public:
+    explicit ScopedSubscriber(int& total) : total_(total) {}
+    void add(int value) { total_ += value; }
+private:
+    int& total_;
+};
+
+class NestedEmission final {
+public:
+    Event<int> event;
+    std::vector<int> order;
+    SubscriptionToken added;
+    void first(int depth) {
+        order.push_back(10 + depth);
+        if (depth == 0) {
+            added = event.subscribe(
+                Delegate<int>::bind<NestedEmission, &NestedEmission::third>(*this));
+            event.emit(1);
+        }
+    }
+    void second(int depth) { order.push_back(20 + depth); }
+    void third(int depth) { order.push_back(30 + depth); }
+};
+
+void test_event_destruction_during_emission() {
+    EventOwnerDestruction owner;
+    const SubscriptionToken first = (*owner.event).subscribe(
+        Delegate<int>::bind<EventOwnerDestruction,
+                            &EventOwnerDestruction::destroy>(owner));
+    const SubscriptionToken second = (*owner.event).subscribe(
+        Delegate<int>::bind<EventOwnerDestruction,
+                            &EventOwnerDestruction::must_not_run>(owner));
+    (*owner.event).emit(1);
+    require(owner.event == nullptr && owner.calls == 1 &&
+                !first.connected() && !second.connected(),
+            "event destruction must cancel pending callbacks and retain dispatch state");
+}
+
+void test_natural_owner_destruction_revokes_subscription() {
+    Event<int> event;
+    int total = 0;
+    SubscriptionToken token;
+    {
+        ScopedSubscriber subscriber(total);
+        token = event.subscribe(subscriber,
+            Delegate<int>::bind<ScopedSubscriber, &ScopedSubscriber::add>(subscriber));
+        event.emit(3);
+    }
+    require(!token.connected(), "natural Component destruction must revoke its slots");
+    event.emit(5);
+    require(total == 3, "a destroyed subscriber must never receive another callback");
+}
+
+void test_nested_emissions_have_independent_boundaries() {
+    NestedEmission scenario;
+    const SubscriptionToken first = scenario.event.subscribe(
+        Delegate<int>::bind<NestedEmission, &NestedEmission::first>(scenario));
+    const SubscriptionToken second = scenario.event.subscribe(
+        Delegate<int>::bind<NestedEmission, &NestedEmission::second>(scenario));
+    scenario.event.emit(0);
+    require(scenario.order == std::vector<int>({10, 11, 21, 31, 20}),
+            "new slots belong to the next nested emission, not the enclosing one");
+}
+
 void test_delegate_representation_and_binding() {
     static_assert(std::is_trivially_copyable_v<Delegate<int>>);
     static_assert(sizeof(Delegate<int>) == 2U * sizeof(void*));
@@ -202,6 +279,9 @@ int main() {
         test_delegate_event_snapshot_and_statistics();
         test_delegate_event_exception_boundary();
         test_legacy_callback_compatibility();
+        test_event_destruction_during_emission();
+        test_natural_owner_destruction_revokes_subscription();
+        test_nested_emissions_have_independent_boundaries();
         std::cout << "delegate event tests passed\n";
         return 0;
     } catch (const std::exception& error) {

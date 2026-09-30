@@ -1,6 +1,7 @@
 #include "skia_raster.hpp"
 
 #include <array>
+#include <cstring>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -61,9 +62,39 @@ const std::uint8_t* pixel_at(const std::uint8_t* pixels, std::size_t row_bytes,
            static_cast<std::size_t>(x * scale) * 4U;
 }
 
+bool mapped_fonts_match_copied_fonts() {
+    gui_forms::render::SkiaRaster copied;
+    gui_forms::render::SkiaRaster mapped;
+    if (!copied.register_typeface(gui_forms::FontRole::control, 400, false,
+            read_file(GUI_FORMS_TEST_CONTROL_FONT)) ||
+        !copied.register_fallback_typeface(400, false, read_file(GUI_FORMS_TEST_CJK_FONT)) ||
+        !mapped.register_typeface_file(gui_forms::FontRole::control, 400, false, GUI_FORMS_TEST_CONTROL_FONT) ||
+        !mapped.register_fallback_typeface_file(400, false, GUI_FORMS_TEST_CJK_FONT) ||
+        mapped.register_fallback_typeface_file(400, false, nullptr) ||
+        mapped.register_fallback_typeface_file(400, false, "/gui-forms-missing-font.otf")) return false;
+    const std::string_view text = "Plan Paint — 漢字 日本語 中文";
+    for (gui_forms::render::SkiaRaster* raster : {&copied, &mapped}) {
+        if (!(*raster).resize({440, 60}, 2)) return false;
+        gui_forms::DamageRegion damage;
+        damage.add({0, 0, 440, 60});
+        (*raster).begin_frame(damage);
+        (*raster).fill_rect({0, 0, 440, 60}, gui_forms::Color::rgba(255, 255, 255));
+        (*raster).draw_text_utf8({8, 36}, text, {gui_forms::FontRole::control, 20, 400, false},
+                               gui_forms::Color::rgba(0, 0, 0));
+        (*raster).end_frame();
+    }
+    return copied.byte_size() == mapped.byte_size() &&
+        std::memcmp(copied.pixels(), mapped.pixels(), copied.byte_size()) == 0;
+}
+
 } // namespace
 
 int main() {
+    if (!mapped_fonts_match_copied_fonts()) {
+        std::fputs("Mapped fonts changed rendered text or accepted an invalid path\n", stderr);
+        return 20;
+    }
+
     constexpr std::array<std::uint8_t, 70> png = {
         0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
         0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,

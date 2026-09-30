@@ -164,6 +164,33 @@ struct PropertyList::Impl final {
         return owner.effective_text_scale();
     }
 
+    [[nodiscard]] double line_height() const {
+        return owner.resolve_text_layout_utf8(
+            "Mg", owner.effective_font(font)).logical_size.height / scale();
+    }
+
+    [[nodiscard]] double group_extent() const {
+        return std::max(property_group_height, line_height() + 8.0) * scale();
+    }
+
+    void apply_editor_font(const Control::Ptr& editor) const {
+        if (!font_overridden || !editor) return;
+        if (const std::shared_ptr<TextBox> text =
+                std::dynamic_pointer_cast<TextBox>(editor)) {
+            (*text).set_font(font);
+        } else if (const std::shared_ptr<NumericUpDown> numeric =
+                       std::dynamic_pointer_cast<NumericUpDown>(editor)) {
+            const std::shared_ptr<TextBox> text = (*numeric).editor();
+            if (text) (*text).set_font(font);
+        } else if (const std::shared_ptr<ComboBox> choice =
+                       std::dynamic_pointer_cast<ComboBox>(editor)) {
+            (*choice).set_font(font);
+        } else if (const std::shared_ptr<ButtonBase> button =
+                       std::dynamic_pointer_cast<ButtonBase>(editor)) {
+            (*button).set_font(font);
+        }
+    }
+
     PropertyRowSpec& spec(RowState& state) {
         return groups[state.group_index].rows[state.row_index];
     }
@@ -274,6 +301,8 @@ struct PropertyList::Impl final {
                     state.reset_button = reset;
                     owner.add_child(reset);
                 }
+                apply_editor_font(state.editor);
+                apply_editor_font(state.reset_button);
                 rows.push_back(std::move(state));
                 connect_row(rows.back());
             }
@@ -317,15 +346,18 @@ struct PropertyList::Impl final {
         const double width = std::max(0.0, owner.committed_arranged_bounds().width);
         const double viewport = std::max(0.0, owner.committed_arranged_bounds().height);
         const double s = scale();
+        const double line = line_height();
+        const double row_extra = std::max(row_height, line + 10.0) - property_row_height;
+        const double stacked_extra = std::max(21.0, line + 6.0) - 21.0;
         const double padding = property_padding * s;
         const double gap = property_gap * s;
         const double scaled_label_width = label_width * s;
-        const double validation_height = property_validation_height * s;
+        const double validation_height = std::max(property_validation_height, line + 4.0) * s;
         const bool stacked = width < std::max(230.0 * s,
                                               scaled_label_width + 116.0 * s);
         double y{header_height};
         for (std::size_t group_index = 0; group_index < groups.size(); ++group_index) {
-            y += property_group_height * s;
+            y += group_extent();
             if (!groups[group_index].expanded) continue;
             for (RowState& state : rows) {
                 if (state.group_index != group_index) continue;
@@ -340,9 +372,9 @@ struct PropertyList::Impl final {
                 }
                 const bool editable = row.editor != PropertyEditorKind::read_only;
                 const bool interactive = editable || row.resettable;
-                double height = (interactive ? property_editor_height
-                                             : property_row_height) * s;
-                if (stacked) height += (interactive ? 21.0 : 13.0) * s;
+                double height = ((interactive ? property_editor_height
+                                              : property_row_height) + row_extra) * s;
+                if (stacked) height += ((interactive ? 21.0 : 13.0) + stacked_extra) * s;
                 if (!row.validation_message.empty()) height += validation_height;
                 state.row_bounds = {0.0, y, width, height};
                 const double indent = static_cast<double>(row.depth) * 15.0 * s +
@@ -353,21 +385,21 @@ struct PropertyList::Impl final {
                     state.name_bounds = {padding + indent, y + 3.0 * s,
                                          std::max(0.0, width - padding * 2.0 -
                                                            indent),
-                                         18.0 * s};
-                    state.value_bounds = {padding, y + 21.0 * s,
+                                         (18.0 + stacked_extra) * s};
+                    state.value_bounds = {padding, y + (21.0 + stacked_extra) * s,
                         std::max(0.0, width - padding * 2.0 - reset_width -
                                           reset_gap),
-                        (interactive ? 28.0 : 19.0) * s};
+                        ((interactive ? 28.0 : 19.0) + row_extra) * s};
                 } else {
                     state.name_bounds = {padding + indent, y + 5.0 * s,
                                          std::max(0.0, scaled_label_width - indent),
-                                         21.0 * s};
+                                         (21.0 + row_extra) * s};
                     state.value_bounds = {
                         padding + scaled_label_width + gap, y + 3.0 * s,
                         std::max(0.0, width - padding * 2.0 -
                                           scaled_label_width - gap - reset_width -
                                           reset_gap),
-                        (interactive ? 28.0 : 22.0) * s};
+                        ((interactive ? 28.0 : 22.0) + row_extra) * s};
                 }
                 state.reset_bounds = row.resettable
                     ? Rect{std::max(padding, width - padding - reset_width),
@@ -433,11 +465,11 @@ struct PropertyList::Impl final {
         owner.invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
     }
 
-    std::optional<std::size_t> group_at(Point absolute) const noexcept {
+    std::optional<std::size_t> group_at(Point absolute) const {
         const Rect bounds = owner.absolute_bounds();
         if (!bounds.contains(absolute)) return {};
         const double y_target = absolute.y - bounds.y + scroll_offset;
-        const double group_height = property_group_height * scale();
+        const double group_height = group_extent();
         double y{header_height};
         for (std::size_t group_index = 0; group_index < groups.size(); ++group_index) {
             if (y_target >= y && y_target < y + group_height) {
@@ -480,6 +512,9 @@ struct PropertyList::Impl final {
     Control::Ptr header;
     double header_height{};
     double label_width{76.0};
+    FontSpec font{FontRole::content, 9.5, 400, false};
+    double row_height{property_row_height};
+    bool font_overridden{};
     double scroll_offset{};
     double content_height{};
     bool synchronizing{};
@@ -743,6 +778,7 @@ bool PropertyList::replace_editor(std::string_view id, Control::Ptr editor) {
 
     // Attach first so an identity/lifecycle failure leaves the existing editor
     // and its subscriptions intact.
+    (*impl_).apply_editor_font(editor);
     add_child(editor);
     Control::Ptr previous = (*row).editor;
     (*row).value_subscription.disconnect();
@@ -812,6 +848,41 @@ void PropertyList::set_header_height(double height) {
 
 double PropertyList::label_width() const noexcept { return (*impl_).label_width; }
 
+FontSpec PropertyList::font() const noexcept { return (*impl_).font; }
+
+void PropertyList::set_font(FontSpec font) {
+    require_mutable();
+    if (!valid_font_spec(font)) {
+        throw std::invalid_argument("PropertyList font specification is invalid");
+    }
+    if ((*impl_).font_overridden && (*impl_).font == font) return;
+    (*impl_).font = font;
+    (*impl_).font_overridden = true;
+    for (const Impl::RowState& row : (*impl_).rows) {
+        (*impl_).apply_editor_font(row.editor);
+        (*impl_).apply_editor_font(row.reset_button);
+    }
+    (*impl_).recompute_geometry();
+    (*impl_).arrange_editors();
+    invalidate(Dirty::measure | Dirty::layout | Dirty::paint |
+               Dirty::hit_test | Dirty::semantics);
+}
+
+double PropertyList::row_height() const noexcept { return (*impl_).row_height; }
+
+void PropertyList::set_row_height(double height) {
+    require_mutable();
+    if (!std::isfinite(height) || height <= 0.0 || height > 4096.0) {
+        throw std::invalid_argument("PropertyList row height must be positive and at most 4096");
+    }
+    if ((*impl_).row_height == height) return;
+    (*impl_).row_height = height;
+    (*impl_).recompute_geometry();
+    (*impl_).arrange_editors();
+    invalidate(Dirty::measure | Dirty::layout | Dirty::paint |
+               Dirty::hit_test | Dirty::semantics);
+}
+
 void PropertyList::set_label_width(double width) {
     require_mutable();
     if (!std::isfinite(width) || width < 40.0 || width > 320.0) {
@@ -845,7 +916,7 @@ double PropertyList::content_height() const noexcept { return (*impl_).content_h
 
 Size PropertyList::measure(Size available) {
     return {available.width, std::min(available.height,
-        std::max(property_group_height * effective_text_scale(),
+        std::max((*impl_).group_extent(),
                  (*impl_).content_height))};
 }
 
@@ -860,17 +931,17 @@ void PropertyList::on_paint(Painter& painter, Rect) {
                       committed_arranged_bounds().height};
     const BasicControlStyle style;
     const double s = effective_text_scale();
-    const double group_height = property_group_height * s;
-    const FontSpec group_glyph = effective_font(
-        {FontRole::control, 8.5, 600, false});
-    const FontSpec group_font = effective_font(
-        {FontRole::control, 8.5, 700, false, 0.24});
-    const FontSpec name_font = effective_font(
-        {FontRole::content, 9.5, 600, false});
-    const FontSpec value_font = effective_font(
-        {FontRole::content, 9.5, 400, false});
-    const FontSpec validation_font = effective_font(
-        {FontRole::content, 8.5, 600, false});
+    const double group_height = (*impl_).group_extent();
+    const FontSpec group_glyph = effective_font((*impl_).font_overridden
+        ? (*impl_).font : FontSpec{FontRole::control, 8.5, 600, false});
+    FontSpec group_font = effective_font((*impl_).font_overridden
+        ? (*impl_).font : FontSpec{FontRole::control, 8.5, 700, false, 0.24});
+    group_font.weight = std::max<std::uint16_t>(group_font.weight, 700U);
+    const FontSpec name_font = effective_font((*impl_).font_overridden
+        ? (*impl_).font : FontSpec{FontRole::content, 9.5, 600, false});
+    const FontSpec value_font = effective_font((*impl_).font);
+    const FontSpec validation_font = effective_font((*impl_).font_overridden
+        ? (*impl_).font : FontSpec{FontRole::content, 8.5, 600, false});
     painter.fill_rect(bounds, background());
     double y = (*impl_).header_height - (*impl_).scroll_offset;
     for (std::size_t group_index = 0;
@@ -906,14 +977,14 @@ void PropertyList::on_paint(Painter& painter, Rect) {
                                     row_state.value_bounds.height};
             if (row.expandable) {
                 painter.draw_text_utf8({std::max(2.0 * s, name.x - 13.0 * s),
-                                        name.y + 15.0 * s},
+                                        name.y + std::max(15.0 * s, name_font.size)},
                     row.expanded ? "▼" : "▶", group_glyph, style.text);
             }
-            painter.draw_text_utf8({name.x, name.y + 15.0 * s}, row.name,
+            painter.draw_text_utf8({name.x, name.y + std::max(15.0 * s, name_font.size)}, row.name,
                                    name_font, style.disabled_text);
             if (row.editor == PropertyEditorKind::read_only) {
                 painter.draw_text_utf8({value_bounds.x,
-                                        value_bounds.y + 15.0 * s},
+                                        value_bounds.y + std::max(15.0 * s, value_font.size)},
                     row.value, value_font,
                     row.enabled ? style.text : style.disabled_text);
             }
@@ -923,7 +994,7 @@ void PropertyList::on_paint(Painter& painter, Rect) {
                     row_state.validation_bounds.width,
                     row_state.validation_bounds.height};
                 painter.draw_text_utf8({validation.x,
-                                        validation.y + 13.0 * s},
+                                        validation.y + std::max(13.0 * s, validation_font.size)},
                     "! " + row.validation_message,
                     validation_font,
                     Color::rgba(151, 45, 43));
@@ -1005,7 +1076,7 @@ SemanticDescriptor PropertyList::semantic_descriptor() const {
 std::vector<SemanticNode> PropertyList::semantic_virtual_children() const {
     std::vector<SemanticNode> nodes;
     const Rect absolute = absolute_bounds();
-    const double group_height = property_group_height * effective_text_scale();
+    const double group_height = (*impl_).group_extent();
     double y = (*impl_).header_height - (*impl_).scroll_offset;
     for (std::size_t group_index = 0;
          group_index < (*impl_).groups.size(); ++group_index) {

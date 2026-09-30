@@ -184,13 +184,20 @@ Size ScrollableControl::content_extent() {
 }
 
 void ScrollableControl::recompute_scroll_layout(Size client_size) {
+    const Size extent = content_extent();
+    if (!is_alive()) return;
+    arrange_scroll_viewport(client_size, extent);
+}
+
+void ScrollableControl::arrange_scroll_viewport(Size client_size, Size measured_content) {
     const Rect previous_viewport = viewport_rectangle_;
     const Size previous_content = content_extent_;
     const bool previous_h = horizontal_scroll_.visible_;
     const bool previous_v = vertical_scroll_.visible_;
     const Point previous_position = scroll_position_;
 
-    content_extent_ = content_extent();
+    content_extent_ = {std::max(auto_scroll_min_size_.width, measured_content.width),
+                       std::max(auto_scroll_min_size_.height, measured_content.height)};
     if (!is_alive()) return;
     const double width = std::max(0.0, client_size.width);
     const double height = std::max(0.0, client_size.height);

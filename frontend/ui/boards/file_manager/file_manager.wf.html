@@ -7,7 +7,7 @@
 </head>
 <body id="file-manager-app" data-wf-surface="own-surface">
   <main id="file-manager-app.shell" class="app-shell" data-wf-control="responsive-tracks" data-wf-responsive-orientation="vertical" data-wf-responsive-gap="0" data-wf-surface="own-surface">
-    <header id="file-manager-app.shell.title" class="title-bar" data-wf-control="toolbar" data-wf-track-index="0" data-wf-track-mode="content" data-wf-track-minimum="40" data-wf-track-preferred="40" data-wf-track-maximum="100" data-wf-surface="own-surface" data-wf-window-drag-region="true">
+    <header id="file-manager-app.shell.title" class="title-bar" data-wf-control="toolbar" data-wf-track-index="0" data-wf-track-collapse-priority="0" data-wf-track-mode="content" data-wf-track-minimum="40" data-wf-track-preferred="40" data-wf-track-maximum="100" data-wf-surface="own-surface" data-wf-window-drag-region="true">
       <div id="file-manager-app.shell.title.mark" class="app-mark" data-wf-surface="own-surface">
         <span id="file-manager-app.shell.title.mark.front" class="mark-front" data-wf-surface="own-surface">F</span>
       </div>
@@ -18,7 +18,7 @@
       <span id="file-manager-app.shell.title.service" class="service-state">LOCAL · CONNECTING</span>
     </header>
 
-    <nav id="file-manager-app.shell.menu" class="menu-bar" data-wf-control="menu-bar" data-wf-track-index="1" data-wf-track-mode="content" data-wf-track-minimum="24" data-wf-track-preferred="24" data-wf-track-maximum="90" data-wf-surface="own-surface" aria-label="Application menu">
+    <nav id="file-manager-app.shell.menu" class="menu-bar" data-wf-control="menu-bar" data-wf-track-index="1" data-wf-track-mode="content" data-wf-track-minimum="28" data-wf-track-preferred="28" data-wf-track-maximum="90" data-wf-surface="own-surface" aria-label="Application menu">
       <button id="file-manager-app.shell.menu.file" class="menu-command" data-wf-command="open-file-menu" data-wf-surface="own-surface">File</button>
       <button id="file-manager-app.shell.menu.home" class="menu-command active" data-wf-command="open-home-menu" data-wf-surface="own-surface">Home</button>
       <button id="file-manager-app.shell.menu.edit" class="menu-command" data-wf-command="open-edit-menu" data-wf-surface="own-surface">Edit</button>
@@ -28,7 +28,7 @@
       <button id="file-manager-app.shell.menu.help" class="menu-command" data-wf-command="open-help-menu" data-wf-surface="own-surface">Help</button>
     </nav>
 
-    <section id="file-manager-app.shell.commands" class="command-shelf" data-wf-control="command-overflow" data-wf-overflow-gap="4" data-wf-track-index="2" data-wf-track-mode="content" data-wf-track-minimum="45" data-wf-track-preferred="66" data-wf-track-maximum="160" data-wf-surface="own-surface">
+    <section id="file-manager-app.shell.commands" class="command-shelf" data-wf-control="command-overflow" data-wf-overflow-gap="4" data-wf-track-index="2" data-wf-track-collapse-priority="1" data-wf-track-mode="content" data-wf-track-minimum="50" data-wf-track-preferred="72" data-wf-track-maximum="160" data-wf-surface="own-surface">
       <div id="file-manager-app.shell.commands.selection-group" class="command-group" data-wf-overflow-minimum="176" data-wf-overflow-preferred="176" data-wf-overflow-maximum="176" data-wf-overflow-priority="2" data-wf-surface="own-surface">
         <div id="file-manager-app.shell.commands.selection-group.actions" class="command-actions" data-wf-surface="own-surface">
           <button id="file-manager-app.shell.commands.selection-group.actions.copy" class="shelf-command arrow" data-wf-control="dropdown-button" data-wf-dropdown-mode="menu" data-wf-dropdown-width="16" data-wf-command="move-copy-selection" data-wf-image-key="transfer" data-wf-image-list="house-commands" data-wf-image-src="assets/house/transfer.png" data-wf-image-src-2x="assets/house/transfer@2x.png" data-wf-image-width="28" data-wf-image-height="28" data-wf-image-relation="image-above-text" data-wf-image-gap="1" data-wf-image-alignment="middle-center" data-wf-text-alignment="middle-center" data-wf-content-padding-left="5" data-wf-content-padding-top="2" data-wf-content-padding-right="21" data-wf-content-padding-bottom="2" data-wf-surface="own-surface">Move / copy</button>
@@ -55,7 +55,7 @@
       <span id="file-manager-app.shell.commands.rule" class="hidden-control" data-wf-surface="own-surface"></span>
     </section>
 
-    <section id="file-manager-app.shell.location" class="location-row" data-wf-control="toolbar" data-wf-track-index="3" data-wf-track-mode="content" data-wf-track-minimum="40" data-wf-track-preferred="40" data-wf-track-maximum="140" data-wf-surface="own-surface">
+    <section id="file-manager-app.shell.location" class="location-row" data-wf-control="toolbar" data-wf-track-index="3" data-wf-track-mode="content" data-wf-track-minimum="42" data-wf-track-preferred="42" data-wf-track-maximum="140" data-wf-surface="own-surface">
       <div id="file-manager-app.shell.location.navigation" class="navigation-cluster" data-wf-connected-axis="horizontal">
         <button id="file-manager-app.shell.location.navigation.back" class="nav-command" data-wf-command="navigate-back" data-wf-image-key="back" data-wf-image-list="house-commands" data-wf-image-src="assets/house/back.png" data-wf-image-src-2x="assets/house/back@2x.png" data-wf-image-width="28" data-wf-image-height="28" data-wf-image-relation="overlay" data-wf-image-gap="1" data-wf-image-alignment="middle-center" data-wf-text-alignment="middle-center" data-wf-content-padding-left="5" data-wf-content-padding-top="2" data-wf-content-padding-right="5" data-wf-content-padding-bottom="2" data-wf-surface="own-surface" aria-label="Back"></button>
         <button id="file-manager-app.shell.location.navigation.forward" class="nav-command" data-wf-command="navigate-forward" data-wf-image-key="forward" data-wf-image-list="house-commands" data-wf-image-src="assets/house/forward.png" data-wf-image-src-2x="assets/house/forward@2x.png" data-wf-image-width="28" data-wf-image-height="28" data-wf-image-relation="overlay" data-wf-image-gap="1" data-wf-image-alignment="middle-center" data-wf-text-alignment="middle-center" data-wf-content-padding-left="5" data-wf-content-padding-top="2" data-wf-content-padding-right="5" data-wf-content-padding-bottom="2" data-wf-surface="own-surface" aria-label="Forward"></button>
@@ -70,12 +70,12 @@
       </div>
     </section>
 
-    <section id="file-manager-app.shell.workspace" class="workspace" data-wf-control="split-view" data-wf-track-index="4" data-wf-track-mode="remaining" data-wf-track-minimum="24" data-wf-track-preferred="200" data-wf-track-maximum="0" data-wf-track-weight="1" data-wf-split-orientation="vertical" data-wf-split-distance="218" data-wf-split-visible-thickness="3" data-wf-split-hit-before="4.5" data-wf-split-hit-after="4.5" data-wf-split-minimum-hit-target="12" data-wf-split-first-minimum="150" data-wf-split-first-maximum="360" data-wf-split-second-minimum="320" data-wf-split-collapse-panel="first" data-wf-split-automatic-collapse-threshold="700" data-wf-split-transition-ms="90" data-wf-surface="own-surface">
+    <section id="file-manager-app.shell.workspace" class="workspace" data-wf-control="split-view" data-wf-track-index="4" data-wf-track-mode="remaining" data-wf-track-minimum="64" data-wf-track-preferred="200" data-wf-track-maximum="0" data-wf-track-weight="1" data-wf-split-orientation="vertical" data-wf-split-distance="218" data-wf-split-visible-thickness="3" data-wf-split-hit-before="4.5" data-wf-split-hit-after="4.5" data-wf-split-minimum-hit-target="12" data-wf-split-first-minimum="200" data-wf-split-first-maximum="360" data-wf-split-second-minimum="320" data-wf-split-collapse-panel="first" data-wf-split-automatic-collapse-threshold="700" data-wf-split-transition-ms="90" data-wf-surface="own-surface">
       <aside id="file-manager-app.shell.workspace.sidebar" class="sidebar" data-wf-control="stack" data-wf-split-panel="first" data-wf-surface="own-surface">
         <div id="file-manager-app.shell.workspace.sidebar.header" class="tree-header" data-wf-control="toolbar" data-wf-surface="own-surface">
           <p id="file-manager-app.shell.workspace.sidebar.header.label" class="pane-caption" data-wf-surface="own-surface">FOLDERS</p>
           <div id="file-manager-app.shell.workspace.sidebar.header.root-mode-host" class="tree-root-mode-host" data-wf-control="panel" data-wf-surface="own-surface">
-            <span id="file-manager-app.shell.workspace.sidebar.header.root-mode-host.placeholder" class="tree-root-mode-placeholder">Home-rooted</span>
+            <span id="file-manager-app.shell.workspace.sidebar.header.root-mode-host.placeholder" class="tree-root-mode-placeholder">Home</span>
           </div>
         </div>
         <button id="file-manager-app.shell.workspace.sidebar.root" class="hidden-control" data-wf-command="navigate-root" data-wf-surface="own-surface">Home</button>
@@ -86,7 +86,7 @@
         </div>
       </aside>
 
-      <section id="file-manager-app.shell.workspace.selection" class="workspace-selection" data-wf-control="split-view" data-wf-split-panel="second" data-wf-split-orientation="vertical" data-wf-split-distance="902" data-wf-split-visible-thickness="3" data-wf-split-hit-before="4.5" data-wf-split-hit-after="4.5" data-wf-split-minimum-hit-target="12" data-wf-split-first-minimum="260" data-wf-split-second-minimum="248" data-wf-split-second-maximum="420" data-wf-split-fixed-panel="second" data-wf-split-collapse-panel="second" data-wf-split-automatic-collapse-threshold="900" data-wf-split-transition-ms="90" data-wf-surface="own-surface">
+      <section id="file-manager-app.shell.workspace.selection" class="workspace-selection" data-wf-control="split-view" data-wf-split-panel="second" data-wf-split-orientation="vertical" data-wf-split-distance="826" data-wf-split-visible-thickness="3" data-wf-split-hit-before="4.5" data-wf-split-hit-after="4.5" data-wf-split-minimum-hit-target="12" data-wf-split-first-minimum="260" data-wf-split-second-minimum="288" data-wf-split-second-maximum="420" data-wf-split-fixed-panel="second" data-wf-split-collapse-panel="second" data-wf-split-automatic-collapse-threshold="900" data-wf-split-transition-ms="90" data-wf-surface="own-surface">
       <article id="file-manager-app.shell.workspace.selection.content" class="content" data-wf-control="panel" data-wf-split-panel="first" data-wf-surface="own-surface">
         <header id="file-manager-app.shell.workspace.selection.content.heading" class="content-heading" data-wf-surface="own-surface">
           <div id="file-manager-app.shell.workspace.selection.content.heading.copy" class="heading-copy">
@@ -168,7 +168,7 @@
       </footer>
     </section>
 
-    <footer id="file-manager-app.shell.status" class="status-bar" data-wf-control="status-bar" data-wf-track-index="5" data-wf-track-mode="content" data-wf-track-minimum="24" data-wf-track-preferred="24" data-wf-track-maximum="80" data-wf-surface="own-surface">
+    <footer id="file-manager-app.shell.status" class="status-bar" data-wf-control="status-bar" data-wf-track-index="5" data-wf-track-collapse-priority="2" data-wf-track-mode="content" data-wf-track-minimum="26" data-wf-track-preferred="26" data-wf-track-maximum="80" data-wf-surface="own-surface">
       <span id="file-manager-app.shell.status.ready">Starting File Manager…</span>
       <span id="file-manager-app.shell.status.summary" class="status-summary" data-wf-surface="own-surface">local navigation · direct filesystem</span>
     </footer>

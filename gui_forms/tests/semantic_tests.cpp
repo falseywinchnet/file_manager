@@ -117,6 +117,25 @@ void test_snapshot_roles_states_hierarchy_and_json() {
             "ineligible hidden controls must not leak into semantic snapshots");
 }
 
+void test_subtree_visibility_advances_semantic_generation() {
+    const std::shared_ptr<Panel> root = make_control<Panel>(StableId("generation.root"));
+    const std::shared_ptr<Panel> group = make_control<Panel>(StableId("generation.group"));
+    const std::shared_ptr<Button> button = make_control<Button>(StableId("generation.button"), "Action");
+    (*group).set_requested_bounds({0, 0, 200, 100});
+    (*button).set_requested_bounds({10, 10, 100, 30});
+    (*group).add_child(button); (*root).add_child(group);
+    Window window(root, {300, 200});
+    const SemanticSnapshot visible = window.semantic_snapshot();
+    (*group).set_visible(false);
+    const SemanticSnapshot hidden = window.semantic_snapshot();
+    require(hidden.generation > visible.generation && hidden.node_count == 0U,
+            "hiding an unfocused subtree must invalidate cached semantic trees");
+    (*group).set_visible(true);
+    const SemanticSnapshot restored = window.semantic_snapshot();
+    require(restored.generation > hidden.generation && restored.node_count == visible.node_count,
+            "restoring a subtree must advance semantic generation independently of layout");
+}
+
 void test_semantic_actions_use_control_behavior() {
     std::shared_ptr<gui_forms::Panel> root = make_control<Panel>(StableId("actions.root"));
     std::shared_ptr<gui_forms::Button> button = make_control<Button>(StableId("actions.button"), "Apply");
@@ -220,10 +239,32 @@ void test_virtual_list_items_are_selectable() {
             "virtual list-item press must complete selection then activation");
 }
 
+void test_modal_semantic_scope() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("root"));
+    std::shared_ptr<Button> outside = make_control<Button>(StableId("outside"), "Outside");
+    std::shared_ptr<Panel> dialog = make_control<Panel>(StableId("dialog"));
+    std::shared_ptr<TextBox> field = make_control<TextBox>(StableId("inside"));
+    (*root).add_child(outside); (*root).add_child(dialog); (*dialog).add_child(field);
+    (*dialog).set_requested_bounds({0, 0, 200, 100});
+    (*field).set_requested_bounds({0, 0, 100, 25});
+    Window window(root, {400, 300});
+    const FocusScopeId scope = window.begin_focus_scope(dialog, field);
+    const SemanticSnapshot snapshot = window.semantic_snapshot();
+    require(find_node(snapshot.roots, "inside") && !find_node(snapshot.roots, "outside"),
+            "modal accessibility exposes only the active scope");
+    require(!window.perform_semantic_action("outside", SemanticAction::press),
+            "stale accessible objects cannot activate background commands");
+    require(window.perform_semantic_action("inside", SemanticAction::set_value, "hello"), "modal field remains editable");
+    window.end_focus_scope(scope);
+    require(find_node(window.semantic_snapshot().roots, "outside"), "closing modal restores semantic tree");
+}
+
 } // namespace
 
 int main() {
     try {
+        test_modal_semantic_scope();
+        test_subtree_visibility_advances_semantic_generation();
         test_snapshot_roles_states_hierarchy_and_json();
         test_semantic_actions_use_control_behavior();
         test_virtual_list_items_are_selectable();

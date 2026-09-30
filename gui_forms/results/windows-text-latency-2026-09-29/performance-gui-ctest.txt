@@ -1,0 +1,133 @@
+Test project C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows
+      Start  2: gui_forms_windows_gdi_compat_shim_tests
+      Start  9: gui_forms_windows_canvas_raster_tests
+ 1/64 Test  #2: gui_forms_windows_gdi_compat_shim_tests .........   Passed    2.84 sec
+      Start 10: gui_forms_windows_text_tests
+ 2/64 Test  #9: gui_forms_windows_canvas_raster_tests ...........   Passed    3.17 sec
+      Start 61: gui_forms_host_boundary_audit
+ 3/64 Test #61: gui_forms_host_boundary_audit ...................   Passed    0.52 sec
+      Start 64: gui_forms_windows_accessibility_tests
+ 4/64 Test #64: gui_forms_windows_accessibility_tests ...........   Passed    0.39 sec
+      Start  6: gui_forms_application_native_tests
+ 5/64 Test  #6: gui_forms_application_native_tests ..............   Passed    0.42 sec
+      Start  3: gui_forms_windows_cursors
+ 6/64 Test  #3: gui_forms_windows_cursors .......................   Passed    0.21 sec
+      Start  1: gui_forms_windows_live_surface_endpoint_tests
+ 7/64 Test  #1: gui_forms_windows_live_surface_endpoint_tests ...   Passed    0.20 sec
+      Start 27: gui_forms_inspection_controls_tests
+ 8/64 Test #27: gui_forms_inspection_controls_tests .............   Passed    0.13 sec
+      Start 15: gui_forms_core_tests
+ 9/64 Test #15: gui_forms_core_tests ............................   Passed    0.09 sec
+      Start 60: gui_forms_host_protocol_tests
+10/64 Test #60: gui_forms_host_protocol_tests ...................   Passed    0.05 sec
+      Start 39: gui_forms_layout_panel_tests
+11/64 Test #39: gui_forms_layout_panel_tests ....................   Passed    0.03 sec
+      Start 31: gui_forms_collection_controls_tests
+12/64 Test #31: gui_forms_collection_controls_tests .............   Passed    0.06 sec
+      Start 36: gui_forms_theme_tests
+13/64 Test #36: gui_forms_theme_tests ...........................   Passed    0.02 sec
+      Start 48: gui_forms_invalidation_damage_tests
+14/64 Test #48: gui_forms_invalidation_damage_tests .............   Passed    0.02 sec
+      Start 13: gui_drawing_renderer_boundary_audit
+15/64 Test #13: gui_drawing_renderer_boundary_audit .............   Passed    0.07 sec
+      Start 23: gui_forms_basic_controls_tests
+16/64 Test #23: gui_forms_basic_controls_tests ..................   Passed    0.03 sec
+      Start 43: gui_forms_focus_scope_tests
+17/64 Test #43: gui_forms_focus_scope_tests .....................   Passed    0.02 sec
+      Start 54: gui_forms_binding_tests
+18/64 Test #54: gui_forms_binding_tests .........................   Passed    0.02 sec
+      Start 28: gui_forms_visual_inspection_tests
+19/64 Test #28: gui_forms_visual_inspection_tests ...............   Passed    0.02 sec
+      Start 33: gui_forms_popup_controls_tests
+20/64 Test #33: gui_forms_popup_controls_tests ..................   Passed    0.02 sec
+      Start 52: gui_forms_dispatcher_tests
+21/64 Test #52: gui_forms_dispatcher_tests ......................   Passed    0.06 sec
+      Start 17: gui_forms_sort_algorithm_tests
+22/64 Test #17: gui_forms_sort_algorithm_tests ..................   Passed    0.10 sec
+      Start 30: gui_forms_checked_list_box_tests
+23/64 Test #30: gui_forms_checked_list_box_tests ................   Passed    0.03 sec
+      Start  8: gui_forms_canvas_tests
+24/64 Test  #8: gui_forms_canvas_tests ..........................   Passed    0.04 sec
+      Start 29: gui_forms_instrument_controls_tests
+25/64 Test #29: gui_forms_instrument_controls_tests .............   Passed    0.03 sec
+      Start 35: gui_forms_material_tests
+26/64 Test #35: gui_forms_material_tests ........................   Passed    0.02 sec
+      Start 59: gui_forms_headless_trace_tests
+27/64 Test #59: gui_forms_headless_trace_tests ..................   Passed    0.02 sec
+      Start 37: gui_forms_composition_controls_tests
+28/64 Test #37: gui_forms_composition_controls_tests ............   Passed    0.03 sec
+      Start 62: gui_forms_c_api_c11_tests
+29/64 Test #62: gui_forms_c_api_c11_tests .......................   Passed    0.09 sec
+      Start 38: gui_forms_split_container_tests
+30/64 Test #38: gui_forms_split_container_tests .................   Passed    0.03 sec
+      Start 34: gui_forms_range_controls_tests
+31/64 Test #34: gui_forms_range_controls_tests ..................   Passed    0.02 sec
+      Start 56: gui_forms_guidance_provider_tests
+32/64 Test #56: gui_forms_guidance_provider_tests ...............   Passed    0.02 sec
+      Start 45: gui_forms_semantic_tests
+33/64 Test #45: gui_forms_semantic_tests ........................   Passed    0.02 sec
+      Start 46: gui_forms_lifecycle_controls_tests
+34/64 Test #46: gui_forms_lifecycle_controls_tests ..............   Passed    0.02 sec
+      Start 42: gui_forms_tab_control_tests
+35/64 Test #42: gui_forms_tab_control_tests .....................   Passed    0.03 sec
+      Start 47: gui_forms_retained_lifetime_tests
+36/64 Test #47: gui_forms_retained_lifetime_tests ...............   Passed    0.03 sec
+      Start 11: gui_drawing_c_api_c11_tests
+37/64 Test #11: gui_drawing_c_api_c11_tests .....................   Passed    0.03 sec
+      Start 40: gui_forms_responsive_track_panel_tests
+38/64 Test #40: gui_forms_responsive_track_panel_tests ..........   Passed    0.02 sec
+      Start 58: gui_forms_png_registry_tests
+39/64 Test #58: gui_forms_png_registry_tests ....................   Passed    0.03 sec
+      Start 50: gui_forms_frame_scheduler_tests
+40/64 Test #50: gui_forms_frame_scheduler_tests .................   Passed    0.02 sec
+      Start 41: gui_forms_command_overflow_panel_tests
+41/64 Test #41: gui_forms_command_overflow_panel_tests ..........   Passed    0.02 sec
+      Start  5: gui_forms_application_contract_tests
+42/64 Test  #5: gui_forms_application_contract_tests ............   Passed    0.02 sec
+      Start 51: gui_forms_timer_tests
+43/64 Test #51: gui_forms_timer_tests ...........................   Passed    0.02 sec
+      Start 49: gui_forms_display_chunk_tests
+44/64 Test #49: gui_forms_display_chunk_tests ...................   Passed    0.02 sec
+      Start 63: gui_forms_c_api_cpp_tests
+45/64 Test #63: gui_forms_c_api_cpp_tests .......................   Passed    0.05 sec
+      Start 19: gui_forms_live_surface_tests
+46/64 Test #19: gui_forms_live_surface_tests ....................   Passed    0.02 sec
+      Start 22: gui_forms_text_shaping_tests
+47/64 Test #22: gui_forms_text_shaping_tests ....................   Passed    0.02 sec
+      Start 26: gui_forms_input_controls_tests
+48/64 Test #26: gui_forms_input_controls_tests ..................   Passed    0.02 sec
+      Start 32: gui_forms_menu_controls_tests
+49/64 Test #32: gui_forms_menu_controls_tests ...................   Passed    0.03 sec
+      Start 25: gui_forms_scrollable_control_tests
+50/64 Test #25: gui_forms_scrollable_control_tests ..............   Passed    0.02 sec
+      Start 24: gui_forms_connected_controls_tests
+51/64 Test #24: gui_forms_connected_controls_tests ..............   Passed    0.02 sec
+      Start 55: gui_forms_validation_tests
+52/64 Test #55: gui_forms_validation_tests ......................   Passed    0.02 sec
+      Start 57: gui_forms_date_time_picker_tests
+53/64 Test #57: gui_forms_date_time_picker_tests ................   Passed    0.03 sec
+      Start 53: gui_forms_tooltip_tests
+54/64 Test #53: gui_forms_tooltip_tests .........................   Passed    0.03 sec
+      Start  4: gui_forms_cursor_images
+55/64 Test  #4: gui_forms_cursor_images .........................   Passed    0.02 sec
+      Start 12: gui_drawing_trace_equivalence_tests
+56/64 Test #12: gui_drawing_trace_equivalence_tests .............   Passed    0.03 sec
+      Start 20: gui_forms_text_store_tests
+57/64 Test #20: gui_forms_text_store_tests ......................   Passed    0.03 sec
+      Start  7: gui_drawing_core_tests
+58/64 Test  #7: gui_drawing_core_tests ..........................   Passed    0.02 sec
+      Start 16: gui_forms_binary_search_tests
+59/64 Test #16: gui_forms_binary_search_tests ...................   Passed    0.02 sec
+      Start 21: gui_forms_grapheme_conformance_tests
+60/64 Test #21: gui_forms_grapheme_conformance_tests ............   Passed    0.02 sec
+      Start 14: gui_forms_host_image_tests
+61/64 Test #14: gui_forms_host_image_tests ......................   Passed    0.02 sec
+      Start 44: gui_forms_animation_tests
+62/64 Test #44: gui_forms_animation_tests .......................   Passed    0.02 sec
+      Start 18: gui_forms_delegate_event_tests
+63/64 Test #18: gui_forms_delegate_event_tests ..................   Passed    0.02 sec
+64/64 Test #10: gui_forms_windows_text_tests ....................   Passed    4.05 sec
+
+100% tests passed out of 64
+
+Total Test time (real) =   6.89 sec

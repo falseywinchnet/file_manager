@@ -15,6 +15,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
@@ -89,6 +90,9 @@ func ServeLocal(ctx context.Context, runtimeDir string, engine *service.Service)
 }
 
 func ServeLocalWithOptions(ctx context.Context, runtimeDir string, engine *service.Service, options LocalOptions) error {
+	if runtime.GOOS == "windows" {
+		return serveWindows(ctx, runtimeDir, engine, options)
+	}
 	if engine == nil {
 		return errors.New("engine service is required")
 	}
@@ -291,6 +295,9 @@ func handleLocal(ctx context.Context, connection net.Conn, engine *service.Servi
 }
 
 func CallLocal(ctx context.Context, runtimeDir string, authority Authority, request Request) (Response, error) {
+	if runtime.GOOS == "windows" {
+		return callWindows(ctx, runtimeDir, authority, request)
+	}
 	files := Files(runtimeDir)
 	socket, tokenPath := files.QuerySock, files.QueryToken
 	if authority == AuthorityAdmin {

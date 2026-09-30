@@ -1,4 +1,5 @@
 #include "gui_forms/input_controls.hpp"
+#include "gui_forms/controls/range_control/scroll_bar/scroll_bar.hpp"
 #include "gui_forms/window.hpp"
 #include "headless_host.hpp"
 #include "support/named_callbacks.hpp"
@@ -380,6 +381,31 @@ void test_list_box_selection_navigation_and_mutation() {
             "ListBox top index must bound virtualized row painting");
 }
 
+void test_combo_box_scrollbar_reaches_last_item() {
+    const std::shared_ptr<Panel> root = make_control<Panel>(StableId("scroll.root"));
+    const std::shared_ptr<ComboBox> combo = make_control<ComboBox>(StableId("scroll.combo"));
+    for (int i = 0; i < 24; ++i) (*combo).add_item("Language " + std::to_string(i));
+    (*combo).set_maximum_drop_down_items(64);
+    (*combo).set_requested_bounds({20, 20, 240, 32});
+    (*root).add_child(combo);
+    Window window(root, {300, 220});
+    window.perform_layout();
+    (*combo).set_dropped_down(true);
+    window.perform_layout();
+    const std::shared_ptr<ListBox> list = std::dynamic_pointer_cast<ListBox>(window.find("scroll.combo.popup.list"));
+    const std::shared_ptr<ScrollBar> bar = std::dynamic_pointer_cast<ScrollBar>(window.find("scroll.combo.popup.list.scrollbar"));
+    require(list && bar && (*bar).visible(), "overflow choices have a visible, operable scrollbar");
+    const Rect bounds = (*list).absolute_bounds();
+    require(bounds.y >= 0 && bounds.y + bounds.height <= 220, "tall popup fits a short window");
+    (*bar).set_value((*bar).maximum());
+    require((*list).top_index() > 0, "scrollbar changes the list viewport");
+    const Point last{bounds.x + 15, bounds.y + 2 + (23 - (*list).top_index()) * 26.0 + 13};
+    window.dispatch_pointer({PointerAction::down, PointerButton::primary, last});
+    window.dispatch_pointer({PointerAction::up, PointerButton::primary, last});
+    require((*combo).selected_index() == 23 && !(*combo).dropped_down(),
+            "the last language is reachable without a mouse wheel");
+}
+
 void test_combo_box_popup_commit_dismiss_and_owner_revocation() {
     std::shared_ptr<gui_forms::Panel> root = make_control<Panel>(StableId("combo.root"));
     std::shared_ptr<gui_forms::ComboBox> combo = make_control<ComboBox>(StableId("combo.field"));
@@ -578,6 +604,7 @@ int main() {
         test_clipboard_commands_and_protected_text();
         test_list_box_selection_navigation_and_mutation();
         test_combo_box_popup_commit_dismiss_and_owner_revocation();
+        test_combo_box_scrollbar_reaches_last_item();
         test_numeric_up_down_composite_edit_spinner_and_keys();
         test_list_box_model_stable_item_ids();
         std::cout << "gui_forms_input_controls_tests: all tests passed\n";

@@ -1,3 +1,4 @@
+#include "file_manager/platform_paths.hpp"
 #include "file_manager/document_picker_view.hpp"
 
 #include <algorithm>
@@ -5,6 +6,56 @@
 
 namespace file_manager {
 namespace {
+
+// Keep controls at usable text/input sizes while the object field absorbs resize.
+class PickerPanel final : public gui_forms::ScaledPanel {
+public:
+    explicit PickerPanel(gui_forms::StableId id) : ScaledPanel(std::move(id)) {}
+    void arrange(gui_forms::Rect bounds) override {
+        arrange_self(bounds);
+        const double width = std::max(540.0, bounds.width);
+        const double height = std::max(400.0, bounds.height);
+        const bool compact = width < 700.0;
+        const double fields = height - (compact ? 125.0 : 83.0);
+        for (const auto& child : children()) {
+            auto slot = design_bounds(*child);
+            if (!slot) continue;
+            auto r = *slot;
+            if (r.y == 1 || r.y == 41) r.width = width - 2;
+            else if (r.y == 50 && r.x == 156) r.width = width - 168;
+            else if (r.y == 101 && r.x == 244) r.width = width - 256;
+            else if (r.y == 143) { r.width = width - 24; r.height = fields - 153; }
+            else if (r.y == 477) {
+                r.y = fields;
+                if (r.x == 386) {
+                    r.x = compact ? 12 : 386;
+                    r.y += compact ? 42 : 0;
+                    r.width = width - r.x - 12;
+                }
+            } else if (r.y >= 517) {
+                r.y = height - (r.y == 519 ? 41 : 43);
+                if (r.x == 12) r.width = width - 202;
+                else r.x = width - (r.x == 584 ? 176 : 90);
+            }
+            if (r.y == 12 && r.x == 272) r.width = std::max(0.0, width - 284);
+            set_child_layout(child, r);
+        }
+    }
+    void on_key_preview(gui_forms::KeyEvent& event) override {
+        if (event.action != gui_forms::KeyAction::down || !attached_window()) return;
+        auto& window = *attached_window();
+        if (event.physical_key == gui_forms::PhysicalKey::l &&
+            gui_forms::has_modifier(event.modifiers, gui_forms::Modifier::control)) {
+            window.request_focus(window.find("file-manager.picker.path"));
+            event.handled = true;
+        } else if (event.physical_key == gui_forms::PhysicalKey::up &&
+                   gui_forms::has_modifier(event.modifiers, gui_forms::Modifier::alt)) {
+            auto button = std::dynamic_pointer_cast<gui_forms::Button>(
+                window.find("file-manager.picker.up"));
+            if (button) event.handled = button->perform_click();
+        }
+    }
+};
 
 gui_forms::SurfaceMaterial watercolor_title_material() {
     using gui_forms::Color;
@@ -91,7 +142,7 @@ std::string accept_title(const DocumentPickerProfile profile) {
 
 DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
     : controller_(std::move(request)),
-      root_(std::make_shared<gui_forms::ScaledPanel>(
+      root_(std::make_shared<PickerPanel>(
           gui_forms::StableId("file-manager.picker"))),
       title_bar_(std::make_shared<gui_forms::Control>(
           gui_forms::StableId("file-manager.picker.title"))),
@@ -104,11 +155,15 @@ DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
       navigation_bar_(std::make_shared<gui_forms::Control>(
           gui_forms::StableId("file-manager.picker.navigation"))),
       back_to_root_(std::make_shared<gui_forms::Button>(
-          gui_forms::StableId("file-manager.picker.root"), "Root")),
+          gui_forms::StableId("file-manager.picker.root"), "Home")),
       up_(std::make_shared<gui_forms::Button>(
           gui_forms::StableId("file-manager.picker.up"), "Up")),
       path_(std::make_shared<gui_forms::TextBox>(
           gui_forms::StableId("file-manager.picker.path"))),
+      locations_(std::make_shared<gui_forms::ComboBox>(
+          gui_forms::StableId("file-manager.picker.locations"))),
+      name_filter_(std::make_shared<gui_forms::TextBox>(
+          gui_forms::StableId("file-manager.picker.name-filter"))),
       objects_(std::make_shared<gui_forms::ObjectView>(
           gui_forms::StableId("file-manager.picker.objects"))),
       filter_(std::make_shared<gui_forms::ComboBox>(
@@ -131,6 +186,8 @@ DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
 
     title_bar_->set_authored_surface_material(watercolor_title_material());
     title_bar_->set_accessible_name("Open dialog title bar");
+    title_->set_text(accept_title(controller_.request().profile) + " a " +
+        (controller_.request().profile == DocumentPickerProfile::select_folder ? "folder" : "file"));
     title_->set_font({gui_forms::FontRole::control, 15.0, 700, false});
     title_->set_foreground(gui_forms::Color::rgba(255, 255, 255));
     title_->set_hit_test_transparent(true);
@@ -140,7 +197,7 @@ DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
     navigation_bar_->set_authored_surface_material(
         graphite_navigation_material());
 
-    back_to_root_->set_accessible_name("Go to picker root");
+    back_to_root_->set_accessible_name("Go to Home");
     up_->set_accessible_name("Go to parent folder");
     path_->set_accessible_name("Picker current location");
     path_->set_placeholder_text("Location inside the selection root");
@@ -151,6 +208,7 @@ DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
         : gui_forms::ObjectSelectionMode::single);
     filter_->set_accessible_name("File type filter");
     hidden_->set_checked(controller_.show_hidden());
+    hidden_->set_enabled(controller_.request().allow_hidden_toggle);
     filename_->set_accessible_name("File name");
     filename_->set_placeholder_text("File name");
     filename_->set_maximum_length(255);
@@ -165,7 +223,12 @@ DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
     root_->add_at(back_to_root_, {12, 50, 70, 32});
     root_->add_at(up_, {90, 50, 58, 32});
     root_->add_at(path_, {156, 50, 592, 32});
-    root_->add_at(objects_, {12, 101, 736, 366});
+    locations_->set_accessible_name("Available selection roots");
+    name_filter_->set_accessible_name("Filename filter");
+    name_filter_->set_placeholder_text("Filter names (for example *.txt)");
+    root_->add_at(locations_, {12, 101, 220, 32});
+    root_->add_at(name_filter_, {244, 101, 504, 32});
+    root_->add_at(objects_, {12, 143, 736, 324});
     root_->add_at(filter_, {12, 477, 220, 32});
     root_->add_at(hidden_, {244, 477, 130, 32});
     root_->add_at(filename_, {386, 477, 362, 32});
@@ -173,9 +236,19 @@ DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
     root_->add_at(cancel_, {584, 517, 78, 34});
     root_->add_at(accept_, {670, 517, 78, 34});
 
+    subscriptions_.push_back(locations_->selected_index_changed().subscribe(
+        [this](const std::optional<std::size_t> index) {
+            if (!reloading_ && index && *index < controller_.request().admitted_roots.size())
+                navigate_path(controller_.request().admitted_roots[*index]);
+        }));
+    subscriptions_.push_back(name_filter_->committed().subscribe(
+        [this](const std::string& value) {
+            if (controller_.set_name_filter(value)) reload();
+            else status_->set_text(controller_.last_error());
+        }));
     subscriptions_.push_back(back_to_root_->clicked().subscribe(
         [this](gui_forms::ButtonBase&) {
-            navigate_path(controller_.request().protected_root);
+            navigate_path(controller_.request().home_location);
         }));
     subscriptions_.push_back(up_->clicked().subscribe(
         [this](gui_forms::ButtonBase&) {
@@ -185,16 +258,19 @@ DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
             }
         }));
     subscriptions_.push_back(path_->committed().subscribe(
-        [this](const std::string& value) { navigate_path(value); }));
+        [this](const std::string& value) { navigate_path(path_from_utf8(value)); }));
     subscriptions_.push_back(path_->cancelled().subscribe(
-        [this] { path_->set_text(controller_.browser().location.string()); }));
+        [this] { path_->set_text(path_utf8(controller_.browser().location)); }));
     subscriptions_.push_back(objects_->selection_changed().subscribe(
         [this](const gui_forms::ObjectSelectionChange&) {
+            if (reloading_) return;
             std::vector<std::string> ids(objects_->selected_ids().begin(),
                                          objects_->selected_ids().end());
             if (!controller_.set_selection(std::move(ids))) {
                 objects_->clear_selection();
                 status_->set_text("Selection is outside this picker profile");
+            } else {
+                filename_->set_text(controller_.filename());
             }
         }));
     subscriptions_.push_back(objects_->item_activated().subscribe(
@@ -214,6 +290,7 @@ DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
         }));
     subscriptions_.push_back(filter_->selected_index_changed().subscribe(
         [this](const std::optional<std::size_t> index) {
+            if (reloading_) return;
             if (!index || *index >= controller_.request().filters.size()) return;
             if (controller_.set_active_filter(
                     controller_.request().filters[*index].id)) {
@@ -222,12 +299,15 @@ DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
         }));
     subscriptions_.push_back(hidden_->checked_changed().subscribe(
         [this](const bool checked) {
+            if (reloading_) return;
             if (controller_.set_show_hidden(checked)) reload();
         }));
     subscriptions_.push_back(filename_->text_changed().subscribe(
         [this](const std::string& value) {
             (void)controller_.set_filename(value);
         }));
+    subscriptions_.push_back(filename_->committed().subscribe(
+        [this](const std::string&) { accept(); }));
     subscriptions_.push_back(accept_->clicked().subscribe(
         [this](gui_forms::ButtonBase&) { accept(); }));
     subscriptions_.push_back(cancel_->clicked().subscribe(
@@ -260,6 +340,13 @@ void DocumentPickerView::set_orchestrator_session_valid(const bool valid) {
     accept_->set_enabled(valid);
 }
 
+void DocumentPickerView::set_authority_valid(const bool valid) {
+    controller_.set_authority_valid(valid);
+    update_status();
+}
+
+void DocumentPickerView::cancel() { publish(controller_.cancel()); }
+
 void DocumentPickerView::confirm_overwrite() {
     accept(true);
 }
@@ -272,8 +359,37 @@ void DocumentPickerView::present(
                       " visible objects Â· direct filesystem");
 }
 
+void DocumentPickerView::attach_dialog(gui_forms::Window& window) {
+    window.set_accept_button(accept_);
+    window.set_cancel_button(cancel_);
+    window.request_focus(save_profile(controller_.request().profile)
+        ? std::static_pointer_cast<gui_forms::Control>(filename_)
+        : std::static_pointer_cast<gui_forms::Control>(objects_));
+}
+
+void DocumentPickerView::update_status() {
+    accept_->set_enabled(controller_.session_valid() && !finished_);
+    status_->set_text(controller_.session_valid()
+        ? std::to_string(controller_.browser().entries.size()) + " visible objects" +
+            (controller_.request().authority == DocumentPickerAuthority::trusted_local_host
+                ? " · local host selection" : "")
+        : "Selection session unavailable · browsing only");
+}
+
 void DocumentPickerView::reload() {
-    path_->set_text(controller_.browser().location.string());
+    reloading_ = true;
+    path_->set_text(path_utf8(controller_.browser().location));
+    std::vector<std::string> locations;
+    std::size_t current_root = 0;
+    for (const auto& root : controller_.request().admitted_roots) {
+        if (root == controller_.request().protected_root) current_root = locations.size();
+        locations.push_back(path_utf8(root));
+    }
+    locations_->set_items(std::move(locations));
+    locations_->set_selected_index(current_root);
+    back_to_root_->set_enabled(resolve_navigation_target(controller_.request().admitted_roots,
+        controller_.browser().location, controller_.request().home_location,
+        controller_.request().home_location).has_value());
     up_->set_enabled(controller_.browser().location !=
                      controller_.request().protected_root);
     std::vector<gui_forms::ObjectViewItem> items;
@@ -307,12 +423,23 @@ void DocumentPickerView::navigate_path(std::filesystem::path path) {
     if (controller_.navigate(path)) {
         reload();
     } else {
-        path_->set_text(controller_.browser().location.string());
+        path_->set_text(path_utf8(controller_.browser().location));
         status_->set_text("Location unavailable Â· " + controller_.last_error());
     }
 }
 
 void DocumentPickerView::accept(const bool overwrite_confirmed) {
+    if (finished_) return;
+    if (controller_.selected_ids().size() == 1 &&
+        controller_.request().profile != DocumentPickerProfile::select_folder) {
+        const auto id = controller_.selected_ids().front();
+        for (const auto& entry : controller_.browser().entries) {
+            if (entry.stable_id == id && entry.directory) {
+                navigate_path(entry.path);
+                return;
+            }
+        }
+    }
     if (save_profile(controller_.request().profile)) {
         (void)controller_.set_filename(std::string(filename_->text()));
     }
@@ -320,6 +447,11 @@ void DocumentPickerView::accept(const bool overwrite_confirmed) {
 }
 
 void DocumentPickerView::publish(DocumentPickerResult result) {
+    if (finished_) return;
+    if (result.accepted() || result.terminal == DocumentPickerTerminal::cancelled) {
+        finished_ = true;
+        accept_->set_enabled(false);
+    }
     if (result.terminal == DocumentPickerTerminal::validation_error ||
         result.terminal == DocumentPickerTerminal::unavailable) {
         status_->set_text(result.message);

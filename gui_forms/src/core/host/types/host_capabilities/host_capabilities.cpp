@@ -26,7 +26,7 @@ std::string json_escape(const std::string& text) {
 } // namespace
 
 std::string HostCapabilities::to_json() const {
-    constexpr std::array<std::pair<HostCapability, const char*>, 18> names{{
+    constexpr std::array<std::pair<HostCapability, const char*>, 19> names{{
         {HostCapability::lifecycle, "lifecycle"},
         {HostCapability::scale_notifications, "scale_notifications"},
         {HostCapability::monitor_geometry, "monitor_geometry"},
@@ -38,6 +38,7 @@ std::string HostCapabilities::to_json() const {
         {HostCapability::pointer_capture, "pointer_capture"},
         {HostCapability::cursor, "cursor"},
         {HostCapability::clipboard, "clipboard"},
+        {HostCapability::clipboard_images, "clipboard_images"},
         {HostCapability::typed_drag_destination, "typed_drag_destination"},
         {HostCapability::dialogs, "dialogs"},
         {HostCapability::menus, "menus"},

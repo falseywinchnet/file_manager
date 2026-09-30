@@ -1,3 +1,4 @@
+#include "fixture_links.hpp"
 #include "file_manager/preview.hpp"
 
 #include <cstdlib>
@@ -68,13 +69,15 @@ int main() {
     require(result.kind == file_manager::PreviewKind::changed,
             "replacement must invalidate a selected preview revision");
 
-    std::filesystem::create_symlink("notes Ω.md", root / "linked.md");
+    if (create_fixture_link("notes Ω.md", root / "linked.md")) {
+
     result = file_manager::load_preview(
         root, root / "linked.md",
         file_manager::observe_identity(root / "linked.md"));
     require(result.kind == file_manager::PreviewKind::refused &&
                 result.code == "symlink-refused",
             "preview must not follow symbolic links");
+    }
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

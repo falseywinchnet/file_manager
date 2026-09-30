@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(GUIForms LANGUAGES C CXX)
+project(GUIForms VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -8,11 +8,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(GUI_FORMS_BUILD_GALLERY "Build the native control gallery" ON)
-option(GUI_FORMS_BUILD_TESTS "Build automated proving-slice tests" ON)
+option(GUI_FORMS_BUILD_GALLERY "Build the native control gallery" ${PROJECT_IS_TOP_LEVEL})
+option(GUI_FORMS_BUILD_TESTS "Build automated proving-slice tests" ${PROJECT_IS_TOP_LEVEL})
 option(GUI_FORMS_ENABLE_SKIA "Build the private CPU-only Skia adapter" ON)
 option(GUI_FORMS_ENABLE_MACOS_HOST "Build the native AppKit host" ${APPLE})
 option(GUI_FORMS_ENABLE_WINDOWS_HOST "Build the native Win32 host" ${WIN32})
+option(GUI_FORMS_ENABLE_LINUX_HOST "Build the native X11 host with the private CPU renderer" OFF)
 option(GUI_FORMS_ENABLE_HARFBUZZ_TEXT
        "Build the pinned HarfBuzz/FreeType text engine"
        ${GUI_FORMS_ENABLE_SKIA})
@@ -37,6 +38,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT GUI_FORMS_ENABLE_SKIA)
 endif()
 
 add_library(gui_forms_core STATIC
+    src/core/application/application.cpp
     src/core/animation/animation_timeline/animation_timeline.cpp
     src/core/binding/value/binding_value.cpp
     src/core/binding/value/property_collection_value/property_collection_value.cpp
@@ -67,11 +69,15 @@ add_library(gui_forms_core STATIC
     src/core/live_surface/wake_connection/live_surface_wake_connection.cpp
     src/core/live_surface/write_lease/live_surface_write_lease.cpp
     src/core/semantics/snapshot/semantic_snapshot.cpp
+    src/core/host/image/host_image.cpp
+    src/core/host/image/clipboard_image_wire.cpp
+    src/core/host/image/clipboard_dib.cpp
     src/core/host/types/host_types.cpp
     src/core/host/types/host_capabilities/host_capabilities.cpp
     src/core/host/types/host_services_snapshot/host_services_snapshot.cpp
     src/core/host/types/host_session_snapshot/host_session_snapshot.cpp
     src/core/host/services/host_services.cpp
+    src/core/types/cursor_image/cursor_image.cpp
     src/core/host/session/host_session.cpp
     src/core/feedback/semantic_feedback/semantic_feedback.cpp
     src/core/display/chunk/display_chunk.cpp
@@ -144,6 +150,10 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
                      "${CMAKE_CURRENT_BINARY_DIR}/third_party/harfbuzz"
                      EXCLUDE_FROM_ALL)
 
+    add_library(gui_forms_bidi STATIC third_party/sheenbidi/Source/SheenBidi.c)
+    target_include_directories(gui_forms_bidi PUBLIC third_party/sheenbidi/Headers)
+    target_compile_definitions(gui_forms_bidi PRIVATE SB_CONFIG_UNITY)
+    set_target_properties(gui_forms_bidi PROPERTIES POSITION_INDEPENDENT_CODE ON)
     add_library(gui_forms_text_engine STATIC
         src/render/text/harfbuzz/harfbuzz_font_engine.cpp
     )
@@ -152,7 +162,7 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     )
     target_link_libraries(gui_forms_text_engine
         PUBLIC gui_forms_core
-        PRIVATE freetype harfbuzz
+        PRIVATE freetype harfbuzz gui_forms_bidi
     )
     target_compile_features(gui_forms_text_engine PUBLIC cxx_std_20)
     set_target_properties(gui_forms_text_engine PROPERTIES
@@ -325,6 +335,8 @@ target_include_directories(gui_forms_controls PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_link_libraries(gui_forms_controls PUBLIC gui_forms_core gui_drawing_core)
+set_target_properties(gui_forms_controls gui_forms_host_headless PROPERTIES
+    POSITION_INDEPENDENT_CODE ON)
 
 add_library(gui_forms_c_api SHARED
     src/abi/c_api.cpp
@@ -379,8 +391,8 @@ configure_package_config_file(
     INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
 write_basic_package_version_file(
     ${CMAKE_CURRENT_BINARY_DIR}/GUIFormsConfigVersion.cmake
-    VERSION 0.1.0
-    COMPATIBILITY SameMajorVersion)
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMinorVersion)
 install(FILES
         ${CMAKE_CURRENT_BINARY_DIR}/GUIFormsConfig.cmake
         ${CMAKE_CURRENT_BINARY_DIR}/GUIFormsConfigVersion.cmake
@@ -409,7 +421,12 @@ if(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD)
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Cousine-Italic.ttf
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Cousine-BoldItalic.ttf
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansCJKjp-Regular.otf
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoEmoji-Regular.ttf)
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoEmoji-Regular.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansArabic-Regular.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansHebrew-Regular.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansDevanagari-Regular.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansBengali-Regular.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansGurmukhi-Regular.ttf)
     set(GUI_FORMS_DEMOBOARD_FONT_NOTICES
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/ATTRIBUTION.md
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Carlito.txt
@@ -530,6 +547,7 @@ if(GUI_FORMS_ENABLE_SKIA)
 
     add_library(gui_forms_skia STATIC
         src/render/skia/raster/skia_raster.cpp
+        src/render/skia/raster/clipboard_png.cpp
     )
     add_dependencies(gui_forms_skia gui_forms_skia_dependency)
     target_include_directories(gui_forms_skia
@@ -658,12 +676,14 @@ endif()
 if(GUI_FORMS_ENABLE_MACOS_HOST)
     enable_language(OBJCXX)
     find_library(GUI_FORMS_APPKIT AppKit REQUIRED)
+    find_library(GUI_FORMS_IMAGEIO ImageIO REQUIRED)
     find_library(GUI_FORMS_COREVIDEO CoreVideo REQUIRED)
     find_library(GUI_FORMS_COREGRAPHICS CoreGraphics REQUIRED)
     find_library(GUI_FORMS_UNIFORMTYPEIDENTIFIERS UniformTypeIdentifiers REQUIRED)
     add_library(gui_forms_host_macos STATIC
         src/host/macos/application/macos_host.mm
         src/host/macos/services/appkit_host_services.mm
+        src/host/macos/services/appkit_clipboard_image.mm
     )
     target_include_directories(gui_forms_host_macos PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/host/macos
@@ -671,7 +691,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
     target_compile_options(gui_forms_host_macos PRIVATE -fobjc-arc)
     target_link_libraries(gui_forms_host_macos
         PUBLIC gui_forms_core gui_forms_skia
-        PRIVATE ${GUI_FORMS_APPKIT} ${GUI_FORMS_COREVIDEO}
+        PRIVATE ${GUI_FORMS_APPKIT} ${GUI_FORMS_IMAGEIO} ${GUI_FORMS_COREVIDEO}
                 ${GUI_FORMS_COREGRAPHICS}
                 ${GUI_FORMS_UNIFORMTYPEIDENTIFIERS}
     )
@@ -684,6 +704,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
     # public C++ surface available without exporting source-tree-only targets.
     add_library(gui_forms_application SHARED
         src/runtime/application_bundle.cpp
+        src/runtime/application/application.cpp
     )
     add_library(GUIForms::Application ALIAS gui_forms_application)
     set_target_properties(gui_forms_application PROPERTIES
@@ -697,6 +718,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     )
     target_compile_features(gui_forms_application PUBLIC cxx_std_20)
+    target_compile_definitions(gui_forms_application PRIVATE GUI_FORMS_APPLICATION_MACOS=1)
     target_link_libraries(gui_forms_application PRIVATE
         gui_forms_core
         gui_drawing_core
@@ -738,9 +760,56 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
             DESTINATION ${CMAKE_INSTALL_DATADIR}/GUIForms/fonts)
 endif()
 
+if(GUI_FORMS_ENABLE_LINUX_HOST)
+    if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" OR NOT GUI_FORMS_ENABLE_SKIA)
+        message(FATAL_ERROR "The Linux X11 host requires Linux and the private CPU Skia adapter")
+    endif()
+    find_package(X11 REQUIRED)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GUI_FORMS_ATK REQUIRED IMPORTED_TARGET atk atk-bridge-2.0)
+    if(TARGET X11::Xcursor)
+        set(GUI_FORMS_XCURSOR_AVAILABLE ON)
+    endif()
+    add_library(gui_forms_host_linux STATIC
+        src/host/linux/application/linux_host.cpp
+        src/host/linux/accessibility/linux_accessibility.cpp
+        src/host/linux/services/linux_services.cpp
+        src/host/linux/services/linux_drag_drop.cpp
+        src/host/linux/services/linux_dialogs.cpp)
+    set_target_properties(gui_forms_host_linux PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_link_libraries(gui_forms_host_linux PUBLIC gui_forms_core gui_forms_controls gui_forms_skia PRIVATE X11::X11 PkgConfig::GUI_FORMS_ATK)
+    if(GUI_FORMS_XCURSOR_AVAILABLE)
+        target_link_libraries(gui_forms_host_linux PUBLIC X11::Xcursor)
+        target_compile_definitions(gui_forms_host_linux PRIVATE GUI_FORMS_HAS_XCURSOR=1)
+    endif()
+    add_library(gui_forms_application SHARED src/runtime/application_bundle.cpp src/runtime/application/application.cpp)
+    add_library(GUIForms::Application ALIAS gui_forms_application)
+    set_target_properties(gui_forms_application PROPERTIES EXPORT_NAME Application OUTPUT_NAME gui_forms_application VERSION 0.1.0 SOVERSION 0)
+    target_include_directories(gui_forms_application PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+    target_compile_definitions(gui_forms_application PRIVATE GUI_FORMS_APPLICATION_LINUX=1)
+    target_link_libraries(gui_forms_application PRIVATE
+        "-Wl,--whole-archive" gui_forms_core gui_drawing_core gui_forms_controls gui_forms_host_linux gui_forms_skia
+        "-Wl,--no-whole-archive" X11::X11)
+    if(GUI_FORMS_XCURSOR_AVAILABLE)
+        target_link_libraries(gui_forms_application PRIVATE X11::Xcursor)
+    endif()
+    if(TARGET gui_forms_text_engine)
+        target_link_libraries(gui_forms_application PRIVATE gui_forms_text_engine freetype harfbuzz)
+    endif()
+    install(TARGETS gui_forms_application EXPORT GUIFormsApplicationTargets
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(EXPORT GUIFormsApplicationTargets FILE GUIFormsApplicationTargets.cmake
+        NAMESPACE GUIForms:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
+    install(DIRECTORY assets/fonts/ DESTINATION ${CMAKE_INSTALL_DATADIR}/GUIForms/fonts)
+endif()
+
 if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     add_library(gui_forms_host_windows STATIC
         src/host/windows/application/windows_host.cpp
+        src/host/windows/accessibility/windows_accessibility.cpp
+        src/host/windows/services/windows_clipboard_image.cpp
         src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
     )
     target_include_directories(gui_forms_host_windows PUBLIC
@@ -751,10 +820,36 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     )
     target_link_libraries(gui_forms_host_windows
         PUBLIC gui_forms_core
-        PRIVATE user32 gdi32 ole32 windowscodecs comdlg32 shell32 usp10
+        PRIVATE user32 gdi32 ole32 oleaut32 oleacc uuid windowscodecs comdlg32 shell32 usp10
     )
     target_link_libraries(gui_forms_c_api PRIVATE gui_forms_host_windows)
     target_compile_definitions(gui_forms_c_api PRIVATE GF_C_API_HAS_WINDOWS_HOST=1)
+    if(MINGW)
+        add_library(gui_forms_application SHARED
+            src/runtime/application_bundle.cpp
+            src/runtime/application/application.cpp)
+        add_library(GUIForms::Application ALIAS gui_forms_application)
+        set_target_properties(gui_forms_application PROPERTIES
+            EXPORT_NAME Application OUTPUT_NAME gui_forms_application
+            VERSION 0.1.0 SOVERSION 0)
+        target_include_directories(gui_forms_application PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+        target_compile_features(gui_forms_application PUBLIC cxx_std_20)
+        target_compile_definitions(gui_forms_application PRIVATE GUI_FORMS_APPLICATION_WINDOWS=1)
+        target_link_libraries(gui_forms_application PRIVATE
+            "-Wl,--whole-archive" gui_forms_core gui_drawing_core
+            gui_forms_controls gui_forms_host_windows "-Wl,--no-whole-archive"
+            user32 gdi32 ole32 oleaut32 oleacc uuid windowscodecs comdlg32 shell32 usp10)
+        target_link_options(gui_forms_application PRIVATE "-Wl,--export-all-symbols")
+        install(TARGETS gui_forms_application EXPORT GUIFormsApplicationTargets
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+        install(EXPORT GUIFormsApplicationTargets FILE GUIFormsApplicationTargets.cmake
+            NAMESPACE GUIForms:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
+        install(DIRECTORY assets/fonts/ DESTINATION ${CMAKE_INSTALL_DATADIR}/GUIForms/fonts)
+    endif()
     add_library(gui_forms_win32_compat SHARED
         src/host/windows/win32_compat_shim.cpp
         src/host/windows/win32_compat_shim.def
@@ -838,6 +933,11 @@ if(GUI_FORMS_BUILD_GALLERY)
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Cousine-BoldItalic.ttf
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansCJKjp-Regular.otf
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoEmoji-Regular.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansArabic-Regular.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansHebrew-Regular.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansDevanagari-Regular.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansBengali-Regular.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansGurmukhi-Regular.ttf
     )
     set(GUI_FORMS_GALLERY_FONT_NOTICES
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/ATTRIBUTION.md
@@ -1375,6 +1475,56 @@ endif()
 
 if(GUI_FORMS_BUILD_TESTS)
     enable_testing()
+    if(WIN32)
+        add_executable(gui_forms_windows_cursor_tests tests/windows_cursor_tests.cpp)
+        target_link_libraries(gui_forms_windows_cursor_tests PRIVATE gui_forms_core user32 gdi32)
+        add_test(NAME gui_forms_windows_cursors COMMAND gui_forms_windows_cursor_tests)
+    endif()
+    if(GUI_FORMS_ENABLE_LINUX_HOST)
+        find_package(X11 QUIET)
+        if(TARGET X11::Xcursor AND TARGET X11::Xfixes)
+            add_executable(gui_forms_x11_cursor_tests tests/x11_cursor_tests.cpp)
+            target_link_libraries(gui_forms_x11_cursor_tests PRIVATE gui_forms_core X11::Xcursor X11::Xfixes X11::X11)
+            add_test(NAME gui_forms_x11_cursors COMMAND gui_forms_x11_cursor_tests)
+        endif()
+    endif()
+    add_executable(gui_forms_cursor_image_tests tests/cursor_image_tests.cpp)
+    target_link_libraries(gui_forms_cursor_image_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_cursor_images COMMAND gui_forms_cursor_image_tests)
+
+    add_executable(gui_forms_application_contract_tests tests/application_contract_tests.cpp)
+    target_link_libraries(gui_forms_application_contract_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_application_contract_tests COMMAND gui_forms_application_contract_tests)
+    if(TARGET gui_forms_application)
+        add_executable(gui_forms_application_native_tests tests/application_native_tests.cpp)
+        target_link_libraries(gui_forms_application_native_tests PRIVATE gui_forms_application)
+        add_test(NAME gui_forms_application_native_tests COMMAND gui_forms_application_native_tests)
+        set_tests_properties(gui_forms_application_native_tests PROPERTIES TIMEOUT 30)
+    endif()
+    if(GUI_FORMS_ENABLE_LINUX_HOST)
+        add_executable(gui_forms_linux_host_tests tests/linux_host_tests.cpp)
+        target_link_libraries(gui_forms_linux_host_tests PRIVATE gui_forms_host_linux X11::X11)
+        add_test(NAME gui_forms_linux_host_tests COMMAND gui_forms_linux_host_tests)
+        set_tests_properties(gui_forms_linux_host_tests PROPERTIES TIMEOUT 45)
+    endif()
+    add_library(gui_forms_reference_examples OBJECT
+        examples/reference/clipboard_image.cpp
+    )
+    target_link_libraries(gui_forms_reference_examples PRIVATE gui_forms_core)
+
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    find_program(GUI_FORMS_REFERENCE_CLANG NAMES clang++)
+    if(Python3_Interpreter_FOUND AND GUI_FORMS_REFERENCE_CLANG)
+        add_test(NAME gui_forms_api_reference_tests
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/api_reference_tests.py)
+        add_custom_target(gui_forms_api_reference
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/api_reference.py
+                --clang ${GUI_FORMS_REFERENCE_CLANG}
+                --output ${CMAKE_CURRENT_BINARY_DIR}/reference
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            COMMENT "Extracting native C++ API and rendering authored contracts"
+            VERBATIM)
+    endif()
     add_executable(gui_drawing_core_tests tests/drawing_core_tests.cpp)
     target_link_libraries(gui_drawing_core_tests PRIVATE gui_drawing_core)
     add_test(NAME gui_drawing_core_tests COMMAND gui_drawing_core_tests)
@@ -1382,6 +1532,23 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_canvas_tests tests/canvas_tests.cpp)
     target_link_libraries(gui_forms_canvas_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_canvas_tests COMMAND gui_forms_canvas_tests)
+    if(GUI_FORMS_ENABLE_WINDOWS_HOST)
+        add_executable(gui_forms_windows_canvas_raster_tests tests/windows_canvas_raster_tests.cpp)
+        target_compile_definitions(gui_forms_windows_canvas_raster_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601)
+        target_link_libraries(gui_forms_windows_canvas_raster_tests PRIVATE
+            gui_forms_controls gui_forms_host_windows)
+        add_test(NAME gui_forms_windows_canvas_raster_tests COMMAND gui_forms_windows_canvas_raster_tests)
+        add_executable(gui_forms_windows_text_tests tests/windows_text_tests.cpp)
+        target_compile_definitions(gui_forms_windows_text_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601)
+        target_link_libraries(gui_forms_windows_text_tests PRIVATE
+            gui_forms_controls gui_forms_host_windows)
+        add_test(NAME gui_forms_windows_text_tests COMMAND gui_forms_windows_text_tests
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+
+    endif()
+
 
     add_executable(gui_drawing_c_api_c11_tests tests/drawing_c_api_c11_tests.c)
     target_link_libraries(gui_drawing_c_api_c11_tests PRIVATE gui_drawing_c_api)
@@ -1417,6 +1584,10 @@ if(GUI_FORMS_BUILD_TESTS)
         )
     endif()
 
+    add_executable(gui_forms_host_image_tests tests/host_image_tests.cpp)
+    target_link_libraries(gui_forms_host_image_tests PRIVATE gui_forms_host_headless)
+    add_test(NAME gui_forms_host_image_tests COMMAND gui_forms_host_image_tests)
+
     add_executable(gui_forms_core_tests tests/core_tests.cpp)
     target_link_libraries(gui_forms_core_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_core_tests COMMAND gui_forms_core_tests)
@@ -1431,6 +1602,9 @@ if(GUI_FORMS_BUILD_TESTS)
 
     add_executable(gui_forms_sort_lab tools/sort_lab.cpp)
     target_link_libraries(gui_forms_sort_lab PRIVATE gui_forms_core)
+
+    add_executable(gui_forms_image_patch_lab tools/image_patch_lab.cpp)
+    target_link_libraries(gui_forms_image_patch_lab PRIVATE gui_forms_core)
 
     add_executable(gui_forms_callback_lab tools/callback_lab.cpp)
     target_link_libraries(gui_forms_callback_lab PRIVATE gui_forms_core)
@@ -1473,6 +1647,8 @@ if(GUI_FORMS_BUILD_TESTS)
             GUI_FORMS_TEST_CARLITO_REGULAR="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Regular.ttf"
             GUI_FORMS_TEST_CARLITO_BOLD="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Bold.ttf"
             GUI_FORMS_TEST_COUSINE_REGULAR="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Cousine-Regular.ttf"
+            GUI_FORMS_TEST_NOTO_ARABIC_REGULAR="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansArabic-Regular.ttf"
+            GUI_FORMS_TEST_NOTO_HEBREW_REGULAR="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansHebrew-Regular.ttf"
             GUI_FORMS_TEST_NOTO_CJK_REGULAR="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansCJKjp-Regular.otf"
             GUI_FORMS_TEST_NOTO_EMOJI="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoEmoji-Regular.ttf"
         )
@@ -1677,6 +1853,7 @@ if(GUI_FORMS_BUILD_TESTS)
         gui_forms_controls
     )
     add_test(NAME gui_forms_dispatcher_tests COMMAND gui_forms_dispatcher_tests)
+    set_tests_properties(gui_forms_dispatcher_tests PROPERTIES TIMEOUT 60)
 
     add_executable(gui_forms_tooltip_tests tests/tooltip_tests.cpp)
     target_link_libraries(gui_forms_tooltip_tests PRIVATE gui_forms_controls)
@@ -1724,6 +1901,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(
         NAME gui_forms_host_boundary_audit
         COMMAND ${CMAKE_COMMAND}
+            -DTARGET_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}
+            -DNM_TOOL=${CMAKE_NM}
+            -DOBJDUMP_TOOL=${CMAKE_OBJDUMP}
             -DCORE_LIBRARY=$<TARGET_FILE:gui_forms_core>
             -DHEADLESS_LIBRARY=$<TARGET_FILE:gui_forms_host_headless>
             -DHEADLESS_TEST_BINARY=$<TARGET_FILE:gui_forms_host_protocol_tests>
@@ -1957,7 +2137,17 @@ if(GUI_FORMS_BUILD_TESTS)
     endif()
 
     if(TARGET gui_forms_host_macos)
-        add_executable(gui_forms_macos_host_close_tests tests/macos_host_close_tests.mm)
+        add_executable(gui_forms_macos_clipboard_image_tests tests/macos_clipboard_image_tests.mm)
+    target_compile_options(gui_forms_macos_clipboard_image_tests PRIVATE -fobjc-arc)
+    target_link_libraries(gui_forms_macos_clipboard_image_tests PRIVATE gui_forms_host_macos)
+    add_test(NAME gui_forms_macos_clipboard_image_tests COMMAND gui_forms_macos_clipboard_image_tests)
+
+        add_executable(gui_forms_macos_exposure_tests tests/macos_exposure_tests.mm)
+        target_compile_options(gui_forms_macos_exposure_tests PRIVATE -fobjc-arc)
+        target_link_libraries(gui_forms_macos_exposure_tests PRIVATE gui_forms_host_macos)
+        add_test(NAME gui_forms_macos_exposure_tests COMMAND gui_forms_macos_exposure_tests)
+
+    add_executable(gui_forms_macos_host_close_tests tests/macos_host_close_tests.mm)
         target_compile_options(gui_forms_macos_host_close_tests PRIVATE -fobjc-arc)
         target_link_libraries(gui_forms_macos_host_close_tests PRIVATE
             gui_forms_host_macos
@@ -1984,6 +2174,11 @@ if(GUI_FORMS_BUILD_TESTS)
         )
         target_link_libraries(gui_forms_skia_smoke PRIVATE gui_forms_skia)
         add_test(NAME gui_forms_skia_smoke COMMAND gui_forms_skia_smoke)
+
+        add_executable(gui_forms_canvas_raster_tests tests/canvas_raster_tests.cpp)
+        target_link_libraries(gui_forms_canvas_raster_tests PRIVATE gui_forms_controls gui_forms_skia)
+        add_test(NAME gui_forms_canvas_raster_tests COMMAND gui_forms_canvas_raster_tests)
+
 
         add_test(
             NAME gui_forms_skia_archive_policy
@@ -2082,4 +2277,41 @@ if(GUI_FORMS_BUILD_FUZZERS)
             -fsanitize=address,undefined
         )
     endif()
+endif()
+
+# Installed consumers need the notices for the code incorporated in the library.
+install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
+install(FILES third_party/unicode/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Unicode-LICENSE.txt)
+if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/third_party/harfbuzz/COPYING" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME HarfBuzz-COPYING.txt)
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/third_party/freetype/docs/FTL.TXT" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME FreeType-FTL.txt)
+endif()
+if(GUI_FORMS_ENABLE_SKIA)
+    install(FILES "${GUI_FORMS_SKIA_ROOT}/LICENSE" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Skia-LICENSE.txt)
+    install(FILES "${GUI_FORMS_SKIA_ROOT}/third_party/externals/libpng/LICENSE" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME libpng-LICENSE.txt)
+    install(FILES "${GUI_FORMS_SKIA_ROOT}/third_party/externals/zlib/LICENSE" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME zlib-LICENSE.txt)
+endif()
+
+install(FILES third_party/sheenbidi/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME SheenBidi-LICENSE.txt)
+
+# The accessibility service adapter is independently testable without a renderer.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND GUI_FORMS_BUILD_TESTS)
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(GUI_FORMS_TEST_ATK QUIET IMPORTED_TARGET atk atk-bridge-2.0)
+        find_package(X11 QUIET)
+        if(TARGET PkgConfig::GUI_FORMS_TEST_ATK AND TARGET X11::X11)
+            add_executable(gui_forms_linux_accessibility_fixture
+                tests/linux_accessibility_fixture.cpp
+                src/host/linux/accessibility/linux_accessibility.cpp)
+            target_link_libraries(gui_forms_linux_accessibility_fixture PRIVATE
+                gui_forms_controls gui_forms_core PkgConfig::GUI_FORMS_TEST_ATK X11::X11)
+        endif()
+    endif()
+endif()
+
+if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
+    add_executable(gui_forms_windows_accessibility_tests tests/windows_accessibility_tests.cpp)
+    target_link_libraries(gui_forms_windows_accessibility_tests PRIVATE GUIForms::Application oleacc oleaut32 uuid)
+    add_test(NAME gui_forms_windows_accessibility_tests COMMAND gui_forms_windows_accessibility_tests)
 endif()

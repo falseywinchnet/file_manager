@@ -66,3 +66,5 @@ File Manager's final locale/font-pack policy remains an M9 decision.
 but painted no pixels in live Skia/FreeType dogfood. The older upstream
 monochrome face is deliberately bounded to fallback proof until GUI.Drawing
 admits and measures a color-font raster policy.
+
+Noto Sans Arabic, Hebrew, Devanagari, Bengali and Gurmukhi are unmodified Noto Project font files under SIL OFL 1.1. See OFL-Noto.txt and language-font-provenance.json for source URLs and byte hashes.

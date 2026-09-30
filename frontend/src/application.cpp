@@ -1,3 +1,4 @@
+#include "file_manager/platform_paths.hpp"
 #include "application.hpp"
 
 #include "fileman_orchestrator/client.hpp"
@@ -10,6 +11,7 @@
 #include <cstdlib>
 #include <exception>
 #include <iomanip>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <thread>
@@ -259,8 +261,8 @@ std::string kind_text(const DirectoryEntry& entry) {
 }
 
 std::string leaf_name(const std::filesystem::path& path) {
-    auto name = path.filename().string();
-    return name.empty() ? path.string() : name;
+    auto name = path_utf8(path.filename());
+    return name.empty() ? path_utf8(path) : name;
 }
 
 std::string search_stable_id(const std::filesystem::path& path,
@@ -268,7 +270,7 @@ std::string search_stable_id(const std::filesystem::path& path,
     constexpr std::uint64_t offset = 14695981039346656037ULL;
     constexpr std::uint64_t prime = 1099511628211ULL;
     std::uint64_t hash = offset;
-    for (const unsigned char value : path.generic_string()) {
+    for (const unsigned char value : path_generic_utf8(path)) {
         hash ^= value;
         hash *= prime;
     }
@@ -282,7 +284,7 @@ std::string breadcrumb_stable_id(const std::filesystem::path& path) {
     constexpr std::uint64_t offset = 14695981039346656037ULL;
     constexpr std::uint64_t prime = 1099511628211ULL;
     std::uint64_t hash = offset;
-    for (const unsigned char value : path.generic_string()) {
+    for (const unsigned char value : path_generic_utf8(path)) {
         hash ^= value;
         hash *= prime;
     }
@@ -296,7 +298,7 @@ EntryKind engine_entry_kind(std::string_view kind,
                             const std::filesystem::path& path) {
     if (kind == "directory") return EntryKind::folder;
     if (kind == "symlink") return EntryKind::symlink;
-    auto extension = path.extension().string();
+    auto extension = path_utf8(path.extension());
     std::transform(extension.begin(), extension.end(), extension.begin(),
                    [](const unsigned char character) {
                        return static_cast<char>(std::tolower(character));
@@ -382,21 +384,18 @@ Application::Application(std::filesystem::path protected_root,
       engine_root_id_(std::move(engine_root_id)),
       form_(web_forms_generated_file_manager_sapphire::make_native_form()) {
     install_command_shelf_controls();
-    if (const char* home = std::getenv("HOME"); home && *home) {
-        home_root_ = canonical_existing_directory(home);
-    }
+    home_root_ = canonical_existing_directory(user_home_directory());
     navigation_roots_.push_back(home_root_);
-    std::error_code volumes_error;
-    if (std::filesystem::is_directory("/Volumes", volumes_error) &&
-        !volumes_error) {
-        volumes_root_ = canonical_existing_directory("/Volumes");
-        if (*volumes_root_ != home_root_) {
-            navigation_roots_.push_back(*volumes_root_);
-        }
+    const std::vector<std::filesystem::path> volumes = local_volume_roots();
+    for (const std::filesystem::path& volume : volumes) {
+        if (volume != home_root_) navigation_roots_.push_back(volume);
+#if defined(__APPLE__)
+        volumes_root_ = volume;
+#endif
     }
-    const bool launch_root_admitted = std::any_of(
-        navigation_roots_.begin(), navigation_roots_.end(),
-        [this](const auto& root) { return path_is_within(root, protected_root_); });
+    const bool launch_root_admitted = std::find(
+        navigation_roots_.begin(), navigation_roots_.end(), protected_root_) !=
+        navigation_roots_.end();
     if (!launch_root_admitted) navigation_roots_.push_back(protected_root_);
     const auto initial_target = resolve_navigation_target(
         navigation_roots_, protected_root_, home_root_, protected_root_);
@@ -469,8 +468,9 @@ void Application::install_house_art() {
 void Application::install_dynamic_controls() {
     menu_strip_ = std::make_shared<gui_forms::MenuStrip>(
         gui_forms::StableId("fm.application.menu"));
+    (*menu_strip_).set_font({gui_forms::FontRole::control, 13.0, 400, false});
     menu_strip_->set_accessible_name("File Manager application menu");
-    menu_strip_->set_requested_bounds({0, 0, 720, 24});
+    menu_strip_->set_requested_bounds({0, 0, 720, 28});
     form_.file_manager_app_shell_menu->clear_children();
     form_.file_manager_app_shell_menu->add_child(menu_strip_);
     form_.file_manager_app_shell_menu->set_flex_grow(*menu_strip_, 1.0);
@@ -478,13 +478,16 @@ void Application::install_dynamic_controls() {
     breadcrumb_ = gui_forms::make_control<gui_forms::BreadcrumbTrail>(
         gui_forms::StableId("fm.path.breadcrumb"), "fm.path.editor");
     breadcrumb_->set_requested_bounds({0, 0, 620, 26});
+    (*breadcrumb_).set_font({gui_forms::FontRole::content, 13.0, 400, false});
+    (*breadcrumb_).set_appearance(gui_forms::BreadcrumbAppearance::raised);
     breadcrumb_->set_border_style(gui_forms::BorderStyle::none);
     breadcrumb_->set_style(breadcrumb_style());
     breadcrumb_->set_accessible_name("Current location breadcrumb");
     breadcrumb_->set_accessible_description(
         "Navigate stable path segments or switch to exact path entry");
     path_box_ = breadcrumb_->editor();
-    path_box_->set_text(protected_root_.string());
+    (*path_box_).set_font({gui_forms::FontRole::content, 13.0, 400, false});
+    path_box_->set_text(path_utf8(protected_root_));
     path_box_->set_placeholder_text("Enter a path in Home or Volumes");
     path_box_->set_accessible_name("Current location path");
     form_.file_manager_app_shell_location_path_host->clear_children();
@@ -493,6 +496,7 @@ void Application::install_dynamic_controls() {
 
     search_box_ = std::make_shared<gui_forms::TextBox>(
         gui_forms::StableId("fm.search.current-folder"));
+    (*search_box_).set_font({gui_forms::FontRole::content, 13.0, 400, false});
     search_box_->set_requested_bounds({0, 0, 228, 30});
     search_box_->set_placeholder_text("Search this subtree");
     search_box_->set_accessible_name("Search current subtree");
@@ -501,12 +505,13 @@ void Application::install_dynamic_controls() {
     form_.file_manager_app_shell_location_search_host->set_flex_grow(*search_box_, 1.0);
 
     tree_root_mode_button_ = std::make_shared<gui_forms::DropDownButton>(
-        gui_forms::StableId("fm.navigation.root-mode"), "Home-rooted",
+        gui_forms::StableId("fm.navigation.root-mode"), "Home",
         gui_forms::DropDownButtonMode::menu);
     tree_root_mode_button_->set_visual_style(gui_forms::ButtonVisualStyle::flat);
     tree_root_mode_button_->set_flat_border_width(0.0);
     tree_root_mode_button_->set_style(tree_mode_style());
     tree_root_mode_button_->set_drop_down_width(14.0);
+    (*tree_root_mode_button_).set_font({gui_forms::FontRole::control, 12.0, 400, false});
     tree_root_mode_button_->set_requested_bounds({0, 0, 112, 27});
     tree_root_mode_button_->set_minimum_size({112, 27});
     tree_root_mode_button_->set_maximum_size({112, 27});
@@ -527,7 +532,8 @@ void Application::install_dynamic_controls() {
     tree_ = std::make_shared<gui_forms::TreeView>(
         gui_forms::StableId("fm.navigation.tree"));
     tree_->set_requested_bounds({0, 0, 178, 340});
-    tree_->set_font({gui_forms::FontRole::content, 10.0, 400, false});
+    (*tree_).set_font({gui_forms::FontRole::content, 13.0, 400, false});
+    (*tree_).set_item_height(26.0);
     tree_->set_accessible_name("Folders in the selected honest root mode");
     form_.file_manager_app_shell_workspace_sidebar_tree_host->clear_children();
     form_.file_manager_app_shell_workspace_sidebar_tree_host->set_flow_direction(
@@ -539,9 +545,10 @@ void Application::install_dynamic_controls() {
         gui_forms::StableId("fm.objects.current-folder"));
     objects_->set_requested_bounds({0, 0, 736, 455});
     objects_->set_view_mode(gui_forms::ObjectViewMode::icons);
-    objects_->set_icon_cell_size({86, 78});
+    (*objects_).set_icon_cell_size({104, 86});
+    (*objects_).set_details_row_height(28.0);
     objects_->set_show_secondary_text(false);
-    objects_->set_font({gui_forms::FontRole::content, 10.0, 400, false});
+    (*objects_).set_font({gui_forms::FontRole::content, 13.0, 400, false});
     objects_->set_selection_mode(gui_forms::ObjectSelectionMode::multiple);
     objects_->set_accessible_name("Objects in current folder");
 
@@ -627,6 +634,7 @@ void Application::install_dynamic_controls() {
     preview_picture_->set_visible(false);
     preview_text_ = std::make_shared<gui_forms::Label>(
         gui_forms::StableId("fm.inspector.preview.text"));
+    (*preview_text_).set_font({gui_forms::FontRole::content, 13.0, 400, false});
     preview_text_->set_requested_bounds({0, 0, 190, 108});
     preview_text_->set_text_style_role(gui_forms::TextStyleRole::monospace);
     preview_text_->set_text_wrapping(gui_forms::TextWrapping::word);
@@ -676,6 +684,8 @@ void Application::install_dynamic_controls() {
 
     property_list_ = std::make_shared<gui_forms::PropertyList>(
         gui_forms::StableId("fm.selection.properties"));
+    (*property_list_).set_font({gui_forms::FontRole::content, 13.0, 400, false});
+    (*property_list_).set_row_height(30.0);
     property_list_->set_accessible_name("Selection properties");
     property_list_->set_label_width(104.0);
     property_list_->set_requested_bounds({0, 0, 270, 170});
@@ -949,12 +959,12 @@ void Application::install_command_surfaces() {
         "go.home", "Home", "Return to the user Home folder",
         [this] { request_navigation(home_root_, true); });
     command_tree_home_ = make_command(
-        "tree-root.home", "Home-rooted",
+        "tree-root.home", "Home",
         "Show the honest user Home hierarchy in the folder tree",
         [this] { select_tree_root_mode(home_root_); });
     if (volumes_root_) {
         command_tree_volumes_ = make_command(
-            "tree-root.volumes", "Volumes-rooted",
+            "tree-root.volumes", "Volumes",
             "Show the honest mounted Volumes hierarchy in the folder tree",
             [this] { select_tree_root_mode(*volumes_root_); });
     }
@@ -965,7 +975,7 @@ void Application::install_command_surfaces() {
         }
         auto command = make_command(
             "tree-root.admitted." + std::to_string(index),
-            leaf_name(root) + "-rooted",
+            leaf_name(root),
             "Show the explicit admitted hierarchy in the folder tree",
             [this, root] { select_tree_root_mode(root); });
         command_tree_admitted_roots_.push_back(std::move(command));
@@ -1037,6 +1047,10 @@ void Application::install_command_surfaces() {
         "help.about", "About File Manager", "Show build and authority information",
         [this] { show_about(); });
 
+    command_focus_search_ = make_command("go.search", "Search this subtree…",
+        "Focus the existing subtree search field", std::bind_front(&Application::focus_search_command, this));
+    command_focus_location_ = make_command("go.location", "Enter location…",
+        "Edit the exact current folder path", std::bind_front(&Application::focus_location_command, this));
     menu_strip_->set_items({
         {"fm.menu.file", "File", {
             {"file.choose-open", MenuItemKind::command, command_choose_open_},
@@ -1088,6 +1102,8 @@ void Application::install_command_surfaces() {
             {"go.forward", MenuItemKind::command, command_forward_},
             {"go.up", MenuItemKind::command, command_up_},
             {"go.home", MenuItemKind::command, command_root_},
+            {"go.location", MenuItemKind::command, command_focus_location_},
+            {"go.search", MenuItemKind::command, command_focus_search_},
         }},
         {"fm.menu.commands", "Commands", {
             {"commands.sha256", MenuItemKind::command, command_checksum_},
@@ -1098,6 +1114,7 @@ void Application::install_command_surfaces() {
             {"help.about", MenuItemKind::command, about},
         }},
     });
+    expanded_menu_items_ = (*menu_strip_).items();
     menu_strip_->set_selected_item_id("fm.menu.home");
 
     move_copy_menu_ = std::make_shared<gui_forms::ContextMenu>("fm.shelf.move-copy");
@@ -1256,6 +1273,40 @@ void Application::install_accelerators() {
     bind_navigation(command_back_, gui_forms::PhysicalKey::left);
     bind_navigation(command_forward_, gui_forms::PhysicalKey::right);
     bind_navigation(command_up_, gui_forms::PhysicalKey::up);
+    accelerator_tokens_.push_back((*window_).register_accelerator(
+        *command_focus_location_, {gui_forms::PhysicalKey::l, primary},
+        std::bind_front(&Application::focus_location_accelerator, this)));
+    (*command_focus_location_).set_shortcut(std::string(primary_text) + "+L");
+    (*command_focus_search_).set_shortcut(std::string(primary_text) + "+F");
+    accelerator_tokens_.push_back((*window_).register_accelerator(
+        *command_focus_search_, {gui_forms::PhysicalKey::f, primary},
+        std::bind_front(&Application::focus_search_accelerator, this)));
+    (*command_refresh_).set_shortcut("F5");
+    accelerator_tokens_.push_back((*window_).register_accelerator(
+        *command_refresh_, {gui_forms::PhysicalKey::f5, gui_forms::Modifier::none},
+        std::bind_front(&Application::refresh_accelerator, this)));
+}
+
+bool Application::focus_location_accelerator() {
+    if (!window_ || settings_open_ || (*rename_box_).visible()) return false;
+    const std::shared_ptr<gui_forms::Control> focused = (*window_).focused_control();
+    const std::shared_ptr<gui_forms::TextBox> editor =
+        std::dynamic_pointer_cast<gui_forms::TextBox>(focused);
+    if (editor && editor != path_box_ && editor != search_box_) return false;
+    compact_search_active_ = false;
+    update_adaptive_layout((*form_.file_manager_app_shell).committed_arranged_bounds());
+    if ((*breadcrumb_).editing()) {
+        (*path_box_).select_all();
+        return (*window_).request_focus(path_box_);
+    }
+    set_path_editing(true);
+    return true;
+}
+
+bool Application::refresh_accelerator() {
+    if (!window_ || settings_open_ || (*rename_box_).visible()) return false;
+    if (std::dynamic_pointer_cast<gui_forms::TextBox>((*window_).focused_control())) return false;
+    return (*command_refresh_).execute("fm.accelerator.view.refresh");
 }
 
 void Application::rebuild_breadcrumb() {
@@ -1270,7 +1321,7 @@ void Application::rebuild_breadcrumb() {
     if (!relative.empty() && relative != ".") {
         for (const auto& component : relative) {
             accumulated /= component;
-            segments.emplace_back(component.string(), accumulated);
+            segments.emplace_back(path_utf8(component), accumulated);
         }
     }
 
@@ -1283,12 +1334,12 @@ void Application::rebuild_breadcrumb() {
         model.push_back({
             stable_id, text,
             index + 1U == segments.size()
-                ? "Current exact location " + path.string()
-                : "Navigate to " + path.string(),
+                ? "Current exact location " + path_utf8(path)
+                : "Navigate to " + path_utf8(path),
             true});
     }
     breadcrumb_->set_segments(std::move(model));
-    path_box_->set_text(location_.string());
+    path_box_->set_text(path_utf8(location_));
     set_path_editing(false);
 }
 
@@ -1309,7 +1360,7 @@ void Application::show_breadcrumb_overflow() {
         }
         auto command = std::make_shared<gui_forms::Command>(
             id + ".navigate", segment->text);
-        command->set_description("Navigate to " + path->second.string());
+        command->set_description("Navigate to " + path_utf8(path->second));
         breadcrumb_subscriptions_.push_back(command->invoked().subscribe(
             [this, target = path->second](const gui_forms::CommandInvocation&) {
                 request_navigation(target, true);
@@ -1334,7 +1385,7 @@ void Application::set_path_editing(const bool editing) {
         }
         return;
     }
-    const std::string location_text = location_.string();
+    const std::string location_text = path_utf8(location_);
     breadcrumb_->begin_edit(location_text);
 }
 
@@ -1350,16 +1401,16 @@ void Application::request_path_suggestions(std::string text) {
         return;
     }
 
-    std::filesystem::path expanded(text);
+    std::filesystem::path expanded = path_from_utf8(text);
     if (text == "~") expanded = home_root_;
-    else if (text.starts_with("~/")) expanded = home_root_ / text.substr(2);
+    else if (text.starts_with("~/")) expanded = home_root_ / path_from_utf8(text.substr(2));
     else if (!expanded.is_absolute()) expanded = location_ / expanded;
     expanded = expanded.lexically_normal();
 
     const std::string requested_text = text;
     apply_path_suggestions(
         generation, requested_text,
-        "Checking: " + expanded.string(), {},
+        "Checking: " + path_utf8(expanded), {},
         "Reading matching local folders…");
     enumerate_path_suggestions(
         generation, std::move(text), navigation_roots_, location_, home_root_,
@@ -1388,7 +1439,7 @@ void Application::enumerate_path_suggestions(
             if (!target) {
                 self->post_ui([self, generation,
                                requested_text = std::move(requested_text),
-                               preview = "Not admitted: " + candidate.string()]() mutable {
+                               preview = "Not admitted: " + path_utf8(candidate)]() mutable {
                     self->apply_path_suggestions(
                         generation, std::move(requested_text),
                         std::move(preview), {},
@@ -1405,7 +1456,7 @@ void Application::enumerate_path_suggestions(
             std::filesystem::path parent = candidate_is_directory
                 ? candidate : candidate.parent_path();
             const std::string prefix = candidate_is_directory
-                ? std::string{} : candidate.filename().string();
+                ? std::string{} : path_utf8(candidate.filename());
             auto snapshot = read_directory(
                 root, parent, prefix, generation,
                 [self, generation] {
@@ -1427,9 +1478,9 @@ void Application::enumerate_path_suggestions(
                 : snapshot.error;
             const std::string preview = snapshot.available()
                 ? (candidate_is_directory
-                    ? "Resolved: " + snapshot.location.string()
-                    : "Proposed: " + candidate.string())
-                : "Unavailable: " + candidate.string();
+                    ? "Resolved: " + path_utf8(snapshot.location)
+                    : "Proposed: " + path_utf8(candidate))
+                : "Unavailable: " + path_utf8(candidate);
             self->post_ui([self, generation,
                            requested_text = std::move(requested_text),
                            preview,
@@ -1442,7 +1493,7 @@ void Application::enumerate_path_suggestions(
             const std::string notice =
                 std::string("Suggestion lookup failed: ") + error.what();
             const std::string preview =
-                "Unavailable: " + candidate.string();
+                "Unavailable: " + path_utf8(candidate);
             self->post_ui([self, generation,
                            requested_text = std::move(requested_text),
                            preview, notice]() mutable {
@@ -1488,7 +1539,7 @@ void Application::apply_path_suggestions(
         labels.reserve(path_suggestion_paths_.size());
         identities.reserve(path_suggestion_paths_.size());
         for (const auto& path : path_suggestion_paths_) {
-            labels.push_back(path.filename().string());
+            labels.push_back(path_utf8(path.filename()));
             identities.push_back(breadcrumb_stable_id(path) + ".suggestion");
         }
         path_suggestion_list_ = std::make_shared<gui_forms::ListBox>(
@@ -1535,7 +1586,7 @@ void Application::show_path_suggestion_popup() {
         path_suggestion_layer_->dismiss_requested().subscribe(
             [this](const gui_forms::PopupDismissReason reason) {
                 (void)reason;
-                path_box_->set_text(location_.string());
+                path_box_->set_text(path_utf8(location_));
                 set_path_editing(false);
             }));
     path_suggestion_popup_ = window_->open_popup(
@@ -1557,7 +1608,7 @@ void Application::close_path_suggestion_popup(const bool restore_focus) {
 
 void Application::accept_path_suggestion(const std::size_t index) {
     if (index >= path_suggestion_paths_.size() || !breadcrumb_->editing()) return;
-    path_box_->set_text(path_suggestion_paths_[index].string());
+    path_box_->set_text(path_utf8(path_suggestion_paths_[index]));
     path_box_->select_all();
     if (window_) static_cast<void>(window_->request_focus(path_box_));
 }
@@ -1697,7 +1748,7 @@ void Application::document_picker_completed(
         return;
     }
     pending_selection_identity_ = selection.identity;
-    set_status("Opening " + selection.path.filename().string(),
+    set_status("Opening " + path_utf8(selection.path.filename()),
                "picker result revalidated · revealing in current location surface");
     request_navigation(selection.path.parent_path(), true);
 }
@@ -1899,7 +1950,92 @@ void Application::focus_active_object_surface() {
     static_cast<void>(window_->request_focus(target));
 }
 
+void Application::update_adaptive_preview() {
+    const bool selected = !(*objects_).selected_ids().empty();
+    const double height = (*form_.file_manager_app_shell).committed_arranged_bounds().height;
+    const bool expanded = selected && (height == 0.0 || height >= 560.0);
+    (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface).set_visible(expanded);
+    (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview).set_minimum_size(
+        {0.0, expanded ? 224.0 : 54.0});
+}
+
+void Application::update_adaptive_layout(const gui_forms::Rect bounds) {
+    if (adapting_layout_ || bounds.width <= 0.0 || bounds.height <= 0.0) return;
+    adapting_layout_ = true;
+    try {
+        const bool stacked = bounds.width < 720.0 && bounds.width >= 420.0 && bounds.height >= 360.0;
+        const bool single_field = bounds.width < 420.0 || (bounds.width < 720.0 && bounds.height < 360.0);
+        if (adaptive_viewport_ != gui_forms::Size{bounds.width, bounds.height} &&
+            window_ && (*window_).focused_control() == search_box_) compact_search_active_ = true;
+        adaptive_viewport_ = {bounds.width, bounds.height};
+        (*form_.file_manager_app_shell_location_navigation).set_visible(bounds.width >= 720.0);
+        (*form_.file_manager_app_shell_location_path_host).set_visible(!single_field || !compact_search_active_);
+        (*form_.file_manager_app_shell_location_search_host).set_visible(!single_field || compact_search_active_);
+        (*form_.file_manager_app_shell_location).set_flow_direction(stacked
+            ? gui_forms::FlowDirection::top_down : gui_forms::FlowDirection::left_to_right);
+        (*form_.file_manager_app_shell_location).set_wrap_contents(false);
+        (*form_.file_manager_app_shell_location).set_flex_grow(*form_.file_manager_app_shell_location_path_host, 0.0);
+        (*form_.file_manager_app_shell_location).set_flex_grow(*form_.file_manager_app_shell_location_search_host, 0.0);
+        const double field_space = std::max(0.0, bounds.width - (bounds.width >= 720.0 ? 118.0 : 14.0));
+        const double search_width = stacked || single_field ? field_space : std::min(465.0, field_space / 3.0);
+        const double path_width = stacked || single_field ? field_space : field_space - search_width;
+        (*form_.file_manager_app_shell_location_path_host).set_requested_bounds({0, 0, path_width, 30});
+        (*form_.file_manager_app_shell_location_path_host).set_maximum_size({path_width, 30});
+        (*form_.file_manager_app_shell_location_search_host).set_requested_bounds({0, 0, search_width, 30});
+        (*form_.file_manager_app_shell_location_search_host).set_maximum_size({search_width, 30});
+        const double location_height = stacked ? 79.0 : 42.0;
+        (*form_.file_manager_app_shell_location).set_minimum_size({0, location_height});
+        gui_forms::ResponsiveTrackSpec location_track = (*form_.file_manager_app_shell).track_specs()[3];
+        location_track.minimum = location_height;
+        location_track.preferred = location_height;
+        (*form_.file_manager_app_shell).set_track_spec(3, location_track);
+
+        double menu_width = 24.0;
+        for (const gui_forms::MenuStripItemSpec& item : expanded_menu_items_) {
+            menu_width += (window_ ? (*window_).resolve_text_layout_utf8(item.text, (*menu_strip_).font()).logical_size.width
+                                  : static_cast<double>(item.text.size()) * 8.0) + 2.0 * (*menu_strip_).item_padding();
+        }
+        const bool compact = bounds.width < menu_width;
+        if (compact != compact_menu_) {
+            compact_menu_ = compact;
+            if (compact) {
+                std::vector<gui_forms::MenuItemSpec> categories;
+                for (const gui_forms::MenuStripItemSpec& item : expanded_menu_items_) {
+                    categories.push_back({item.stable_id, gui_forms::MenuItemKind::submenu, {}, item.text, item.items});
+                }
+                (*menu_strip_).set_items({{"fm.menu.compact", "Menu", std::move(categories)}});
+                (*menu_strip_).set_selected_item_id("fm.menu.compact");
+            } else {
+                (*menu_strip_).set_items(expanded_menu_items_);
+                (*menu_strip_).set_selected_item_id("fm.menu.home");
+            }
+        }
+        update_adaptive_preview();
+    } catch (...) {
+        adapting_layout_ = false;
+        throw;
+    }
+    adapting_layout_ = false;
+}
+
+void Application::focus_search_command() { static_cast<void>(focus_search_accelerator()); }
+void Application::focus_location_command() { static_cast<void>(focus_location_accelerator()); }
+
+bool Application::focus_search_accelerator() {
+    if (!window_ || settings_open_ || (*rename_box_).visible()) return false;
+    const std::shared_ptr<gui_forms::TextBox> editor =
+        std::dynamic_pointer_cast<gui_forms::TextBox>((*window_).focused_control());
+    if (editor && editor != path_box_ && editor != search_box_) return false;
+    compact_search_active_ = true;
+    update_adaptive_layout((*form_.file_manager_app_shell).committed_arranged_bounds());
+    (*search_box_).select_all();
+    return (*window_).request_focus(search_box_);
+}
+
 void Application::install_handlers() {
+    (*form_.file_manager_app_shell).set_track_focus_fallback(2, *menu_strip_);
+    subscriptions_.push_back((*form_.file_manager_app_shell).arranged_bounds_changed().subscribe(
+        std::bind_front(&Application::update_adaptive_layout, this)));
     auto click = [this](const std::shared_ptr<gui_forms::Button>& button,
                         std::function<void()> action) {
         subscriptions_.push_back(button->clicked().subscribe(
@@ -2036,12 +2172,12 @@ void Application::install_handlers() {
     subscriptions_.push_back(breadcrumb_->overflow_activated().subscribe(
         [this] { show_breadcrumb_overflow(); }));
     subscriptions_.push_back(breadcrumb_->edit_committed().subscribe(
-        [this](const std::string& text) { request_navigation(text, true); }));
+        [this](const std::string& text) { request_navigation(path_from_utf8(text), true); }));
     subscriptions_.push_back(breadcrumb_->edit_started().subscribe(
         [this](const std::string& text) { request_path_suggestions(text); }));
     subscriptions_.push_back(breadcrumb_->edit_cancelled().subscribe(
         [this] {
-            path_box_->set_text(location_.string());
+            path_box_->set_text(path_utf8(location_));
             set_path_editing(false);
         }));
     subscriptions_.push_back(breadcrumb_->edit_completion_requested().subscribe(
@@ -2053,7 +2189,7 @@ void Application::install_handlers() {
     subscriptions_.push_back(path_box_->focus_observed().subscribe(
         [this](const bool focused) {
             if (!focused && breadcrumb_->editing()) {
-                path_box_->set_text(location_.string());
+                path_box_->set_text(path_utf8(location_));
                 set_path_editing(false);
             }
         }));
@@ -2065,7 +2201,7 @@ void Application::install_handlers() {
                 breadcrumb_->absolute_bounds().contains(event.position)) {
                 return;
             }
-            path_box_->set_text(location_.string());
+            path_box_->set_text(path_utf8(location_));
             set_path_editing(false);
         }));
     subscriptions_.push_back(search_box_->committed().subscribe(
@@ -2128,7 +2264,7 @@ void Application::install_handlers() {
             if (tree_model_syncing_) return;
             const auto found = tree_locations_.find(change.stable_id);
             if (found == tree_locations_.end()) return;
-            const auto key = found->second.generic_string();
+            const auto key = path_generic_utf8(found->second);
             if (change.expanded) {
                 tree_expanded_paths_.insert(key);
                 request_tree_expansion(found->second);
@@ -2983,10 +3119,10 @@ void Application::apply_runtime_settings() {
     const auto density = setting_as<std::string>(
         *settings_snapshot_, "appearance.density").value_or("comfortable");
     const bool compact = density == "compact";
-    tree_->set_item_height(compact ? 21.0 : 24.0);
-    objects_->set_icon_cell_size(compact ? gui_forms::Size{94.0, 78.0}
-                                        : gui_forms::Size{104.0, 78.0});
-    objects_->set_details_row_height(compact ? 24.0 : 28.0);
+    (*tree_).set_item_height(compact ? 26.0 : 28.0);
+    (*objects_).set_icon_cell_size(compact ? gui_forms::Size{104.0, 86.0}
+                                        : gui_forms::Size{112.0, 92.0});
+    (*objects_).set_details_row_height(compact ? 28.0 : 30.0);
     correspondence_->set_compact_height(compact ? 41.0 : 45.0);
     correspondence_->set_expanded_height(compact ? 103.0 : 118.0);
     if (window_) {
@@ -3022,7 +3158,7 @@ void Application::request_navigation(std::filesystem::path path,
     const auto target = resolve_navigation_target(
         navigation_roots_, location_, home_root_, path);
     if (!target) {
-        path_box_->set_text(location_.string());
+        path_box_->set_text(path_utf8(location_));
         set_path_editing(false);
         set_status("Location not admitted",
                    "read-only roots are Home, Volumes, and explicit launch roots");
@@ -3045,7 +3181,7 @@ void Application::request_navigation(std::filesystem::path path,
     const auto generation = requested_generation_.fetch_add(1) + 1;
     const auto root = target->root;
     path = target->path;
-    set_status("Reading " + path.string(),
+    set_status("Reading " + path_utf8(path),
                "direct filesystem · " + navigation_label(root) +
                    " · read-only observation");
     post_worker([self = shared_from_this(), root, path = std::move(path),
@@ -3075,7 +3211,7 @@ void Application::request_tree_expansion(std::filesystem::path path) {
             [self] { return self->stopping_.load(); }, self->show_hidden_);
         if (snapshot.cancelled || !snapshot.available()) return;
         self->post_ui([self, snapshot = std::move(snapshot)]() mutable {
-            self->tree_directory_entries_[snapshot.location.generic_string()] =
+            self->tree_directory_entries_[path_generic_utf8(snapshot.location)] =
                 snapshot.entries;
             self->rebuild_tree(snapshot);
         });
@@ -3090,7 +3226,7 @@ void Application::apply_directory(DirectorySnapshot snapshot,
     }
     applied_generation_ = snapshot.generation;
     if (!snapshot.available()) {
-        path_box_->set_text(location_.string());
+        path_box_->set_text(path_utf8(location_));
         set_status("Location unavailable", snapshot.error);
         return;
     }
@@ -3100,7 +3236,7 @@ void Application::apply_directory(DirectorySnapshot snapshot,
     // below. Preserve its paths until that retained model has consumed them.
     location_ = snapshot.location;
     navigation_root_ = snapshot.root;
-    path_box_->set_text(location_.string());
+    path_box_->set_text(path_utf8(location_));
     rebuild_breadcrumb();
     correspondence_->set_items({});
     correspondence_->set_visible(false);
@@ -3143,7 +3279,7 @@ void Application::apply_directory(DirectorySnapshot snapshot,
         auto display_name = entry.name;
         if (!show_extensions_ && !entry.directory &&
             entry.kind != EntryKind::symlink) {
-            const auto stem = entry.path.stem().string();
+            const auto stem = path_utf8(entry.path.stem());
             if (!stem.empty()) display_name = stem;
         }
         items.push_back({entry.stable_id, std::move(display_name), entry.secondary_text,
@@ -3178,13 +3314,7 @@ void Application::apply_directory(DirectorySnapshot snapshot,
     update_mutation_controls();
     update_command_state();
     if (returning_from_virtual_surface) focus_active_object_surface();
-    set_status(snapshot.entries.empty() ? "This folder is empty" :
-                   std::to_string(snapshot.entries.size()) +
-                       (snapshot.entries.size() == 1 ? " object" : " objects"),
-               "direct filesystem · " + navigation_label(navigation_root_) +
-                   (mutation_scope_active()
-                        ? " · protected operations admitted"
-                        : " · read-only observation"));
+    update_browsing_status();
 }
 
 void Application::show_tree_root_menu() {
@@ -3197,8 +3327,8 @@ void Application::select_tree_root_mode(const std::filesystem::path& root) {
     if (admitted == navigation_roots_.end()) return;
     tree_root_mode_ = *admitted;
     tree_expanded_paths_.clear();
-    tree_expanded_paths_.insert(tree_root_mode_.generic_string());
-    const auto current = tree_directory_entries_.find(location_.generic_string());
+    tree_expanded_paths_.insert(path_generic_utf8(tree_root_mode_));
+    const auto current = tree_directory_entries_.find(path_generic_utf8(location_));
     DirectorySnapshot snapshot;
     snapshot.root = navigation_root_;
     snapshot.location = location_;
@@ -3209,13 +3339,13 @@ void Application::select_tree_root_mode(const std::filesystem::path& root) {
 
 void Application::rebuild_tree(const DirectorySnapshot& snapshot) {
     std::vector<gui_forms::TreeViewItem> items;
-    tree_directory_entries_[snapshot.location.generic_string()] = snapshot.entries;
+    tree_directory_entries_[path_generic_utf8(snapshot.location)] = snapshot.entries;
     tree_locations_.clear();
-    const auto mode_label = navigation_label(tree_root_mode_) + "-rooted";
+    const auto mode_label = navigation_label(tree_root_mode_);
     tree_root_mode_button_->set_text(mode_label);
     tree_root_mode_button_->set_accessible_description(
-        "Current mode: " + mode_label +
-        ". Switch immediately between honest admitted roots");
+        "Folder tree root: " + path_utf8(tree_root_mode_) +
+        ". Choose another available root");
     command_tree_home_->set_checked(tree_root_mode_ == home_root_);
     if (command_tree_volumes_) {
         command_tree_volumes_->set_checked(
@@ -3241,7 +3371,7 @@ void Application::rebuild_tree(const DirectorySnapshot& snapshot) {
             root_id = "fm.location.admitted." + std::to_string(root_index);
         }
         const bool expanded = path_is_within(root, location_) ||
-            tree_expanded_paths_.contains(root.generic_string());
+            tree_expanded_paths_.contains(path_generic_utf8(root));
         const auto root_icon = root == home_root_
             ? house_art::key(house_art::Icon::home)
             : volumes_root_ && root == *volumes_root_
@@ -3271,7 +3401,7 @@ void Application::append_tree_children(
     const std::filesystem::path& parent,
     const std::size_t depth,
     std::string& selected_id) {
-    const auto cached = tree_directory_entries_.find(parent.generic_string());
+    const auto cached = tree_directory_entries_.find(path_generic_utf8(parent));
     if (cached == tree_directory_entries_.end()) return;
     for (const auto& entry : cached->second) {
         if (!entry.directory) continue;
@@ -3279,7 +3409,7 @@ void Application::append_tree_children(
         const bool on_current_ancestry =
             entry.path == location_ || path_is_within(entry.path, location_);
         const bool expanded = on_current_ancestry ||
-            tree_expanded_paths_.contains(entry.path.generic_string());
+            tree_expanded_paths_.contains(path_generic_utf8(entry.path));
         items.push_back({tree_stable_id, entry.name, depth, true,
                          expanded, true,
                          std::string(house_art::key(house_art::Icon::folder))});
@@ -3549,8 +3679,7 @@ void Application::request_engine_criteria(const bool next_page) {
         ->set_enabled(false);
     update_command_state();
     const auto engine_root_id = engine_root_id_;
-    auto relative = std::filesystem::relative(location_, protected_root_)
-                        .generic_string();
+    auto relative = path_generic_utf8(std::filesystem::relative(location_, protected_root_));
     std::optional<std::string> relative_path;
     if (!relative.empty() && relative != ".") relative_path = std::move(relative);
     std::uint32_t maximum_results = 100;
@@ -3615,7 +3744,7 @@ void Application::request_engine_search(const bool next_page) {
     form_.file_manager_app_shell_workspace_selection_content_heading_more_results->set_enabled(false);
     update_command_state();
     const auto engine_root_id = engine_root_id_;
-    auto relative = std::filesystem::relative(location_, protected_root_).generic_string();
+    auto relative = path_generic_utf8(std::filesystem::relative(location_, protected_root_));
     std::optional<std::string> relative_path;
     if (!relative.empty() && relative != ".") relative_path = std::move(relative);
     std::uint32_t maximum_results = 100;
@@ -3718,7 +3847,7 @@ void Application::apply_engine_criteria(
         auto display_name = entry.name;
         if (!show_extensions_ && !entry.directory &&
             entry.kind != EntryKind::symlink) {
-            const auto stem = entry.path.stem().string();
+            const auto stem = path_utf8(entry.path.stem());
             if (!stem.empty()) display_name = stem;
         }
         items.push_back({stable_id, std::move(display_name),
@@ -3852,15 +3981,14 @@ void Application::apply_engine_search(
         auto display_name = entry.name;
         if (!show_extensions_ && !entry.directory &&
             entry.kind != EntryKind::symlink) {
-            const auto stem = entry.path.stem().string();
+            const auto stem = path_utf8(entry.path.stem());
             if (!stem.empty()) display_name = stem;
         }
         items.push_back({stable_id, std::move(display_name), entry.secondary_text,
                          kind_text(entry), object_glyph(entry.kind), true,
                          std::string(house_art::object_key(entry.kind))});
-        auto relative_path = entry.path.lexically_relative(protected_root_)
-                                 .generic_string();
-        if (relative_path.empty()) relative_path = entry.path.generic_string();
+        auto relative_path = path_generic_utf8(entry.path.lexically_relative(protected_root_));
+        if (relative_path.empty()) relative_path = path_generic_utf8(entry.path);
         gui_forms::CorrespondenceItem correspondence{
             stable_id,
             entry.name,
@@ -4032,6 +4160,9 @@ void Application::apply_preview(PreviewResult result, std::string stable_id,
 }
 
 void Application::update_selection(const std::string_view stable_id) {
+    update_adaptive_preview();
+    (*property_list_).set_visible(!(*objects_).selected_ids().empty());
+    update_browsing_status();
     pending_delete_id_.reset();
     property_list_->set_value("fm.property.expected-sha256", {});
     if (rename_box_->visible()) cancel_rename();
@@ -4057,7 +4188,7 @@ void Application::update_selection(const std::string_view stable_id) {
             editor->set_enabled(false);
         }
         property_list_->set_value("fm.property.kind", "Multiple kinds");
-        property_list_->set_value("fm.property.location", location_.string());
+        property_list_->set_value("fm.property.location", path_utf8(location_));
         property_list_->set_value("fm.property.size", "Multiple values");
         property_list_->set_value("fm.property.modified", "Multiple values");
         update_command_state();
@@ -4093,14 +4224,14 @@ void Application::update_selection(const std::string_view stable_id) {
     form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind->set_text(
         kind_text(entry));
     form_.file_manager_app_shell_workspace_selection_inspector_facts_path->set_text(
-        "Path · " + entry.path.string());
+        "Path · " + path_utf8(entry.path));
     form_.file_manager_app_shell_workspace_selection_inspector_facts_size->set_text(
         "Size · " + entry.secondary_text);
     form_.file_manager_app_shell_workspace_selection_inspector_facts_modified->set_text(
         "Modified · " + entry.modified_text);
     property_list_->set_value("fm.property.name", entry.name);
     property_list_->set_value("fm.property.kind", kind_text(entry));
-    property_list_->set_value("fm.property.location", entry.path.string());
+    property_list_->set_value("fm.property.location", path_utf8(entry.path));
     property_list_->set_value("fm.property.size", entry.secondary_text);
     property_list_->set_value("fm.property.modified", entry.modified_text);
     update_command_state();
@@ -4211,7 +4342,7 @@ void Application::apply_checksum(ChecksumResult result, std::string expected,
             gui_forms::HostMessageDialogRequest message;
             message.title = "SHA-256 unavailable";
             message.message = result.message + "\n\nCode: " + result.code +
-                "\nObject: " + result.path.string();
+                "\nObject: " + path_utf8(result.path);
             message.buttons = gui_forms::HostMessageButtons::ok;
             message.icon = gui_forms::HostMessageIcon::warning;
             gui_forms::HostDialogRequest request;
@@ -4255,8 +4386,8 @@ void Application::apply_checksum(ChecksumResult result, std::string expected,
                checksum_detail);
     if (!window_ || !window_->host_services()) return;
     gui_forms::HostMessageDialogRequest message;
-    message.title = "SHA-256 · " + result.path.filename().string();
-    message.message = "Object: " + result.path.string() +
+    message.title = "SHA-256 · " + path_utf8(result.path.filename());
+    message.message = "Object: " + path_utf8(result.path) +
         "\nBytes read: " + std::to_string(result.bytes_read) +
         "\nAlgorithm: SHA-256\n\n" + result.digest_hex + comparison +
         "\n\nCopy this digest to the clipboard?";
@@ -4313,13 +4444,13 @@ void Application::copy_current_path() {
     const auto entry = selected_entry();
     const auto path = entry ? entry->path : location_;
     if (!window_ || !window_->host_services()) {
-        set_status("Clipboard unavailable", path.string());
+        set_status("Clipboard unavailable", path_utf8(path));
         return;
     }
     const auto copied = window_->host_services()->write_clipboard_text(
-        path.string());
+        path_utf8(path));
     set_status(copied.accepted() ? "Path copied" : "Clipboard unavailable",
-               path.string());
+               path_utf8(path));
 }
 
 void Application::run_platform_command(const PlatformCommandKind kind,
@@ -4333,7 +4464,7 @@ void Application::run_platform_command(const PlatformCommandKind kind,
     }
     set_status(kind == PlatformCommandKind::open_terminal_here
                    ? "Opening Terminal…" : "Opening " + entry.name + "…",
-               "macOS argv-only launcher · identity revalidation");
+               "native platform launcher · identity revalidation");
     post_worker([self = shared_from_this(), kind, plan = std::move(plan),
                  path = entry.path]() mutable {
         auto result = execute_platform_command(plan);
@@ -4357,7 +4488,7 @@ void Application::apply_platform_command(const PlatformCommandKind kind,
     message.title = kind == PlatformCommandKind::open_terminal_here
         ? "Terminal unavailable" : "Open unavailable";
     message.message = result.message + "\n\nCode: " + result.code +
-        "\nPath: " + path.string();
+        "\nPath: " + path_utf8(path);
     message.buttons = gui_forms::HostMessageButtons::ok;
     message.icon = gui_forms::HostMessageIcon::warning;
     gui_forms::HostDialogRequest request;
@@ -4682,10 +4813,10 @@ void Application::show_operation_failure(const OperationResult& result) {
     message.title = "File operation refused";
     message.message = result.message + "\n\nCode: " + result.code;
     if (!result.original_path.empty()) {
-        message.message += "\nObject: " + result.original_path.string();
+        message.message += "\nObject: " + path_utf8(result.original_path);
     }
     if (!result.resulting_path.empty()) {
-        message.message += "\nDestination: " + result.resulting_path.string();
+        message.message += "\nDestination: " + path_utf8(result.resulting_path);
     }
     message.buttons = gui_forms::HostMessageButtons::ok;
     message.icon = result.terminal == OperationTerminal::conflict
@@ -4718,6 +4849,43 @@ void Application::activate(const std::string_view stable_id) {
     } else {
         run_platform_command(PlatformCommandKind::open_default, found->second);
     }
+}
+
+void Application::update_browsing_status() {
+    if (settings_open_ || search_showing_ || criteria_showing_) return;
+    const std::span<const std::string> selected = (*objects_).selected_ids();
+    std::string text;
+    if (selected.empty()) {
+        text = entries_.empty() ? "This folder is empty" :
+            std::to_string(entries_.size()) + (entries_.size() == 1U ? " object" : " objects");
+    } else {
+        std::uint64_t bytes{};
+        std::size_t folders{};
+        std::size_t files{};
+        bool unavailable{};
+        for (const std::string& id : selected) {
+            const std::unordered_map<std::string, DirectoryEntry>::const_iterator found = entries_.find(id);
+            if (found == entries_.end()) { unavailable = true; continue; }
+            const DirectoryEntry& entry = (*found).second;
+            if (entry.directory) { ++folders; continue; }
+            if (entry.identity.type != std::filesystem::file_type::regular) continue;
+            ++files;
+            if (!entry.identity.available() || entry.identity.size > std::numeric_limits<std::uint64_t>::max() - bytes) {
+                unavailable = true;
+            } else {
+                bytes += entry.identity.size;
+            }
+        }
+        text = std::to_string(selected.size()) + " selected";
+        if (files > 0) text += " · " + format_bytes(bytes) + " in files";
+        if (folders > 0) text += " · " + std::to_string(folders) + (folders == 1U ? " folder" : " folders");
+        if (unavailable) text += " · some sizes unavailable";
+    }
+    const std::string summary = path_utf8(location_) + " · direct filesystem" +
+        (mutation_scope_active() ? " · protected operations admitted" : " · read-only observation");
+    set_status(std::move(text), summary);
+    (*form_.file_manager_app_shell_status_summary).set_accessible_description(
+        "Current folder: " + path_utf8(location_));
 }
 
 void Application::set_status(std::string text, std::string summary) {

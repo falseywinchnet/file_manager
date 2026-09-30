@@ -300,6 +300,33 @@ HostDialogResult shutdown_during_dialog(
                                 HostDialogChoice::ok}};
 }
 
+class InterruptModalObserver final {
+public:
+    InterruptModalObserver(HostServices& services, bool entering, bool shutdown)
+        : services_(services), entering_(entering), shutdown_(shutdown) {}
+    void operator()(const HostModalTransition& transition) const {
+        if (transition.entering != entering_) return;
+        if (shutdown_) services_.shutdown();
+        else throw std::runtime_error("modal observer failure");
+    }
+private:
+    HostServices& services_;
+    bool entering_;
+    bool shutdown_;
+};
+class CountDialogCalls final {
+public:
+    explicit CountDialogCalls(unsigned& count) : count_(count) {}
+    HostDialogResult operator()(const HostDialogRequest& request,
+                                host::HeadlessHostServices&) const {
+        ++count_;
+        return {{}, request.request_id,
+                HostMessageDialogResult{HostDialogOutcome::accepted, HostDialogChoice::ok}};
+    }
+private:
+    unsigned& count_;
+};
+
 class QueryMonitorsOffThread final {
 public:
     QueryMonitorsOffThread(HostServices& services, HostMonitorResult& result)
@@ -840,6 +867,31 @@ void test_nested_modal_order_owner_suppression_and_limit() {
             "shutdown during a modal adapter call must unwind and reject its stale result");
 }
 
+void test_modal_observer_failure_and_shutdown_unwind() {
+    for (unsigned scenario = 0; scenario < 3; ++scenario) {
+        Fixture fixture;
+        host::HeadlessHostServices& services =
+            static_cast<host::HeadlessHostServices&>(fixture.host.services());
+        unsigned calls{};
+        services.set_dialog_handler(CountDialogCalls(calls));
+        SubscriptionToken observation = services.modal_changed().subscribe(
+            InterruptModalObserver(services, scenario != 1, scenario == 2));
+        const HostDialogResult result = services.show_dialog(message_request(301));
+        require(result.status.error == (scenario == 2 ? HostServiceError::after_shutdown
+                                                     : HostServiceError::backend_failure) &&
+                    result.request_id == 301 && services.snapshot().modal_depth == 0 &&
+                    fixture.host.session().snapshot().modal_depth == 0 &&
+                    calls == (scenario == 1 ? 1U : 0U),
+                "observer failure or shutdown must unwind modal state and skip stale backend calls");
+        observation.disconnect();
+        if (scenario != 2) {
+            require(services.show_dialog(message_request(301)).status.accepted() &&
+                        services.snapshot().modal_depth == 0,
+                    "observer failure must leave the request ID and owner usable");
+        }
+    }
+}
+
 void test_display_capture_and_occlusion_synchronization() {
     Fixture fixture;
     require(fixture.host.dispatch(HostAttachEvent{{640.0, 360.0}, 1.0}, 1).accepted(),
@@ -1195,6 +1247,7 @@ int main() {
         test_typed_dialog_requests_and_results();
         test_typed_drag_destination_routing_and_bounds();
         test_nested_modal_order_owner_suppression_and_limit();
+        test_modal_observer_failure_and_shutdown_unwind();
         test_display_capture_and_occlusion_synchronization();
         test_environment_services_are_bounded_and_deterministic();
         test_sequence_geometry_and_shutdown_guards();

@@ -160,17 +160,20 @@ public:
         std::scoped_lock lock(mutex_);
         Slot* slot = find_locked(handle);
         if (slot == nullptr) return stale("release");
-        std::scoped_lock operation_lock((*(*slot).record).operation_mutex);
-        if ((*(*slot).record).owner_thread != std::this_thread::get_id()) {
-            (*(*(*slot).record).object).handoff_to_current_thread();
-            (*(*slot).record).owner_thread = std::this_thread::get_id();
+        // Recycling removes the registry reference. Keep the record and its
+        // mutex alive until the operation lock has released it.
+        const std::shared_ptr<ObjectRecord> record = (*slot).record;
+        const std::scoped_lock<std::recursive_mutex> operation_lock((*record).operation_mutex);
+        if ((*record).owner_thread != std::this_thread::get_id()) {
+            (*(*record).object).handoff_to_current_thread();
+            (*record).owner_thread = std::this_thread::get_id();
         }
-        if ((*(*slot).record).owner_thread != std::this_thread::get_id()) {
+        if ((*record).owner_thread != std::this_thread::get_id()) {
             return wrong_thread("release");
         }
-        if (--(*(*slot).record).external_references == 0U) {
-            if (!(*(*(*slot).record).object).is_disposed()) {
-                (*(*(*slot).record).object).dispose();
+        if (--(*record).external_references == 0U) {
+            if (!(*(*record).object).is_disposed()) {
+                (*(*record).object).dispose();
             }
             recycle_locked(*slot);
         }

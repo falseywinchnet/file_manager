@@ -737,10 +737,53 @@ void test_compound_anchor_resize_runtime_rebase_and_validation() {
             "Dock/Anchor must reject unknown values and remain convergence-bounded");
 }
 
+void test_flow_auto_scroll_owns_viewport_and_input() {
+    std::shared_ptr<FlowLayoutPanel> flow = make_control<FlowLayoutPanel>(StableId("flow.scroll"));
+    (*flow).set_auto_scroll(true);
+    (*flow).set_wrap_contents(false);
+    (*flow).set_item_spacing({4.0, 4.0});
+    std::vector<std::shared_ptr<Button>> items;
+    for (int index = 0; index < 8; ++index) {
+        std::shared_ptr<Button> item = make_control<Button>(StableId("flow.item." + std::to_string(index)), "Frame");
+        (*item).set_requested_bounds({0.0, 0.0, 82.0, 76.0});
+        (*flow).add_child(item);
+        items.push_back(item);
+    }
+    Window window(flow, {300.0, 100.0});
+    window.perform_layout();
+    require((*flow).hscroll() && !(*flow).vscroll() &&
+                (*flow).scroll_snapshot().viewport_rectangle.width == 300.0,
+            "unwrapped flow initializes a horizontal scroll viewport");
+    require(window.hit_test({20.0, 20.0}) == items[0],
+            "scrolled flow children remain visible to hit testing");
+    (*flow).scroll_control_into_view(items.back());
+    window.perform_layout();
+    const Rect last = (*items.back()).absolute_bounds();
+    require((*flow).scroll_position().x > 0.0 && last.right() <= 300.001 &&
+                window.hit_test({last.x + 10.0, last.y + 10.0}) == items.back(),
+            "scroll into view moves retained flow geometry and routed input together");
+    (*flow).set_wrap_contents(true);
+    window.resize({180.0, 100.0});
+    window.perform_layout();
+    require(!(*flow).hscroll() && (*flow).vscroll() &&
+                (*items[1]).committed_arranged_bounds().y > (*items[0]).committed_arranged_bounds().y,
+            "wrapped flow remeasures rows after vertical scrollbar consumes width");
+    (*flow).scroll_control_into_view(items.back());
+    window.perform_layout();
+    require((*flow).scroll_position().y > 0.0,
+            "wrapped flow scrolls to later rows");
+    window.resize({900.0, 400.0});
+    window.perform_layout();
+    require(!(*flow).hscroll() && !(*flow).vscroll() && (*flow).scroll_position() == Point{} &&
+                window.metrics_snapshot().bounded_pass_limit_hits == 0U,
+            "resizing resets obsolete scroll offsets without a layout loop");
+}
+
 } // namespace
 
 int main() {
     try {
+        test_flow_auto_scroll_owns_viewport_and_input();
         test_margin_padding_validation_and_retained_slots();
         test_flow_direction_break_visibility_and_resize();
         test_flow_item_spacing_is_explicit_bounded_layout_state();

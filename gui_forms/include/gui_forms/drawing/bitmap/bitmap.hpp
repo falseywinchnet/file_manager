@@ -49,7 +49,8 @@ struct BitmapDamageSnapshot final {
 class Bitmap final : public DrawingObject {
 public:
     static constexpr std::uint32_t maximum_dimension = 32768;
-    static constexpr std::uint64_t maximum_bytes = 256ULL * 1024ULL * 1024ULL;
+    static constexpr std::uint64_t maximum_pixels = 100'000'000ULL;
+    static constexpr std::uint64_t maximum_bytes = maximum_pixels * 4ULL;
     static constexpr std::size_t maximum_damage_rectangles = 256;
     static constexpr std::size_t maximum_damage_history = 256;
 

@@ -1,5 +1,8 @@
+#include "fixture_links.hpp"
 #include "file_manager/filesystem_model.hpp"
 
+#include <chrono>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -18,9 +21,12 @@ public:
         std::ofstream(path_ / "alpha.txt") << "alpha";
         std::ofstream(path_ / "zeta.png") << "not an image";
         std::ofstream(path_ / "Folder" / "child.cpp") << "int child;";
-        std::filesystem::create_directory_symlink("Folder", path_ / "Folder link");
-        std::filesystem::create_directory_symlink(path_, alias_);
+        link_available = create_fixture_link("Folder", path_ / "Folder link", true);
+        alias_available = create_fixture_link(path_, alias_, true);
     }
+
+    bool link_available{};
+    bool alias_available{};
 
     ~TestRoot() {
         std::error_code ignored;
@@ -55,11 +61,13 @@ int main() {
                  "child path must be inside root")) return 1;
     if (!require(!file_manager::path_is_within(canonical, canonical.parent_path()),
                  "parent path must be outside root")) return 1;
+    if (root.alias_available) {
     const auto rebased = file_manager::rebase_path_from_equivalent_root(
         canonical, root.alias() / "Folder" / "child.cpp");
     if (!require(rebased && *rebased == canonical / "Folder" / "child.cpp",
                  "an equivalent root spelling must rebase onto the protected root")) {
         return 1;
+    }
     }
     if (!require(!file_manager::rebase_path_from_equivalent_root(
                      canonical, canonical.parent_path()),
@@ -104,7 +112,7 @@ int main() {
     const auto snapshot = file_manager::read_directory(canonical, canonical, {}, 7);
     if (!require(snapshot.available(), "fixture root must enumerate")) return 1;
     if (!require(snapshot.generation == 7, "generation must be retained")) return 1;
-    if (!require(snapshot.entries.size() == 4, "fixture must expose four objects")) return 1;
+    if (!require(snapshot.entries.size() == (root.link_available ? 4U : 3U), "fixture must expose four objects")) return 1;
     if (!require(snapshot.entries.front().name == "Folder" &&
                  snapshot.entries.front().directory,
                  "directories must sort before files")) return 1;
@@ -121,12 +129,14 @@ int main() {
                  rejected.error.find("outside the protected root") != std::string::npos,
                  "out-of-root navigation must fail closed")) return 1;
 
+    if (root.link_available) {
     const auto symlink_rejected = file_manager::read_directory(
         canonical, canonical / "Folder link", {}, 10);
     if (!require(!symlink_rejected.available() &&
                  symlink_rejected.error.find("symbolic link") != std::string::npos,
                  "direct navigation must not traverse a symlink")) return 1;
 
+    }
     int cancellation_checks = 0;
     const auto cancelled = file_manager::read_directory(
         canonical, canonical, {}, 11, [&cancellation_checks] {
@@ -141,6 +151,24 @@ int main() {
     const auto identity_after = file_manager::observe_identity(canonical / "renamed.txt");
     if (!require(identity_before.available() && identity_before == identity_after,
                  "no-follow filesystem identity must survive rename")) return 1;
+
+    std::tm local_calendar{};
+    local_calendar.tm_year = 124;
+    local_calendar.tm_mon = 0;
+    local_calendar.tm_mday = 15;
+    local_calendar.tm_hour = 13;
+    local_calendar.tm_min = 45;
+    local_calendar.tm_sec = 30;
+    local_calendar.tm_isdst = -1;
+    const std::time_t local_seconds = std::mktime(&local_calendar);
+    const std::filesystem::file_time_type modified = std::chrono::file_clock::from_sys(
+        std::chrono::system_clock::from_time_t(local_seconds));
+    std::filesystem::last_write_time(canonical / "renamed.txt", modified);
+    const file_manager::DirectorySnapshot dated = file_manager::read_directory(
+        canonical, canonical, "renamed.txt", 12);
+    if (!require(dated.available() && dated.entries.size() == 1U &&
+                 dated.entries.front().modified_text == "2024-01-15 13:45",
+                 "Modified must show local calendar time rather than filesystem epoch ticks")) return 1;
 
     if (!require(file_manager::format_bytes(1536) == "1.5 KB",
                  "byte formatting must be stable")) return 1;

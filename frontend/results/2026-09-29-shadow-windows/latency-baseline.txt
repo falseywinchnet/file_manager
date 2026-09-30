@@ -1,0 +1,14 @@
+real_home_repo,constructor_ms=5.988,make_window_ms=71.240,make_window_flushes=0
+real_home_repo.initial,total_ms=11.983,drain_ms=0.245,max_drain_ms=0.233,drains=2,final_layout_ms=0.401,flushes=1,measure_passes=2,arrange_passes=2
+real_home_repo.navigate0,total_ms=15.150,drain_ms=0.285,max_drain_ms=0.285,drains=2,final_layout_ms=0.191,flushes=1,measure_passes=1,arrange_passes=1
+real_home_repo.navigate1,total_ms=15.165,drain_ms=0.164,max_drain_ms=0.163,drains=2,final_layout_ms=0.128,flushes=1,measure_passes=1,arrange_passes=1
+real_home_repo.navigate2,total_ms=15.440,drain_ms=0.227,max_drain_ms=0.226,drains=2,final_layout_ms=0.129,flushes=1,measure_passes=1,arrange_passes=1
+real_home_repo.navigate3,total_ms=15.283,drain_ms=0.163,max_drain_ms=0.162,drains=2,final_layout_ms=0.128,flushes=1,measure_passes=1,arrange_passes=1
+real_home_repo.navigate4,total_ms=15.425,drain_ms=0.213,max_drain_ms=0.212,drains=2,final_layout_ms=0.126,flushes=1,measure_passes=1,arrange_passes=1
+synthetic_2000,constructor_ms=7.315,make_window_ms=73.982,make_window_flushes=0
+synthetic_2000.initial,total_ms=14.837,drain_ms=0.137,max_drain_ms=0.125,drains=2,final_layout_ms=0.339,flushes=1,measure_passes=2,arrange_passes=2
+synthetic_2000.navigate0,total_ms=548.924,drain_ms=7.072,max_drain_ms=7.000,drains=36,final_layout_ms=0.160,flushes=1,measure_passes=1,arrange_passes=1
+synthetic_2000.navigate1,total_ms=26.196,drain_ms=2.321,max_drain_ms=2.321,drains=2,final_layout_ms=0.226,flushes=1,measure_passes=1,arrange_passes=1
+synthetic_2000.navigate2,total_ms=561.558,drain_ms=6.780,max_drain_ms=6.707,drains=37,final_layout_ms=0.175,flushes=1,measure_passes=1,arrange_passes=1
+synthetic_2000.navigate3,total_ms=9.701,drain_ms=1.110,max_drain_ms=1.109,drains=2,final_layout_ms=0.123,flushes=1,measure_passes=1,arrange_passes=1
+synthetic_2000.navigate4,total_ms=594.427,drain_ms=7.117,max_drain_ms=7.041,drains=38,final_layout_ms=0.227,flushes=1,measure_passes=1,arrange_passes=1

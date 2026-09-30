@@ -1,0 +1,54 @@
+[CmdletBinding()]
+param(
+    [ValidateSet('Toolkit', 'Frontend')]
+    [string]$Component = 'Toolkit',
+    [ValidateRange(1, 64)]
+    [int]$Jobs = 3,
+    [switch]$Test
+)
+
+$ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Enter-WindowsToolchain.ps1')
+$fileManagerRoot = Split-Path $PSScriptRoot -Parent
+$fileManagerSdk = Join-Path $fileManagerRoot 'gui_forms\.build\shadow-sdk'
+
+function Invoke-FileManagerBuildCommand {
+    param([string]$Program, [string[]]$Arguments)
+    & $Program @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Program failed with exit code $LASTEXITCODE"
+    }
+}
+
+Push-Location $fileManagerRoot
+try {
+    if ($Component -eq 'Toolkit') {
+        $fileManagerBuild = Join-Path $fileManagerRoot 'gui_forms\.build\shadow-windows'
+        Invoke-FileManagerBuildCommand 'cmake' @(
+            '-S', 'gui_forms', '-B', $fileManagerBuild, '-G', 'Ninja',
+            '-DCMAKE_BUILD_TYPE=Release', '-DGUI_FORMS_ENABLE_WINDOWS_HOST=ON',
+            '-DGUI_FORMS_ENABLE_MACOS_HOST=OFF', '-DGUI_FORMS_ENABLE_SKIA=OFF',
+            '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=OFF', '-DGUI_FORMS_BUILD_GALLERY=OFF',
+            '-DGUI_FORMS_BUILD_TESTS=ON', "-DCMAKE_INSTALL_PREFIX=$fileManagerSdk"
+        )
+    } else {
+        $fileManagerBuild = Join-Path $fileManagerRoot 'frontend\.build\shadow-windows'
+        if (-not (Test-Path -LiteralPath (Join-Path $fileManagerSdk 'lib\cmake\GUIForms\GUIFormsConfig.cmake'))) {
+            throw 'Build and install the Toolkit component first.'
+        }
+        Invoke-FileManagerBuildCommand 'cmake' @(
+            '-S', 'frontend', '-B', $fileManagerBuild, '-G', 'Ninja',
+            '-DCMAKE_BUILD_TYPE=Release', "-DGUIForms_DIR=$fileManagerSdk/lib/cmake/GUIForms",
+            "-DFILE_MANAGER_GUI_FORMS_MANIFEST=$fileManagerRoot/gui_forms/manifests/gui-forms-shadow-windows-x64-2026-09-29.json"
+        )
+    }
+    Invoke-FileManagerBuildCommand 'cmake' @('--build', $fileManagerBuild, '--parallel', "$Jobs")
+    if ($Test) {
+        Invoke-FileManagerBuildCommand 'ctest' @('--test-dir', $fileManagerBuild, '--output-on-failure', '--timeout', '90')
+    }
+    if ($Component -eq 'Toolkit') {
+        Invoke-FileManagerBuildCommand 'cmake' @('--install', $fileManagerBuild)
+    }
+} finally {
+    Pop-Location
+}

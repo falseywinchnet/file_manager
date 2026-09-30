@@ -69,6 +69,8 @@ enum class CursorKind : std::uint8_t {
     resize_vertical,
     wait,
     forbidden,
+    resize_diagonal_down,
+    resize_diagonal_up,
 };
 
 struct FontSpec {

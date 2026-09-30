@@ -233,6 +233,9 @@ struct DialogKeySnapshot final {
 class Window {
 public:
     explicit Window(Control::Ptr root, Size client_size = {});
+    /// Uses explicit per-window image quotas. The two-argument constructor
+    /// retains the normal defaults; large-document consumers choose a budget.
+    Window(Control::Ptr root, Size client_size, ImageRegistryLimits image_limits);
     ~Window();
     Window(const Window&) = delete;
     Window& operator=(const Window&) = delete;

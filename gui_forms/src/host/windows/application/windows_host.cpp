@@ -1,4 +1,7 @@
 #include "windows_host.hpp"
+#include "../accessibility/windows_accessibility.hpp"
+#include "../services/windows_clipboard_image.hpp"
+#include "../services/windows_cursor.hpp"
 
 #include "gui_forms/live_surface.hpp"
 #include "gui_forms/text.hpp"
@@ -11,6 +14,7 @@
 #include <wincodec.h>
 #include <commdlg.h>
 #include <shlobj.h>
+#include <shellapi.h>
 #include <usp10.h>
 
 #include <algorithm>
@@ -351,6 +355,8 @@ LPCWSTR native_cursor_identifier(CursorKind cursor) noexcept {
     case CursorKind::resize_vertical: return IDC_SIZENS;
     case CursorKind::wait: return IDC_WAIT;
     case CursorKind::forbidden: return IDC_NO;
+    case CursorKind::resize_diagonal_down: return IDC_SIZENWSE;
+    case CursorKind::resize_diagonal_up: return IDC_SIZENESW;
     case CursorKind::arrow: return IDC_ARROW;
     }
     return IDC_ARROW;
@@ -539,12 +545,28 @@ double query_scale(HWND window) noexcept {
         const GetDpiForWindowFunction function =
             load_function<GetDpiForWindowFunction>(
             user32, "GetDpiForWindow");
-        if (function != nullptr) return std::max(1.0, function(window) / 96.0);
+        if (function != nullptr && window != nullptr) {
+            const UINT dpi = function(window);
+            if (dpi != 0U) return std::max(1.0, dpi / 96.0);
+        }
     }
     HDC dc = GetDC(window);
     const int dpi = dc == nullptr ? 96 : GetDeviceCaps(dc, LOGPIXELSX);
     if (dc != nullptr) ReleaseDC(window, dc);
     return std::max(1.0, dpi / 96.0);
+}
+
+void adjust_client_frame(RECT& frame, DWORD style, DWORD extended_style,
+                         double scale) noexcept {
+    using AdjustForDpiFunction = BOOL(WINAPI*)(LPRECT, DWORD, BOOL, DWORD, UINT);
+    const HMODULE user32 = GetModuleHandleW(L"user32.dll");
+    if (user32 != nullptr) {
+        const AdjustForDpiFunction function = load_function<AdjustForDpiFunction>(
+            user32, "AdjustWindowRectExForDpi");
+        if (function != nullptr && function(&frame, style, FALSE, extended_style,
+                static_cast<UINT>(std::lround(scale * 96.0)))) return;
+    }
+    AdjustWindowRectEx(&frame, style, FALSE, extended_style);
 }
 
 void enable_best_dpi_awareness() noexcept {
@@ -562,6 +584,25 @@ void enable_best_dpi_awareness() noexcept {
 }
 
 class DibPainter final : public Painter {
+    struct PaintTiming final {
+        std::uint64_t calls{};
+        std::uint64_t nanoseconds{};
+    };
+    struct PaintTimer final {
+        PaintTiming* timing{};
+        std::chrono::steady_clock::time_point started{};
+        explicit PaintTimer(PaintTiming& target) {
+            static const bool enabled = environment_flag("GUI_FORMS_PROFILE_PAINTER");
+            if (enabled) { timing = &target; started = std::chrono::steady_clock::now(); }
+        }
+        ~PaintTimer() {
+            if (timing == nullptr) return;
+            ++(*timing).calls;
+            (*timing).nanoseconds += static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now() - started).count());
+        }
+    };
     struct DecodedImage final {
         std::uint64_t content_hash{};
         std::uint32_t width{};
@@ -572,11 +613,22 @@ class DibPainter final : public Painter {
 
 public:
     DibPainter() = default;
-    ~DibPainter() override { reset(); }
+    ~DibPainter() override {
+        constexpr std::array<const char*, 8> names{
+            "fill", "linear_gradient", "radial_gradient", "shadow", "line", "text", "text_metrics", "image"};
+        for (std::size_t index = 0; index < timings_.size(); ++index) {
+            if (timings_[index].calls == 0U) continue;
+            std::fprintf(stderr, "painter_profile=%s calls=%llu ms=%.3f\n", names[index],
+                static_cast<unsigned long long>(timings_[index].calls),
+                static_cast<double>(timings_[index].nanoseconds) / 1000000.0);
+        }
+        reset();
+    }
     DibPainter(const DibPainter&) = delete;
     DibPainter& operator=(const DibPainter&) = delete;
 
     bool resize(Size logical_size, double scale) {
+        if (scale_ != scale) text_run_cache_.clear();
         const int width = std::max(1, static_cast<int>(std::ceil(logical_size.width * scale)));
         const int height = std::max(1, static_cast<int>(std::ceil(logical_size.height * scale)));
         logical_size_ = logical_size;
@@ -761,14 +813,14 @@ public:
     }
 
     void fill_rect(Rect rect, Color color) override {
+        const PaintTimer timer(timings_[0]);
         const PixelRect area = pixel_rect(rect);
         if (area.empty()) return;
         const unsigned alpha = color.alpha;
         for (int y = area.top; y < area.bottom; ++y) {
             std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
-            for (int x = area.left; x < area.right; ++x) {
-                if (pixel_allowed(x, y)) blend_pixel(row[x], color, alpha);
-            }
+            const PixelSpan span = clipped_row_span(area, y);
+            fill_span(row, span, color, alpha);
         }
     }
 
@@ -781,12 +833,8 @@ public:
                             std::max(0.0, std::min(rect.width, rect.height) * 0.5));
         for (int y = area.top; y < area.bottom; ++y) {
             std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
-            for (int x = area.left; x < area.right; ++x) {
-                const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
-                if (pixel_allowed(x, y) && inside_rounded(sample, rect, radius)) {
-                    blend_pixel(row[x], color, color.alpha);
-                }
-            }
+            const PixelSpan span = rounded_row_span(rect, radius, y, clipped_row_span(area, y));
+            fill_span(row, span, color, color.alpha);
         }
     }
 
@@ -812,14 +860,13 @@ public:
         const double inner_radius = std::max(0.0, radius - line);
         for (int y = area.top; y < area.bottom; ++y) {
             std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
-            for (int x = area.left; x < area.right; ++x) {
-                const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
-                const bool in_outer = inside_rounded(sample, rect, radius);
-                const bool in_inner = !inner.empty() &&
-                    inside_rounded(sample, inner, inner_radius);
-                if (pixel_allowed(x, y) && in_outer && !in_inner) {
-                    blend_pixel(row[x], color, color.alpha);
-                }
+            const PixelSpan outer = rounded_row_span(rect, radius, y, clipped_row_span(area, y));
+            const PixelSpan inset = inner.empty() ? PixelSpan{} : rounded_row_span(inner, inner_radius, y, outer);
+            if (inset.right > inset.left) {
+                fill_span(row, {outer.left, inset.left}, color, color.alpha);
+                fill_span(row, {inset.right, outer.right}, color, color.alpha);
+            } else {
+                fill_span(row, outer, color, color.alpha);
             }
         }
     }
@@ -835,6 +882,7 @@ public:
         Rect rect, Point start, Point end,
         std::span<const GradientStop> stops,
         GradientSpreadMode spread) override {
+        const PaintTimer timer(timings_[1]);
         const PixelRect area = pixel_rect(rect);
         if (area.empty() || !valid_gradient_stops(stops) ||
             (spread != GradientSpreadMode::pad &&
@@ -850,10 +898,35 @@ public:
         const double dy = end.y - start.y;
         const double length_squared = dx * dx + dy * dy;
         if (length_squared <= 0.0) return;
+        if (dx != 0.0 && dy != 0.0) {
+            const GradientRaster* raster = gradient_raster(area, start, end, stops, spread, false);
+            if (raster != nullptr) { paint_gradient_raster(*raster); return; }
+        }
+        std::vector<Color> columns;
+        if (dy == 0.0) {
+            columns.reserve(static_cast<std::size_t>(area.right - area.left));
+            for (int x = area.left; x < area.right; ++x) {
+                const double amount = spread_gradient_coordinate(
+                    (((x + 0.5) / scale_ - start.x) * dx) / length_squared, spread);
+                columns.push_back(gradient_color(stops, amount));
+            }
+        }
         for (int y = area.top; y < area.bottom; ++y) {
             std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
-            for (int x = area.left; x < area.right; ++x) {
-                if (!pixel_allowed(x, y)) continue;
+            const PixelSpan span = clipped_row_span(area, y);
+            if (dx == 0.0) {
+                const double amount = spread_gradient_coordinate(
+                    (((y + 0.5) / scale_ - start.y) * dy) / length_squared, spread);
+                const Color color = gradient_color(stops, amount);
+                fill_span(row, span, color, color.alpha);
+                continue;
+            }
+            for (int x = span.left; x < span.right; ++x) {
+                if (!columns.empty()) {
+                    const Color color = columns[static_cast<std::size_t>(x - area.left)];
+                    blend_pixel(row[x], color, color.alpha);
+                    continue;
+                }
                 const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
                 const double amount = spread_gradient_coordinate(
                     ((sample.x - start.x) * dx +
@@ -869,6 +942,7 @@ public:
     void fill_radial_gradient(
         Rect rect, Point center, Size radii,
         std::span<const GradientStop> stops) override {
+        const PaintTimer timer(timings_[2]);
         const PixelRect area = pixel_rect(rect);
         if (area.empty() || radii.width <= 0.0 || radii.height <= 0.0 ||
             !valid_gradient_stops(stops)) {
@@ -876,6 +950,9 @@ public:
         }
         center.x += state().tx;
         center.y += state().ty;
+        const GradientRaster* raster = gradient_raster(area, center, {radii.width, radii.height},
+            stops, GradientSpreadMode::pad, true);
+        if (raster != nullptr) { paint_gradient_raster(*raster); return; }
         for (int y = area.top; y < area.bottom; ++y) {
             std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
             for (int x = area.left; x < area.right; ++x) {
@@ -894,6 +971,7 @@ public:
     void draw_box_shadow(Rect rect, double corner_radius, Point offset,
                          double blur_radius, double spread,
                          Color color) override {
+        const PaintTimer timer(timings_[3]);
         if (rect.empty() || color.alpha == 0U || blur_radius < 0.0) return;
         const double reach = blur_radius * 3.0;
         const Rect paint_bounds{rect.x + offset.x - spread - reach,
@@ -925,6 +1003,7 @@ public:
     }
 
     void draw_line(Point from, Point to, Color color, double width) override {
+        const PaintTimer timer(timings_[4]);
         const int x0 = logical_x(from.x);
         const int y0 = logical_y(from.y);
         const int x1 = logical_x(to.x);
@@ -944,6 +1023,7 @@ public:
 
     void draw_text_utf8(Point origin, std::string_view text,
                         FontSpec font, Color color) override {
+        const PaintTimer timer(timings_[5]);
         const std::vector<GdiTextRun> runs = text_runs(text, font);
         if (runs.empty() || memory_dc_ == nullptr) return;
         const int saved = SaveDC(memory_dc_);
@@ -973,7 +1053,7 @@ public:
                 x += measured.cx;
             }
             SelectObject(memory_dc_, old);
-            DeleteObject(native_font);
+            release_font(native_font);
         }
         RestoreDC(memory_dc_, saved);
     }
@@ -996,7 +1076,7 @@ public:
                 height = std::max(height, static_cast<int>(measured.cy));
             }
             SelectObject(memory_dc_, old);
-            DeleteObject(native_font);
+            release_font(native_font);
         }
         RestoreDC(memory_dc_, saved);
         return {width / scale_, height / scale_};
@@ -1004,6 +1084,7 @@ public:
 
     ResolvedTextLayout resolve_text_layout_utf8(
         std::string_view text, FontSpec font) override {
+        const PaintTimer timer(timings_[6]);
         ResolvedTextLayout result;
         result.effective_font = font;
         if (!valid_font_spec(font) || !validate_utf8(text).valid()) {
@@ -1045,7 +1126,7 @@ public:
             }
             SelectObject(memory_dc_, old);
             RestoreDC(memory_dc_, saved);
-            DeleteObject(native_font);
+            release_font(native_font);
             return result;
         }
         const std::vector<GdiTextRun> runs = text_runs(text, font);
@@ -1098,11 +1179,18 @@ public:
                 missing_face = true;
             }
             SelectObject(memory_dc_, old);
-            DeleteObject(native_font);
+            release_font(native_font);
             if (missing_face) break;
         }
         RestoreDC(memory_dc_, saved);
-        if (missing_face || (result.primary_family.empty() && !text.empty())) {
+        // A fallback-only string still has a valid requested primary face.
+        // Resolve that identity separately instead of discarding its layout.
+        if (!missing_face && result.primary_family.empty()) {
+            const ResolvedTextLayout primary = resolve_text_layout_utf8({}, font);
+            if (primary.status != TextResolutionStatus::exact) return primary;
+            result.primary_family = primary.primary_family;
+        }
+        if (missing_face) {
             result = {};
             result.effective_font = font;
             result.status = TextResolutionStatus::missing_primary_face;
@@ -1118,6 +1206,7 @@ public:
     }
 
     void set_bundled_fonts_ready(bool ready) noexcept {
+        if (bundled_fonts_ready_ != ready) text_run_cache_.clear();
         bundled_fonts_ready_ = ready;
     }
 
@@ -1206,42 +1295,47 @@ public:
 
     void draw_image_region(ImageId image, Rect source_rect, Rect destination,
                            double opacity) override {
+        draw_image_region_sampled(image, source_rect, destination,
+                                  ImageSampling::linear, opacity);
+    }
+
+    void draw_image_region_sampled(ImageId image, Rect source_rect,
+                                   Rect destination, ImageSampling sampling,
+                                   double opacity) override {
+        const PaintTimer timer(timings_[7]);
         const ImageMap::iterator found = images_.find(image.value);
         const PixelRect area = pixel_rect(destination);
         if (found == images_.end() || area.empty() || source_rect.empty() ||
             !source_rect.finite() || !destination.finite() ||
-            !std::isfinite(opacity) || opacity <= 0.0) {
-            return;
-        }
+            !std::isfinite(opacity) || opacity <= 0.0) return;
         const DecodedImage& source = (*found).second;
         const Rect source_bounds{0.0, 0.0, static_cast<double>(source.width),
                                  static_cast<double>(source.height)};
         if (!source_bounds.contains(source_rect)) return;
         const double left = (destination.x + state().tx) * scale_;
         const double top = (destination.y + state().ty) * scale_;
-        const double width = std::max(1.0, destination.width * scale_);
-        const double height = std::max(1.0, destination.height * scale_);
+        const double width = destination.width * scale_;
+        const double height = destination.height * scale_;
         const unsigned global_alpha = static_cast<unsigned>(
             std::lround(std::clamp(opacity, 0.0, 1.0) * 255.0));
+        Rect global_destination = destination;
+        global_destination.x += state().tx;
+        global_destination.y += state().ty;
         for (int y = area.top; y < area.bottom; ++y) {
-            const unsigned int source_y = std::min<std::uint32_t>(
-                source.height - 1U,
-                static_cast<std::uint32_t>(source_rect.y + std::max(
-                    0.0, (y - top) * source_rect.height / height)));
+            // Sample at destination pixel centers. Do not round a subpixel
+            // tile to a whole-pixel width or overlap adjacent content clips.
+            const double source_y = source_rect.y + (y + 0.5 - top) * source_rect.height / height;
             std::uint32_t* destination_row = pixels_ + static_cast<std::size_t>(y) * width_;
             for (int x = area.left; x < area.right; ++x) {
-                if (!pixel_allowed(x, y)) continue;
-                const unsigned int source_x = std::min<std::uint32_t>(
-                    source.width - 1U,
-                    static_cast<std::uint32_t>(source_rect.x + std::max(
-                        0.0, (x - left) * source_rect.width / width)));
-                const std::uint32_t source_pixel =
-                    source.pixels[static_cast<std::size_t>(source_y) * source.width + source_x];
+                const Point center{(x + 0.5) / scale_, (y + 0.5) / scale_};
+                if (!state().clip.contains(center) || !global_destination.contains(center) ||
+                    !pixel_allowed(x, y)) continue;
+                const double source_x = source_rect.x + (x + 0.5 - left) * source_rect.width / width;
+                const std::uint32_t source_pixel = sample_image_pixel(
+                    source, source_rect, source_x, source_y, sampling);
                 const unsigned source_alpha = ((source_pixel >> 24U) & 0xffU) * global_alpha / 255U;
-                const std::uint32_t destination_pixel = destination_row[x];
                 destination_row[x] = blend_image_pixel(
-                    source_pixel, destination_pixel, global_alpha,
-                    source_alpha);
+                    source_pixel, destination_row[x], global_alpha, source_alpha);
             }
         }
     }
@@ -1297,6 +1391,45 @@ public:
     }
 
 private:
+    [[nodiscard]] static std::uint32_t sample_image_pixel(
+        const DecodedImage& image, Rect bounds, double x, double y,
+        ImageSampling sampling) noexcept {
+        const int minimum_x = static_cast<int>(std::floor(bounds.x));
+        const int minimum_y = static_cast<int>(std::floor(bounds.y));
+        const int maximum_x = std::min(static_cast<int>(image.width) - 1,
+                                      static_cast<int>(std::ceil(bounds.right())) - 1);
+        const int maximum_y = std::min(static_cast<int>(image.height) - 1,
+                                      static_cast<int>(std::ceil(bounds.bottom())) - 1);
+        if (sampling == ImageSampling::nearest) {
+            const int column = std::clamp(static_cast<int>(std::floor(x)), minimum_x, maximum_x);
+            const int row = std::clamp(static_cast<int>(std::floor(y)), minimum_y, maximum_y);
+            return image.pixels[static_cast<std::size_t>(row) * image.width + column];
+        }
+        const double floor_x = std::floor(x - 0.5);
+        const double floor_y = std::floor(y - 0.5);
+        const double fraction_x = x - 0.5 - floor_x;
+        const double fraction_y = y - 0.5 - floor_y;
+        const int x0 = std::clamp(static_cast<int>(floor_x), minimum_x, maximum_x);
+        const int x1 = std::clamp(static_cast<int>(floor_x) + 1, minimum_x, maximum_x);
+        const int y0 = std::clamp(static_cast<int>(floor_y), minimum_y, maximum_y);
+        const int y1 = std::clamp(static_cast<int>(floor_y) + 1, minimum_y, maximum_y);
+        const std::uint32_t p00 = image.pixels[static_cast<std::size_t>(y0) * image.width + x0];
+        const std::uint32_t p10 = image.pixels[static_cast<std::size_t>(y0) * image.width + x1];
+        const std::uint32_t p01 = image.pixels[static_cast<std::size_t>(y1) * image.width + x0];
+        const std::uint32_t p11 = image.pixels[static_cast<std::size_t>(y1) * image.width + x1];
+        std::uint32_t result{};
+        for (unsigned shift = 0; shift < 32; shift += 8) {
+            const double upper = ((p00 >> shift) & 255U) * (1.0 - fraction_x) +
+                                 ((p10 >> shift) & 255U) * fraction_x;
+            const double lower = ((p01 >> shift) & 255U) * (1.0 - fraction_x) +
+                                 ((p11 >> shift) & 255U) * fraction_x;
+            const std::uint32_t channel = static_cast<std::uint32_t>(
+                std::lround(upper * (1.0 - fraction_y) + lower * fraction_y));
+            result |= channel << shift;
+        }
+        return result;
+    }
+
     struct RoundedClip final {
         Rect rect{};
         double radius{};
@@ -1317,10 +1450,138 @@ private:
         bool registered_italic{};
         bool fallback{};
     };
+    struct CachedTextRuns final {
+        std::string text;
+        FontSpec font;
+        std::vector<GdiTextRun> runs;
+    };
+    struct CachedFont final {
+        int height{};
+        std::uint16_t weight{};
+        bool italic{};
+        std::wstring family;
+        HFONT handle{};
+        SCRIPT_CACHE script_cache{};
+    };
     struct PixelRect {
         int left{}; int top{}; int right{}; int bottom{};
         [[nodiscard]] bool empty() const noexcept { return right <= left || bottom <= top; }
     };
+    struct PixelSpan final { int left{}; int right{}; };
+    struct GradientRaster final {
+        PixelRect area;
+        Point first;
+        Point second;
+        double scale{};
+        GradientSpreadMode spread{};
+        bool radial{};
+        bool opaque{};
+        std::vector<GradientStop> stops;
+        std::vector<std::uint32_t> pixels;
+    };
+
+    [[nodiscard]] const GradientRaster* gradient_raster(PixelRect area, Point first, Point second,
+        std::span<const GradientStop> stops, GradientSpreadMode spread, bool radial) {
+        // Cache the sampled brush, never the destination/background. Alpha is
+        // composited afresh and current clipping is applied on every replay.
+        // FIFO eviction bounds material pixels to 16 MiB per painter.
+        constexpr std::size_t maximum_pixels = 4U * 1024U * 1024U;
+        const std::size_t count = static_cast<std::size_t>(area.right - area.left) * (area.bottom - area.top);
+        if (count > maximum_pixels) return nullptr;
+        for (const GradientRaster& cached : gradient_cache_) {
+            if (cached.area.left != area.left || cached.area.right != area.right ||
+                cached.area.top != area.top || cached.area.bottom != area.bottom ||
+                cached.first != first || cached.second != second || cached.scale != scale_ ||
+                cached.radial != radial || cached.spread != spread || cached.stops.size() != stops.size()) continue;
+            bool same = true;
+            for (std::size_t index = 0; index < stops.size(); ++index) {
+                if (cached.stops[index].offset != stops[index].offset || cached.stops[index].color != stops[index].color) {
+                    same = false;
+                    break;
+                }
+            }
+            if (same) return &cached;
+        }
+        while (!gradient_cache_.empty() &&
+               (gradient_cache_.size() >= 32U || gradient_cache_pixels_ + count > maximum_pixels)) {
+            gradient_cache_pixels_ -= gradient_cache_.front().pixels.size();
+            gradient_cache_.erase(gradient_cache_.begin());
+        }
+        GradientRaster raster{area, first, second, scale_, spread, radial, true,
+            std::vector<GradientStop>(stops.begin(), stops.end()), {}};
+        raster.pixels.reserve(count);
+        for (const GradientStop& stop : stops) raster.opaque = raster.opaque && stop.color.alpha == 255U;
+        const double dx = second.x - first.x;
+        const double dy = second.y - first.y;
+        const double squared = dx * dx + dy * dy;
+        for (int y = area.top; y < area.bottom; ++y) {
+            for (int x = area.left; x < area.right; ++x) {
+                const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
+                double amount{};
+                if (radial) {
+                    const double rx = (sample.x - first.x) / second.x;
+                    const double ry = (sample.y - first.y) / second.y;
+                    amount = std::sqrt(rx * rx + ry * ry);
+                } else {
+                    amount = spread_gradient_coordinate(
+                        ((sample.x - first.x) * dx + (sample.y - first.y) * dy) / squared, spread);
+                }
+                const Color color = gradient_color(stops, amount);
+                raster.pixels.push_back(color.blue | (static_cast<std::uint32_t>(color.green) << 8U) |
+                    (static_cast<std::uint32_t>(color.red) << 16U) | (static_cast<std::uint32_t>(color.alpha) << 24U));
+            }
+        }
+        gradient_cache_pixels_ += count;
+        gradient_cache_.push_back(std::move(raster));
+        return &gradient_cache_.back();
+    }
+    void paint_gradient_raster(const GradientRaster& raster) {
+        const PixelRect area = raster.area;
+        const int stride = area.right - area.left;
+        for (int y = area.top; y < area.bottom; ++y) {
+            const PixelSpan span = clipped_row_span(area, y);
+            if (span.right <= span.left) continue;
+            const std::uint32_t* source = raster.pixels.data() +
+                static_cast<std::size_t>(y - area.top) * stride;
+            std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            if (raster.opaque) {
+                std::copy(source + span.left - area.left, source + span.right - area.left, row + span.left);
+                continue;
+            }
+            for (int x = span.left; x < span.right; ++x) {
+                const std::uint32_t pixel = source[x - area.left];
+                const Color color = Color::rgba((pixel >> 16U) & 255U, (pixel >> 8U) & 255U, pixel & 255U, pixel >> 24U);
+                blend_pixel(row[x], color, color.alpha);
+            }
+        }
+    }
+
+    [[nodiscard]] PixelSpan rounded_row_span(Rect rect, double radius, int y, PixelSpan span) const noexcept {
+        // Rounded rectangles are convex: each pixel row has one interval.
+        // Retain the scalar edge predicate and skip tests across its interior.
+        const double sample_y = (y + 0.5) / scale_;
+        if (sample_y < rect.y || sample_y >= rect.bottom()) return {};
+        while (span.left < span.right && !inside_rounded({(span.left + 0.5) / scale_, sample_y}, rect, radius)) ++span.left;
+        while (span.right > span.left && !inside_rounded({(span.right - 0.5) / scale_, sample_y}, rect, radius)) --span.right;
+        return span;
+    }
+    [[nodiscard]] PixelSpan clipped_row_span(PixelRect area, int y) const noexcept {
+        PixelSpan span = rounded_row_span(state().clip, 0.0, y, {area.left, area.right});
+        if (state().rounded_clip) {
+            span = rounded_row_span((*state().rounded_clip).rect, (*state().rounded_clip).radius, y, span);
+        }
+        return span;
+    }
+    static void fill_span(std::uint32_t* row, PixelSpan span, Color color, unsigned alpha) noexcept {
+        if (span.right <= span.left) return;
+        if (alpha == 255U) {
+            const std::uint32_t pixel = color.blue | (static_cast<std::uint32_t>(color.green) << 8U) |
+                (static_cast<std::uint32_t>(color.red) << 16U) | 0xff000000U;
+            std::fill(row + span.left, row + span.right, pixel);
+            return;
+        }
+        for (int x = span.left; x < span.right; ++x) blend_pixel(row[x], color, alpha);
+    }
 
     const State& state() const noexcept { return states_.back(); }
     [[nodiscard]] static bool inside_rounded(Point point, Rect rect,
@@ -1352,8 +1613,9 @@ private:
         return outside + inside - radius;
     }
     [[nodiscard]] bool pixel_allowed(int x, int y) const noexcept {
-        if (!state().rounded_clip) return true;
         const Point point{(x + 0.5) / scale_, (y + 0.5) / scale_};
+        if (!state().clip.contains(point)) return false;
+        if (!state().rounded_clip) return true;
         return inside_rounded(point, (*state().rounded_clip).rect,
                               (*state().rounded_clip).radius);
     }
@@ -1464,11 +1726,36 @@ private:
             : role == FontRole::monospace ? L"Cousine" : L"Carlito";
     }
     [[nodiscard]] HFONT create_font(FontSpec font, const wchar_t* family) const {
-        return CreateFontW(
-            -std::max(1, static_cast<int>(std::lround(font.size * scale_))),
+        // Font and Uniscribe state belong to this painter/DC. Recreating them
+        // per grapheme made unchanged File Manager labels cost seconds/frame.
+        // The bounded overflow path remains owned by the immediate caller.
+        const int height = -std::max(1, static_cast<int>(std::lround(font.size * scale_)));
+        for (const CachedFont& cached : font_cache_) {
+            if (cached.height == height && cached.weight == font.weight &&
+                cached.italic == font.italic && cached.family == family) return cached.handle;
+        }
+        const HFONT handle = CreateFontW(
+            height,
             0, 0, 0, font.weight, font.italic ? TRUE : FALSE, FALSE, FALSE,
             DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
             CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, family);
+        if (handle != nullptr && font_cache_.size() < 64U) {
+            font_cache_.push_back({height, font.weight, font.italic, family, handle});
+        }
+        return handle;
+    }
+    void release_font(HFONT handle) const noexcept {
+        for (const CachedFont& cached : font_cache_) {
+            if (cached.handle == handle) return;
+        }
+        if (handle != nullptr) DeleteObject(handle);
+    }
+    [[nodiscard]] SCRIPT_CACHE* selected_script_cache(SCRIPT_CACHE& temporary) const noexcept {
+        const HGDIOBJ selected = GetCurrentObject(memory_dc_, OBJ_FONT);
+        for (CachedFont& cached : font_cache_) {
+            if (cached.handle == selected) return &cached.script_cache;
+        }
+        return &temporary;
     }
     [[nodiscard]] bool shape_text_run(std::wstring_view text, int x, int y,
                                       bool draw, SIZE& measured) const {
@@ -1492,7 +1779,8 @@ private:
             std::vector<GOFFSET> offsets;
             int width{};
         };
-        SCRIPT_CACHE cache{};
+        SCRIPT_CACHE temporary_cache{};
+        SCRIPT_CACHE* const cache = selected_script_cache(temporary_cache);
         std::vector<PlacedItem> placed;
         placed.reserve(static_cast<std::size_t>(item_count));
         bool valid = true;
@@ -1510,7 +1798,7 @@ private:
                 static_cast<std::size_t>(capacity));
             int glyph_count{};
             if (FAILED(ScriptShape(
-                    memory_dc_, &cache, text.data() + start, item_length,
+                    memory_dc_, cache, text.data() + start, item_length,
                     capacity, &output.analysis, output.glyphs.data(),
                     clusters.data(), attributes.data(), &glyph_count)) ||
                 glyph_count <= 0) {
@@ -1522,7 +1810,7 @@ private:
             output.advances.resize(static_cast<std::size_t>(glyph_count));
             output.offsets.resize(static_cast<std::size_t>(glyph_count));
             ABC extent{};
-            if (FAILED(ScriptPlace(memory_dc_, &cache, output.glyphs.data(),
+            if (FAILED(ScriptPlace(memory_dc_, cache, output.glyphs.data(),
                                    glyph_count, attributes.data(),
                                    &output.analysis, output.advances.data(),
                                    output.offsets.data(), &extent))) {
@@ -1560,7 +1848,7 @@ private:
                     visual_to_logical[visual]);
                 PlacedItem& item = placed[logical];
                 if (draw && FAILED(ScriptTextOut(
-                        memory_dc_, &cache, x + measured.cx, y, 0, nullptr,
+                        memory_dc_, cache, x + measured.cx, y, 0, nullptr,
                         &item.analysis, nullptr, 0, item.glyphs.data(),
                         static_cast<int>(item.glyphs.size()), item.advances.data(),
                         nullptr, item.offsets.data()))) {
@@ -1570,7 +1858,7 @@ private:
                 measured.cx += item.width;
             }
         }
-        ScriptFreeCache(&cache);
+        if (cache == &temporary_cache) ScriptFreeCache(cache);
         if (valid) return true;
         if (!GetTextExtentPoint32W(memory_dc_, text.data(), length, &measured)) {
             return false;
@@ -1592,7 +1880,8 @@ private:
                                  items.data(), &item_count)) || item_count <= 0) {
             return false;
         }
-        SCRIPT_CACHE cache{};
+        SCRIPT_CACHE temporary_cache{};
+        SCRIPT_CACHE* const cache = selected_script_cache(temporary_cache);
         bool covered = true;
         for (int item = 0; item < item_count && covered; ++item) {
             const int start = items[static_cast<std::size_t>(item)].iCharPos;
@@ -1606,7 +1895,7 @@ private:
                 static_cast<std::size_t>(capacity));
             int glyph_count{};
             const HRESULT shaped = ScriptShape(
-                memory_dc_, &cache, text.data() + start, item_length, capacity,
+                memory_dc_, cache, text.data() + start, item_length, capacity,
                 &items[static_cast<std::size_t>(item)].a, glyphs.data(),
                 clusters.data(), attributes.data(), &glyph_count);
             if (FAILED(shaped) || glyph_count <= 0) {
@@ -1615,7 +1904,7 @@ private:
             }
             SCRIPT_FONTPROPERTIES properties{};
             properties.cBytes = sizeof(properties);
-            if (FAILED(ScriptGetFontProperties(memory_dc_, &cache, &properties))) {
+            if (FAILED(ScriptGetFontProperties(memory_dc_, cache, &properties))) {
                 covered = false;
                 continue;
             }
@@ -1638,7 +1927,7 @@ private:
                 std::fputc('\n', stderr);
             }
         }
-        ScriptFreeCache(&cache);
+        if (cache == &temporary_cache) ScriptFreeCache(cache);
         return covered;
     }
     [[nodiscard]] bool font_covers(HFONT font, const wchar_t* requested_family,
@@ -1649,7 +1938,11 @@ private:
         }
         const int saved = SaveDC(memory_dc_);
         HGDIOBJ old = SelectObject(memory_dc_, font);
-        const bool shaped_coverage = selected_font_shapes(text);
+        std::array<wchar_t, LF_FACESIZE> selected_family{};
+        const bool requested_face = GetTextFaceW(memory_dc_,
+            static_cast<int>(selected_family.size()), selected_family.data()) > 0 &&
+            _wcsicmp(selected_family.data(), requested_family) == 0;
+        const bool shaped_coverage = requested_face && selected_font_shapes(text);
         std::vector<WORD> glyphs(text.size(), 0xffffU);
         const DWORD count = GetGlyphIndicesW(
             memory_dc_, text.data(), static_cast<int>(text.size()),
@@ -1669,6 +1962,7 @@ private:
         }
         SelectObject(memory_dc_, old);
         RestoreDC(memory_dc_, saved);
+        if (!requested_face) return false;
         if (shaped_coverage) return true;
         if (count == GDI_ERROR) return false;
         for (std::size_t index = 0; index < text.size(); ++index) {
@@ -1688,19 +1982,20 @@ private:
     }
     [[nodiscard]] std::vector<GdiTextRun> text_runs(
         std::string_view utf8, FontSpec font) const {
+        for (const CachedTextRuns& cached : text_run_cache_) {
+            if (cached.font == font && cached.text == utf8) return cached.runs;
+        }
         std::vector<GdiTextRun> runs;
         if (utf8.empty() || memory_dc_ == nullptr || !validate_utf8(utf8).valid()) {
             return runs;
         }
-        constexpr std::array<const wchar_t*, 2> fallback_families{
-            L"Noto Sans CJK JP", L"Noto Emoji"};
-        std::array<HFONT, 3> candidates{
-            create_font(font, primary_font_family(font.role)),
-            create_font(font, fallback_families[0]),
-            create_font(font, fallback_families[1])};
-        const std::array<const wchar_t*, 3> families{
-            primary_font_family(font.role), fallback_families[0],
-            fallback_families[1]};
+        // Prefer the bundled UI companion for Cyrillic/Greek before CJK,
+        // and use the shipped script faces rather than implicit GDI substitutes.
+        const std::array<const wchar_t*, 9> families{
+            primary_font_family(font.role), L"Carlito", L"Noto Sans CJK JP",
+            L"Noto Sans Arabic", L"Noto Sans Hebrew", L"Noto Sans Devanagari",
+            L"Noto Sans Bengali", L"Noto Sans Gurmukhi", L"Noto Emoji"};
+        std::array<HFONT, 9> candidates{};
         TextStore store(utf8);
         for (std::size_t index = 0; index < store.grapheme_count().value();
              ++index) {
@@ -1712,6 +2007,9 @@ private:
             std::size_t selected{};
             bool covered{};
             for (; selected < candidates.size(); ++selected) {
+                if (candidates[selected] == nullptr) {
+                    candidates[selected] = create_font(font, families[selected]);
+                }
                 covered = font_covers(candidates[selected], families[selected],
                                       cluster);
                 if (covered) break;
@@ -1745,7 +2043,13 @@ private:
             }
         }
         for (HFONT candidate : candidates) {
-            if (candidate != nullptr) DeleteObject(candidate);
+            if (candidate != nullptr) release_font(candidate);
+        }
+        if (utf8.size() <= 2048U) {
+            // Keep retained labels cheap without retaining unbounded filenames
+            // or preview content. Font changes key separately; DPI clears runs.
+            if (text_run_cache_.size() >= 512U) text_run_cache_.clear();
+            text_run_cache_.push_back({std::string(utf8), font, runs});
         }
         return runs;
     }
@@ -1756,7 +2060,15 @@ private:
         memory_dc_ = nullptr; bitmap_ = nullptr; old_bitmap_ = nullptr; pixels_ = nullptr;
         width_ = 0; height_ = 0;
     }
-    void reset() noexcept { reset_bitmap(); }
+    void reset() noexcept {
+        reset_bitmap();
+        for (CachedFont& cached : font_cache_) {
+            ScriptFreeCache(&cached.script_cache);
+            DeleteObject(cached.handle);
+        }
+        font_cache_.clear();
+        text_run_cache_.clear();
+    }
 
     static bool decode_png(IWICImagingFactory& factory,
                            const ImageResourceView& resource,
@@ -1819,6 +2131,11 @@ private:
     std::uint64_t image_revision_{std::numeric_limits<std::uint64_t>::max()};
     bool images_synchronized_{true};
     bool bundled_fonts_ready_{};
+    mutable std::vector<CachedFont> font_cache_;
+    mutable std::vector<CachedTextRuns> text_run_cache_;
+    std::array<PaintTiming, 8> timings_{};
+    std::vector<GradientRaster> gradient_cache_;
+    std::size_t gradient_cache_pixels_{};
 };
 
 class WindowsHostState final {
@@ -1834,6 +2151,15 @@ public:
     }
 
     ~WindowsHostState() {
+        accessibility_.detach();
+        // Initialization can unwind before WM_DESTROY. Detach the callback
+        // address before releasing the native window so no later message can
+        // reach this partially destroyed owner.
+        if (hwnd_ != nullptr) {
+            SetWindowLongPtrW(hwnd_, GWLP_USERDATA, 0);
+            DestroyWindow(hwnd_);
+            hwnd_ = nullptr;
+        }
         if (live_frame_clock_ != nullptr) {
             CancelWaitableTimer(live_frame_clock_);
             CloseHandle(live_frame_clock_);
@@ -1841,7 +2167,10 @@ public:
         }
         hide_tooltip();
         if (tooltip_.font != nullptr) DeleteObject(tooltip_.font);
-        if (model_) (*model_).set_text_metrics_provider(nullptr);
+        if (model_) {
+            (*model_).set_paint_wake_handler({});
+            (*model_).set_text_metrics_provider(nullptr);
+        }
         session_.shutdown();
         services_.shutdown();
         for (const std::wstring& path : private_font_paths_) {
@@ -1878,6 +2207,7 @@ public:
         const HostDispatchResult attached = dispatch(HostAttachEvent{logical, scale_});
         if (!attached.accepted()) return false;
         native_phase_ = NativePhase::attached;
+        accessibility_.attach(hwnd_, *model_, scale_);
         (*model_).set_dispatch_wake_handler(
             gui_forms::detail::BoundMemberFunction<
                 void (WindowsHostState::*)() noexcept>(
@@ -1912,6 +2242,17 @@ public:
                     HostServiceStatus (HostServices::*)(std::string_view)>(
                         services_, &HostServices::write_clipboard_text));
         }
+        if (options_.full_screen_ready) {
+            options_.full_screen_ready(gui_forms::detail::BoundMemberFunction<void (WindowsHostState::*)() noexcept>(
+                *this, &WindowsHostState::toggle_full_screen));
+        }
+        if (options_.visibility_ready) {
+            options_.visibility_ready(
+                gui_forms::detail::BoundMemberFunction<void (WindowsHostState::*)() noexcept>(
+                    *this, &WindowsHostState::show_window),
+                gui_forms::detail::BoundMemberFunction<void (WindowsHostState::*)() noexcept>(
+                    *this, &WindowsHostState::hide_window));
+        }
         // One FIFO initialization turn runs before presentation. Work posted by
         // those callbacks stays deferred to the ordinary next host turn.
         static_cast<void>((*model_).drain_posted_work());
@@ -1937,11 +2278,20 @@ public:
     }
 
     LRESULT message(UINT message, WPARAM wparam, LPARAM lparam) {
+        if (message == WM_NCDESTROY) {
+            const HWND destroyed = hwnd_;
+            hwnd_ = nullptr;
+            SetWindowLongPtrW(destroyed, GWLP_USERDATA, 0);
+            return DefWindowProcW(destroyed, message, wparam, lparam);
+        }
         const bool ready = native_phase_ == NativePhase::ready ||
             native_phase_ == NativePhase::visible ||
             native_phase_ == NativePhase::closing;
         if (!ready) {
             switch (message) {
+            case WM_GETOBJECT:
+                if (static_cast<LONG>(lparam) == OBJID_CLIENT) { return accessibility_.object(wparam); }
+                break;
             case WM_GETMINMAXINFO:
                 minimum_size(reinterpret_cast<MINMAXINFO*>(lparam));
                 return 0;
@@ -1952,6 +2302,7 @@ public:
                 return 0;
             }
             case WM_DESTROY:
+                accessibility_.detach();
                 break;
             default:
                 return DefWindowProcW(hwnd_, message, wparam, lparam);
@@ -2070,13 +2421,23 @@ public:
         case WM_LBUTTONUP: case WM_RBUTTONUP: case WM_MBUTTONUP:
             pointer(message, PointerAction::up, wparam, lparam); return 0;
         case WM_MOUSEWHEEL: wheel(wparam, lparam); return 0;
-        case WM_KEYDOWN: case WM_SYSKEYDOWN: key(KeyAction::down, wparam, lparam); return 0;
+        case WM_SYSKEYDOWN:
+            // Preserve the native close gesture. Swallowing all system keys
+            // prevents DefWindowProc from producing the ordinary WM_CLOSE,
+            // including its existing cancellation and owned-window policy.
+            if (wparam == VK_F4 && (lparam & (1LL << 29)) != 0) break;
+            key(KeyAction::down, wparam, lparam); return 0;
+        case WM_KEYDOWN: key(KeyAction::down, wparam, lparam); return 0;
         case WM_KEYUP: case WM_SYSKEYUP: key(KeyAction::up, wparam, lparam); return 0;
         case WM_CHAR: character(static_cast<wchar_t>(wparam)); return 0;
+        case WM_GETOBJECT:
+            if (static_cast<LONG>(lparam) == OBJID_CLIENT) { return accessibility_.object(wparam); }
+            break;
         case WM_GETMINMAXINFO: minimum_size(reinterpret_cast<MINMAXINFO*>(lparam)); return 0;
         case WM_COPYDATA: return automation(reinterpret_cast<const COPYDATASTRUCT*>(lparam));
         case WM_CLOSE: return close();
         case WM_DESTROY:
+            accessibility_.detach();
             if (!closed_) {
                 const HostLifecyclePhase phase = session_.snapshot().phase;
                 if (phase == HostLifecyclePhase::attached ||
@@ -2141,6 +2502,34 @@ private:
 
     void post_close() noexcept {
         if (hwnd_ != nullptr) PostMessageW(hwnd_, WM_CLOSE, 0, 0);
+    }
+
+    void show_window() noexcept {
+        if (hwnd_ != nullptr && !closed_) ShowWindow(hwnd_, SW_SHOW);
+    }
+
+    void toggle_full_screen() noexcept {
+        if (hwnd_ == nullptr || closed_) return;
+        if (!full_screen_) {
+            MONITORINFO monitor{sizeof(MONITORINFO)};
+            restore_placement_.length = sizeof(WINDOWPLACEMENT);
+            if (!GetWindowPlacement(hwnd_, &restore_placement_) ||
+                !GetMonitorInfoW(MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST), &monitor)) return;
+            restore_style_ = GetWindowLongPtrW(hwnd_, GWL_STYLE);
+            SetWindowLongPtrW(hwnd_, GWL_STYLE, restore_style_ & ~WS_OVERLAPPEDWINDOW);
+            SetWindowPos(hwnd_, HWND_TOP, monitor.rcMonitor.left, monitor.rcMonitor.top,
+                monitor.rcMonitor.right - monitor.rcMonitor.left, monitor.rcMonitor.bottom - monitor.rcMonitor.top,
+                SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+        } else {
+            SetWindowLongPtrW(hwnd_, GWL_STYLE, restore_style_);
+            SetWindowPlacement(hwnd_, &restore_placement_);
+            SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+        }
+        full_screen_ = !full_screen_;
+    }
+
+    void hide_window() noexcept {
+        if (hwnd_ != nullptr && !closed_) ShowWindow(hwnd_, SW_HIDE);
     }
 
     template <class Payload>
@@ -2248,6 +2637,7 @@ private:
 
     void collect_damage() {
         static_cast<void>((*model_).poll_frame_schedule(FrameClock::now()));
+        accessibility_.notify(scale_);
         DamageRegion damage = (*model_).take_damage();
         if (!damage.empty()) {
             const Rect bounds = damage.bounds();
@@ -2389,6 +2779,7 @@ private:
         }
         dispatch(std::move(event));
         synchronize_capture();
+        if (!update_cursor(client_point(lparam))) apply_system_cursor(CursorKind::arrow);
         collect_damage();
     }
 
@@ -2416,6 +2807,13 @@ private:
     }
 
     void character(wchar_t character) {
+        // Key events own editing commands. TranslateMessage also emits these
+        // WM_CHAR values; forwarding them would insert a second newline/tab or
+        // a literal control byte after the command has already been handled.
+        if (character < 0x20 || character == 0x7F) {
+            pending_high_surrogate_ = 0;
+            return;
+        }
         if (character >= 0xD800 && character <= 0xDBFF) {
             pending_high_surrogate_ = character;
             return;
@@ -2438,14 +2836,16 @@ private:
         if (!requested && GetCapture() == hwnd_) ReleaseCapture();
     }
 
-    bool update_cursor(Point position) const {
-        const Control::Ptr target = (*model_).hit_test(position);
+    bool update_cursor(Point position) {
+        const Control::Ptr captured = (*model_).captured_control();
+        const Control::Ptr target = captured ? captured : (*model_).hit_test(position);
         const CursorKind cursor = target ? (*target).effective_cursor() : CursorKind::arrow;
         // The class cursor is authoritative for the ordinary pointer. Let
         // DefWindowProc complete WM_SETCURSOR for that case instead of writing
         // process-global cursor state again from every WM_MOUSEMOVE turn.
-        if (cursor == CursorKind::arrow) return false;
-        return apply_system_cursor(cursor);
+        const CursorImagesPtr images = target ? (*target).effective_cursor_images() : CursorImagesPtr{};
+        if (cursor == CursorKind::arrow && !images) return false;
+        return services_.set_custom_cursor(images, scale_, cursor).accepted();
     }
 
     void minimum_size(MINMAXINFO* info) const {
@@ -2453,16 +2853,22 @@ private:
         RECT rect{0, 0,
                   static_cast<LONG>(std::ceil(options_.minimum_size.width * scale_)),
                   static_cast<LONG>(std::ceil(options_.minimum_size.height * scale_))};
-        AdjustWindowRectEx(&rect, WS_OVERLAPPEDWINDOW, FALSE, 0);
+        adjust_client_frame(rect, static_cast<DWORD>(GetWindowLongPtrW(hwnd_, GWL_STYLE)),
+            static_cast<DWORD>(GetWindowLongPtrW(hwnd_, GWL_EXSTYLE)), scale_);
         (*info).ptMinTrackSize.x = rect.right - rect.left;
         (*info).ptMinTrackSize.y = rect.bottom - rect.top;
     }
 
     LRESULT close() {
-        HostCloseRequest request{HostCloseReason::user, false};
+        HostCloseRequest request{HostCloseReason::user, false, options_.hide_on_close};
         if (options_.close_request) options_.close_request(request);
+        request.hide_on_accept = options_.hide_on_close;
         const HostDispatchResult result = dispatch(request);
         if (result.accepted() && result.close_allowed) {
+            if (options_.hide_on_close) {
+                hide_window();
+                return 0;
+            }
             native_phase_ = NativePhase::closing;
             DestroyWindow(hwnd_);
         }
@@ -2752,21 +3158,24 @@ private:
     bool load_private_fonts() {
         const std::wstring directory = executable_directory();
         if (directory.empty()) return false;
-        constexpr std::array<const wchar_t*, 12> names{
+        constexpr std::array<const wchar_t*, 17> names{
             L"PortsmouthRapids.ttf", L"PortsmouthRapids-Bold.ttf",
             L"Carlito-Regular.ttf", L"Carlito-Bold.ttf",
             L"Carlito-Italic.ttf", L"Carlito-BoldItalic.ttf",
             L"Cousine-Regular.ttf", L"Cousine-Bold.ttf",
             L"Cousine-Italic.ttf", L"Cousine-BoldItalic.ttf",
-            L"NotoSansCJKjp-Regular.otf", L"NotoEmoji-Regular.ttf"};
+            L"NotoSansCJKjp-Regular.otf", L"NotoSansArabic-Regular.ttf", L"NotoSansHebrew-Regular.ttf", L"NotoSansDevanagari-Regular.ttf", L"NotoSansBengali-Regular.ttf", L"NotoSansGurmukhi-Regular.ttf", L"NotoEmoji-Regular.ttf"};
         private_font_paths_.reserve(names.size());
-        for (const wchar_t* name : names) {
-            std::wstring path = directory + L"fonts\\" + name;
+        bool required_ready = true;
+        for (std::size_t index = 0; index < names.size(); ++index) {
+            std::wstring path = directory + L"fonts\\" + names[index];
             if (AddFontResourceExW(path.c_str(), FR_PRIVATE, nullptr) > 0) {
                 private_font_paths_.push_back(std::move(path));
+            } else if (index < 7) {
+                required_ready = false;
             }
         }
-        return private_font_paths_.size() == names.size();
+        return required_ready;
     }
 
     static std::wstring executable_directory() {
@@ -2790,11 +3199,15 @@ private:
         shutdown,
     };
 
+    WindowsAccessibility accessibility_;
     std::unique_ptr<Window> model_;
     WindowsHostOptions options_;
     WindowsHostServices services_;
     HostSession session_;
     HWND hwnd_{};
+    bool full_screen_{};
+    LONG_PTR restore_style_{};
+    WINDOWPLACEMENT restore_placement_{};
     DibPainter raster_;
     DamageRegion pending_damage_;
     double scale_{1.0};
@@ -2849,12 +3262,13 @@ HostCapabilities windows_capabilities() {
                 HostCapability::pointer_capture |
                 HostCapability::cursor |
                 HostCapability::clipboard |
+                HostCapability::clipboard_images |
                 HostCapability::dialogs |
                 HostCapability::sound_cues};
 }
 
 int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
-    if (!model) return 2;
+    if (!model || !options.initially_visible || options.hide_on_close) return 2;
     const HRESULT com_status = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     enable_best_dpi_awareness();
     HINSTANCE instance = GetModuleHandleW(nullptr);
@@ -2873,10 +3287,12 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
     }
 
     WindowsHostState state(std::move(model), options);
-    const DWORD style = options.popup_window ? (WS_POPUP | WS_BORDER) : WS_OVERLAPPEDWINDOW;
-    RECT frame{0, 0, static_cast<LONG>(std::ceil(options.initial_size.width)),
-               static_cast<LONG>(std::ceil(options.initial_size.height))};
-    AdjustWindowRectEx(&frame, style, FALSE, 0);
+    const DWORD style = options.popup_window ? (WS_POPUP | WS_BORDER) :
+        (options.minimizable ? WS_OVERLAPPEDWINDOW : (WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX));
+    const double initial_scale = query_scale(nullptr);
+    RECT frame{0, 0, static_cast<LONG>(std::ceil(options.initial_size.width * initial_scale)),
+               static_cast<LONG>(std::ceil(options.initial_size.height * initial_scale))};
+    adjust_client_frame(frame, style, 0, initial_scale);
     const std::wstring title = wide_from_utf8(options.title);
     const int initial_x = options.popup_window
         ? static_cast<int>(std::lround(options.initial_position.x)) : CW_USEDEFAULT;
@@ -2972,7 +3388,10 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
             (!entry.owner_id.empty() && entry.owner_id == entry.stable_id)) {
             return 2;
         }
-        if (entry.owner_id.empty() && !entry.tool_window) ++primary_count;
+        if (entry.owner_id.empty() && !entry.tool_window) {
+            if (!entry.options.initially_visible || entry.options.hide_on_close) return 2;
+            ++primary_count;
+        }
     }
     for (const WindowsApplicationWindow& entry : windows) {
         if (!entry.owner_id.empty() && !identities.contains(entry.owner_id)) return 2;
@@ -3024,12 +3443,15 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
                 std::make_unique<WindowsHostState>(
                     std::move(entry.model), std::move(host_options));
             const DWORD style = entry.options.popup_window
-                ? (WS_POPUP | WS_BORDER) : WS_OVERLAPPEDWINDOW;
+                ? (WS_POPUP | WS_BORDER) :
+                (entry.options.minimizable ? WS_OVERLAPPEDWINDOW :
+                                            (WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX));
             const DWORD ex_style = entry.tool_window ? WS_EX_TOOLWINDOW : 0;
+            const double initial_scale = query_scale(owner);
             RECT frame{0, 0,
-                       static_cast<LONG>(std::ceil(entry.options.initial_size.width)),
-                       static_cast<LONG>(std::ceil(entry.options.initial_size.height))};
-            AdjustWindowRectEx(&frame, style, FALSE, ex_style);
+                       static_cast<LONG>(std::ceil(entry.options.initial_size.width * initial_scale)),
+                       static_cast<LONG>(std::ceil(entry.options.initial_size.height * initial_scale))};
+            adjust_client_frame(frame, style, ex_style, initial_scale);
             const std::wstring title = wide_from_utf8(entry.options.title);
             HWND window = CreateWindowExW(
                 ex_style, window_class_name, title.c_str(), style, CW_USEDEFAULT,
@@ -3067,9 +3489,11 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
             if (SUCCEEDED(com_status)) CoUninitialize();
             return 5;
         }
-        ShowWindow(handles[index], windows[index].tool_window ? SW_SHOWNOACTIVATE
-                                                              : SW_SHOWNORMAL);
-        UpdateWindow(handles[index]);
+        if (windows[index].options.initially_visible) {
+            ShowWindow(handles[index], windows[index].tool_window ? SW_SHOWNOACTIVATE
+                                                                  : SW_SHOWNORMAL);
+            UpdateWindow(handles[index]);
+        }
         if (windows[index].options.close_after_launch_for_testing) {
             PostMessageW(handles[index], WM_CLOSE, 0, 0);
         }

@@ -380,6 +380,21 @@ bool test_isolated_macos_services() {
     if (!services) {
         return false;
     }
+    const gui_forms::CursorImage pixels{32, 32, 1.0,
+        std::vector<gui_forms::Color>(1024, {30, 60, 90, 255})};
+    const gui_forms::CursorImage retina{64, 64, 2.0,
+        std::vector<gui_forms::Color>(4096, {30, 60, 90, 255})};
+    const gui_forms::CursorImagesPtr images = gui_forms::CursorImages::create({pixels, retina}, .25, .75);
+    if (!(*services).set_custom_cursor(images, 2, gui_forms::CursorKind::crosshair).accepted()) return false;
+    NSCursor* native = [NSCursor currentCursor];
+    if (native == [NSCursor crosshairCursor] || native.hotSpot.x != 8 || native.hotSpot.y != 24 ||
+        native.image.size.width != 32 || native.image.representations.count != 2) return false;
+    for (int i = 0; i < 200; ++i) {
+        if (!(*services).set_custom_cursor(images, 2, gui_forms::CursorKind::crosshair).accepted() ||
+            [NSCursor currentCursor] != native) return false;
+    }
+    if (!(*services).set_cursor(gui_forms::CursorKind::crosshair).accepted() ||
+        [NSCursor currentCursor] != [NSCursor crosshairCursor]) return false;
     const gui_forms::HostMonitorResult monitors = (*services).query_monitors();
     if (!monitors.status.accepted() || monitors.monitors.empty()) {
         return false;

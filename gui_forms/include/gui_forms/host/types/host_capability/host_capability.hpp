@@ -24,6 +24,7 @@ enum class HostCapability : std::uint64_t {
     accessibility = 1ULL << 15U,
     typed_drag_source = 1ULL << 16U,
     sound_cues = 1ULL << 17U,
+    clipboard_images = 1ULL << 18U,
 };
 
 [[nodiscard]] constexpr HostCapability operator|(HostCapability left,

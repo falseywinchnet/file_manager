@@ -1,4 +1,5 @@
 #pragma once
+#include "gui_forms/types/cursor_image/cursor_image.hpp"
 
 #include "gui_forms/component.hpp"
 #include "gui_forms/control/stable_id/stable_id.hpp"
@@ -540,6 +541,9 @@ public:
     void set_double_buffered(bool enabled);
     [[nodiscard]] std::optional<CursorKind> cursor() const noexcept { return cursor_; }
     void set_cursor(std::optional<CursorKind> cursor);
+    // A stock assignment clears the image override. Null images select fallback.
+    void set_custom_cursor(CursorImagesPtr images, CursorKind fallback = CursorKind::arrow);
+    [[nodiscard]] CursorImagesPtr effective_cursor_images() const noexcept;
     [[nodiscard]] const std::string& accessible_name() const noexcept {
         return accessible_name_;
     }
@@ -837,6 +841,7 @@ private:
                           ControlStyles::selectable |
                           ControlStyles::all_painting_in_one_pass};
     std::optional<CursorKind> cursor_;
+    CursorImagesPtr cursor_images_;
     std::shared_ptr<const Theme> theme_override_;
     std::optional<SurfaceMaterial> authored_surface_material_;
     std::vector<OwnerDecorationRecipe> owned_decorations_;

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(FileManagerFrontend VERSION 1.0.0 LANGUAGES CXX)
+project(FileManagerFrontend VERSION 0.0.1 LANGUAGES CXX)
 
 include(CMakePackageConfigHelpers)
 
@@ -8,16 +8,26 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(FILE_MANAGER_BUILD_TESTS "Build File Manager frontend tests" ON)
-set(FILE_MANAGER_GUI_FORMS_MANIFEST
-    "${CMAKE_CURRENT_SOURCE_DIR}/../gui_forms/manifests/gui-forms-fm0-macos-arm64-2026-08-10.json"
-    CACHE FILEPATH "Named GUI.Forms FM0 manifest")
-
-if(NOT APPLE)
-    message(FATAL_ERROR "The named File Manager 0.1 frontend snapshot is macOS arm64 only")
+if(APPLE)
+    set(FILE_MANAGER_DEFAULT_MANIFEST
+        "${CMAKE_CURRENT_SOURCE_DIR}/../gui_forms/manifests/gui-forms-fm0-macos-arm64-2026-08-10.json")
+elseif(WIN32)
+    set(FILE_MANAGER_DEFAULT_MANIFEST
+        "${CMAKE_CURRENT_SOURCE_DIR}/../gui_forms/manifests/gui-forms-shadow-windows-x64-2026-09-29.json")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(FILE_MANAGER_DEFAULT_MANIFEST
+        "${CMAKE_CURRENT_SOURCE_DIR}/manifests/gui-forms-linux-development.json")
+else()
+    message(FATAL_ERROR "File Manager has no verified host adapter for this platform")
 endif()
+set(FILE_MANAGER_GUI_FORMS_MANIFEST "${FILE_MANAGER_DEFAULT_MANIFEST}"
+    CACHE FILEPATH "Named GUI.Forms consumption manifest for the target platform")
 if(NOT EXISTS "${FILE_MANAGER_GUI_FORMS_MANIFEST}")
     message(FATAL_ERROR "Named GUI.Forms FM0 manifest is absent")
 endif()
+
+file(READ "${FILE_MANAGER_GUI_FORMS_MANIFEST}" FILE_MANAGER_MANIFEST_JSON)
+string(JSON FILE_MANAGER_MANIFEST_ID GET "${FILE_MANAGER_MANIFEST_JSON}" identity id)
 
 find_package(GUIForms 0.1 REQUIRED CONFIG)
 if(NOT TARGET GUIForms::Application)
@@ -78,6 +88,8 @@ add_custom_command(
 
 add_library(file_manager_frontend_model STATIC
     src/checksum.cpp
+    src/native_file.cpp
+    src/platform_paths.cpp
     src/filesystem_model.cpp
     src/file_operations.cpp
     src/internal_drag.cpp)
@@ -85,6 +97,10 @@ target_sources(file_manager_frontend_model PRIVATE
     src/platform_commands.cpp
     src/preview.cpp)
 add_library(FileManager::FrontendModel ALIAS file_manager_frontend_model)
+if(WIN32)
+    target_compile_definitions(file_manager_frontend_model PRIVATE _WIN32_WINNT=0x0602 NOMINMAX)
+    target_link_libraries(file_manager_frontend_model PUBLIC shell32 ole32 uuid)
+endif()
 target_include_directories(file_manager_frontend_model PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
@@ -138,7 +154,7 @@ target_link_libraries(file_manager_application PUBLIC
 target_compile_features(file_manager_application PUBLIC cxx_std_20)
 target_compile_definitions(file_manager_application PRIVATE
     FILE_MANAGER_VERSION="0.001-alpha"
-    FILE_MANAGER_GUI_FORMS_MANIFEST_ID="gui-forms-fm0-macos-arm64-2026-08-10")
+    FILE_MANAGER_GUI_FORMS_MANIFEST_ID="${FILE_MANAGER_MANIFEST_ID}")
 
 add_executable(file_manager MACOSX_BUNDLE src/main.cpp)
 target_sources(file_manager PRIVATE src/about_view.cpp)
@@ -160,6 +176,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         -Wall -Wextra -Werror -Wpedantic)
 endif()
 
+if(APPLE)
 set_target_properties(file_manager PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME "File Manager"
     MACOSX_BUNDLE_GUI_IDENTIFIER "local.filemanager.frontend"
@@ -186,7 +203,41 @@ add_custom_command(TARGET file_manager POST_BUILD
             "$<TARGET_BUNDLE_DIR:file_manager>/Contents/Info.plist"
     VERBATIM)
 
-install(TARGETS file_manager BUNDLE DESTINATION .)
+elseif(WIN32)
+    set_target_properties(file_manager PROPERTIES OUTPUT_NAME "File Manager" WIN32_EXECUTABLE TRUE)
+    add_custom_command(TARGET file_manager POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:GUIForms::Application>" "$<TARGET_FILE_DIR:file_manager>"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${GUIForms_FONT_DIR}" "$<TARGET_FILE_DIR:file_manager>/fonts"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${GUIForms_DIR}/../../../share/licenses" "$<TARGET_FILE_DIR:file_manager>/licenses"
+        VERBATIM)
+    get_filename_component(FILE_MANAGER_TOOLCHAIN_BIN "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    add_custom_command(TARGET file_manager POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+            "-DEXECUTABLE=$<TARGET_FILE:file_manager>"
+            "-DTOOLCHAIN_BIN=${FILE_MANAGER_TOOLCHAIN_BIN}"
+            "-DCMAKE_OBJDUMP=${CMAKE_OBJDUMP}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/StageWindowsRuntime.cmake"
+        VERBATIM)
+    install(FILES "$<TARGET_FILE:GUIForms::Application>" DESTINATION .)
+    install(DIRECTORY "${GUIForms_FONT_DIR}/" DESTINATION fonts)
+else()
+    set_target_properties(file_manager PROPERTIES
+        OUTPUT_NAME "File Manager"
+        BUILD_RPATH "$ORIGIN" INSTALL_RPATH "$ORIGIN")
+    add_custom_command(TARGET file_manager POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:GUIForms::Application>" "$<TARGET_FILE_DIR:file_manager>/$<TARGET_SONAME_FILE_NAME:GUIForms::Application>"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${GUIForms_FONT_DIR}" "$<TARGET_FILE_DIR:file_manager>/fonts"
+        VERBATIM)
+    install(FILES "$<TARGET_FILE:GUIForms::Application>"
+        DESTINATION . RENAME "$<TARGET_SONAME_FILE_NAME:GUIForms::Application>")
+    install(DIRECTORY "${GUIForms_FONT_DIR}/" DESTINATION fonts)
+endif()
+install(TARGETS file_manager BUNDLE DESTINATION . RUNTIME DESTINATION .)
 
 set(FILE_MANAGER_PICKER_CMAKE_DIR
     "lib/cmake/FileManagerDocumentPicker")
@@ -196,7 +247,7 @@ configure_package_config_file(
     INSTALL_DESTINATION "${FILE_MANAGER_PICKER_CMAKE_DIR}")
 write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/FileManagerDocumentPickerConfigVersion.cmake"
-    VERSION "${PROJECT_VERSION}"
+    VERSION "1.0.0" # Picker package contract version is independent of the application.
     COMPATIBILITY SameMajorVersion)
 install(TARGETS file_manager_frontend_model file_manager_document_picker
                 file_manager_document_picker_view
@@ -214,7 +265,19 @@ install(FILES
     DESTINATION "${FILE_MANAGER_PICKER_CMAKE_DIR}")
 
 if(FILE_MANAGER_BUILD_TESTS)
+    add_executable(file_manager_application_latency_benchmark EXCLUDE_FROM_ALL
+        tests/application_latency_benchmark.cpp)
+    target_link_libraries(file_manager_application_latency_benchmark PRIVATE file_manager_application)
+    target_compile_features(file_manager_application_latency_benchmark PRIVATE cxx_std_20)
+    if(WIN32)
+        target_link_libraries(file_manager_application_latency_benchmark PRIVATE psapi)
+    endif()
     enable_testing()
+    if(WIN32)
+        add_executable(file_manager_windows_platform_tests tests/windows_platform_tests.cpp)
+        target_link_libraries(file_manager_windows_platform_tests PRIVATE FileManager::FrontendModel)
+        add_test(NAME file_manager_windows_platform_tests COMMAND file_manager_windows_platform_tests)
+    endif()
     add_executable(file_manager_frontend_model_tests
         tests/filesystem_model_tests.cpp)
     target_link_libraries(file_manager_frontend_model_tests PRIVATE

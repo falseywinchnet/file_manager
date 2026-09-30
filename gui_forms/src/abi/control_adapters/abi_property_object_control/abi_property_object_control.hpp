@@ -411,9 +411,9 @@ private:
         result.kind = abi_kind(gui_forms::binding_value_kind(value));
         if (const bool* item = std::get_if<bool>(&value)) {
             result.boolean_value = *item ? 1U : 0U;
-        } else if (const long long* item = std::get_if<std::int64_t>(&value)) {
+        } else if (const std::int64_t* item = std::get_if<std::int64_t>(&value)) {
             result.signed_value = *item;
-        } else if (const unsigned long long* item = std::get_if<std::uint64_t>(&value)) {
+        } else if (const std::uint64_t* item = std::get_if<std::uint64_t>(&value)) {
             result.unsigned_value = *item;
         } else if (const double* item = std::get_if<double>(&value)) {
             result.number_value = *item;

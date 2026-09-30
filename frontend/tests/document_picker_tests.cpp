@@ -1,3 +1,4 @@
+#include "fixture_links.hpp"
 #include "file_manager/document_picker.hpp"
 
 #include <cstdlib>
@@ -19,7 +20,7 @@ public:
         std::ofstream(path_ / "beta.txt") << "beta";
         std::ofstream(path_ / "image.png") << "png";
         std::ofstream(path_ / ".hidden.txt") << "hidden";
-        std::filesystem::create_symlink("alpha.txt", path_ / "linked.txt");
+        (void)create_fixture_link("alpha.txt", path_ / "linked.txt");
     }
     ~TestRoot() {
         std::error_code ignored;
@@ -45,6 +46,7 @@ file_manager::DocumentPickerRequest request(
     value.profile = profile;
     value.protected_root = root.path();
     value.initial_location = root.path();
+    value.orchestrator_session_valid = true; // Explicit fixture session.
     value.owner_application_id = "picker-test-consumer";
     value.filters = {{"text", "Text", {"txt"}},
                      {"images", "Images", {"png"}}};
@@ -165,6 +167,34 @@ int main() {
     require(stale.accept().code == "selection-changed",
             "replacement between selection and acceptance must fail closed");
 
+    auto offline_request = request(root, file_manager::DocumentPickerProfile::open_file);
+    offline_request.orchestrator_session_valid = false;
+    file_manager::FileSelectionController unavailable(offline_request);
+    require(unavailable.accept().code == "session-unavailable", "default must not invent authority");
+    offline_request.authority = file_manager::DocumentPickerAuthority::trusted_local_host;
+    offline_request.home_location = root.path();
+    file_manager::FileSelectionController local(offline_request);
+    require(local.set_selection({find(local, "Folder")->stable_id}) && !local.accept().accepted(),
+            "folders are selectable for navigation, never accepted as open files");
+    require(local.navigate("Folder") && local.navigate(".."), "relative navigation is based on current location");
+    require(local.set_name_filter("a*.TXT") && find(local, "alpha.txt") && !find(local, "beta.txt") && find(local, "Folder"),
+            "filename glob combines with type and leaves folders navigable");
+    require(local.set_selection({find(local, "alpha.txt")->stable_id}) && local.accept().accepted(),
+            "explicit trusted host grant accepts without Engine or synthetic daemon");
+    local.set_authority_valid(false);
+    require(local.accept().code == "session-unavailable", "host revocation blocks acceptance");
+    auto hidden_request = offline_request;
+    hidden_request.allow_hidden_toggle = false;
+    file_manager::FileSelectionController hidden_locked(hidden_request);
+    require(!hidden_locked.set_show_hidden(true), "host can prohibit session hidden toggle");
+    require(save.set_filename("alpha.txt") && save.accept().terminal == file_manager::DocumentPickerTerminal::overwrite_confirmation_required,
+            "capture overwrite observation");
+    std::ofstream(root.path() / "alpha.txt", std::ios::app) << "changed";
+    require(save.accept(true).code == "destination-changed", "overwrite confirmation binds to displayed revision");
+    require(save.set_active_filter("images") && save.set_filename("new") && save.accept().selections.front().path.filename() == "new.png",
+            "save extension follows selected type");
+    require(save.set_filename(".hidden") && save.accept().code == "hidden-destination",
+            "hidden save path must obey same visibility policy");
     std::cout << "document picker tests passed\n";
     return 0;
 }

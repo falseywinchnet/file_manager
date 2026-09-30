@@ -38,6 +38,12 @@ public:
 
     [[nodiscard]] double label_width() const noexcept;
     void set_label_width(double width);
+    [[nodiscard]] FontSpec font() const noexcept;
+    void set_font(FontSpec font);
+    // Minimum logical row height; editable rows retain five extra pixels.
+    // Font-fit and stacked/validation content may require more space.
+    [[nodiscard]] double row_height() const noexcept;
+    void set_row_height(double height);
     [[nodiscard]] double scroll_offset() const noexcept;
     void set_scroll_offset(double offset);
     [[nodiscard]] double content_height() const noexcept;

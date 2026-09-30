@@ -2,10 +2,18 @@
 
 #include <cerrno>
 #include <cstring>
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <shellapi.h>
+#else
 #include <spawn.h>
 #include <sys/wait.h>
 
 extern char** environ;
+#endif
 
 namespace file_manager {
 namespace {
@@ -35,6 +43,9 @@ PlatformCommandResult validate(const PlatformCommandKind kind,
         ? (canonical_root / supplied_path.lexically_relative(supplied_root))
               .lexically_normal()
         : supplied_path;
+    if (lexical_path.filename().empty() && lexical_path != lexical_path.root_path()) {
+        lexical_path = lexical_path.parent_path();
+    }
     if (!path_is_within(canonical_root, lexical_path)) {
         return refuse("outside-protected-root",
                       "launch path is outside the protected root");
@@ -83,6 +94,22 @@ PlatformCommandResult make_platform_command_plan(
     plan.protected_root = std::move(canonical_root);
     plan.selected_path = std::move(path);
     plan.expected_identity = expected_identity;
+#if defined(_WIN32)
+    if (kind == PlatformCommandKind::open_terminal_here) {
+        wchar_t system_directory[MAX_PATH]{};
+        const UINT length = GetSystemDirectoryW(system_directory, MAX_PATH);
+        if (length == 0 || length >= MAX_PATH) {
+            return refuse("terminal-unavailable", "Windows system directory is unavailable");
+        }
+        const std::filesystem::path terminal =
+            std::filesystem::path(system_directory) / L"cmd.exe";
+        plan.executable = terminal;
+        plan.arguments = {"/D"};
+    } else {
+        plan.executable.clear();
+        plan.arguments.clear();
+    }
+#else
     plan.executable = "/usr/bin/open";
     if (kind == PlatformCommandKind::open_terminal_here) {
         plan.arguments = {"/usr/bin/open", "-a", "Terminal",
@@ -90,6 +117,7 @@ PlatformCommandResult make_platform_command_plan(
     } else {
         plan.arguments = {"/usr/bin/open", plan.selected_path.string()};
     }
+#endif
     return checked;
 }
 
@@ -100,6 +128,54 @@ PlatformCommandResult execute_platform_command(
     auto checked = validate(plan.kind, plan.protected_root, plan.selected_path,
                             plan.expected_identity, canonical_root, path);
     if (checked.code != "ok") return checked;
+#if defined(_WIN32)
+    PlatformCommandPlan expected_plan;
+    const PlatformCommandResult planned = make_platform_command_plan(
+        plan.kind, plan.protected_root, plan.selected_path,
+        plan.expected_identity, expected_plan);
+    if (planned.code != "ok") return planned;
+    if (plan.executable != expected_plan.executable ||
+        plan.arguments != expected_plan.arguments) {
+        return refuse("invalid-plan", "native launch plan failed closed");
+    }
+    if (plan.kind == PlatformCommandKind::open_terminal_here) {
+        STARTUPINFOW startup{};
+        startup.cb = sizeof(startup);
+        PROCESS_INFORMATION process{};
+        // The selected path is supplied only as lpCurrentDirectory. /D disables
+        // cmd AutoRun; no user path or command is inserted into shell input.
+        std::wstring command = L"\"" + plan.executable.wstring() + L"\" /D";
+        const BOOL created = CreateProcessW(plan.executable.c_str(), command.data(),
+            nullptr, nullptr, FALSE, CREATE_NEW_CONSOLE, nullptr, path.c_str(),
+            &startup, &process);
+        if (!created) {
+            return refuse("spawn-failed", "Windows terminal launch failed: " +
+                          std::to_string(GetLastError()));
+        }
+        CloseHandle(process.hThread);
+        CloseHandle(process.hProcess);
+        return {true, "ok", "Command Prompt opened at the selected directory", 0};
+    }
+    const HRESULT apartment = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED |
+                                                      COINIT_DISABLE_OLE1DDE);
+    if (FAILED(apartment) && apartment != RPC_E_CHANGED_MODE) {
+        return refuse("launcher-unavailable", "Windows shell initialization failed");
+    }
+    SHELLEXECUTEINFOW launch{};
+    launch.cbSize = sizeof(launch);
+    launch.fMask = SEE_MASK_FLAG_NO_UI | SEE_MASK_NOASYNC;
+    launch.lpVerb = L"open";
+    launch.lpFile = path.c_str();
+    launch.nShow = SW_SHOWNORMAL;
+    const BOOL launched = ShellExecuteExW(&launch);
+    const DWORD launch_error = launched ? ERROR_SUCCESS : GetLastError();
+    if (SUCCEEDED(apartment)) CoUninitialize();
+    if (!launched) {
+        return refuse("launcher-rejected", "Windows default Open failed: " +
+                      std::to_string(launch_error));
+    }
+    return {true, "ok", "Object handed to its default Windows application", 0};
+#else
     if (plan.executable != "/usr/bin/open" || plan.arguments.empty() ||
         plan.arguments.front() != "/usr/bin/open" ||
         plan.arguments.back() != path.string()) {
@@ -138,6 +214,7 @@ PlatformCommandResult execute_platform_command(
                 ? "Terminal opened at the selected directory"
                 : "Object handed to its default macOS application",
             0};
+#endif
 }
 
 } // namespace file_manager

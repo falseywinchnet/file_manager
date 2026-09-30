@@ -45,6 +45,7 @@ struct MacHostOptions {
     bool minimizable{true};
     std::function<void(std::function<void()> show,
                        std::function<void()> hide)> visibility_ready;
+    std::function<void(std::function<void()> toggle)> full_screen_ready;
     bool print_metrics_on_close{true};
     bool close_after_launch_for_testing{};
     std::uint32_t close_attempts_for_testing{1};

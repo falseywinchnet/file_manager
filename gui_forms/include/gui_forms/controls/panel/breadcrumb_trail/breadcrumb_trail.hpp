@@ -12,6 +12,8 @@
 
 namespace gui_forms {
 
+enum class BreadcrumbAppearance : std::uint8_t { plain, raised };
+
 struct BreadcrumbSegment final {
     std::string stable_id;
     std::string text;
@@ -29,6 +31,11 @@ public:
     explicit BreadcrumbTrail(StableId stable_id,
                              std::string editor_stable_id = {});
     void initialize_control_tree();
+
+    [[nodiscard]] FontSpec font() const noexcept { return font_; }
+    void set_font(FontSpec font);
+    [[nodiscard]] BreadcrumbAppearance appearance() const noexcept { return appearance_; }
+    void set_appearance(BreadcrumbAppearance appearance);
 
     [[nodiscard]] std::span<const BreadcrumbSegment> segments() const noexcept {
         return segments_;
@@ -117,6 +124,7 @@ private:
     [[nodiscard]] std::string_view visible_stable_id(const VisibleItem& item) const noexcept;
     void activate_visible(std::size_t index);
     void normalize_active();
+    void paint_raised(Painter& painter);
 
     std::vector<BreadcrumbSegment> segments_;
     std::vector<VisibleItem> visible_items_;
@@ -131,6 +139,7 @@ private:
     std::optional<std::size_t> hovered_visible_;
     std::optional<std::size_t> pressed_visible_;
     FontSpec font_{FontRole::control, 10.5, 400, false};
+    BreadcrumbAppearance appearance_{BreadcrumbAppearance::plain};
     bool editing_{};
     bool tab_completion_available_{};
     bool focused_{};

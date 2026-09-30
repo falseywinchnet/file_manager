@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <array>
+#include <new>
 #include <sstream>
 #include <type_traits>
 #include <unordered_set>
@@ -356,16 +357,55 @@ HostMonitorResult HostServices::query_monitors() {
 
 HostServiceStatus HostServices::set_cursor(CursorKind cursor) {
     HostServiceStatus status = validate_request(HostCapability::cursor);
-    if (!status.accepted() || snapshot_.cursor == cursor) {
+    if (!status.accepted()) {
         return status;
     }
     status = set_cursor_impl(cursor);
     if (status.accepted()) {
+        if (!cursor_applied_ || active_cursor_images_ || snapshot_.cursor != cursor)
+            ++snapshot_.cursor_updates;
+        cursor_applied_ = true;
+        active_cursor_images_.reset();
         snapshot_.cursor = cursor;
-        ++snapshot_.cursor_updates;
     } else {
         ++snapshot_.rejected_requests;
     }
+    return status;
+}
+
+HostServiceStatus HostServices::set_custom_cursor_impl(const CursorImagesPtr&, const CursorImage&) {
+    return {HostServiceError::unsupported};
+}
+
+HostServiceStatus HostServices::set_custom_cursor(CursorImagesPtr images,
+                                                 double scale, CursorKind fallback) {
+    HostServiceStatus status = validate_request(HostCapability::cursor);
+    if (!status.accepted()) return status;
+    if (!images) return set_cursor(fallback);
+    if (!std::isfinite(scale) || scale <= 0) scale = 1;
+    if (prepared_cursor_images_ != images || prepared_request_scale_ != scale) {
+        try {
+            prepared_cursor_ = (*images).rasterize(scale);
+            prepared_cursor_images_ = images;
+            prepared_request_scale_ = scale;
+        } catch (const std::exception&) { return set_cursor(fallback); }
+    }
+    const CursorImage& selected = prepared_cursor_;
+    if (failed_cursor_images_ == images && failed_cursor_scale_ == selected.scale)
+        return set_cursor(fallback);
+    try { status = set_custom_cursor_impl(images, selected); }
+    catch (const std::exception&) { status = {HostServiceError::backend_failure}; }
+    if (!status.accepted()) {
+        failed_cursor_images_ = images;
+        failed_cursor_scale_ = selected.scale;
+        return set_cursor(fallback);
+    }
+    if (active_cursor_images_ != images || active_cursor_scale_ != selected.scale)
+        ++snapshot_.cursor_updates;
+    active_cursor_images_ = images;
+    active_cursor_scale_ = selected.scale;
+    cursor_applied_ = true;
+    snapshot_.cursor = fallback;
     return status;
 }
 
@@ -444,6 +484,108 @@ HostServiceStatus HostServices::write_clipboard_text(std::string_view text_utf8)
     return status;
 }
 
+HostClipboardImageResult HostServices::read_clipboard_image() {
+    HostClipboardImageResult result;
+    result.status = validate_request(HostCapability::clipboard_images);
+    if (!result.status.accepted()) return result;
+    ++snapshot_.clipboard_reads;
+    try {
+        result = read_clipboard_image_impl();
+        if (result.status.accepted() && result.has_image) {
+            const HostImageError error = validate_host_image(result.image.view());
+            if (error != HostImageError::none) {
+                result.status.error = error == HostImageError::too_large
+                    ? HostServiceError::too_large : HostServiceError::backend_failure;
+            }
+        }
+    } catch (const std::bad_alloc&) {
+        result.status.error = HostServiceError::backend_failure;
+    }
+    if (!result.status.accepted()) {
+        result.image = {};
+        result.has_image = false;
+        ++snapshot_.rejected_requests;
+    } else {
+        if (!result.has_image) result.image = {};
+        snapshot_.clipboard_generation = result.generation;
+    }
+    return result;
+}
+
+HostClipboardFilesResult HostServices::read_clipboard_files() {
+    HostClipboardFilesResult result;
+    result.status = validate_request(HostCapability::clipboard);
+    if (!result.status.accepted()) return result;
+    ++snapshot_.clipboard_reads;
+    try {
+        result = read_clipboard_files_impl();
+        if (result.status.accepted()) {
+            std::size_t total = 0;
+            if (result.paths_utf8.size() > maximum_dialog_paths) {
+                result.status.error = HostServiceError::too_large;
+            }
+            for (const std::string& path : result.paths_utf8) {
+                if (path.size() > maximum_dialog_text_bytes ||
+                    path.size() > maximum_clipboard_text_bytes - total) {
+                    result.status.error = HostServiceError::too_large;
+                    break;
+                }
+                if (path.empty() || path.find('\0') != std::string::npos || !valid_utf8(path)) {
+                    result.status.error = HostServiceError::invalid_utf8;
+                    break;
+                }
+                total += path.size();
+            }
+        }
+    } catch (const std::bad_alloc&) {
+        result.status.error = HostServiceError::backend_failure;
+    }
+    if (!result.status.accepted()) {
+        result.paths_utf8.clear();
+        ++snapshot_.rejected_requests;
+    } else {
+        snapshot_.clipboard_generation = result.generation;
+    }
+    return result;
+}
+
+HostClipboardFilesResult HostServices::read_clipboard_files_impl() {
+    return {};
+}
+
+HostServiceStatus HostServices::write_clipboard_image(HostImageView image) {
+    HostServiceStatus status = validate_request(HostCapability::clipboard_images);
+    if (!status.accepted()) return status;
+    const HostImageError error = validate_host_image(image);
+    if (error != HostImageError::none) {
+        ++snapshot_.rejected_requests;
+        return {error == HostImageError::too_large
+            ? HostServiceError::too_large : HostServiceError::invalid_argument};
+    }
+    try {
+        status = write_clipboard_image_impl(image);
+    } catch (const std::bad_alloc&) {
+        status.error = HostServiceError::backend_failure;
+    }
+    if (status.accepted()) {
+        ++snapshot_.clipboard_writes;
+        ++snapshot_.clipboard_generation;
+    } else {
+        ++snapshot_.rejected_requests;
+    }
+    return status;
+}
+
+HostClipboardImageResult HostServices::read_clipboard_image_impl() {
+    HostClipboardImageResult result;
+    result.status.error = HostServiceError::unsupported;
+    return result;
+}
+
+HostServiceStatus HostServices::write_clipboard_image_impl(HostImageView) {
+    return {HostServiceError::unsupported};
+}
+
 HostDialogResult HostServices::show_dialog(const HostDialogRequest& request) {
     HostDialogResult result;
     result.request_id = request.request_id;
@@ -469,10 +611,12 @@ HostDialogResult HostServices::show_dialog(const HostDialogRequest& request) {
     snapshot_.modal_depth = static_cast<std::uint32_t>(modal_stack_.size());
     snapshot_.maximum_modal_depth =
         std::max(snapshot_.maximum_modal_depth, snapshot_.modal_depth);
-    modal_changed_.emit(HostModalTransition{request.request_id,
-                                            snapshot_.modal_depth, true});
     try {
-        result = show_dialog_impl(request);
+        modal_changed_.emit(HostModalTransition{request.request_id,
+                                                snapshot_.modal_depth, true});
+        if (!snapshot_.shutdown) {
+            result = show_dialog_impl(request);
+        }
     } catch (...) {
         result = {{HostServiceError::backend_failure}, request.request_id,
                   HostMessageDialogResult{}};
@@ -480,8 +624,13 @@ HostDialogResult HostServices::show_dialog(const HostDialogRequest& request) {
 
     modal_stack_.pop_back();
     snapshot_.modal_depth = static_cast<std::uint32_t>(modal_stack_.size());
-    modal_changed_.emit(HostModalTransition{request.request_id,
-                                            snapshot_.modal_depth, false});
+    try {
+        modal_changed_.emit(HostModalTransition{request.request_id,
+                                                snapshot_.modal_depth, false});
+    } catch (...) {
+        result = {{HostServiceError::backend_failure}, request.request_id,
+                  HostMessageDialogResult{}};
+    }
 
     if (snapshot_.shutdown) {
         result.status.error = HostServiceError::after_shutdown;
@@ -561,6 +710,10 @@ void HostServices::shutdown() noexcept {
     }
     snapshot_.shutdown = true;
     shutdown_impl();
+    active_cursor_images_.reset();
+    failed_cursor_images_.reset();
+    prepared_cursor_images_.reset();
+    prepared_cursor_ = {};
 }
 
 HostServicesSnapshot HostServices::snapshot() const {

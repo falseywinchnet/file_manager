@@ -1,9 +1,12 @@
+#include "file_manager/platform_paths.hpp"
 #include "file_manager/filesystem_model.hpp"
+#include "native_file.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cctype>
 #include <chrono>
+#include <ctime>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -25,12 +28,13 @@ std::string stable_id_for(const std::filesystem::path& path,
         std::ostringstream stream;
         stream << "fm.object." << std::hex << std::setw(16) << std::setfill('0')
                << identity.device << '.' << std::setw(16) << identity.inode;
+        if (identity.inode_high != 0) stream << '.' << std::setw(16) << identity.inode_high;
         return stream.str();
     }
     constexpr std::uint64_t offset = 14695981039346656037ULL;
     constexpr std::uint64_t prime = 1099511628211ULL;
     std::uint64_t hash = offset;
-    const auto bytes = path.generic_string();
+    const auto bytes = path_generic_utf8(path);
     for (const unsigned char value : bytes) {
         hash ^= value;
         hash *= prime;
@@ -41,6 +45,7 @@ std::string stable_id_for(const std::filesystem::path& path,
     return stream.str();
 }
 
+#if !defined(_WIN32)
 std::filesystem::file_type file_type_from_mode(const mode_t mode) {
     if (S_ISREG(mode)) return std::filesystem::file_type::regular;
     if (S_ISDIR(mode)) return std::filesystem::file_type::directory;
@@ -51,6 +56,8 @@ std::filesystem::file_type file_type_from_mode(const mode_t mode) {
     if (S_ISSOCK(mode)) return std::filesystem::file_type::socket;
     return std::filesystem::file_type::unknown;
 }
+
+#endif
 
 bool has_symlink_component(const std::filesystem::path& root,
                            const std::filesystem::path& candidate) {
@@ -63,6 +70,11 @@ bool has_symlink_component(const std::filesystem::path& root,
         const auto status = std::filesystem::symlink_status(cursor, error);
         if (error) return false;
         if (std::filesystem::is_symlink(status)) return true;
+#if defined(_WIN32)
+        const DWORD attributes = GetFileAttributesW(cursor.c_str());
+        if (attributes != INVALID_FILE_ATTRIBUTES &&
+            (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) return true;
+#endif
     }
     return false;
 }
@@ -71,7 +83,7 @@ EntryKind kind_for(const std::filesystem::directory_entry& entry,
                    const std::filesystem::file_status status) {
     if (std::filesystem::is_symlink(status)) return EntryKind::symlink;
     if (std::filesystem::is_directory(status)) return EntryKind::folder;
-    const auto extension = ascii_lower(entry.path().extension().string());
+    const auto extension = ascii_lower(path_utf8(entry.path().extension()));
     static constexpr std::array image_extensions{
         ".png", ".jpg", ".jpeg", ".gif", ".webp", ".tiff", ".heic"};
     static constexpr std::array archive_extensions{
@@ -94,11 +106,9 @@ EntryKind kind_for(const std::filesystem::directory_entry& entry,
 
 std::string modified_text(const std::filesystem::directory_entry& entry) {
     std::error_code error;
-    const auto time = entry.last_write_time(error);
+    const std::filesystem::file_time_type time = entry.last_write_time(error);
     if (error) return "Unavailable";
-    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(
-        time.time_since_epoch()).count();
-    return "filesystem time " + std::to_string(seconds);
+    return format_modified_time(time);
 }
 
 } // namespace
@@ -172,7 +182,7 @@ std::optional<NavigationTarget> resolve_navigation_target(
     if (requested.empty() || admitted_roots.empty()) return {};
 
     auto expanded = requested;
-    const auto text = requested.string();
+    const auto text = path_utf8(requested);
     if (text == "~") {
         expanded = home_root;
     } else if (text.starts_with("~/")) {
@@ -203,6 +213,16 @@ std::optional<NavigationTarget> resolve_navigation_target(
 }
 
 ObjectIdentity observe_identity(const std::filesystem::path& path) {
+#if defined(_WIN32)
+    const HANDLE handle = CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+        OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS,
+        nullptr);
+    if (handle == INVALID_HANDLE_VALUE) return {};
+    const ObjectIdentity result = identity_from_handle(handle);
+    CloseHandle(handle);
+    return result;
+#else
     struct stat observed {};
     if (::lstat(path.c_str(), &observed) != 0) return {};
     const auto modified_nanoseconds =
@@ -218,12 +238,17 @@ ObjectIdentity observe_identity(const std::filesystem::path& path) {
             static_cast<std::uint64_t>(observed.st_size),
             modified_nanoseconds,
             file_type_from_mode(observed.st_mode)};
+#endif
 }
 
 bool object_is_hidden(const std::filesystem::path& path,
                       const std::string_view name) {
     if (!name.empty() && name.front() == '.') return true;
-#if defined(__APPLE__)
+#if defined(_WIN32)
+    const DWORD attributes = GetFileAttributesW(path.c_str());
+    return attributes != INVALID_FILE_ATTRIBUTES &&
+        (attributes & FILE_ATTRIBUTE_HIDDEN) != 0;
+#elif defined(__APPLE__)
     struct stat observed {};
     return ::lstat(path.c_str(), &observed) == 0 &&
         (observed.st_flags & UF_HIDDEN) != 0;
@@ -287,7 +312,7 @@ DirectorySnapshot read_directory(const std::filesystem::path& root,
                 result.error = "location exceeds the 50,000-item frontend bound";
                 break;
             }
-            const auto name = entry.path().filename().string();
+            const auto name = path_utf8(entry.path().filename());
             if (!show_hidden && object_is_hidden(entry.path(), name)) continue;
             if (!needle.empty() && ascii_lower(name).find(needle) == std::string::npos) {
                 continue;
@@ -303,6 +328,9 @@ DirectorySnapshot read_directory(const std::filesystem::path& root,
             item.stable_id = stable_id_for(item.path, item.identity);
             item.name = name;
             item.kind = kind_for(entry, status);
+            if (item.identity.type == std::filesystem::file_type::symlink) {
+                item.kind = EntryKind::symlink;
+            }
             item.directory = item.kind == EntryKind::folder;
             if (item.directory) {
                 item.secondary_text = "Folder";
@@ -330,6 +358,21 @@ DirectorySnapshot read_directory(const std::filesystem::path& root,
         result.error = error.what();
     }
     return result;
+}
+
+std::string format_modified_time(const std::filesystem::file_time_type time) {
+    const std::chrono::system_clock::time_point system_time =
+        std::chrono::file_clock::to_sys(time);
+    const std::time_t seconds = std::chrono::system_clock::to_time_t(system_time);
+    std::tm local{};
+#if defined(_WIN32)
+    if (localtime_s(&local, &seconds) != 0) return "Unavailable";
+#else
+    if (localtime_r(&seconds, &local) == nullptr) return "Unavailable";
+#endif
+    char text[32]{};
+    if (std::strftime(text, sizeof(text), "%Y-%m-%d %H:%M", &local) == 0) return "Unavailable";
+    return text;
 }
 
 std::string format_bytes(const std::uintmax_t bytes) {

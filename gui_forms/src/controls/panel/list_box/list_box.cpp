@@ -170,9 +170,7 @@ void ListBox::select_index(std::size_t index, bool extend, bool toggle) {
         throw std::out_of_range("ListBox selection index is outside the collection");
     }
     if (selection_mode_ == ListSelectionMode::one) {
-        selected_ == std::vector<std::size_t>{index}
-            ? apply_selection(selected_, index)
-            : apply_selection({index}, index);
+        apply_selection({index}, index);
         anchor_index_ = index;
     } else if (extend && anchor_index_) {
         std::vector<std::size_t> next;

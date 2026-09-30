@@ -64,6 +64,18 @@ public:
     [[nodiscard]] std::optional<FontFaceId> register_fallback_typeface(
         std::uint16_t weight, bool italic,
         std::span<const std::byte> encoded, std::uint32_t face_index = 0U);
+    // Shared immutable bytes let the rasterizer and shaper retain one font
+    // allocation. Span overloads continue to take an independent owned copy.
+    [[nodiscard]] std::optional<FontFaceId> register_shared_typeface(
+        std::optional<FontRole> role, std::uint16_t weight, bool italic,
+        std::shared_ptr<const std::vector<std::byte>> encoded,
+        std::uint32_t face_index = 0U);
+    // The owner keeps the immutable span alive, including file mappings. This
+    // avoids a private heap copy of every bundled font in each native window.
+    [[nodiscard]] std::optional<FontFaceId> register_owned_typeface(
+        std::optional<FontRole> role, std::uint16_t weight, bool italic,
+        std::span<const std::byte> encoded, std::shared_ptr<const void> owner,
+        std::uint32_t face_index = 0U);
     [[nodiscard]] ShapedText shape(std::string_view utf8, FontSpec font);
     [[nodiscard]] ResolvedTextLayout resolve(std::string_view utf8,
                                              FontSpec font);

@@ -1,12 +1,11 @@
+#include "file_manager/platform_paths.hpp"
 #include "file_manager/preview.hpp"
+#include "native_file.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cerrno>
 #include <cstring>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 namespace file_manager {
 namespace {
@@ -88,17 +87,6 @@ std::string readable_text(std::string value, const bool truncated) {
     return value;
 }
 
-class Descriptor final {
-public:
-    explicit Descriptor(const int value) noexcept : value_(value) {}
-    ~Descriptor() { if (value_ >= 0) ::close(value_); }
-    Descriptor(const Descriptor&) = delete;
-    Descriptor& operator=(const Descriptor&) = delete;
-    [[nodiscard]] int get() const noexcept { return value_; }
-private:
-    int value_{};
-};
-
 } // namespace
 
 PreviewResult load_preview(const std::filesystem::path& protected_root,
@@ -131,7 +119,7 @@ PreviewResult load_preview(const std::filesystem::path& protected_root,
         return terminal(PreviewKind::refused, "symlink-refused",
                         "preview never follows a symbolic link", path);
     }
-    const auto extension = path.extension().string();
+    const auto extension = path_utf8(path.extension());
     std::string lowered = extension;
     std::transform(lowered.begin(), lowered.end(), lowered.begin(),
                    [](const unsigned char value) {
@@ -145,18 +133,16 @@ PreviewResult load_preview(const std::filesystem::path& protected_root,
                         path);
     }
 
-    const Descriptor descriptor(::open(path.c_str(), O_RDONLY | O_CLOEXEC |
-                                                   O_NOFOLLOW));
-    if (descriptor.get() < 0) {
+    NativeReadFile descriptor(path);
+    if (!descriptor.available()) {
         return terminal(PreviewKind::unavailable, "open-failed",
-            std::string("cannot open preview: ") + std::strerror(errno), path);
+            std::string("cannot open preview: ") + descriptor.error_message(), path);
     }
-    struct stat before {};
-    if (::fstat(descriptor.get(), &before) != 0 || !S_ISREG(before.st_mode)) {
+    const ObjectIdentity opened = descriptor.identity();
+    if (opened.type != std::filesystem::file_type::regular) {
         return terminal(PreviewKind::refused, "not-regular-file",
                         "preview accepts one regular file", path);
     }
-    const auto opened = observe_identity(path);
     if (!opened.available() ||
         (expected_identity.available() &&
          !expected_identity.same_revision(opened))) {
@@ -165,7 +151,7 @@ PreviewResult load_preview(const std::filesystem::path& protected_root,
     }
     const auto limit = png ? maximum_png_preview_bytes
                            : maximum_text_preview_bytes;
-    const auto total = static_cast<std::uint64_t>(before.st_size);
+    const auto total = opened.size;
     if (png && total > limit) {
         return terminal(PreviewKind::unsupported, "image-too-large",
                         "PNG preview exceeds the 16 MiB encoded-byte bound",
@@ -179,23 +165,20 @@ PreviewResult load_preview(const std::filesystem::path& protected_root,
             return terminal(PreviewKind::unavailable, "cancelled",
                             "preview cancelled", path);
         }
-        const auto count = ::read(descriptor.get(), bytes.data() + offset,
-                                  bytes.size() - offset);
+        const std::ptrdiff_t count = descriptor.read(bytes.data() + offset,
+                                                     bytes.size() - offset);
         if (count < 0) {
-            if (errno == EINTR) continue;
             return terminal(PreviewKind::unavailable, "read-failed",
-                std::string("cannot read preview: ") + std::strerror(errno),
+                std::string("cannot read preview: ") + descriptor.error_message(),
                 path);
         }
         if (count == 0) break;
         offset += static_cast<std::size_t>(count);
     }
     bytes.resize(offset);
-    struct stat after {};
-    if (::fstat(descriptor.get(), &after) != 0 ||
-        !opened.same_revision(observe_identity(path)) ||
-        before.st_dev != after.st_dev || before.st_ino != after.st_ino ||
-        before.st_size != after.st_size) {
+    const ObjectIdentity after = descriptor.identity();
+    if (!opened.same_revision(after) ||
+        !opened.same_revision(observe_identity(path))) {
         return terminal(PreviewKind::changed, "changed-during-read",
                         "file changed or was replaced during preview", path);
     }

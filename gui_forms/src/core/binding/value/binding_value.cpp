@@ -201,8 +201,8 @@ std::optional<std::int64_t> enum_numeric_value(
         return (*item).type_name == descriptor.type_name
             ? std::optional<std::int64_t>{(*item).value} : std::nullopt;
     }
-    if (const long long* item = std::get_if<std::int64_t>(&value)) return *item;
-    if (const unsigned long long* item = std::get_if<std::uint64_t>(&value)) {
+    if (const std::int64_t* item = std::get_if<std::int64_t>(&value)) return *item;
+    if (const std::uint64_t* item = std::get_if<std::uint64_t>(&value)) {
         return *item <= static_cast<std::uint64_t>(
                             std::numeric_limits<std::int64_t>::max())
             ? std::optional<std::int64_t>{static_cast<std::int64_t>(*item)}

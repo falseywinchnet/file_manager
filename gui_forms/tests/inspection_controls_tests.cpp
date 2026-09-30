@@ -3,11 +3,13 @@
 #include "gui_forms/detail/bound_member_function.hpp"
 #include "gui_forms/detail/property_binding_adapters.hpp"
 #include "support/named_callbacks.hpp"
+#include "support/typography_painter.hpp"
 
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -1085,6 +1087,108 @@ void test_recursive_object_and_collection_projection_and_mutation() {
     static_cast<void>(changed);
 }
 
+void test_property_typography_preserves_editors_and_updates_geometry() {
+    const std::shared_ptr<PropertyList> properties = make_properties();
+    Window window(properties, {440.0, 500.0});
+    window.perform_layout();
+    require((*properties).font() == FontSpec{FontRole::content, 9.5, 400, false} &&
+                (*properties).row_height() == 29.0,
+            "property list must retain its existing font and row defaults");
+    const std::shared_ptr<TextBox> name = std::dynamic_pointer_cast<TextBox>(
+        (*properties).editor("inspection.name"));
+    require(name && (*name).font().size == 10.0,
+            "default property editor typography must remain unchanged");
+    require(window.request_focus(name), "property editor must accept focus");
+    (*name).select_all();
+    require(window.dispatch_text({"Uncommitted name"}), "draft edit must be accepted");
+    (*name).select(Utf8Offset(2U), Utf8Offset(7U));
+    const TextSelection selection = (*name).selection();
+    const double old_height = (*properties).content_height();
+    (*properties).set_row_height(40.0);
+    window.perform_layout();
+    require((*properties).row_height() == 40.0 &&
+                (*properties).content_height() == old_height + 44.0,
+            "four property rows must reflect the explicit row-height increase");
+
+    const std::shared_ptr<NumericUpDown> numeric = make_control<NumericUpDown>(
+        StableId("font.numeric"));
+    (*numeric).set_value(42.0);
+    require((*properties).replace_editor("inspection.location", numeric),
+            "numeric replacement editor must attach");
+    const std::shared_ptr<TextBox> numeric_text = (*numeric).editor();
+    (*numeric_text).set_text("-");
+    (*numeric_text).select_all();
+    const TextSelection numeric_selection = (*numeric_text).selection();
+    std::uint64_t changes{};
+    SubscriptionToken changed = (*properties).value_changed().subscribe(
+        callbacks::IncrementCounter<std::uint64_t, const PropertyValueChange&>(changes));
+    const FontSpec chosen{FontRole::content, 17.0, 500, true, 0.5};
+    (*properties).set_font(chosen);
+    window.perform_layout();
+    require((*properties).font() == chosen && (*name).font() == chosen &&
+                (*numeric_text).font() == chosen &&
+                (*properties).editor("inspection.name") == name &&
+                (*properties).editor("inspection.location") == numeric,
+            "font updates must reach text and numeric editors without replacing them");
+    require((*name).text() == "Uncommitted name" && (*name).selection() == selection &&
+                (*name).can_undo() && window.focused_control() == name &&
+                (*numeric_text).text() == "-" &&
+                (*numeric_text).selection() == numeric_selection &&
+                (*numeric).value() == 42.0 && changes == 0U,
+            "typography changes must preserve draft, selection, focus, undo and numeric value without publishing edits");
+    test_support::TypographyPainter painter;
+    (*properties).on_paint(painter, {0.0, 0.0, 440.0, 500.0});
+    const test_support::PaintedText* label = painter.find("Kind");
+    const test_support::PaintedText* value = painter.find("PNG image");
+    require(label && value && (*label).font == chosen && (*value).font == chosen,
+            "read-only property names and values must paint with the selected font");
+    const std::vector<SemanticNode> nodes = (*properties).semantic_virtual_children();
+    const SemanticNode* kind = find_semantic(nodes, "inspection.kind");
+    require(kind && (*kind).bounds.height == 40.0,
+            "property semantic row bounds must agree with row-height geometry");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::escape}) &&
+                (*name).text() == "Facade Study.png",
+            "font changes must retain the original text commit/cancel subscription");
+
+    const std::shared_ptr<NumericUpDown> later_numeric = make_control<NumericUpDown>(
+        StableId("font.later.numeric"));
+    require((*properties).replace_editor("inspection.location", later_numeric) &&
+                (*(*later_numeric).editor()).font() == chosen,
+            "future replacement numeric editors must inherit the selected font");
+    const std::vector<PropertyGroupSpec> groups = (*properties).groups();
+    (*properties).set_groups(groups);
+    const std::shared_ptr<TextBox> future = std::dynamic_pointer_cast<TextBox>(
+        (*properties).editor("inspection.name"));
+    require(future && (*future).font() == chosen,
+            "future stock text editors must inherit the selected font");
+
+    const double invalid[] = {0.0, -1.0, std::numeric_limits<double>::infinity(),
+                              std::numeric_limits<double>::quiet_NaN()};
+    for (const double metric : invalid) {
+        bool font_rejected{};
+        FontSpec malformed = chosen;
+        malformed.size = metric;
+        try { (*properties).set_font(malformed); }
+        catch (const std::invalid_argument&) { font_rejected = true; }
+        bool height_rejected{};
+        try { (*properties).set_row_height(metric); }
+        catch (const std::invalid_argument&) { height_rejected = true; }
+        require(font_rejected && height_rejected && (*properties).font() == chosen &&
+                    (*properties).row_height() == 40.0,
+                "invalid property font and row metrics must be rejected without mutation");
+    }
+    FontSpec malformed = chosen;
+    malformed.letter_spacing = std::numeric_limits<double>::quiet_NaN();
+    bool tracking_rejected{};
+    try { (*properties).set_font(malformed); }
+    catch (const std::invalid_argument&) { tracking_rejected = true; }
+    bool height_rejected{};
+    try { (*properties).set_row_height(4097.0); }
+    catch (const std::invalid_argument&) { height_rejected = true; }
+    require(tracking_rejected && height_rejected,
+            "property typography must reject invalid tracking and excessive row height");
+}
+
 } // namespace
 
 int main() {
@@ -1098,6 +1202,7 @@ int main() {
         test_multiple_owner_atomic_property_commit();
         test_default_flags_and_color_property_editors();
         test_recursive_object_and_collection_projection_and_mutation();
+        test_property_typography_preserves_editors_and_updates_geometry();
         std::cout << "gui_forms_inspection_controls_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

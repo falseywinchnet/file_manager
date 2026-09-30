@@ -1,3 +1,4 @@
+#include "fixture_links.hpp"
 #include "file_manager/file_operations.hpp"
 
 #include <filesystem>
@@ -74,7 +75,7 @@ int main() {
         area.source(), area.quarantine(), true);
 
     const auto linked_root = area.source().parent_path() / "source-link";
-    std::filesystem::create_directory_symlink(area.source(), linked_root);
+    if (create_fixture_link(area.source(), linked_root, true)) {
     bool rejected_link_route = false;
     try {
         file_manager::FileOperationService rejected(
@@ -85,6 +86,7 @@ int main() {
     if (!require(rejected_link_route,
                  "mutation profile must reject a symlink-routed root")) return 1;
 
+    }
     const auto created = operations.create_folder(area.source());
     if (!require(created.succeeded() && created.undo_available &&
                  std::filesystem::is_directory(created.resulting_path),
@@ -138,14 +140,14 @@ int main() {
     const auto copy_tree = area.source() / "copy-tree";
     std::filesystem::create_directories(copy_tree / "nested");
     write_file(copy_tree / "nested" / "value.txt", "tree value");
-    std::filesystem::create_symlink(area.outside(), copy_tree / "outside-link");
+    const bool copy_link_available = create_fixture_link(area.outside(), copy_tree / "outside-link");
     const auto copied_tree = operations.copy_object(
         copy_tree, file_manager::observe_identity(copy_tree), copy_destination);
     if (!require(copied_tree.succeeded() &&
                  std::filesystem::exists(copy_destination / "copy-tree" /
                                          "nested" / "value.txt") &&
-                 std::filesystem::is_symlink(copy_destination / "copy-tree" /
-                                             "outside-link"),
+                 (!copy_link_available || std::filesystem::is_symlink(copy_destination / "copy-tree" /
+                                             "outside-link")),
                  "directory copy must preserve nested files and symlink leaves")) return 1;
     const auto recursive_copy = operations.copy_object(
         copy_tree, file_manager::observe_identity(copy_tree), copy_tree / "nested");
@@ -290,7 +292,7 @@ int main() {
 
     write_file(area.outside(), "outside target");
     const auto link = area.source() / "outside-link";
-    std::filesystem::create_symlink(area.outside(), link);
+    if (create_fixture_link(area.outside(), link)) {
     const auto link_identity = file_manager::observe_identity(link);
     const auto quarantined_link = operations.quarantine_object(link, link_identity);
     if (!require(quarantined_link.succeeded() &&
@@ -303,6 +305,7 @@ int main() {
                  std::filesystem::exists(area.outside()),
                  "undo must restore the symlink leaf and preserve its target")) return 1;
 
+    }
     const auto tree = area.source() / "tree";
     std::filesystem::create_directories(tree / "nested");
     write_file(tree / "nested" / "value.txt", "value");

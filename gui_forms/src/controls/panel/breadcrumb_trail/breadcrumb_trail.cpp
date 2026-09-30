@@ -35,6 +35,7 @@ void BreadcrumbTrail::initialize_control_tree() {
     (*editor_).set_placeholder_text("Enter an exact path");
     (*editor_).set_accessible_name("Exact location path");
     (*editor_).set_visible(false);
+    (*editor_).set_font(font_);
     add_child(editor_);
     const std::weak_ptr<BreadcrumbTrail> weak =
         std::static_pointer_cast<BreadcrumbTrail>(shared_from_this());
@@ -42,6 +43,30 @@ void BreadcrumbTrail::initialize_control_tree() {
         *this, EditorCommitCallback{weak});
     editor_cancel_ = (*editor_).cancelled().subscribe(
         *this, EditorCancelCallback{weak});
+}
+
+void BreadcrumbTrail::set_font(FontSpec font) {
+    require_mutable();
+    if (!valid_font_spec(font)) throw std::invalid_argument("BreadcrumbTrail font is invalid");
+    if (font_ == font) return;
+    font_ = font;
+    if (editor_) (*editor_).set_font(font);
+    rebuild_layout(committed_arranged_bounds().width, committed_arranged_bounds().height);
+    normalize_active();
+    invalidate(Dirty::measure | Dirty::layout | Dirty::paint | Dirty::hit_test |
+               Dirty::semantics | Dirty::accessibility);
+}
+
+void BreadcrumbTrail::set_appearance(BreadcrumbAppearance appearance) {
+    require_mutable();
+    if (appearance != BreadcrumbAppearance::plain && appearance != BreadcrumbAppearance::raised) {
+        throw std::invalid_argument("BreadcrumbTrail appearance is invalid");
+    }
+    if (appearance_ == appearance) return;
+    appearance_ = appearance;
+    rebuild_layout(committed_arranged_bounds().width, committed_arranged_bounds().height);
+    normalize_active();
+    invalidate(Dirty::measure | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
 
 void BreadcrumbTrail::EditorCommitCallback::operator()(
@@ -155,7 +180,8 @@ double BreadcrumbTrail::natural_width(
     }
     const double text_width =
         resolve_text_layout_utf8(segment.text, font).logical_size.width;
-    return std::clamp(23.0 + text_width, 38.0, 220.0);
+    const double padding = appearance_ == BreadcrumbAppearance::raised ? 33.0 : 23.0;
+    return std::clamp(padding + text_width, 38.0, 220.0);
 }
 
 void BreadcrumbTrail::rebuild_layout(double width, double height) {
@@ -276,6 +302,10 @@ std::string_view BreadcrumbTrail::visible_stable_id(
 void BreadcrumbTrail::on_paint(Painter& painter, Rect damage) {
     Panel::on_paint(painter, damage);
     if (editing_) return;
+    if (appearance_ == BreadcrumbAppearance::raised) {
+        paint_raised(painter);
+        return;
+    }
     const FontSpec font = effective_font(font_);
     const double baseline = snap_text_baseline(std::max(
         font.size, committed_arranged_bounds().height * 0.5 + font.size * 0.34));
@@ -355,12 +385,111 @@ void BreadcrumbTrail::on_paint(Painter& painter, Rect damage) {
     painter.restore();
 }
 
+void BreadcrumbTrail::paint_raised(Painter& painter) {
+    const FontSpec font = effective_font(font_);
+    const double baseline = snap_text_baseline(std::max(
+        font.size, committed_arranged_bounds().height * 0.5 + font.size * 0.34));
+    painter.save();
+    painter.clip_rect(local_bounds());
+    // Back-to-front preserves the complete pointed nose of each preceding
+    // segment. Nine bounded strips express the tip through the public Painter
+    // vocabulary; every backend receives the same retained geometry.
+    for (std::size_t remaining = visible_items_.size(); remaining > 0U; --remaining) {
+        const std::size_t index = remaining - 1U;
+        const VisibleItem& item = visible_items_[index];
+        const Rect bounds = item.bounds;
+        if (bounds.width <= 0.0 || bounds.height <= 0.0) continue;
+        const bool current = item.kind == VisibleKind::segment &&
+            item.segment_index + 1U == segments_.size();
+        const bool active = focused_ && visible_stable_id(item) == active_id_;
+        const bool hot = hovered_visible_ == index || active;
+        const bool pressed = pressed_visible_ == index;
+        const bool terminal = item.kind == VisibleKind::edit;
+        const double tip = terminal ? 0.0 : std::min(edge_overlap_, bounds.width * 0.25);
+        const double shoulder = bounds.x + bounds.width - tip;
+        const double middle = bounds.y + bounds.height * 0.5;
+        Color top = style().highlight;
+        Color bottom = current ? style().accent_light : style().face;
+        if (hot) bottom = style().accent_light;
+        if (pressed) { top = style().face; bottom = style().face_light; }
+        if (terminal) { top = style().accent; bottom = style().dark_border; }
+        const std::array<GradientStop, 3> stops{{
+            {0.0, top}, {0.45, pressed ? bottom : style().face_light}, {1.0, bottom}}};
+        const std::array<GradientStop, 2> terminal_stops{{{0.0, top}, {1.0, bottom}}};
+        const Point start{bounds.x, bounds.y};
+        const Point end{bounds.x, bounds.y + bounds.height};
+        const Rect body{bounds.x, bounds.y, bounds.width - tip, bounds.height};
+        if (terminal) painter.fill_linear_gradient(body, start, end, terminal_stops);
+        else painter.fill_linear_gradient(body, start, end, stops);
+        for (unsigned strip = 0U; strip < 9U && tip > 0.0; ++strip) {
+            const double left = tip * static_cast<double>(strip) / 9.0;
+            const double right = tip * static_cast<double>(strip + 1U) / 9.0;
+            const double inset = bounds.height * 0.5 * left / tip;
+            const Rect slice{shoulder + left, bounds.y + inset,
+                             right - left, bounds.height - inset * 2.0};
+            painter.fill_linear_gradient(slice, start, end, stops);
+        }
+        if (!terminal) {
+            const std::array<GradientStop, 4> grain{{
+                {0.0, {255, 255, 255, 18}}, {0.32, {255, 255, 255, 18}},
+                {0.34, {255, 255, 255, 0}}, {1.0, {255, 255, 255, 0}}}};
+            painter.fill_linear_gradient_spread(body, {bounds.x, bounds.y},
+                {bounds.x + 3.0, bounds.y + 3.0}, grain, GradientSpreadMode::repeat);
+        }
+        painter.draw_line({bounds.x, bounds.y + 0.5}, {shoulder, bounds.y + 0.5},
+                          pressed ? style().dark_border : style().highlight, 1.0);
+        painter.draw_line({bounds.x, bounds.y + bounds.height - 0.5},
+                          {shoulder, bounds.y + bounds.height - 0.5}, style().border, 1.0);
+        if (!terminal) {
+            painter.draw_line({shoulder, bounds.y + 0.5},
+                              {bounds.x + bounds.width - 0.5, middle}, style().dark_border, 1.0);
+            painter.draw_line({bounds.x + bounds.width - 0.5, middle},
+                              {shoulder, bounds.y + bounds.height - 0.5}, style().dark_border, 1.0);
+            painter.draw_line({shoulder - 1.0, bounds.y + 1.0},
+                              {bounds.x + bounds.width - 2.0, middle}, style().highlight, 1.0);
+        }
+        std::string_view text = terminal ? "./" : "…";
+        Color foreground = terminal ? style().highlight : style().text;
+        if (item.kind == VisibleKind::segment) {
+            text = segments_[item.segment_index].text;
+            if (!segments_[item.segment_index].enabled) foreground = style().disabled_text;
+        }
+        FontSpec item_font = font;
+        if (current || terminal) item_font.weight = 700;
+        const double left_padding = index == 0U || terminal ? 9.0 : edge_overlap_ + 5.0;
+        const double text_x = bounds.x + left_padding;
+        painter.save();
+        painter.clip_rect({text_x, bounds.y + 1.0,
+                           std::max(0.0, shoulder - text_x - 2.0), std::max(0.0, bounds.height - 2.0)});
+        painter.draw_text_utf8({text_x, baseline}, text, item_font, foreground);
+        painter.restore();
+        if (active) painter.stroke_rect({bounds.x + left_padding - 2.0, bounds.y + 2.5,
+            std::max(0.0, shoulder - bounds.x - left_padding), std::max(0.0, bounds.height - 5.0)}, style().accent, 1.0);
+    }
+    painter.restore();
+}
+
 std::optional<std::size_t> BreadcrumbTrail::visible_index_at(
     Point absolute) const noexcept {
     const Rect bounds = absolute_bounds();
     const Point local{absolute.x - bounds.x, absolute.y - bounds.y};
     for (std::size_t index = visible_items_.size(); index > 0U; --index) {
-        if (visible_items_[index - 1U].bounds.contains(local)) return index - 1U;
+        const VisibleItem& item = visible_items_[index - 1U];
+        if (!item.bounds.contains(local)) continue;
+        if (appearance_ == BreadcrumbAppearance::raised && item.kind != VisibleKind::edit) {
+            const double half_height = item.bounds.height * 0.5;
+            const double tip = std::min(edge_overlap_, item.bounds.width * 0.25);
+            const double distance = std::abs(local.y - item.bounds.y - half_height);
+            const double point_x = item.bounds.x + item.bounds.width - tip * distance / half_height;
+            if (local.x > point_x) continue;
+            if (index > 1U) {
+                const Rect previous = visible_items_[index - 2U].bounds;
+                const double previous_tip = std::min(edge_overlap_, previous.width * 0.25);
+                const double previous_edge = previous.x + previous.width - previous_tip * distance / half_height;
+                if (local.x < previous_edge) continue;
+            }
+        }
+        return index - 1U;
     }
     return {};
 }

@@ -149,6 +149,8 @@ const char* cursor_kind_name(CursorKind cursor) noexcept {
     case CursorKind::resize_vertical: return "resize_vertical";
     case CursorKind::wait: return "wait";
     case CursorKind::forbidden: return "forbidden";
+    case CursorKind::resize_diagonal_down: return "resize_diagonal_down";
+    case CursorKind::resize_diagonal_up: return "resize_diagonal_up";
     }
     return "unknown";
 }

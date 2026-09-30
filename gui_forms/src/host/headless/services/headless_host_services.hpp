@@ -34,6 +34,8 @@ protected:
     [[nodiscard]] HostClipboardTextResult read_clipboard_text_impl() override;
     [[nodiscard]] HostServiceStatus write_clipboard_text_impl(
         std::string_view text_utf8) override;
+    [[nodiscard]] HostClipboardImageResult read_clipboard_image_impl() override;
+    [[nodiscard]] HostServiceStatus write_clipboard_image_impl(HostImageView image) override;
     [[nodiscard]] HostDialogResult show_dialog_impl(
         const HostDialogRequest& request) override;
     [[nodiscard]] HostServiceStatus play_sound_cue_impl(
@@ -42,6 +44,8 @@ protected:
 
 private:
     std::vector<HostMonitor> monitors_;
+    HostImage clipboard_image_;
+    bool clipboard_has_image_{};
     std::string clipboard_text_;
     std::uint64_t clipboard_generation_{};
     bool clipboard_has_text_{};

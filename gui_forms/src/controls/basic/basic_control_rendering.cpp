@@ -1,4 +1,5 @@
 #include "basic_control_rendering.hpp"
+#include "gui_forms/text.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -141,6 +142,25 @@ std::vector<std::string> label_lines(
                     ++word_end;
                 }
                 const std::string_view word = paragraph.substr(cursor, word_end - cursor);
+                // CJK paragraphs and long unbroken identifiers have no ASCII
+                // word boundary. Break only at grapheme boundaries, retaining
+                // combining marks and joined emoji with their base character.
+                if (resolve_width(word) > width) {
+                    const TextStore store(word);
+                    if (!line.empty()) { line.push_back(' '); }
+                    for (std::size_t index = 0; index < store.grapheme_count().value(); ++index) {
+                        const Utf8Range range = store.grapheme_range(GraphemeIndex(index));
+                        const std::string_view cluster = word.substr(range.start.value(), range.end.value() - range.start.value());
+                        const std::string joined = line + std::string(cluster);
+                        if (!line.empty() && resolve_width(joined) > width) {
+                            if (line.back() == ' ') { line.pop_back(); }
+                            lines.push_back(std::move(line)); line.clear();
+                        }
+                        line.append(cluster);
+                    }
+                    cursor = word_end;
+                    continue;
+                }
                 std::string candidate = line;
                 if (!candidate.empty()) {
                     candidate.push_back(' ');

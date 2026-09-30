@@ -1,4 +1,5 @@
 #pragma once
+#include "gui_forms/types/cursor_image/cursor_image.hpp"
 
 #include "gui_forms/host/types/host_types.hpp"
 
@@ -27,11 +28,23 @@ public:
 
     [[nodiscard]] HostMonitorResult query_monitors();
     [[nodiscard]] HostServiceStatus set_cursor(CursorKind cursor);
+    // Native failure/unsupported images immediately install fallback. Success
+    // then means a usable pointer; it does not promise custom-image support.
+    [[nodiscard]] HostServiceStatus set_custom_cursor(CursorImagesPtr images,
+        double device_scale, CursorKind fallback = CursorKind::arrow);
     [[nodiscard]] HostServiceStatus set_pointer_capture(
         bool captured, std::uint64_t pointer_id = 1);
     [[nodiscard]] HostClipboardTextResult read_clipboard_text();
     [[nodiscard]] HostServiceStatus write_clipboard_text(
         std::string_view text_utf8);
+    /// Reads an owned straight-alpha RGBA8 image on the creating UI thread.
+    /// Successful absence is distinguished by has_image == false.
+    [[nodiscard]] HostClipboardImageResult read_clipboard_image();
+    /// Reads local file references without opening or decoding their contents.
+    [[nodiscard]] HostClipboardFilesResult read_clipboard_files();
+    /// Copies an image to the native clipboard before returning. Does not retain
+    /// the borrowed view. Replaces clipboard contents on successful publication.
+    [[nodiscard]] HostServiceStatus write_clipboard_image(HostImageView image);
     [[nodiscard]] HostDialogResult show_dialog(
         const HostDialogRequest& request);
     [[nodiscard]] HostServiceStatus play_sound_cue(
@@ -55,11 +68,16 @@ public:
 protected:
     [[nodiscard]] virtual HostMonitorResult query_monitors_impl() = 0;
     [[nodiscard]] virtual HostServiceStatus set_cursor_impl(CursorKind cursor) = 0;
+    [[nodiscard]] virtual HostServiceStatus set_custom_cursor_impl(
+        const CursorImagesPtr& images, const CursorImage& image);
     [[nodiscard]] virtual HostServiceStatus set_pointer_capture_impl(
         bool captured, std::uint64_t pointer_id) = 0;
     [[nodiscard]] virtual HostClipboardTextResult read_clipboard_text_impl() = 0;
     [[nodiscard]] virtual HostServiceStatus write_clipboard_text_impl(
         std::string_view text_utf8) = 0;
+    [[nodiscard]] virtual HostClipboardImageResult read_clipboard_image_impl();
+    [[nodiscard]] virtual HostClipboardFilesResult read_clipboard_files_impl();
+    [[nodiscard]] virtual HostServiceStatus write_clipboard_image_impl(HostImageView image);
     [[nodiscard]] virtual HostDialogResult show_dialog_impl(
         const HostDialogRequest& request) = 0;
     [[nodiscard]] virtual HostServiceStatus play_sound_cue_impl(
@@ -70,6 +88,14 @@ private:
     [[nodiscard]] HostServiceStatus validate_request(
         HostCapability capability) noexcept;
 
+    CursorImagesPtr prepared_cursor_images_;
+    CursorImage prepared_cursor_;
+    double prepared_request_scale_{};
+    CursorImagesPtr active_cursor_images_;
+    CursorImagesPtr failed_cursor_images_;
+    double active_cursor_scale_{};
+    double failed_cursor_scale_{};
+    bool cursor_applied_{};
     std::thread::id ui_thread_;
     HostServicesSnapshot snapshot_;
     Event<const HostModalTransition&> modal_changed_;

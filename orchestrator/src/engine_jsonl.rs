@@ -752,18 +752,22 @@ const fn error_kind(error: &EngineJsonlError) -> &'static str {
 mod tests {
     use super::{
         EngineJsonlCaller, EngineJsonlError, EngineJsonlPeer, EngineJsonlSearchAdapter,
-        EngineWorkerCommand, EngineWorkerPeer, MAX_ENGINE_JSONL_FRAME_BYTES, run_engine_worker,
-        wait_engine_child,
+        EngineWorkerCommand, MAX_ENGINE_JSONL_FRAME_BYTES, run_engine_worker,
     };
+    #[cfg(unix)]
+    use super::{EngineWorkerPeer, wait_engine_child};
     use crate::common::TerminalStatus;
     use crate::engine_contract::{EngineSearchBudget, EngineSearchRequest};
     use crate::engine_port::EngineSearchProvider;
     use serde_json::json;
     use std::collections::BTreeMap;
     use std::io::{BufReader, Cursor};
+    #[cfg(unix)]
     use std::process::{Command, Stdio};
+    #[cfg(unix)]
+    use std::sync::Mutex;
     use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::{Arc, Mutex, mpsc};
+    use std::sync::{Arc, mpsc};
     use std::thread;
     use std::time::Duration;
 
@@ -779,8 +783,10 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     struct SlowCaller;
 
+    #[cfg(unix)]
     impl EngineJsonlCaller for SlowCaller {
         fn call(
             &mut self,

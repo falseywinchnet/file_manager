@@ -1,3 +1,4 @@
+#include "file_manager/platform_paths.hpp"
 #include "file_manager/file_operations.hpp"
 
 #include <cstdlib>
@@ -38,11 +39,10 @@ bool absolute_route_has_symlink(const std::filesystem::path& path) {
 
 bool broad_or_personal_root(const std::filesystem::path& path) {
     if (path == path.root_path()) return true;
-    if (const char* home = std::getenv("HOME"); home != nullptr) {
-        std::error_code error;
-        const auto canonical_home = std::filesystem::canonical(home, error);
-        if (!error && path == canonical_home) return true;
-    }
+    std::error_code error;
+    const std::filesystem::path canonical_home =
+        std::filesystem::canonical(user_home_directory(), error);
+    if (!error && path == canonical_home) return true;
     return looks_like_repository_root(path);
 }
 
@@ -245,8 +245,7 @@ std::optional<std::string> FileOperationService::validate_basename(
     if (basename.empty()) return "name must not be empty";
     if (basename.size() > 255) return "name exceeds the 255-byte protected bound";
     if (basename == "." || basename == "..") return "reserved path component";
-    if (basename.find('/') != std::string_view::npos ||
-        basename.find('\0') != std::string_view::npos) {
+    if (!valid_platform_basename(basename)) {
         return "name must be one filesystem component";
     }
     return std::nullopt;
@@ -261,12 +260,12 @@ bool FileOperationService::destination_exists_no_follow(
 
 std::filesystem::path FileOperationService::available_quarantine_path(
     const std::filesystem::path& source) {
-    const auto basename = source.filename().string();
+    const auto basename = path_utf8(source.filename());
     for (std::uint64_t attempt = 0; attempt < 100'000; ++attempt) {
         std::ostringstream name;
         name << "fm-q-" << std::setw(8) << std::setfill('0') << next_id_ << '-'
              << std::setw(5) << attempt << '-' << basename;
-        const auto candidate = quarantine_root_ / name.str();
+        const auto candidate = quarantine_root_ / path_from_utf8(name.str());
         if (!destination_exists_no_follow(candidate)) return candidate;
     }
     throw std::runtime_error("quarantine name space is exhausted");
@@ -295,7 +294,7 @@ OperationResult FileOperationService::create_folder(
     for (std::uint64_t suffix = 1; suffix <= 10'000; ++suffix) {
         const auto name = suffix == 1 ? "New folder"
                                       : "New folder " + std::to_string(suffix);
-        const auto candidate = parent / name;
+        const std::filesystem::path candidate = parent / path_from_utf8(name);
         if (!destination_exists_no_follow(candidate)) {
             destination = candidate;
             break;
@@ -371,7 +370,7 @@ OperationResult FileOperationService::rename_object(
         value.operation_id = operation_id;
         return value;
     }
-    const auto destination = source.parent_path() / std::string(new_basename);
+    const auto destination = source.parent_path() / path_from_utf8(new_basename);
     if (destination_exists_no_follow(destination)) {
         auto value = result(OperationKind::rename_object,
                             OperationTerminal::conflict,
@@ -527,7 +526,7 @@ OperationResult FileOperationService::copy_object(
         return value;
     }
     const auto stage = destination_parent /
-        (".fm-stage-" + operation_id + '-' + source.filename().string());
+        (".fm-stage-" + operation_id + '-' + path_utf8(source.filename()));
     if (destination_exists_no_follow(stage)) {
         auto value = result(OperationKind::copy_object,
                             OperationTerminal::conflict,

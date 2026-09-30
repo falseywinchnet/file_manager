@@ -288,8 +288,8 @@ void ComboBox::open_drop_down() {
     const Rect combo = absolute_bounds();
     const Size client = (*window()).client_size();
     const std::size_t rows = std::min(maximum_drop_down_items_, items_.size());
-    const double popup_height = static_cast<double>(rows) *
-        26.0 * effective_text_scale() + 4.0;
+    const double popup_height = std::min(std::max(0.0, client.height - 8.0),
+        static_cast<double>(rows) * 26.0 * effective_text_scale() + 4.0);
     const double requested_width = drop_down_width_ > 0.0
         ? drop_down_width_ : combo.width;
     const double popup_width = std::min(requested_width, client.width);
@@ -301,7 +301,7 @@ void ComboBox::open_drop_down() {
     const std::string prefix(stable_id().value());
     std::shared_ptr<gui_forms::DropDownLayer> layer = make_control<DropDownLayer>(StableId(prefix + ".popup.layer"));
     (*layer).set_requested_bounds({0.0, 0.0, client.width, client.height});
-    std::shared_ptr<gui_forms::ListBox> list = make_control<ListBox>(StableId(prefix + ".popup.list"));
+    std::shared_ptr<gui_forms::ListBox> list = make_control<DropDownList>(StableId(prefix + ".popup.list"));
     (*list).set_paint_plane(PaintPlane::overlay);
     (*list).set_items(items_);
     (*list).set_font(font_);
@@ -419,12 +419,12 @@ void ComboBox::on_paint(Painter& painter, Rect damage) {
     const double center_x = bounds.width - button_width * 0.5;
     const double center_y = bounds.height * 0.5 + (dropped_down_ ? 2.0 : -1.0);
     const double direction = dropped_down_ ? -1.0 : 1.0;
-    painter.draw_line({center_x - 4.0, center_y - direction * 2.0},
-                      {center_x, center_y + direction * 2.0},
-                      themed ? button_recipe.glyph : style().dark_border, 1.0);
-    painter.draw_line({center_x, center_y + direction * 2.0},
-                      {center_x + 4.0, center_y - direction * 2.0},
-                      themed ? button_recipe.glyph : style().dark_border, 1.0);
+    for (int row = 0; row < 4; ++row) {
+        painter.fill_rect({std::floor(center_x) - 3.0 + row,
+                           std::floor(center_y) + direction * (row - 1.0),
+                           7.0 - row * 2.0, 1.0},
+                          themed ? button_recipe.glyph : style().dark_border);
+    }
     const std::string_view text = selected_index_ ? selected_text()
                                                   : std::string_view(placeholder_);
     painter.save();
