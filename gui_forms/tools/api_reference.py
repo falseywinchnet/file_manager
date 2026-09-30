@@ -37,6 +37,20 @@ def node_file(node, inherited):
     return location.get("file", location.get("spellingLoc", {}).get("file", inherited))
 
 
+def source_filename(filename):
+    if not filename:
+        return ""
+    path = Path(filename)
+    if path.is_absolute():
+        try:
+            path = path.relative_to(ROOT)
+        except ValueError:
+            pass
+    # Clang's Windows locations and Path.relative_to use backslashes. Public
+    # source identities are slash-separated on every host, including Windows.
+    return path.as_posix()
+
+
 def source_declaration(node, filename):
     path = ROOT / filename
     if not path.is_file():
@@ -125,9 +139,7 @@ def inventory(ast_text):
 
     def visit(node, scope, filename, access="public", template=None, namespace_scope=None):
         namespace_scope = namespace_scope or []
-        filename = node_file(node, filename)
-        if filename.startswith(str(ROOT) + "/"):
-            filename = str(Path(filename).relative_to(ROOT))
+        filename = source_filename(node_file(node, filename))
         kind = node.get("kind")
         name = node.get("name", "")
         if kind == "NamespaceDecl":

@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import plistlib
 import re
 import shutil
 import subprocess
@@ -96,6 +97,41 @@ def mac_closure(app, sdk):
     subprocess.run(['codesign', '--verify', '--deep', '--strict', str(app)], check=True)
 
 
+def mac_minimum_versions(app, package):
+    """Report linker-declared deployment minima; these are not older-OS test evidence."""
+    records = {}
+    candidates = list((app / 'Contents/MacOS').iterdir()) + list((app / 'Contents/Frameworks').iterdir())
+    if (package / 'components').is_dir():
+        candidates += list((package / 'components').iterdir())
+    for path in candidates:
+        if not path.is_file():
+            continue
+        versions = []
+        for command in re.split(r'Load command \d+\n', output('otool', '-l', path)):
+            if re.search(r'\bcmd LC_BUILD_VERSION\b', command):
+                match = re.search(r'\bminos ([0-9.]+)', command)
+            elif re.search(r'\bcmd LC_VERSION_MIN_MACOSX\b', command):
+                match = re.search(r'\bversion ([0-9.]+)', command)
+            else:
+                continue
+            if match:
+                versions.append(match.group(1))
+        if not versions:
+            raise RuntimeError(f'No macOS deployment minimum load command found: {path}')
+        records[path.relative_to(package).as_posix()] = versions
+    plist = plistlib.loads((app / 'Contents/Info.plist').read_bytes())
+    plist_minimum = plist.get('LSMinimumSystemVersion')
+    all_versions = [version for versions in records.values() for version in versions]
+    if plist_minimum:
+        all_versions.append(plist_minimum)
+    # Normalize trailing zeroes before comparing 13.0, 13.0.0, etc.
+    required = max(all_versions, key=lambda value: tuple((list(map(int, value.split('.'))) + [0, 0, 0])[:3]))
+    return {'mach_o_minima': records, 'plist_minimum': plist_minimum,
+            'required_minimum_from_load_commands_and_plist': required,
+            'tested_host_macos': platform.mac_ver()[0],
+            'scope': 'Linker/plist requirement only; runtime tested on the named CI host, not on every OS at or above this minimum'}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build', type=Path, required=True)
@@ -149,10 +185,19 @@ def main():
                 raise RuntimeError(f'Missing component binary: {source}')
             shutil.copy2(source, component_dir)
             components.append({'name': name, 'state': 'bundled, not installed or activated'})
+        if host == 'windows':
+            shutil.copy2(ROOT / 'tools/launch_windows_search.ps1', package)
+            launcher_notes = (ROOT / 'tools/WINDOWS_SEARCH_LAUNCH.md').read_text(encoding='utf-8')
+            launcher_notes = launcher_notes.replace(
+                '`../orchestrator/conformance/evidence/SHADOW_WINDOWS_PIPES_2026-09-29.md`',
+                '[Orchestrator evidence](https://github.com/falseywinchnet/file_manager/blob/' + revision +
+                '/orchestrator/conformance/evidence/SHADOW_WINDOWS_PIPES_2026-09-29.md)')
+            (package / 'WINDOWS_SEARCH_LAUNCH.md').write_text(launcher_notes, encoding='utf-8')
     if host == 'macos':
         mac_closure(app, sdk)
         for component in (package / 'components').glob('*') if not args.skip_components else []:
             subprocess.run(['codesign', '--force', '--sign', '-', str(component)], check=True)
+        macos_requirements = mac_minimum_versions(app, package)
     if host == 'linux':
         dependencies = output('ldd', executable) + '\n' + output('ldd', package / 'libgui_forms_application.so.0')
         if 'not found' in dependencies:
@@ -165,8 +210,10 @@ def main():
         'source_dirty': dirty, 'platform': host, 'architecture': arch,
         'build_os': platform.platform(), 'components': components,
         'service_availability': 'Determined by live negotiation; bundling is not activation or readiness',
+        'explicit_windows_search_launcher': 'launch_windows_search.ps1' if host == 'windows' and not args.skip_components else None,
         'signature': 'ad-hoc, not Developer ID notarized' if host == 'macos' else 'unsigned',
-        'linux_baseline': 'Ubuntu 24.04, X11 or XWayland, system GTK accessibility/X11 libraries' if host == 'linux' else None,
+        'linux_baseline': 'Ubuntu 24.04, X11 or XWayland, system X11/ATK/AT-SPI libraries; xdg-utils for default Open' if host == 'linux' else None,
+        'macos_requirements': macos_requirements if host == 'macos' else None,
         'executable': executable.relative_to(package).as_posix(),
         'executable_sha256': sha256(executable),
         'font_rights': 'Portsmouth owner-supplied evaluation fonts; production redistribution-rights gate remains open; attribution retained',
@@ -177,9 +224,10 @@ def main():
         'Extract the complete folder. Open File Manager.app on macOS, File Manager.exe on Windows, '
         'or ./File Manager on Linux. Read-only browsing is the default.\n'
         'Mac: the bundle is ad-hoc signed and is not notarized. Windows: unsigned development executable.\n'
-        'Linux: built on Ubuntu 24.04; requires an X11/XWayland display and system X11/ATK libraries.\n'
-        'Service executables in components are included for independent inspection. This package does not '
-        'install, activate or configure services. Search and settings may report unavailable.\n\n'
+        'Linux: built on Ubuntu 24.04; requires an X11/XWayland display, system X11/ATK libraries '
+        'and xdg-utils for default Open. Terminal Here is unavailable until a terminal contract is configured.\n'
+        'Service executables in components are included for independent inspection. Extracting this package '
+        'does not install or start services. Search and settings may report unavailable without explicit service activation.\n\n'
         'Diagnostics: python3 collect_diagnostics.py (Windows: python collect_diagnostics.py). '
         'This writes a local JSON report containing build identity, OS/architecture and package hash checks. '
         'No automatic uploads, personal files, environment values or directory listings are collected. '
@@ -187,6 +235,19 @@ def main():
         'Known home/package/fixture path prefixes are redacted; review the report before sending it back. '
         'Manually describe what you clicked and what happened.\n',
         encoding='utf-8')
+    if host == 'windows' and not args.skip_components:
+        with (package / 'README.txt').open('a', encoding='utf-8') as stream:
+            stream.write('\nExplicit Windows search: run .\\launch_windows_search.ps1 -Root "C:\\chosen\\folder" '
+                         'from PowerShell in this extracted folder. Read WINDOWS_SEARCH_LAUNCH.md first. '
+                         'The root is mandatory; -IndexEnabled separately opts into an initial catalogue scan. '
+                         'The launcher owns only its new service processes and stops them when its app closes. '
+                         'Private state/logs remain locally for review.\n')
+    if host == 'macos':
+        with (package / 'README.txt').open('a', encoding='utf-8') as stream:
+            stream.write('\nmacOS load commands/plist require at least ' +
+                         macos_requirements['required_minimum_from_load_commands_and_plist'] +
+                         '. Startup was tested on macOS ' + macos_requirements['tested_host_macos'] +
+                         '. Compatibility with other OS versions has not been tested.\n')
     # Use an empty generated root and a clean font environment, never a personal directory.
     with tempfile.TemporaryDirectory(prefix='file-manager-smoke-') as fixture:
         env = os.environ.copy()

@@ -165,6 +165,13 @@ unavailable, stale, or quarantined catalogue outcomes, and never falls back
 around denied, invalid, budget, timeout, or cancellation outcomes. An
 authoritative catalogue no-match is terminal.
 
+The 2026-09-29 [ordinary text reconciliation](../FRONTEND_TEXT_PREDICATE.md)
+defines the current development text predicate and compatibility impact.
+Catalogue planning must support the requested predicate, not substitute exact
+name equality for substring search. The current adapter reports unsupported
+before any catalogue call for new ordinary text, permitting bounded live fallback
+even with indexing enabled. Exact callers use explicit `filters.name`.
+
 The response uses one result identity shape and terminal vocabulary, plus
 `source`, `complete`, optional source-bound cursor, and source-specific
 generation or scan/work details. Frontend may display live, partial, stale, or

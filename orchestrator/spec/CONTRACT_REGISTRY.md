@@ -103,6 +103,17 @@ Consumers validate before replacement and report refusal without truncation.
 No stable C ABI, large-document decision, IME/bidi/accessibility parity or final
 application acceptance is inferred.
 
+### Ordinary frontend text correction — 2026-09-29
+
+The owner directed the bounded ORC-FE-001 predicate reconciliation in
+[FRONTEND_TEXT_PREDICATE.md](FRONTEND_TEXT_PREDICATE.md) after measured indexed/live
+mismatch. New ordinary text has the existing live name/path substring meaning;
+the current catalogue adapter plans it as unsupported before sending a query,
+then uses the allowed live fallback. Exact `filters.name`, successful catalogue
+no-match, metadata authority and issued cursor source/predicate remain unchanged.
+This is a documented development compatibility change; indexed substring
+acceleration is not implemented or claimed.
+
 ## Explicitly forbidden edges
 
 - plugin worker → Go engine writable/index API;

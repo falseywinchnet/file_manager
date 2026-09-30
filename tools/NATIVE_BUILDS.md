@@ -71,12 +71,17 @@ cmake --install .build/native-windows-x64/frontend --component DocumentPicker
 - Windows: executable, GUI.Forms and MinGW DLL closure, fonts and notices.
   Unsigned portable folder; no installer or system registration.
 - Linux: executable, GUI.Forms `.so`, fonts and notices. Ubuntu 24.04/glibc
-  baseline with system X11/ATK dependencies, checked by `ldd`. This is not a
+  baseline with system X11/ATK dependencies, checked by `ldd`; `xdg-utils` supplies
+  default Open. Terminal Here remains unavailable pending an admitted terminal
+  launch contract. This is not a
   universal musl/AppImage package. No native Wayland host is claimed.
-- Engine and Orchestrator executables are included but not installed, activated,
-  assigned roots or configured by this package. Live negotiation remains the
-  source of capability availability. Compilation alone does not promote search
-  or durable settings.
+- Engine and Orchestrator executables are included; extraction does not install,
+  activate or assign roots to them. Windows packages include the separately
+  invoked `launch_windows_search.ps1` and its instructions. The user must choose
+  a root; catalogue creation requires a separate opt-in. The launcher owns and
+  stops only its new processes, and retains private local state/logs for review.
+  Live negotiation remains the source of capability availability. Compilation
+  alone does not promote search or durable settings.
 - Portsmouth remains owner-supplied evaluation font material; its production
   redistribution-rights gate remains open. Original attribution accompanies the
   requested development archives. No new license claim is made.
@@ -126,3 +131,19 @@ timestamps, causing an incremental build to combine old TextBox allocations with
 a new DLL. The mixed build failed the picker-view and application tests; the
 clean rebuild passed. The SDK content stamp and automatic clean rule above retain
 the cause and prevent that incremental route.
+
+**MEASURED Mac baseline:** [CI run 36674658657](https://github.com/falseywinchnet/file_manager/actions/runs/36674658657)
+source `21a89b51f89333ee1dd9626e1eeb15b9c8208fd4` produced a clean macOS arm64
+archive. GUI.Forms passed 73/73 CTests in 13.46 s and the frontend passed 11/11 in
+1.38 s. Ad-hoc signature verification, generated-empty-root five-second startup,
+archive readback and an independent downloaded-archive check of all 42 receipt
+file hashes passed. Archive SHA-256:
+`0951e0c7048acdf957a2559fdf9753f2e90fbe54f5847bd0606ee68eb133cce6`.
+
+**OBSERVED in those actual Mach-O bytes:** the application, GUI.Forms libraries
+and Engine each declare macOS 26.0 in `LC_BUILD_VERSION`; Orchestrator declares
+11.0. The plist has no `LSMinimumSystemVersion`. Every executable/library is
+arm64. The package therefore requires **macOS 26 or later** and startup was
+measured on **macOS 26.6.2**; earlier OS compatibility is not established. Later
+packages record the load-command/plist minimum explicitly in their receipt.
+This baseline predates the subsequent DPI and service-launcher corrections.

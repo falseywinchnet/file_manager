@@ -1,7 +1,7 @@
 # Independent C++ Orchestrator client
 
-Status: **OBSERVED Unix/macOS Core 1.0 conformance consumer; Windows transport
-projection remains open**.
+Status: **OBSERVED Unix/macOS Core 1.0 conformance consumer and Windows
+explicit-process named-pipe development projection**.
 
 This C++17 library and probe executable implement ADR-009 without linking Rust,
 sharing Rust layout, or depending on frontend/GUI.Forms code. The client:
@@ -57,9 +57,13 @@ Support default and activation retry as the Rust CLI:
 ```
 
 The reusable public header is
-`include/fileman_orchestrator/client.hpp`. Windows currently fails explicitly;
-its implementation waits for the named-pipe/ACL projection rather than
-pretending Unix socket semantics are portable.
+`include/fileman_orchestrator/client.hpp`. Windows uses native overlapped pipes,
+private current-SID discovery, actual server PID/SID validation and ORC1 hello.
+Set `FILEMAN_ORCHESTRATOR_RUNTIME_DIR` to an absolute private runtime directory
+for default connections on any platform, or supply the runtime argument. The
+Windows client does not install or activate services. See
+[`../../../spec/WINDOWS_LOCAL_PROJECTION.md`](../../../spec/WINDOWS_LOCAL_PROJECTION.md)
+and the native evidence receipt for limits and remaining readiness gates.
 
 A CMake consumer may add this directory and link
 `fileman::orchestrator_client`. Set

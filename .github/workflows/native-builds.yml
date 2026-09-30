@@ -12,6 +12,7 @@ concurrency:
 jobs:
   native:
     name: ${{ matrix.platform }}
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       fail-fast: false
       matrix:
@@ -40,7 +41,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build clang generate-ninja pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev xvfb xauth
+          sudo apt-get install -y cmake ninja-build clang generate-ninja pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev xvfb xauth xdg-utils
       - uses: msys2/setup-msys2@v2
         if: runner.os == 'Windows'
         with:

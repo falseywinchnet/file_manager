@@ -185,7 +185,7 @@ public:
     }
     int run() {
         gui_forms::ApplicationWindowOptions options;
-        options.title = "File Manager — isolated latency benchmark (self-closing)";
+        options.title = "File Manager — repaint benchmark (self-closing)";
         options.initial_size = {1340, 850};
         options.print_metrics_on_close = true;
         options.wake_ready = std::bind_front(&NativeBenchmark::wake_ready, this);
@@ -245,7 +245,9 @@ int main(int argc, char** argv) {
             run_live_search(file_manager::path_from_utf8(argv[1]), argv[3], argv[4], argv[5]);
             return 0;
         }
-        if (argc != 2 && argc != 3) throw std::runtime_error("usage: application_latency_benchmark REPOSITORY [--native|--native-partial]");
+        if (argc != 2 && argc != 3) throw std::runtime_error(
+            "usage: application_latency_benchmark REPOSITORY [--native|--native-partial]\n"
+            "or: application_latency_benchmark ROOT --live-search ROOT_ID QUERY EXPECTED_FILENAME");
         std::cout << std::fixed << std::setprecision(3);
         if (argc == 3) {
             const bool partial = std::string_view(argv[2]) == "--native-partial";

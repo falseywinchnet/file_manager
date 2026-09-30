@@ -191,6 +191,7 @@ private:
     std::uint64_t multiline_revision_{};
     FontSpec multiline_font_{};
     double multiline_width_{-1.0};
+    double multiline_device_scale_{};
     const TextMetricsProvider* multiline_provider_{};
     std::size_t maximum_length_{};
     bool read_only_{};

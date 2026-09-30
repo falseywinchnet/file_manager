@@ -38,6 +38,35 @@ search architecture.
 
 ## Evidence boundary
 
+### Owner visual rejection: rich breadcrumb segments remain open
+
+**GIVEN — subsequent owner correction:** the visible chevrons still do not
+represent the prototype's rich textured segments; broader presentation gaps
+remain. The raised appearance above is an implementation attempt, not visual
+acceptance. Passing interaction, geometry, and paint-command tests does not
+close this correction.
+
+**OBSERVED — source audit:** `BreadcrumbTrail::paint_raised` in
+`gui_forms/src/controls/panel/breadcrumb_trail/breadcrumb_trail.cpp` uses a
+three-stop face gradient, a repeating translucent white stripe on the
+rectangular body only, and nine gradient-filled rectangular strips for each
+pointed tip. The grain does not cover the tip. Edge depth is represented by
+highlight and border lines. These operations establish what is implemented;
+they do not establish the requested material appearance at native scale.
+
+**OBSERVED — reference limitation:** `.crumb` in
+`frontend/planning/visual/frontend-concept-atlas.html` still specifies a
+rectangular divider and a `::after` right-angle quotation glyph. That older
+specimen is insufficient to override the owner's richer segment direction.
+
+**OPEN — acceptance:** compare the intended rich segment reference with the
+exact staged native build at matching scale, including continuous body/tip
+material, joint depth, current-leaf distinction, hover, pressed, focus, and
+inline editing. Retain screenshot evidence and rerun the existing paint
+latency workload after repair. The command shelf's material/group geography
+and object-view focus/selection/full-name presentation also remain open under
+FM-R009 and FM-R013; this source audit is not a complete visual inventory.
+
 The root chat owns authored HTML/CSS, breadcrumb rendering, SDK build and native
 visual checks. The existing frontend chat owns application logic and tests; the
 existing Orchestrator chat owns the bounded MenuStrip/PropertyList public type

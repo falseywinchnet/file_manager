@@ -21,7 +21,7 @@
       "GUIForms::Drawing"
     ],
     "native_application_library": "libgui_forms_application.dll",
-    "native_application_sha256": "aafc07514503f1e86ca2ef27687bddf8f121996831f21975a81d1b053ef7fd72",
+    "native_application_sha256": "3c66e1c188a183eff2c93833c7c9a3781de57936a14721f00fa9ddbc865c664f",
     "host_protocol": 7,
     "runtime_font_locator": "GUIForms_FONT_DIR"
   },
@@ -36,9 +36,9 @@
     "configure": "passed on Shadow Windows with GCC 16.2.0, CMake 4.4.3, Ninja 1.13.2",
     "application_library_build": "passed",
     "installed_sdk": "passed",
-    "full_ctest": "65/65 passed on Shadow Windows in 9.17 seconds after retained multiline editor and Windows command-character normalization; full rebuild and matching SDK install completed.",
-    "frontend_runtime": "Prior SDK performance and adaptive evidence remains in frontend/results/2026-09-29-shadow-windows. Final multiline SDK requires all consumers rebuilt; coordinated frontend/package validation is pending. Prior timing measurements do not describe this new DLL.",
-    "macos_linux_rebuild": "Native CI development builds in progress; no platform promotion claim."
+    "full_ctest": "65/65 passed on Shadow Windows in 8.21 seconds after the scale-aware multiline cache fix; old-key regression failure reproduced, fixed focused tests passed, full rebuild and matching SDK install completed. API reference Clang fixture separately passed all 4 Python tests after UTF-8 and Windows path fixes.",
+    "frontend_runtime": "Clean pre-DPI-fix SDK frontend package passed all 11 tests and live/indexed service probes. DPI-fixed picker and independent Notepad consumers passed clean rebuild and native lifecycle tests; final File Manager distribution rebuild is pending. Earlier timings apply only to their recorded DLL hashes.",
+    "macos_linux_rebuild": "Native CI 21a89b5: macOS arm64 toolkit73/73 and frontend11/11 passed; macOS26+ development archive verified. Linux toolkit68/68 passed; frontend volume navigation correction pending next run. Windows hosted API-reference path fix passed locally; hosted rerun pending."
   },
   "limits": [
     "development consumption only; not a replacement for the historical macOS FM0 ready artifact",

@@ -1,5 +1,6 @@
 #include "fixture_links.hpp"
 #include "file_manager/platform_commands.hpp"
+#include "file_manager/platform_paths.hpp"
 
 #include <cstdlib>
 #include <filesystem>
@@ -20,6 +21,10 @@ void require(const bool condition, const std::string_view message) {
 } // namespace
 
 int main() {
+#if defined(__linux__)
+    require(file_manager::local_volume_roots() == std::vector<std::filesystem::path>{"/"},
+            "Linux navigation must expose its actual filesystem root without a synthetic Volumes folder");
+#endif
     const auto root = std::filesystem::temp_directory_path() /
         ("file-manager-platform-command-" + std::to_string(::getpid()));
     std::filesystem::create_directories(root / u8"space Ω ' -- folder");
@@ -37,12 +42,17 @@ int main() {
     require(result.code == "ok" && !result.launched && plan.executable.empty() &&
                 plan.arguments.empty() && plan.selected_path == canonical_file,
             "Windows default Open must preserve the exact path without shell input");
-#else
+#elif defined(__APPLE__)
     require(result.code == "ok" && !result.launched &&
                 plan.executable == "/usr/bin/open" &&
                 plan.arguments.size() == 2U &&
                 plan.arguments.back() == canonical_file.string(),
             "default Open must preserve a hostile-looking path as one argv value");
+#else
+    require(result.code == "ok" && !result.launched &&
+                plan.executable == "/usr/bin/xdg-open" &&
+                plan.arguments == std::vector<std::string>{"/usr/bin/xdg-open", canonical_file.string()},
+            "Linux Open must pass one absolute path to xdg-open without shell parsing");
 #endif
 
     result = file_manager::make_platform_command_plan(
@@ -53,12 +63,15 @@ int main() {
                 plan.arguments == std::vector<std::string>{"/D"} &&
                 plan.selected_path == canonical_directory,
             "Windows Terminal Here must pass the directory independently of shell input");
-#else
+#elif defined(__APPLE__)
     require(result.code == "ok" && plan.arguments.size() == 4U &&
                 plan.arguments[1] == "-a" &&
                 plan.arguments[2] == "Terminal" &&
                 plan.arguments[3] == canonical_directory.string(),
             "Terminal Here must use a fixed application and one directory argv");
+#else
+    require(result.code == "terminal-unavailable" && !result.launched,
+            "Linux must not claim the macOS Terminal application is available");
 #endif
 
     result = file_manager::make_platform_command_plan(

@@ -315,8 +315,11 @@ retained caret reveal, three-row wheel scrolling, and wrapping at spaces/tabs
 with grapheme fallback. Four-space tab stops are presentation only. Soft-wrap
 caret affinity retains the end of the preceding visual row when appropriate.
 Font metrics are resolved through the attached public TextMetricsProvider;
-visual-row geometry is cached by document revision, effective font, width and
-provider. Paint emits only visible rows and retains complete shaping runs
+visual-row geometry is cached by document revision, effective font, width,
+device scale and provider. The follow-up device-scale key corrects in-place
+provider DPI changes; its private C++ layout change requires a coordinated
+consumer rebuild before the next SDK publication. Paint emits only visible
+rows and retains complete shaping runs
 between tabs instead of cutting arbitrary chunks through joining text.
 
 **CANDIDATE development limits, not accepted final Notepad semantics:**

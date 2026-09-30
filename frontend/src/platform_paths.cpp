@@ -61,9 +61,13 @@ std::vector<std::filesystem::path> local_volume_roots() {
         // Do not probe mapped remote drives or spin up removable media here.
         if (type == DRIVE_FIXED || type == DRIVE_RAMDISK) roots.emplace_back(root);
     }
-#else
+#elif defined(__APPLE__)
     std::error_code error;
     if (std::filesystem::is_directory("/Volumes", error)) roots.emplace_back("/Volumes");
+#else
+    // Linux mounts form one real filesystem hierarchy. Expose its root without
+    // assuming a desktop-specific removable-media directory or scanning it.
+    roots.emplace_back("/");
 #endif
     return roots;
 }

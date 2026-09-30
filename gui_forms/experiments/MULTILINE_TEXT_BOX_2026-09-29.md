@@ -17,7 +17,7 @@ existing defaults remain single-line. It preserves exact UTF-8 and all stored
 line endings, supports LF/CR/CRLF Enter insertion, optional literal Tab, visual
 row navigation and selection, pointer hit testing, caret reveal and wheel
 scrolling. Layout caches document revision, effective font, provider pointer,
-and viewport width. Painting visits only the visible rows. Complete shaping
+device scale and viewport width. Painting visits only the visible rows. Complete shaping
 runs between tabs reach the renderer intact, including long joining-script
 text. Four-space tab stops affect presentation only.
 
@@ -101,8 +101,38 @@ or absent. Logical grapheme-safe storage does not imply those capabilities.
 The viewport supports wheel and keyboard caret reveal. The metrics provider
 must be installed on the Window for terminal metrics; a provider-free window
 uses the existing explicitly estimated typography fallback. Cached geometry
-tracks provider identity, effective font and width, not an unexposed internal
-revision of a provider mutated in place.
+tracks provider identity, effective font, width and device scale, not an
+unexposed internal revision of a provider mutated in place for other reasons.
 
 The provider negotiation entry records the public edge. Parent coordination
 owns canonical registry reconciliation and the shared development SDK manifest.
+
+## DPI cache correction for the next SDK checkpoint
+
+**OBSERVED defect:** Window device-scale invalidation dirties the retained
+subtree, but the initial multiline key omitted `Window::scale()`. Windows keeps
+its raster metrics provider at the same address while changing device scale;
+device-pixel rounding can alter logical advances, ascent and row height. An
+unchanged logical width and effective font therefore allowed stale row geometry
+to survive the repaint.
+
+The correction adds device scale to the private multiline cache key. No public
+method or default single-line behavior changes. The additional private field
+requires a coherent rebuild of C++ consumers before distributing the new DLL.
+
+**MEASURED regression evidence:** the focused test was first built against the
+old cache key and failed with `DPI change must invalidate same-provider multiline
+metrics`. The fixture keeps document, font, logical bounds and provider pointer
+unchanged, changes the provider's logical metrics alongside a 1x-to-1.5x scale
+transition, then checks remeasurement, wrapping, ascent/line-height placement,
+hit testing, caret scrolling, zero new metric calls on an unchanged repaint,
+and restoration when returning to 1x. This is deterministic cache-invalidation
+evidence; it does not claim physical multi-monitor GUI acceptance.
+
+The shared installed SDK and immutable CI checkpoint `21a89b5` remain untouched
+by this follow-up until parent/build coordination approves publication.
+
+**MEASURED corrected build:** focused multiline plus existing input controls
+passed 2/2 in 0.41 seconds after the expected pre-fix regression failure. The
+complete Release rebuild with two jobs succeeded; full Windows CTest passed
+65/65 in 8.21 seconds. No shared SDK install was performed for this correction.

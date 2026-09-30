@@ -73,3 +73,21 @@ Repeating with the full filename passed. Enabling indexing therefore does not
 yet provide consistent general filename search semantics. This is unfinished
 product work, not a reason to silently widen an authoritative catalogue
 no-match into a live fallback or to claim content/lexical search support.
+
+## Corrected ordinary-text route
+
+The subsequent Orchestrator correction explicitly plans ordinary frontend text
+as bounded name/path substring matching. A catalogue lacking that predicate is
+classified unsupported before any catalogue query executes; the admitted live
+route then handles it. Explicit exact-name metadata criteria and their
+authoritative no-match results retain catalogue semantics. This is documented
+as an ORC-FE compatibility correction, not indexed substring support.
+
+Against a newly built Orchestrator with the same indexed Engine fixture, the
+actual frontend query `needle` now passed: initial navigation 19.4576 ms,
+search 30.5365 ms. Raw output is `search-indexed-partial-route.txt`. The frontend
+probe/DLL hashes remain those of the current-SDK repeat above. Independent
+typed-client checks reported `live_filesystem` with one result for ordinary
+`needle`, `catalogue` with one result for explicit exact name
+`needle-report.txt`, and `catalogue` with zero results for explicit exact name
+`needle`. No failed exact query is reinterpreted as a fallback trigger.

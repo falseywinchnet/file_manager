@@ -20,13 +20,14 @@ public:
         bytes += text.size();
         ResolvedTextLayout result = estimate_text_layout_utf8(text, font);
         const TextStore store(text);
-        result.logical_size = {store.grapheme_count().value() * 10.0, 20.0};
-        result.ascent = 15.0;
-        result.descent = 5.0;
+        result.logical_size = {store.grapheme_count().value() * advance, line_height};
+        result.ascent = ascent;
+        result.descent = line_height - ascent;
         result.line_gap = 0.0;
         return result;
     }
     std::size_t calls{}, bytes{};
+    double advance{10.0}, line_height{20.0}, ascent{15.0};
 };
 
 struct Fixture {
@@ -201,6 +202,51 @@ void clipboard_and_limits() {
     require(f.field->undo() && f.field->text() == "firond", "refused edit leaves undo unchanged");
 }
 
+void dpi_transition_remeasures_same_provider() {
+    Fixture f;
+    f.field->set_word_wrap(true);
+    f.field->set_text("abcdefghijklmnopqrst");
+    f.caret(0);
+    f.paint();
+    require(f.field->visual_line_count() == 2, "initial DPI wrap geometry");
+    const auto calls = f.metrics.calls;
+    const FontSpec font = f.field->font();
+    const Rect bounds = f.field->arranged_bounds();
+
+    // Native providers stay at the same address across a DPI change; rounded
+    // device font metrics can produce different advances in logical units.
+    f.metrics.advance = 20.0;
+    f.metrics.line_height = 30.0;
+    f.metrics.ascent = 23.0;
+    f.window.set_scale(1.5);
+    f.window.perform_layout();
+    f.painter.texts.clear();
+    f.paint();
+    require(f.metrics.calls > calls, "DPI change must invalidate same-provider multiline metrics");
+    require(f.field->font() == font && f.field->arranged_bounds() == bounds &&
+        f.window.text_metrics_provider() == &f.metrics, "DPI regression keeps other cache keys unchanged");
+    require(f.field->visual_line_count() == 4, "DPI transition updates wrapping");
+    require(f.painter.texts.size() >= 2 && f.painter.texts[0].origin.y == 27.0 &&
+        f.painter.texts[1].origin.y == 57.0, "DPI transition updates ascent and row height");
+    require(f.window.dispatch_pointer({PointerAction::down, PointerButton::primary, {46, 39}}), "DPI hit-test down");
+    require(f.caret() == 7, "DPI hit-test uses updated row height and advances");
+    require(f.window.dispatch_pointer({PointerAction::up, PointerButton::primary, {46, 39}}), "DPI hit-test up");
+    f.key(PhysicalKey::end, Modifier::control);
+    f.paint();
+    require(f.field->scroll_offset().y == 60.0, "DPI caret reveal uses updated document height");
+    const auto warm_calls = f.metrics.calls;
+    f.paint();
+    require(f.metrics.calls == warm_calls, "unchanged DPI repaint reuses refreshed metrics");
+
+    f.metrics.advance = 10.0;
+    f.metrics.line_height = 20.0;
+    f.metrics.ascent = 15.0;
+    f.window.set_scale(1.0);
+    f.paint();
+    require(f.field->visual_line_count() == 2 && f.field->scroll_offset().y == 0.0,
+        "return DPI transition remeasures and clamps viewport");
+}
+
 void bounded_workload() {
     Fixture f;
     std::string many;
@@ -228,6 +274,7 @@ int main() {
         navigation();
         wrapping_metrics_and_hit_testing();
         clipboard_and_limits();
+        dpi_transition_remeasures_same_provider();
         bounded_workload();
         std::cout << "gui_forms_multiline_text_box_tests: passed\n";
         return 0;

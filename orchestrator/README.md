@@ -73,7 +73,8 @@ and CLI status/shutdown across separate processes. ADR-011 adds a stable macOS
 Application Support endpoint, launchd listener adoption, and bounded
 activation/credential rediscovery. The installed LaunchAgent lifecycle now
 passes first activation, shutdown, bounded supervisor reactivation, instance
-rotation, bootout, and exact removal; the Windows named-pipe gate remains open.
+rotation, bootout, and exact removal. Windows explicit-process named pipes are
+now implemented as a development projection; installed supervision remains open.
 Its fixed worker pool and bounded
 pending-session queue prevent slow peers from creating unbounded threads or
 blocking the control plane beyond the bounded handshake interval. Native peer
@@ -153,8 +154,11 @@ component-local trees.
 The Windows GNU development build can be verified with
 `./orchestrator/tools/verify_windows.ps1`, supplying `-MingwBin` and `-RustBin`
 when needed. It builds the native Rust CLI/laboratory and C++ source client.
-Windows local daemon transport, installed supervision, and durable settings
-remain unavailable; this does not promote Windows to Core 1.0 readiness.
+Windows local daemon transport and separate Go Engine integration are available
+for explicitly launched current-user processes. Installed supervision and durable
+settings remain unavailable; this does not promote Windows to Core 1.0 readiness.
+See [the Windows projection](spec/WINDOWS_LOCAL_PROJECTION.md) and
+[native evidence](conformance/evidence/SHADOW_WINDOWS_PIPES_2026-09-29.md).
 The release manifest's `first_platform: macos` remains historical macOS
 evidence, not an assertion about the host running a development CLI.
 See [the Shadow verification receipt](conformance/evidence/SHADOW_WINDOWS_2026-09-29.md).

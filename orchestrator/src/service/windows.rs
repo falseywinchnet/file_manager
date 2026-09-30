@@ -12,6 +12,7 @@ use crate::windows_local::{Pipe, current_sid, private_directory, publish_private
 use crate::{Kernel, Request, Response};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::io::Read;
 use std::path::Path;
 use std::sync::{
     Arc,
@@ -175,6 +176,18 @@ fn session(
         pipe.reset_deadline();
         write_json_frame(pipe, &response).map_err(|error| error.to_string())?;
         health.record_completed_request();
+        if kernel.is_stopped() {
+            // DisconnectNamedPipe discards unread buffered output. Let the
+            // client consume the terminal reply and close first. This read
+            // drain is bounded by the same absolute deadline, unlike blocking
+            // FlushFileBuffers on an uncooperative peer.
+            let mut ignored = [0_u8; 256];
+            while let Ok(count) = pipe.read(&mut ignored) {
+                if count == 0 {
+                    break;
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -228,7 +241,6 @@ pub(crate) fn call_local(runtime: &Path, request: &Request) -> Result<Response, 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Read;
     use std::time::Instant;
 
     fn fresh_runtime() -> std::path::PathBuf {
@@ -318,6 +330,19 @@ mod tests {
             .expect("restart shutdown");
         host.join().expect("host thread").expect("host success");
         std::fs::remove_dir(runtime).expect("empty private test directory");
+    }
+
+    #[test]
+    fn terminal_reply_is_consumed_before_pipe_disconnect() {
+        let runtime = fresh_runtime();
+        for _ in 0..12 {
+            let host = start(&runtime);
+            let response = call_local(&runtime, &Request::local("stop", "orchestrator.shutdown"))
+                .expect("terminal reply must survive buffered pipe close");
+            assert_eq!(response.status, crate::TerminalStatus::Success);
+            host.join().expect("host thread").expect("host success");
+        }
+        std::fs::remove_dir(runtime).expect("empty test directory");
     }
 
     #[test]

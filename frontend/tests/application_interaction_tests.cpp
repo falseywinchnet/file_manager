@@ -421,7 +421,7 @@ void test_application_controls_navigate_real_directories() {
             rect_text(tree_header) + " caption=" + rect_text(tree_caption) +
             " mode=" + rect_text(root_mode));
     }
-#if defined(_WIN32)
+#if !defined(__APPLE__)
     const std::string volume_menu_id = "fm.navigation.root-mode-menu.popup.row.admitted.0";
     const std::string launch_menu_id = "fm.navigation.root-mode-menu.popup.row.admitted." +
         std::to_string(file_manager::local_volume_roots().size());
@@ -435,7 +435,7 @@ void test_application_controls_navigate_real_directories() {
                     "fm.navigation.root-mode-menu.popup.row.home") != nullptr &&
                 window->find(
                     volume_menu_id) != nullptr,
-            "tree root mode menu must keep Home and Volumes immediately available");
+            "tree root mode menu must keep Home and actual filesystem roots immediately available");
     require(window->perform_semantic_action(
                 "fm.navigation.root-mode-menu.popup.row.home",
                 gui_forms::SemanticAction::press),

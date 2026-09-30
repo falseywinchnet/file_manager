@@ -109,7 +109,7 @@ PlatformCommandResult make_platform_command_plan(
         plan.executable.clear();
         plan.arguments.clear();
     }
-#else
+#elif defined(__APPLE__)
     plan.executable = "/usr/bin/open";
     if (kind == PlatformCommandKind::open_terminal_here) {
         plan.arguments = {"/usr/bin/open", "-a", "Terminal",
@@ -117,6 +117,12 @@ PlatformCommandResult make_platform_command_plan(
     } else {
         plan.arguments = {"/usr/bin/open", plan.selected_path.string()};
     }
+#else
+    if (kind == PlatformCommandKind::open_terminal_here) {
+        return refuse("terminal-unavailable", "A Linux terminal launcher has not been configured");
+    }
+    plan.executable = "/usr/bin/xdg-open";
+    plan.arguments = {"/usr/bin/xdg-open", plan.selected_path.string()};
 #endif
     return checked;
 }
@@ -176,9 +182,13 @@ PlatformCommandResult execute_platform_command(
     }
     return {true, "ok", "Object handed to its default Windows application", 0};
 #else
-    if (plan.executable != "/usr/bin/open" || plan.arguments.empty() ||
-        plan.arguments.front() != "/usr/bin/open" ||
-        plan.arguments.back() != path.string()) {
+    PlatformCommandPlan expected_plan;
+    const PlatformCommandResult planned = make_platform_command_plan(
+        plan.kind, plan.protected_root, plan.selected_path,
+        plan.expected_identity, expected_plan);
+    if (planned.code != "ok") return planned;
+    if (plan.executable != expected_plan.executable ||
+        plan.arguments != expected_plan.arguments) {
         return refuse("invalid-plan", "native launch plan failed closed");
     }
 
@@ -205,14 +215,14 @@ PlatformCommandResult execute_platform_command(
     }
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         PlatformCommandResult result = refuse(
-            "launcher-rejected", "macOS open rejected the requested object");
+            "launcher-rejected", "The desktop launcher rejected the requested object");
         result.exit_status = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
         return result;
     }
     return {true, "ok",
             plan.kind == PlatformCommandKind::open_terminal_here
                 ? "Terminal opened at the selected directory"
-                : "Object handed to its default macOS application",
+                : "Object handed to its default desktop application",
             0};
 #endif
 }

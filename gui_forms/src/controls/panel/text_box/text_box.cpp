@@ -444,10 +444,13 @@ std::string TextBox::display_text() const {
 void TextBox::ensure_multiline_layout() {
     const FontSpec font = effective_font(font_);
     const double width = std::max(1.0, local_bounds().width - 10.0);
+    // Device-pixel rounding can change logical advances/ascent while the
+    // provider address, authored font and logical viewport remain unchanged.
+    const double device_scale = window() ? window()->scale() : 1.0;
     const TextMetricsProvider* provider = window() ? window()->text_metrics_provider() : nullptr;
     if (!visual_lines_.empty() && multiline_revision_ == store_.revision() &&
         multiline_font_ == font && multiline_width_ == width &&
-        multiline_provider_ == provider) return;
+        multiline_provider_ == provider && multiline_device_scale_ == device_scale) return;
     visual_lines_.clear();
     document_width_ = 0.0;
     const ResolvedTextLayout metrics = resolve_text_layout_utf8("Mg", font);
@@ -509,6 +512,7 @@ void TextBox::ensure_multiline_layout() {
     multiline_font_ = font;
     multiline_width_ = width;
     multiline_provider_ = provider;
+    multiline_device_scale_ = device_scale;
     reveal_pending_ = true;
 }
 

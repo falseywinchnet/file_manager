@@ -474,3 +474,14 @@ identity/root/purpose policy, and revokes each completed owned presentation.
 It returns only revalidated selection; the host revalidates before its own I/O.
 No daemon session, plugin privilege or inferred drive authority is fabricated.
 Consumer instructions/evidence live in `../docs/document_picker.md`.
+
+### Ordinary text predicate correction
+
+The owner directed practical ordinary text consistency after the native indexed
+fixture exposed text-as-exact-name substitution. Canonical reconciliation is
+`../../orchestrator/spec/FRONTEND_TEXT_PREDICATE.md`. Ordinary text currently uses
+bounded live name/path substring search even with a persistent catalogue; exact
+criteria still use the catalogue. The frontend retains the one-operation API,
+worker scheduling, source/completeness presentation and identity revalidation.
+It must not claim indexed substring acceleration. Old exact text callers migrate
+to explicit `filters.name`; issued cursor source/predicate remains bound.
