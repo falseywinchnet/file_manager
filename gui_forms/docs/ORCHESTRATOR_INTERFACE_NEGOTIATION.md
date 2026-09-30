@@ -392,3 +392,31 @@ directions populated, verifies read-only/idempotent clearing with no text,
 selection, viewport, dirtiness, metric or event changes, then proves new edits
 undo exactly to the boundary and redo normally. A single-line case preserves
 its value too. No SDK install or staged/application DLL replacement occurred.
+
+### Coordinated Windows development SDK publication
+
+**MEASURED, 2026-09-30:** the parent subsequently built the complete Windows
+Release provider from source `dbe3766b3c8c6ded939fdbb791694d30262cd20f` and ran
+all 65 configured toolkit CTests successfully. It installed a separate SDK at
+`.build/sdk-checkpoints/dbe3766/windows-x64/gui-forms-sdk` under the workspace
+root. The File Manager picker was rebuilt into the sibling `picker-sdk` prefix;
+its controller/view tests passed 2/2. Independent installed-only consumers
+passed for the picker (1/1) and for calling `clear_undo_history()` through
+`GUIForms::Application` (1/1). This establishes the new linked symbol as well
+as source-level behavior; SwiftEdit application acceptance remains consumer work.
+
+Checkpoint hashes:
+
+- Application DLL: `45cb7bb9267686f5e93333952f691b55f2c6db0aa80d256ef9df3df2ab8c12ea`.
+- TextBox header: `4d6f98b2af0b16c40f8386dd06b98c99e50ee625beeb1e5c98f54f7ea2facb80`.
+- Combined GUI/picker fingerprint using SwiftEdit's `Build-Windows.ps1`
+  algorithm at the supplied absolute prefixes:
+  `cd8f39da910556e56b401f783727bb4370bb363ebae2f8e60b7c850908ceb654`.
+
+The local `sdk-receipt.json`, preserved toolkit test log and independent
+consumer build/test directories live beside those two prefixes. Both prefixes
+are frozen for the consumer handoff. The previous `shadow-sdk` DLL remains
+`3c66e1c188a183eff2c93833c7c9a3781de57936a14721f00fa9ddbc865c664f`;
+existing application stages and the published File Manager release were not
+replaced. This is a Windows development SDK publication, not a stable ABI or
+new three-platform application release.

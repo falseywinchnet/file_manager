@@ -112,6 +112,15 @@ documents focused tests and unchanged object layout; a matching provider build
 is still required for the new symbol. This is source availability only: no SDK
 installation or released application update is recorded by this addition.
 
+**MEASURED subsequent local publication, 2026-09-30:** the matching Windows
+development provider and picker SDKs were installed into separate versioned
+`dbe3766` prefixes. All 65 toolkit tests, two picker tests and two independent
+installed-package consumer checks passed, including a call to the new history
+symbol. The GUI.Forms negotiation record names the prefixes and hashes.
+SwiftEdit received that coherent checkpoint for its own build; prior SDKs and
+released File Manager binaries remain unchanged. Consumer application
+acceptance and any other platform publication are separate evidence.
+
 ### Ordinary frontend text correction — 2026-09-29
 
 The owner directed the bounded ORC-FE-001 predicate reconciliation in
