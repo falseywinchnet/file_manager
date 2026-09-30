@@ -7,6 +7,15 @@
 #include <stdexcept>
 #include <system_error>
 
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#undef near
+#undef far
+#endif
+
 namespace file_manager {
 namespace {
 
@@ -118,7 +127,25 @@ CopyOutcome copy_node_no_follow(const std::filesystem::path& source,
         case std::filesystem::file_type::symlink: {
             const auto target = std::filesystem::read_symlink(source, error);
             if (error) return {false, false, "symlink_read_failed", error.message()};
+#if defined(_WIN32)
+            // The link itself retains its directory kind even when its target
+            // is missing. Do not follow the target to infer that kind.
+            const DWORD attributes = GetFileAttributesW(source.c_str());
+            if (attributes == INVALID_FILE_ATTRIBUTES) {
+                error = std::error_code(static_cast<int>(GetLastError()),
+                                        std::system_category());
+                return {false, false, "symlink_attributes_failed", error.message()};
+            }
+            DWORD flags = (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0
+                ? SYMBOLIC_LINK_FLAG_DIRECTORY : 0;
+            flags |= SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
+            if (!CreateSymbolicLinkW(destination.c_str(), target.c_str(), flags)) {
+                error = std::error_code(static_cast<int>(GetLastError()),
+                                        std::system_category());
+            }
+#else
             std::filesystem::create_symlink(target, destination, error);
+#endif
             if (error) return {false, false, "symlink_copy_failed", error.message()};
             return {true, false, "copied", "symlink leaf copied to stage"};
         }

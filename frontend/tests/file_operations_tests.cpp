@@ -141,14 +141,39 @@ int main() {
     std::filesystem::create_directories(copy_tree / "nested");
     write_file(copy_tree / "nested" / "value.txt", "tree value");
     const bool copy_link_available = create_fixture_link(area.outside(), copy_tree / "outside-link");
+    const bool directory_link_available = create_fixture_link(
+        std::filesystem::path("missing-directory"), copy_tree / "directory-link", true);
     const auto copied_tree = operations.copy_object(
         copy_tree, file_manager::observe_identity(copy_tree), copy_destination);
+    if (!copied_tree.succeeded()) {
+        std::cerr << "directory copy failed: code=" << copied_tree.code
+                  << " message=" << copied_tree.message << '\n';
+    }
     if (!require(copied_tree.succeeded() &&
                  std::filesystem::exists(copy_destination / "copy-tree" /
                                          "nested" / "value.txt") &&
-                 (!copy_link_available || std::filesystem::is_symlink(copy_destination / "copy-tree" /
-                                             "outside-link")),
+                 (!copy_link_available || file_manager::observe_identity(
+                     copy_destination / "copy-tree" / "outside-link").type ==
+                     std::filesystem::file_type::symlink),
                  "directory copy must preserve nested files and symlink leaves")) return 1;
+    if (copy_link_available && !require(
+            std::filesystem::read_symlink(copy_destination / "copy-tree" / "outside-link") ==
+                std::filesystem::read_symlink(copy_tree / "outside-link") &&
+            !std::filesystem::exists(area.outside()),
+            "copy must preserve a dangling file link target without creating it")) return 1;
+    if (directory_link_available) {
+        const auto copied_link = copy_destination / "copy-tree" / "directory-link";
+        if (!require(file_manager::observe_identity(copied_link).type ==
+                         std::filesystem::file_type::symlink &&
+                     std::filesystem::read_symlink(copied_link) == "missing-directory",
+                     "copy must preserve a dangling relative directory link")) return 1;
+#if defined(_WIN32)
+        const DWORD attributes = GetFileAttributesW(copied_link.c_str());
+        if (!require(attributes != INVALID_FILE_ATTRIBUTES &&
+                     (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0,
+                     "copied Windows directory link must retain its directory kind")) return 1;
+#endif
+    }
     const auto recursive_copy = operations.copy_object(
         copy_tree, file_manager::observe_identity(copy_tree), copy_tree / "nested");
     if (!require(recursive_copy.terminal ==
@@ -301,7 +326,7 @@ int main() {
                  !std::filesystem::exists(link),
                  "quarantine must move a symlink leaf without following its target")) return 1;
     if (!require(operations.undo_last().succeeded() &&
-                 std::filesystem::is_symlink(link) &&
+                 file_manager::observe_identity(link) == link_identity &&
                  std::filesystem::exists(area.outside()),
                  "undo must restore the symlink leaf and preserve its target")) return 1;
 

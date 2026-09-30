@@ -1899,9 +1899,15 @@ void Application::update_command_state() {
         checksum_visible_ && files_active && !checksum_in_flight_ && entry &&
         !entry->directory && entry->kind != EntryKind::symlink);
     command_terminal_->set_visible(terminal_visible_);
+#if defined(__linux__)
+    command_terminal_->set_enabled(false);
+    command_terminal_->set_availability_reason(
+        "A Linux terminal launcher has not been configured");
+#else
     command_terminal_->set_enabled(files_active);
     command_terminal_->set_availability_reason(
         files_active ? std::string{} : hidden_workspace_reason);
+#endif
     command_copy_path_->set_enabled(files_active);
     command_copy_path_->set_availability_reason(
         files_active ? std::string{} : hidden_workspace_reason);
@@ -4277,7 +4283,11 @@ void Application::update_mutation_controls() {
         (entry.has_value() && !entry->directory &&
          entry->kind != EntryKind::symlink)));
     form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_terminal->set_enabled(
+#if defined(__linux__)
+        false);
+#else
         terminal_visible_);
+#endif
     form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_copy_path->set_enabled(
         true);
     update_command_state();

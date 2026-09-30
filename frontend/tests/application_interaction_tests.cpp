@@ -1344,8 +1344,13 @@ void test_application_command_truth_across_files_search_and_settings() {
                     file_manager::format_bytes(std::filesystem::file_size(tree_fixture.root() / "root.txt")) + " in files" &&
                 checksum_command->state().enabled &&
                 checksum_command->state().availability_reason.empty() &&
+#if defined(__linux__)
+                !terminal_command->state().enabled &&
+                !terminal_command->state().availability_reason.empty() &&
+#else
                 terminal_command->state().enabled &&
                 terminal_command->state().availability_reason.empty() &&
+#endif
                 window->dispatch_key({gui_forms::KeyAction::down,
                                       gui_forms::PhysicalKey::f2}) &&
                 rename->visible() && window->focused_control() == rename,
@@ -1470,6 +1475,14 @@ void test_application_command_truth_across_files_search_and_settings() {
         file_manager::PlatformCommandKind::open_terminal_here,
         tree_fixture.root(), file_terminal_target.path,
         file_terminal_target.identity, file_terminal_plan);
+#if defined(__linux__)
+    require(file_terminal_target.path == tree_fixture.root() &&
+                file_terminal_target.directory &&
+                file_terminal_result.code == "terminal-unavailable" &&
+                file_terminal_plan.executable.empty() &&
+                file_terminal_plan.arguments.empty(),
+            "Linux must retain the selected directory but refuse an unconfigured terminal launcher");
+#else
 #if defined(_WIN32)
     const std::vector<std::string> expected_terminal_arguments{"/D"};
     const bool terminal_executable_matches = file_terminal_plan.executable.filename() == L"cmd.exe";
@@ -1500,6 +1513,7 @@ void test_application_command_truth_across_files_search_and_settings() {
                  ? std::string("<empty>")
                  : file_terminal_plan.arguments.back()));
     }
+#endif
 
 #if defined(__APPLE__)
     constexpr std::uint32_t delete_key = gui_forms::PhysicalKey::backspace;
