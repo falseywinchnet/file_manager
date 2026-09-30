@@ -83,8 +83,8 @@ struct DocumentPickerResult final {
 
 // FileSelectionController is the independently consumable semantic boundary.
 // It navigates directly from the filesystem and therefore does not require the
-// Engine, but acceptance fails closed when its Orchestrator selection session
-// is no longer valid.
+// Engine. Acceptance requires an explicit current Orchestrator session or
+// trusted local-host selection grant and fails closed when that grant is revoked.
 class FileSelectionController final {
 public:
     explicit FileSelectionController(DocumentPickerRequest request);

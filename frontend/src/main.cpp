@@ -40,24 +40,49 @@ struct Runtime final {
     std::function<void()> hide_about;
     std::function<void()> wake;
     gui_forms::ApplicationWindowHandle primary_handle;
+    gui_forms::ApplicationWindowHandle picker_handle;
+    gui_forms::Window* primary_window{};
+    gui_forms::Control::Ptr picker_return_focus;
+    bool picker_open{};
+    bool primary_was_enabled{};
 
     ~Runtime() { if (application) (*application).stop(); }
 
     void present_picker(const std::filesystem::path& location) {
+        if (picker_open || !show_picker || primary_window == nullptr) return;
+        picker_return_focus = (*primary_window).focused_control();
+        primary_was_enabled = (*(*primary_window).root()).enabled();
+        (*picker).set_authority_valid(true);
         (*picker).present(location);
-        if (show_picker) show_picker();
+        picker_open = true;
+        (*(*primary_window).root()).set_enabled(false);
+        show_picker();
     }
+    void picker_closing(gui_forms::HostCloseRequest&) { (*picker).cancel(); }
     void present_about() { if (show_about) show_about(); }
     void dismiss_about() { if (hide_about) hide_about(); }
     void picker_completed(const file_manager::DocumentPickerResult& result) {
-        (*application).document_picker_completed(result);
         if (result.terminal == file_manager::DocumentPickerTerminal::accepted ||
             result.terminal == file_manager::DocumentPickerTerminal::cancelled) {
             if (hide_picker) hide_picker();
+            if (picker_open && primary_window != nullptr) {
+                (*(*primary_window).root()).set_enabled(primary_was_enabled);
+                if (picker_return_focus) (*primary_window).request_focus(picker_return_focus);
+            }
+            picker_return_focus.reset();
+            picker_open = false;
         }
+        (*application).document_picker_completed(result);
     }
     void drain() { (*application).drain_ui(); }
-    void stop() { (*application).stop(); }
+    void stop() {
+        // Native teardown can close the owner before its secondary window.
+        // Cancel selection without trying to restore focus into that owner.
+        primary_window = nullptr;
+        if (picker_open) (*picker).cancel();
+        (*picker).set_authority_valid(false);
+        (*application).stop();
+    }
     void close_primary() { (void)primary_handle.request_close(); }
     void accept_wake(std::function<void()> value) { wake = std::move(value); }
     void primary_ready(gui_forms::Window&, gui_forms::ApplicationWindowHandle handle) {
@@ -73,8 +98,12 @@ struct Runtime final {
         hide_about = std::move(hide);
     }
     void picker_ready(gui_forms::Window&, gui_forms::ApplicationWindowHandle handle) {
-        show_picker = std::bind_front(&gui_forms::ApplicationWindowHandle::show, handle);
+        picker_handle = handle;
+        show_picker = std::bind_front(&Runtime::show_portable_picker, this);
         hide_picker = std::bind_front(&gui_forms::ApplicationWindowHandle::hide, handle);
+    }
+    void show_portable_picker() {
+        if (!picker_handle.show().accepted()) (*picker).cancel();
     }
     void about_ready(gui_forms::Window&, gui_forms::ApplicationWindowHandle handle) {
         show_about = std::bind_front(&gui_forms::ApplicationWindowHandle::show, handle);
@@ -161,6 +190,8 @@ int main(const int argc, char** argv) {
         picker_request.protected_root = root;
         picker_request.initial_location = root;
         picker_request.owner_application_id = "file-manager";
+        picker_request.authority = file_manager::DocumentPickerAuthority::trusted_local_host;
+        picker_request.home_location = file_manager::user_home_directory();
         picker_request.maximum_selection = 1;
         runtime.picker = std::make_shared<file_manager::DocumentPickerView>(std::move(picker_request));
         runtime.about = std::make_shared<file_manager::AboutView>();
@@ -180,6 +211,7 @@ int main(const int argc, char** argv) {
         NativeWindow primary;
         primary.stable_id = "file-manager.window";
         primary.model = (*runtime.application).make_window();
+        runtime.primary_window = primary.model.get();
         primary.options.title = "File Manager";
         primary.options.initial_size = {1340, 850};
         primary.options.minimum_size = {150, 150};
@@ -201,6 +233,7 @@ int main(const int argc, char** argv) {
         picker_window.owner_id = primary.stable_id;
         picker_window.model = std::make_unique<gui_forms::Window>(
             (*runtime.picker).root_control(), gui_forms::Size{760, 560});
+        (*runtime.picker).attach_dialog(*picker_window.model);
         picker_window.options.title = "Open — File Manager";
         picker_window.options.initial_size = {760, 560};
         picker_window.options.minimum_size = {620, 460};
@@ -209,10 +242,12 @@ int main(const int argc, char** argv) {
         picker_window.options.minimizable = false;
         picker_window.options.print_metrics_on_close = false;
 #if defined(__APPLE__)
+        picker_window.options.close_request = std::bind_front(&Runtime::picker_closing, &runtime);
         picker_window.options.titlebar_presentation = gui_forms::host::MacTitlebarPresentation::transparent_full_size_content;
         picker_window.options.window_drag_region_id = "file-manager.picker.title";
         picker_window.options.visibility_ready = std::bind_front(&Runtime::picker_visibility, &runtime);
 #else
+        picker_window.options.closing = std::bind_front(&Runtime::picker_closing, &runtime);
         picker_window.options.ready = std::bind_front(&Runtime::picker_ready, &runtime);
 #endif
         NativeWindow about_window;

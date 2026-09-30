@@ -45,6 +45,8 @@ def main():
         executable = (root / receipt['executable']).resolve()
         if not executable.is_relative_to(root) or not executable.is_file():
             raise RuntimeError('Package executable is invalid')
+        if any(state != 'matched' for state in checks.values()):
+            raise RuntimeError('Package verification failed; refusing diagnostic launch. Run without --launch for the hash report.')
         with tempfile.TemporaryDirectory(prefix='file-manager-diagnostic-') as temporary:
             fixture = Path(temporary) / 'empty-root'
             fixture.mkdir()

@@ -21,7 +21,7 @@
       "GUIForms::Drawing"
     ],
     "native_application_library": "libgui_forms_application.dll",
-    "native_application_sha256": "e89cf95f7c5599c0f3718589f456847f5bdfdaae13ba2586a7e6d42a5ff11b9b",
+    "native_application_sha256": "aafc07514503f1e86ca2ef27687bddf8f121996831f21975a81d1b053ef7fd72",
     "host_protocol": 7,
     "runtime_font_locator": "GUIForms_FONT_DIR"
   },
@@ -36,9 +36,9 @@
     "configure": "passed on Shadow Windows with GCC 16.2.0, CMake 4.4.3, Ninja 1.13.2",
     "application_library_build": "passed",
     "installed_sdk": "passed",
-    "full_ctest": "64/64 passed natively on Shadow Windows after font/shaping caches, scanline kernels and bounded material cache, 6.99 seconds; scalar pixel reference, multilingual cold/cache equality, DPI and resource-lifetime regressions passed",
-    "frontend_runtime": "Final performance SDK staged side-by-side at frontend/.build/shadow-windows-latency; 11/11 native Windows frontend tests passed in 2.31 seconds. Actual test-owned File Manager window steady full repaint26.638\u201329.243ms and toolbar partial0.325\u20130.522ms at2xDPI, zero injected input/callback faults, self-close. Native ergonomic visual/workflow acceptance remains pending; existing user application untouched. Evidence frontend/results/2026-09-29-shadow-windows/LATENCY.md.",
-    "macos_linux_rebuild": "not performed"
+    "full_ctest": "65/65 passed on Shadow Windows in 9.17 seconds after retained multiline editor and Windows command-character normalization; full rebuild and matching SDK install completed.",
+    "frontend_runtime": "Prior SDK performance and adaptive evidence remains in frontend/results/2026-09-29-shadow-windows. Final multiline SDK requires all consumers rebuilt; coordinated frontend/package validation is pending. Prior timing measurements do not describe this new DLL.",
+    "macos_linux_rebuild": "Native CI development builds in progress; no platform promotion claim."
   },
   "limits": [
     "development consumption only; not a replacement for the historical macOS FM0 ready artifact",

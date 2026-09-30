@@ -21,7 +21,7 @@ int main() {
         std::cerr << "service snapshot lookup failed\n";
         return 1;
     }
-#if !defined(__unix__) && !defined(__APPLE__)
+#if !defined(__unix__) && !defined(__APPLE__) && !defined(_WIN32)
     try {
         (void)orc::Client::connect_default();
         std::cerr << "unimplemented transport unexpectedly connected\n";

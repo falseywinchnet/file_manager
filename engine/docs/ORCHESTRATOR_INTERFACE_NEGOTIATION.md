@@ -783,3 +783,73 @@ verified. Evidence:
 This reconciliation does not close Windows named pipes, Linux installed IPC,
 native NTFS/ext4 evidence, event subscription/replay, distribution signing, or
 million-entry live-query measurement.
+
+## Windows projection reply 008 — native local integration
+
+Date: 2026-09-29 (Shadow session; UTC execution may be 2026-09-30).
+
+Status: **OBSERVED implementation under current owner instruction to introduce
+actual Engine search; Windows adapter conformance in progress; not an SCM or
+cross-platform release promotion**. Coordinated with the active Orchestrator
+integration chat, which owns canonical registry/decision updates.
+
+The semantic ORC-ENG operations and ENG1 frame/hello remain unchanged. Windows
+projects them over separate byte-mode local named pipes. Discovery is bounded
+JSON at the explicitly supplied runtime directory's `discovery.json`:
+
+```text
+protocol = engine.local.v1
+transport = windows_named_pipe
+instance_id = 32 lowercase hexadecimal characters
+user_sid = current Windows process-token user SID
+server_pid = actual Windows server process ID
+query_pipe = \\.\pipe\filemanager-engine-<instance_id>-query
+admin_pipe = \\.\pipe\filemanager-engine-<instance_id>-admin
+query_token_file = <runtime directory>\query.token
+admin_token_file = <runtime directory>\admin.token
+```
+
+No Windows UID sentinel grants authority. Runtime files and directory must have
+the current SID as owner, and every allowed DACL principal must be that SID.
+New private directories use a protected current-SID-only inheritable DACL;
+existing broad ACLs fail rather than being silently changed. Opened leaf handles
+are checked for identity/kind/reparse attributes and ACL; state reads are bounded.
+Paths with reparse ancestors are refused. Runtime/store pins deny delete sharing.
+An exclusive runtime startup/serving lock and store writer lock prevent duplicate
+writers through the same state paths. New tokens rotate per process.
+
+The server uses a current-user-only pipe DACL and rejects remote clients. It
+verifies the actual client's process-token SID before hello. Clients open with
+identification-only SQOS, verify the actual server PID against private discovery
+and its process-token SID against the current user before transmitting a token.
+Hello remains `{protocol, authority, token}`. Query/admin credentials are distinct;
+admin operations are rejected on query authority. A Windows account is the trust
+boundary; this is not isolation from other processes already running as that user.
+
+Bounds reuse the existing 1 MiB frame ceiling, 32 query/4 admin active handlers,
+5-second hello/write, 30-second idle/request budgets and draining close behavior.
+Client context cancellation closes a connected pipe as well as cancelling dial.
+No admin retry is added.
+
+Windows admission is a distinct `fileman.engine.windows-deployment.v1` manifest,
+not a reinterpretation of the macOS UID manifest. It binds host MachineGuid,
+current user SID, deployment ID, exact root IDs/paths/object identities, relative
+exclusions and explicit engine-state placement. `index_enabled=false` is default:
+live query has no persistent catalogue. `index_enabled=true` requires a separate
+private store and currently one root. That profile authoritatively reconciles
+before publishing discovery on every start, preventing recovered generations
+from bypassing changed exclusions. The earlier macOS-only profile remains intact.
+
+Commands: `create-windows-manifest`, `serve-windows`, and existing `call-local`.
+This is an explicitly launched user process. No SCM registration, automatic
+indexing, network root discovery, or installed supervisor capability is claimed.
+Windows root-reparse observation and exact-current watcher coverage remain gates.
+
+Implementation: `cmd/fileman-engine/windows.go`,
+`internal/deployment/manifest_windows.go`, `internal/windowssecure/`,
+`internal/transport/local_windows.go`, and their Windows tests. The bounded
+shared dispatcher is retained. Microsoft go-winio v0.6.2 and x/sys v0.30.0 are
+pinned and vendored for offline builds. Dependency admission is bounded to
+Windows overlapped pipe lifecycle/security bindings, with deadline/cancellation,
+ACL rejection, authority separation, native live/indexed lifecycle and race
+checks; replacing these adapters does not change Engine semantic contracts.

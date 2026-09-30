@@ -14,6 +14,13 @@ does not establish rendering, interaction, search, accessibility or daily-root
 acceptance. The exact build revision, dirty state, platform, packaged file hashes
 and test/startup result travel in `build-receipt.json`.
 
+The build fingerprints installed SDK headers, libraries, runtime, resources and
+configuration. A changed or unknown fingerprint forces a clean frontend build:
+installation can preserve header timestamps, so timestamp-only incremental
+compilation is insufficient when a public C++ class layout changes. The
+fingerprint is checked after tests and again before/after package verification;
+an SDK replacement during the run rejects the package attempt.
+
 The owner/source coordinator controls Git commits, pushes and release uploads.
 This workflow uploads Actions artifacts and does not create a public release.
 
@@ -47,6 +54,14 @@ it still requires the matching GUI.Forms SDK. Distributable archives are under
 each attempt, preserving earlier attempts. No existing running executable or
 DLL is overwritten. `--skip-components` is an explicit frontend-only development
 option, and the receipt then lists no bundled services.
+
+The CMake install component `DocumentPicker` can install just the public picker
+libraries, headers and package configuration after focused picker tests. It does
+not install a potentially stale application executable:
+
+```sh
+cmake --install .build/native-windows-x64/frontend --component DocumentPicker
+```
 
 ## Package boundaries
 
@@ -84,3 +99,30 @@ fixture prefixes are redacted. Review the JSON before sharing, together with a
 manual description of the observed behavior. There are no uploads, directory
 listings, credential collection or automatic crash-log searches. Reports use
 exclusive creation and never overwrite an existing report.
+
+## First native execution evidence, 2026-09-29
+
+**MEASURED:** [CI run 36673458473](https://github.com/falseywinchnet/file_manager/actions/runs/36673458473)
+built source checkpoint `ddade5b2614b` on native hosted runners. This first run
+did not produce a verified distribution. Its failures are retained here:
+
+| Target | Passing evidence | Stopping result |
+|---|---|---|
+| macOS arm64 | GUI.Forms 72/72 CTests, 13.33 s | Frontend file-clock/system-clock duration conversion rejected by libc++; explicit `time_point_cast` required |
+| Ubuntu 24.04 x64 | GUI.Forms 67/67 CTests, 4.29 s | Frontend structured-binding range loop copied pairs; GCC `-Werror=range-loop-construct` required a const reference |
+| Windows x64 | GUI.Forms 64/65 CTests | API-reference Python fixture used locale-default text encoding for a Unicode lambda; explicit UTF-8 required |
+
+**MEASURED:** the later local Shadow build from that revision plus working-tree
+changes passed all 11 frontend CTests in 3.28 s after a clean SDK-bound rebuild.
+SDK content fingerprint:
+`bf3e9cf14dfab5aeefbff0bf7456bb57f7bdba9b3c41e6f4b87512072db00961`.
+Its generated-root packaged startup stayed alive for five seconds and archive
+CRC/file-hash readback passed. The dirty archive identity does not claim a clean
+source release. A fresh native CI checkpoint remains necessary for Mac/Linux
+application artifacts and a common source revision.
+
+**OBSERVED and corrected build hazard:** a changed SDK could preserve header
+timestamps, causing an incremental build to combine old TextBox allocations with
+a new DLL. The mixed build failed the picker-view and application tests; the
+clean rebuild passed. The SDK content stamp and automatic clean rule above retain
+the cause and prevent that incremental route.

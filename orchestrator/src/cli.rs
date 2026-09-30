@@ -30,7 +30,10 @@ pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<(), String> {
     };
 
     if engine_runtime.is_some() && (command != "serve-local" || engine_options.is_some()) {
-        return Err("--engine-runtime-dir requires serve-local without development Engine options".to_owned());
+        return Err(
+            "--engine-runtime-dir requires serve-local without development Engine options"
+                .to_owned(),
+        );
     }
     match command {
         "serve-local" => {
@@ -41,7 +44,12 @@ pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<(), String> {
             }
             let runtime = resolve_runtime_directory(runtime_directory)?;
             let settings = settings_directory.map(PathBuf::from);
-            return serve_local(&runtime, engine_options, settings.as_deref(), engine_runtime.as_deref());
+            return serve_local(
+                &runtime,
+                engine_options,
+                settings.as_deref(),
+                engine_runtime.as_deref(),
+            );
         }
         "call-local" => {
             if engine_options.is_some() {
@@ -86,6 +94,23 @@ pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<(), String> {
         _ => {}
     }
 
+    run_in_process(
+        &arguments,
+        runtime_directory.as_ref(),
+        settings_directory.as_ref(),
+        engine_options.as_ref(),
+        json_output,
+    )
+}
+
+fn run_in_process(
+    arguments: &[String],
+    runtime_directory: Option<&String>,
+    settings_directory: Option<&String>,
+    engine_options: Option<&EngineProviderConfig>,
+    json_output: bool,
+) -> Result<(), String> {
+    let command = arguments[0].as_str();
     if runtime_directory.is_some() {
         return Err(
             "--runtime-dir is valid only with serve-local, call-local, serve-launchd, or launchd-plist"
@@ -157,10 +182,22 @@ fn remove_engine_options(
 
 #[cfg(unix)]
 fn resolve_runtime_directory(explicit: Option<String>) -> Result<PathBuf, String> {
-    explicit.map_or_else(
-        || crate::local_endpoint::default_runtime_directory().map_err(|error| error.to_string()),
-        |path| Ok(path.into()),
-    )
+    explicit
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("FILEMAN_ORCHESTRATOR_RUNTIME_DIR").map(PathBuf::from))
+        .map_or_else(
+            || {
+                crate::local_endpoint::default_runtime_directory()
+                    .map_err(|error| error.to_string())
+            },
+            |path| {
+                if path.is_absolute() {
+                    Ok(path)
+                } else {
+                    Err("runtime directory must be absolute".to_owned())
+                }
+            },
+        )
 }
 
 #[cfg(target_os = "macos")]
@@ -179,9 +216,14 @@ fn resolve_settings_directory(explicit: Option<String>) -> Result<PathBuf, Strin
 
 #[cfg(not(unix))]
 fn resolve_runtime_directory(explicit: Option<String>) -> Result<PathBuf, String> {
-    explicit
-        .map(Into::into)
-        .ok_or_else(|| "this platform requires --runtime-dir PATH".to_owned())
+    let path = explicit
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("FILEMAN_ORCHESTRATOR_RUNTIME_DIR").map(PathBuf::from))
+        .unwrap_or_else(|| std::env::temp_dir().join("fo-orchestrator"));
+    if !path.is_absolute() {
+        return Err("runtime directory must be absolute".to_owned());
+    }
+    Ok(path)
 }
 
 fn remove_flag(arguments: &mut Vec<String>, flag: &str) -> bool {

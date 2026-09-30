@@ -1683,6 +1683,11 @@ if(GUI_FORMS_BUILD_TESTS)
     )
     add_test(NAME gui_forms_input_controls_tests COMMAND gui_forms_input_controls_tests)
 
+    add_executable(gui_forms_multiline_text_box_tests tests/multiline_text_box_tests.cpp)
+    target_link_libraries(gui_forms_multiline_text_box_tests PRIVATE
+        gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_multiline_text_box_tests COMMAND gui_forms_multiline_text_box_tests)
+
     add_executable(gui_forms_inspection_controls_tests
         tests/inspection_controls_tests.cpp)
     target_link_libraries(gui_forms_inspection_controls_tests PRIVATE

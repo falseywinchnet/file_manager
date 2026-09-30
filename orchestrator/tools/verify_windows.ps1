@@ -18,6 +18,8 @@ function Invoke-Checked {
 
 try {
     $env:PATH = "$RustBin;$MingwBin;$originalPath"
+    $priorJobs = $env:CARGO_BUILD_JOBS
+    $env:CARGO_BUILD_JOBS = '2'
     Invoke-Checked 'rustc' @('--version', '--verbose')
     Invoke-Checked 'cargo' @('fmt', '--manifest-path', $manifest, '--', '--check')
     Invoke-Checked 'cargo' @('test', '--manifest-path', $manifest, '--locked')
@@ -29,4 +31,5 @@ try {
     Invoke-Checked 'ctest' @('--test-dir', $build, '--output-on-failure')
 } finally {
     $env:PATH = $originalPath
+    $env:CARGO_BUILD_JOBS = $priorJobs
 }

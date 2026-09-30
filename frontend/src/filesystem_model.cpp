@@ -362,7 +362,8 @@ DirectorySnapshot read_directory(const std::filesystem::path& root,
 
 std::string format_modified_time(const std::filesystem::file_time_type time) {
     const std::chrono::system_clock::time_point system_time =
-        std::chrono::file_clock::to_sys(time);
+        std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+            std::chrono::file_clock::to_sys(time));
     const std::time_t seconds = std::chrono::system_clock::to_time_t(system_time);
     std::tm local{};
 #if defined(_WIN32)

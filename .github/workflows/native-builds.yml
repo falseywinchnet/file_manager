@@ -50,6 +50,33 @@ jobs:
           install: >-
             mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja mingw-w64-x86_64-python git
+      - name: Identify dependency compiler
+        id: dependency-compiler
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, os, subprocess
+          commands = [['clang', '--version']]
+          if os.uname().sysname == 'Darwin':
+              commands += [['xcrun', '--show-sdk-version']]
+          text = os.environ.get('ImageVersion', '')
+          for command in commands:
+              text += subprocess.check_output(command, text=True)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('identity=' + hashlib.sha256(text.encode()).hexdigest()[:20] + '\n')
+          PY
+      - name: Restore pinned source and Skia build cache
+        id: native-dependencies
+        if: runner.os != 'Windows'
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            gui_forms/third_party/skia
+            gui_forms/third_party/harfbuzz
+            gui_forms/third_party/freetype
+            .build/native-${{ matrix.platform }}/skia
+          key: native-deps-v1-${{ matrix.platform }}-${{ steps.dependency-compiler.outputs.identity }}-${{ hashFiles('gui_forms/third_party/fetch_skia_cpu.sh', 'gui_forms/third_party/fetch_text_stack.sh', 'gui_forms/third_party/build_skia_cpu*.sh', 'gui_forms/third_party/skia*.patch', 'gui_forms/third_party/skia_cpu_args.gn', 'tools/build_native.py') }}
       - name: Build Windows
         if: runner.os == 'Windows'
         shell: msys2 {0}
@@ -60,6 +87,16 @@ jobs:
       - name: Build Linux with test display
         if: runner.os == 'Linux'
         run: xvfb-run -a python3 tools/build_native.py --jobs 2
+      - name: Save pinned dependency cache after build attempts
+        if: always() && runner.os != 'Windows' && steps.native-dependencies.outputs.cache-primary-key != '' && steps.native-dependencies.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            gui_forms/third_party/skia
+            gui_forms/third_party/harfbuzz
+            gui_forms/third_party/freetype
+            .build/native-${{ matrix.platform }}/skia
+          key: ${{ steps.native-dependencies.outputs.cache-primary-key }}
       - name: Upload verified development archive
         uses: actions/upload-artifact@v4
         with:

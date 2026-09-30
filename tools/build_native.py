@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build a development distribution using native tools; never install services."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,20 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def sdk_fingerprint(sdk):
+    """Bind public headers, import/static libraries and runtime bytes to one SDK."""
+    digest = hashlib.sha256()
+    for directory in ['include', 'lib', 'bin', 'share']:
+        for path in sorted((sdk / directory).rglob('*')):
+            if path.is_file():
+                digest.update(path.relative_to(sdk).as_posix().encode('utf-8') + b'\0')
+                with path.open('rb') as stream:
+                    for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+                        digest.update(chunk)
+                digest.update(b'\0')
+    return digest.hexdigest()
 
 
 def run(*args, cwd=ROOT):
@@ -71,12 +86,21 @@ def main():
         'limits': ['No platform promotion or installed service claim; see package receipt']
     }, indent=2) + '\n', encoding='utf-8')
     frontend = build / 'frontend'
+    sdk_identity = sdk_fingerprint(sdk)
     run('cmake', '-S', ROOT / 'frontend', '-B', frontend, '-G', 'Ninja',
         '-DCMAKE_BUILD_TYPE=Release', f'-DGUIForms_DIR={sdk}/lib/cmake/GUIForms',
         f'-DFILE_MANAGER_GUI_FORMS_MANIFEST={manifest}',
         f'-DCMAKE_INSTALL_PREFIX={build}/frontend-sdk')
+    sdk_stamp = frontend / 'sdk-fingerprint.txt'
+    if not sdk_stamp.is_file() or sdk_stamp.read_text(encoding='utf-8').strip() != sdk_identity:
+        # Installed headers can preserve source mtimes across an SDK replacement.
+        # Ninja timestamp checks alone cannot protect public C++ class layout ABI.
+        run('cmake', '--build', frontend, '--target', 'clean')
     run('cmake', '--build', frontend, '--parallel', args.jobs)
     run('ctest', '--test-dir', frontend, '--output-on-failure', '--timeout', '120')
+    if sdk_fingerprint(sdk) != sdk_identity:
+        raise RuntimeError('GUI.Forms SDK changed during frontend build/tests; rebuild against a stable SDK')
+    sdk_stamp.write_text(sdk_identity + '\n', encoding='utf-8')
     run('cmake', '--install', frontend)
     if not args.skip_components:
         suffix = '.exe' if host == 'windows' else ''
@@ -90,6 +114,7 @@ def main():
         shutil.copy2(build / 'rust/release' / ('orchestrator' + suffix), services)
     (build / 'build-validation.json').write_text(json.dumps({
         'source_revision': revision, 'frontend_ctest': 'passed',
+        'gui_forms_sdk_sha256': sdk_identity,
         'gui_forms_ctest': 'externally supplied SDK' if args.gui_forms_sdk else 'passed'
     }, indent=2) + '\n', encoding='utf-8')
     run(sys.executable, ROOT / 'tools/package_native.py', '--build', build,

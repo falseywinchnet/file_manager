@@ -49,7 +49,7 @@ def all_symbols(data):
 def load_contracts(directory, data, root):
     contracts = {}
     for path in sorted(directory.glob('*.json')):
-        contents = json.loads(path.read_text())
+        contents = json.loads(path.read_text(encoding="utf-8"))
         if contents.get('schema') != 1: raise ValueError('Unknown contract schema: ' + str(path))
         for identifier, contract in contents['symbols'].items():
             if identifier in contracts: raise ValueError('Duplicate contract: ' + identifier)
@@ -163,7 +163,7 @@ def render(data, contracts, output, root):
             sections.append(('examples', 'Examples'))
             body += '<h2 id="examples">Examples</h2>'
             for example in contract['examples']:
-                body += paragraphs(example['caption']) + '<p class="metadata">' + escape(example['source']) + '</p><pre><code>' + escape((root / example['source']).read_text()) + '</code></pre>'
+                body += paragraphs(example['caption']) + '<p class="metadata">' + escape(example['source']) + '</p><pre><code>' + escape((root / example['source']).read_text(encoding="utf-8")) + '</code></pre>'
         if contract.get('see_also'):
             sections.append(('related', 'See also'))
             body += '<h2 id="related">See also</h2><ul>' + ''.join('<li>' + link(s) + '</li>' for s in contract['see_also']) + '</ul>'
@@ -178,16 +178,16 @@ def render(data, contracts, output, root):
     body += ''.join('<li>' + link(t['id']) + ': ' + str(sum(m['id'] in coverage['missing'] for m in t['members'])) + ' member contracts pending.</li>' for t in data['types'])
     body += '</ul>'
     page('coverage.html', 'Reference coverage', body, sections=(('pending', 'Pending contracts'),))
-    for filename, content in pages.items(): (output / filename).write_text(content + '\n')
+    for filename, content in pages.items(): (output / filename).write_text(content + '\n', encoding="utf-8")
     # This directory is entirely generated; only remove pages owned by an earlier manifest.
     manifest = output / 'pages.json'
     if manifest.exists():
-        for stale in set(json.loads(manifest.read_text())) - set(pages):
+        for stale in set(json.loads(manifest.read_text(encoding="utf-8"))) - set(pages):
             if Path(stale).name == stale and stale.endswith('.html'): (output / stale).unlink(missing_ok=True)
-    manifest.write_text(json.dumps(sorted(pages), indent=2) + '\n')
-    (output / 'reference.css').write_text(STYLE)
-    (output / 'search.js').write_text(SEARCH)
+    manifest.write_text(json.dumps(sorted(pages), indent=2) + '\n', encoding="utf-8")
+    (output / 'reference.css').write_text(STYLE, encoding="utf-8")
+    (output / 'search.js').write_text(SEARCH, encoding="utf-8")
     search = [{k: s[k] for k in ('id', 'header', 'page', 'declaration')} | {'summary': contracts.get(s['id'], {}).get('summary', '')} for s in symbols.values()]
-    (output / 'search-data.js').write_text('window.GUIFormsSearch=' + json.dumps(search, ensure_ascii=True) + ';\n')
-    (output / 'coverage.json').write_text(json.dumps(coverage, indent=2) + '\n')
+    (output / 'search-data.js').write_text('window.GUIFormsSearch=' + json.dumps(search, ensure_ascii=True) + ';\n', encoding="utf-8")
+    (output / 'coverage.json').write_text(json.dumps(coverage, indent=2) + '\n', encoding="utf-8")
     return coverage

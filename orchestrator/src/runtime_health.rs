@@ -99,7 +99,11 @@ impl RuntimeHealth {
             authoritative: false,
             consistency: "relaxed_observability",
             worker_limit: LOCAL_SESSION_WORKERS,
-            pending_session_limit: LOCAL_PENDING_SESSIONS,
+            pending_session_limit: if cfg!(windows) && self.kind == "local_daemon" {
+                0
+            } else {
+                LOCAL_PENDING_SESSIONS
+            },
             accepted_sessions: self.accepted_sessions.load(Ordering::Relaxed),
             rejected_sessions: self.rejected_sessions.load(Ordering::Relaxed),
             active_sessions: self.active_sessions.load(Ordering::Relaxed),

@@ -35,6 +35,20 @@ public:
     static std::uint64_t applied(const Application& application) {
         return application.applied_generation_;
     }
+    static void search(Application& application, const std::string& query) {
+        (*application.search_box_).set_text(query);
+        application.apply_filter();
+    }
+    static bool searching(const Application& application) { return application.search_loading_; }
+    static bool found(const Application& application, const std::string& filename) {
+        if (!application.search_showing_) return false;
+        for (const std::string& id : application.search_order_) {
+            const std::unordered_map<std::string, DirectoryEntry>::const_iterator entry = application.entries_.find(id);
+            if (entry != application.entries_.end() && (*entry).second.name == filename &&
+                (*entry).second.identity.available()) return true;
+        }
+        return false;
+    }
 };
 }
 
@@ -196,10 +210,41 @@ private:
     bool partial_{};
     gui_forms::Control::Ptr repaint_control_;
 };
+
+void run_live_search(const std::filesystem::path& root, const std::string& root_id,
+                     const std::string& query, const std::string& expected_filename) {
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(root, std::nullopt, false, root_id);
+    StopGuard stop(*application);
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
+    (*application).bind_host(noop, noop);
+    await_generation(*application, *window, 1, Clock::now(), "live_search.initial");
+    const Clock::time_point started = Clock::now();
+    file_manager::ApplicationLatencyProbe::search(*application, query);
+    do {
+        (*application).drain_ui();
+        if (Clock::now() - started > std::chrono::seconds(30)) {
+            throw std::runtime_error("live frontend search timed out");
+        }
+        if (file_manager::ApplicationLatencyProbe::searching(*application)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    } while (file_manager::ApplicationLatencyProbe::searching(*application));
+    if (!file_manager::ApplicationLatencyProbe::found(*application, expected_filename)) {
+        throw std::runtime_error("live frontend search did not return the expected identity-checked file");
+    }
+    (*window).perform_layout();
+    std::cout << "live_search,expected_file_present=true,elapsed_ms="
+              << milliseconds(Clock::now() - started) << '\n';
+}
 }
 
 int main(int argc, char** argv) {
     try {
+        if (argc == 6 && std::string_view(argv[2]) == "--live-search") {
+            run_live_search(file_manager::path_from_utf8(argv[1]), argv[3], argv[4], argv[5]);
+            return 0;
+        }
         if (argc != 2 && argc != 3) throw std::runtime_error("usage: application_latency_benchmark REPOSITORY [--native|--native-partial]");
         std::cout << std::fixed << std::setprecision(3);
         if (argc == 3) {

@@ -212,10 +212,10 @@ def extract(compiler):
     with tempfile.TemporaryDirectory(prefix="gui-forms-api-") as scratch:
         translation = Path(scratch) / "public.cpp"
         translation.write_text("".join('#include "' + str(p.relative_to(ROOT / "include")) + '"\n'
-                                       for p in sorted((ROOT / "include/gui_forms").rglob("*.hpp"))))
+                                       for p in sorted((ROOT / "include/gui_forms").rglob("*.hpp"))), encoding="utf-8")
         result = subprocess.run([compiler, "-std=c++20", "-x", "c++", "-Iinclude", "-fsyntax-only",
             "-Xclang", "-ast-dump=json", "-Xclang", "-ast-dump-filter=gui_", str(translation)],
-            cwd=ROOT, capture_output=True, text=True, check=False)
+            cwd=ROOT, capture_output=True, text=True, check=False, encoding="utf-8")
         if result.returncode:
             raise RuntimeError(result.stderr)
         return inventory(result.stdout)
@@ -229,15 +229,15 @@ def main():
     parser.add_argument("--check", action="store_true", help="Check the committed declaration inventory and contract schema")
     parser.add_argument("--inventory-only", action="store_true")
     args = parser.parse_args()
-    data = inventory(args.ast.read_text()) if args.ast else extract(args.clang)
+    data = inventory(args.ast.read_text(encoding="utf-8")) if args.ast else extract(args.clang)
     REFERENCE.mkdir(exist_ok=True)
     encoded = json.dumps(data, indent=2) + "\n"
     inventory_path = REFERENCE / "inventory.json"
     if args.check:
-        if not inventory_path.exists() or inventory_path.read_text() != encoded:
+        if not inventory_path.exists() or inventory_path.read_text(encoding="utf-8") != encoded:
             raise SystemExit("API inventory is stale; run tools/api_reference.py")
     else:
-        inventory_path.write_text(encoded)
+        inventory_path.write_text(encoded, encoding="utf-8")
     from api_reference_render import load_contracts, render
     contracts = load_contracts(REFERENCE / "contracts", data, ROOT)
     if not args.inventory_only and not args.check:

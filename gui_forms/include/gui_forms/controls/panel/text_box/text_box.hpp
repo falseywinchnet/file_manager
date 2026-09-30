@@ -47,7 +47,8 @@ public:
     [[nodiscard]] bool read_only() const noexcept { return read_only_; }
     void set_read_only(bool read_only);
     // Opt-in plain-text document editing. Existing single-line behavior remains
-    // the default. Stored line endings are preserved; Enter inserts LF.
+    // the default. Stored line endings are preserved; Enter uses newline_sequence
+    // (LF initially). Tab insertion is separately opt-in.
     [[nodiscard]] bool multiline() const noexcept { return multiline_; }
     void set_multiline(bool enabled);
     [[nodiscard]] bool word_wrap() const noexcept { return word_wrap_; }
@@ -56,9 +57,14 @@ public:
     void set_newline_sequence(std::string sequence);
     [[nodiscard]] bool accepts_tab() const noexcept { return accepts_tab_; }
     void set_accepts_tab(bool enabled);
-    // Multiline documents are bounded independently of TextStore's capacity.
+    // Provisional development bounds until cluster-position metrics replace
+    // prefix measurement. Validation/refusal never truncates source text.
     static constexpr std::size_t maximum_multiline_bytes = 1024U * 1024U;
     static constexpr std::size_t maximum_multiline_line_bytes = 4096U;
+    enum class MultilineValidation : std::uint8_t {
+        valid, invalid_utf8, document_too_large, line_too_long
+    };
+    [[nodiscard]] static MultilineValidation validate_multiline_text(std::string_view text);
     [[nodiscard]] std::size_t visual_line_count();
     [[nodiscard]] Point scroll_offset() const noexcept {
         return {horizontal_offset_, vertical_offset_};
@@ -174,6 +180,8 @@ private:
     bool accepts_tab_{};
     std::string newline_{"\n"};
     bool reveal_pending_{true};
+    bool caret_upstream_{};
+    bool next_upstream_{};
     double vertical_offset_{};
     double preferred_x_{-1.0};
     double line_height_{14.4};

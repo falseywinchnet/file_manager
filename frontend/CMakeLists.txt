@@ -226,7 +226,8 @@ elseif(WIN32)
 else()
     set_target_properties(file_manager PROPERTIES
         OUTPUT_NAME "File Manager"
-        BUILD_RPATH "$ORIGIN" INSTALL_RPATH "$ORIGIN")
+        BUILD_RPATH "$ORIGIN" INSTALL_RPATH "$ORIGIN"
+        BUILD_WITH_INSTALL_RPATH TRUE)
     add_custom_command(TARGET file_manager POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE:GUIForms::Application>" "$<TARGET_FILE_DIR:file_manager>/$<TARGET_SONAME_FILE_NAME:GUIForms::Application>"
@@ -252,17 +253,17 @@ write_basic_package_version_file(
 install(TARGETS file_manager_frontend_model file_manager_document_picker
                 file_manager_document_picker_view
     EXPORT FileManagerDocumentPickerTargets
-    ARCHIVE DESTINATION lib)
+    ARCHIVE DESTINATION lib COMPONENT DocumentPicker)
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/file_manager"
-    DESTINATION include)
+    DESTINATION include COMPONENT DocumentPicker)
 install(EXPORT FileManagerDocumentPickerTargets
     FILE FileManagerDocumentPickerTargets.cmake
     NAMESPACE FileManager::
-    DESTINATION "${FILE_MANAGER_PICKER_CMAKE_DIR}")
+    DESTINATION "${FILE_MANAGER_PICKER_CMAKE_DIR}" COMPONENT DocumentPicker)
 install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/FileManagerDocumentPickerConfig.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/FileManagerDocumentPickerConfigVersion.cmake"
-    DESTINATION "${FILE_MANAGER_PICKER_CMAKE_DIR}")
+    DESTINATION "${FILE_MANAGER_PICKER_CMAKE_DIR}" COMPONENT DocumentPicker)
 
 if(FILE_MANAGER_BUILD_TESTS)
     add_executable(file_manager_application_latency_benchmark EXCLUDE_FROM_ALL

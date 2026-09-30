@@ -46,8 +46,8 @@ using Count = unsigned;
 inline constexpr int limit = 10;
 }
 namespace gui_drawing { struct Example { int visible{}; }; }
-''')
-        result = subprocess.run(['clang++', '-std=c++20', '-x', 'c++', '-fsyntax-only', '-Wno-pragma-once-outside-header', '-Xclang', '-ast-dump=json', '-Xclang', '-ast-dump-filter=gui_', str(cls.header)], capture_output=True, text=True, check=True)
+''', encoding="utf-8")
+        result = subprocess.run(['clang++', '-std=c++20', '-x', 'c++', '-fsyntax-only', '-Wno-pragma-once-outside-header', '-Xclang', '-ast-dump=json', '-Xclang', '-ast-dump-filter=gui_', str(cls.header)], capture_output=True, text=True, check=True, encoding="utf-8")
         old = api_reference.ROOT
         api_reference.ROOT = cls.root
         try: cls.data = api_reference.inventory(result.stdout)
@@ -91,12 +91,12 @@ namespace gui_drawing { struct Example { int visible{}; }; }
         directory = self.root / 'contracts'
         directory.mkdir(exist_ok=True)
         path = directory / 'test.json'
-        path.write_text(json.dumps({'schema': 1, 'symbols': {'missing': {'summary': 'bad'}}}))
+        path.write_text(json.dumps({'schema': 1, 'symbols': {'missing': {'summary': 'bad'}}}), encoding="utf-8")
         with self.assertRaisesRegex(ValueError, 'Stale contract'):
             api_reference_render.load_contracts(directory, self.data, self.root)
         symbol = next(f for f in self.data['functions'] if f['name'] == 'process')
         contract = dict(reviewed=True, summary='Processes input.', remarks='Example.', ownership='Value.', threading='Any.', availability='Core.', returns='Integer.', errors='None.', parameters={'wrong': 'Input.'})
-        path.write_text(json.dumps({'schema': 1, 'symbols': {symbol['id']: contract}}))
+        path.write_text(json.dumps({'schema': 1, 'symbols': {symbol['id']: contract}}), encoding="utf-8")
         with self.assertRaisesRegex(ValueError, 'Parameter contract differs'):
             api_reference_render.load_contracts(directory, self.data, self.root)
         path.unlink()
@@ -107,7 +107,7 @@ namespace gui_drawing { struct Example { int visible{}; }; }
         self.assertEqual(coverage['reviewed_contracts'], 0)
         for path in output.glob('*.html'):
             import re
-            source = path.read_text()
+            source = path.read_text(encoding="utf-8")
             for href in re.findall(r'href="([^"]+)"', source):
                 if not href.startswith('#'):
                     self.assertTrue((output / href).exists(), (path.name, href))

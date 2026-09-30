@@ -33,7 +33,7 @@ fn human_status_is_concise() {
     assert!(stdout.contains("user-scoped, lazy, no GUI"));
 }
 
-#[cfg(not(unix))]
+#[cfg(not(any(unix, windows)))]
 #[test]
 fn local_transport_is_explicitly_unavailable_without_publishing_an_endpoint() {
     let runtime = std::env::temp_dir().join(format!(

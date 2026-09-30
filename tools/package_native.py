@@ -12,6 +12,9 @@ import subprocess
 import sys
 import tempfile
 import time
+import tarfile
+import zipfile
+from build_native import sdk_fingerprint
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -114,6 +117,8 @@ def main():
     validation = json.loads((build / 'build-validation.json').read_text(encoding='utf-8'))
     if validation['source_revision'] != revision or validation['frontend_ctest'] != 'passed':
         raise RuntimeError('Build validation is absent or belongs to another revision')
+    if sdk_fingerprint(sdk) != validation['gui_forms_sdk_sha256']:
+        raise RuntimeError('GUI.Forms SDK changed after frontend compilation; rebuild before packaging')
     if host == 'macos':
         app = package / 'File Manager.app'
         shutil.copytree(frontend / 'File Manager.app', app, symlinks=False)
@@ -203,10 +208,28 @@ def main():
         else:
             raise RuntimeError(f'Packaged application exited early ({code}) after {time.monotonic() - start:.2f}s')
     receipt['files'] = {p.relative_to(package).as_posix(): sha256(p) for p in sorted(package.rglob('*')) if p.is_file()}
+    if sdk_fingerprint(sdk) != validation['gui_forms_sdk_sha256']:
+        raise RuntimeError('GUI.Forms SDK changed during package verification; discard this staging attempt')
     (package / 'build-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
     (build / 'package-check.json').write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
     name = f'file-manager-0.001-alpha-{host}-{arch}-{revision[:12]}' + ('-dirty' if dirty else '')
     archive = Path(shutil.make_archive(str(distribution / name), 'zip' if host == 'windows' else 'gztar', stage, package.name))
+    # Re-read archive bytes, not just the staging directory, before publishing a checksum.
+    if host == 'windows':
+        with zipfile.ZipFile(archive) as packed:
+            if packed.testzip() is not None:
+                raise RuntimeError('Archive CRC check failed')
+            for relative, expected in receipt['files'].items():
+                if hashlib.sha256(packed.read('FileManager/' + relative)).hexdigest() != expected:
+                    raise RuntimeError(f'Archive hash mismatch: {relative}')
+    else:
+        with tarfile.open(archive, 'r:gz') as packed:
+            for relative, expected in receipt['files'].items():
+                member = packed.extractfile('FileManager/' + relative)
+                if member is None or hashlib.sha256(member.read()).hexdigest() != expected:
+                    raise RuntimeError(f'Archive hash mismatch: {relative}')
+            if not packed.getmember('FileManager/' + receipt['executable']).mode & 0o111:
+                raise RuntimeError('Archive lost executable permissions')
     (distribution / (archive.name + '.sha256')).write_text(sha256(archive) + '  ' + archive.name + '\n', encoding='utf-8')
     print(archive)
 

@@ -82,6 +82,13 @@ The [2026-09-29 Windows validation receipt](results/WINDOWS_TOOLCHAIN_VALIDATION
 records the verified user-local Go toolchain, PowerShell build/test/race commands,
 native fixture results, and remaining Windows platform gates.
 
+The [Windows local deployment profile](docs/WINDOWS_LOCAL_DEPLOYMENT.md) now
+provides explicit host/SID/root-bound user-process startup and authenticated
+query/admin named pipes. It defaults to catalogue-independent live search;
+persistent indexing requires separate explicit consent. Native fixture evidence
+is recorded there; SCM installation and full Windows platform promotion remain
+open.
+
 ```sh
 go test ./...
 go test -race ./...

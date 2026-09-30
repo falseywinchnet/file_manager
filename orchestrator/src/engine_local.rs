@@ -9,14 +9,21 @@ use crate::engine_contract::{
 };
 use crate::engine_jsonl::{EngineJsonlCaller, EngineJsonlError, EngineJsonlSearchAdapter};
 use crate::engine_port::EngineSearchProvider;
-use nix::fcntl::{OFlag, open};
-use nix::sys::stat::Mode;
+#[cfg(unix)]
+use nix::{
+    fcntl::{OFlag, open},
+    sys::stat::Mode,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+#[cfg(unix)]
 use std::fs::File;
 use std::io::{Read, Write};
-use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
-use std::os::unix::net::UnixStream;
+#[cfg(unix)]
+use std::os::unix::{
+    fs::{FileTypeExt, MetadataExt, PermissionsExt},
+    net::UnixStream,
+};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -39,9 +46,18 @@ pub enum EngineLocalAuthority {
 struct Discovery {
     protocol: String,
     instance_id: String,
+    #[cfg(unix)]
     uid: u32,
+    #[cfg(windows)]
+    user_sid: String,
+    #[cfg(windows)]
+    server_pid: u32,
+    #[cfg(windows)]
+    transport: String,
+    #[cfg_attr(windows, serde(rename = "query_pipe"))]
     query_socket: PathBuf,
     query_token_file: PathBuf,
+    #[cfg_attr(windows, serde(rename = "admin_pipe"))]
     admin_socket: PathBuf,
     admin_token_file: PathBuf,
 }
@@ -108,11 +124,29 @@ impl EngineLocalCaller {
             EngineLocalAuthority::Admin => (&discovery.admin_socket, &discovery.admin_token_file),
         };
         let token = read_token(token_path)?;
-        validate_private_socket(socket_path, discovery.uid)?;
-        let mut stream = UnixStream::connect(socket_path)?;
-        validate_peer(&stream, discovery.uid)?;
-        stream.set_read_timeout(Some(CALL_TIMEOUT))?;
-        stream.set_write_timeout(Some(CALL_TIMEOUT))?;
+        #[cfg(unix)]
+        let mut stream = {
+            validate_private_socket(socket_path, discovery.uid)?;
+            let stream = UnixStream::connect(socket_path)?;
+            validate_peer(&stream, discovery.uid)?;
+            stream.set_read_timeout(Some(CALL_TIMEOUT))?;
+            stream.set_write_timeout(Some(CALL_TIMEOUT))?;
+            stream
+        };
+        #[cfg(windows)]
+        let mut stream = {
+            let name = socket_path
+                .to_str()
+                .ok_or_else(|| protocol_error("invalid pipe name"))?;
+            let mut stream = crate::windows_local::Pipe::connect(
+                name,
+                discovery.server_pid,
+                &discovery.user_sid,
+            )?;
+            stream.timeout = CALL_TIMEOUT;
+            stream.reset_deadline();
+            stream
+        };
 
         write_frame(
             &mut stream,
@@ -244,6 +278,7 @@ pub fn default_m4_engine_runtime() -> Result<PathBuf, String> {
         .join("com.filemanager.engine.fm1"))
 }
 
+#[cfg(unix)]
 fn validate_private_directory(path: &Path) -> Result<(), EngineJsonlError> {
     let metadata = path.symlink_metadata()?;
     if !metadata.is_dir()
@@ -258,6 +293,7 @@ fn validate_private_directory(path: &Path) -> Result<(), EngineJsonlError> {
     Ok(())
 }
 
+#[cfg(unix)]
 fn validate_discovery(runtime: &Path, discovery: &Discovery) -> Result<(), EngineJsonlError> {
     let uid = nix::unistd::Uid::current().as_raw();
     if discovery.protocol != LOCAL_PROTOCOL
@@ -273,6 +309,7 @@ fn validate_discovery(runtime: &Path, discovery: &Discovery) -> Result<(), Engin
     Ok(())
 }
 
+#[cfg(unix)]
 fn validate_private_socket(path: &Path, expected_uid: u32) -> Result<(), EngineJsonlError> {
     let metadata = path.symlink_metadata()?;
     if !metadata.file_type().is_socket()
@@ -286,6 +323,7 @@ fn validate_private_socket(path: &Path, expected_uid: u32) -> Result<(), EngineJ
     Ok(())
 }
 
+#[cfg(unix)]
 fn validate_peer(stream: &UnixStream, expected_uid: u32) -> Result<(), EngineJsonlError> {
     let (uid, _) = nix::unistd::getpeereid(stream).map_err(nix_error)?;
     if uid.as_raw() != expected_uid {
@@ -294,6 +332,7 @@ fn validate_peer(stream: &UnixStream, expected_uid: u32) -> Result<(), EngineJso
     Ok(())
 }
 
+#[cfg(unix)]
 fn read_private_json<T: for<'de> Deserialize<'de>>(
     path: &Path,
     maximum_bytes: usize,
@@ -312,6 +351,7 @@ fn read_private_json<T: for<'de> Deserialize<'de>>(
     serde_json::from_slice(&payload).map_err(EngineJsonlError::Decode)
 }
 
+#[cfg(unix)]
 fn read_token(path: &Path) -> Result<String, EngineJsonlError> {
     let mut file = open_no_follow(path)?;
     validate_private_file(&file, TOKEN_BYTES)?;
@@ -325,6 +365,7 @@ fn read_token(path: &Path) -> Result<String, EngineJsonlError> {
     Ok(token)
 }
 
+#[cfg(unix)]
 fn open_no_follow(path: &Path) -> Result<File, EngineJsonlError> {
     let descriptor = open(
         path,
@@ -335,6 +376,7 @@ fn open_no_follow(path: &Path) -> Result<File, EngineJsonlError> {
     Ok(File::from(descriptor))
 }
 
+#[cfg(unix)]
 fn validate_private_file(file: &File, maximum_bytes: usize) -> Result<(), EngineJsonlError> {
     let metadata = file.metadata()?;
     if !metadata.is_file()
@@ -349,9 +391,7 @@ fn validate_private_file(file: &File, maximum_bytes: usize) -> Result<(), Engine
     Ok(())
 }
 
-fn read_frame<T: for<'de> Deserialize<'de>>(
-    stream: &mut UnixStream,
-) -> Result<T, EngineJsonlError> {
+fn read_frame<T: for<'de> Deserialize<'de>>(stream: &mut impl Read) -> Result<T, EngineJsonlError> {
     let mut header = [0_u8; FRAME_HEADER_BYTES];
     stream.read_exact(&mut header)?;
     if &header[..4] != FRAME_MAGIC {
@@ -366,7 +406,7 @@ fn read_frame<T: for<'de> Deserialize<'de>>(
     serde_json::from_slice(&payload).map_err(EngineJsonlError::Decode)
 }
 
-fn write_frame<T: Serialize>(stream: &mut UnixStream, value: &T) -> Result<(), EngineJsonlError> {
+fn write_frame<T: Serialize>(stream: &mut impl Write, value: &T) -> Result<(), EngineJsonlError> {
     let payload = serde_json::to_vec(value).map_err(EngineJsonlError::Encode)?;
     if payload.is_empty() || payload.len() > MAX_FRAME_BYTES {
         return Err(EngineJsonlError::FrameTooLarge);
@@ -381,6 +421,48 @@ fn write_frame<T: Serialize>(stream: &mut UnixStream, value: &T) -> Result<(), E
     Ok(())
 }
 
+#[cfg(windows)]
+fn validate_private_directory(path: &Path) -> Result<(), EngineJsonlError> {
+    crate::windows_local::private_directory(path, false)?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn validate_discovery(runtime: &Path, discovery: &Discovery) -> Result<(), EngineJsonlError> {
+    if discovery.protocol != LOCAL_PROTOCOL
+        || discovery.transport != "windows_named_pipe"
+        || discovery.instance_id.is_empty()
+        || discovery.user_sid != crate::windows_local::current_sid()?
+        || discovery.server_pid == 0
+        || discovery.query_token_file.parent() != Some(runtime)
+        || discovery.admin_token_file.parent() != Some(runtime)
+        || discovery.query_token_file == discovery.admin_token_file
+        || discovery.query_socket == discovery.admin_socket
+    {
+        return Err(protocol_error("Windows Engine discovery mismatch"));
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn read_private_json<T: for<'de> Deserialize<'de>>(
+    path: &Path,
+    limit: usize,
+) -> Result<T, EngineJsonlError> {
+    serde_json::from_slice(&crate::windows_local::read_private(path, limit)?)
+        .map_err(EngineJsonlError::Decode)
+}
+
+#[cfg(windows)]
+fn read_token(path: &Path) -> Result<String, EngineJsonlError> {
+    let token = String::from_utf8(crate::windows_local::read_private(path, TOKEN_BYTES)?)
+        .map_err(|_| protocol_error("Engine token is not UTF-8"))?;
+    if token.len() != TOKEN_BYTES || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(protocol_error("Engine token must be 256-bit hexadecimal"));
+    }
+    Ok(token)
+}
+
 fn protocol_error(message: &str) -> EngineJsonlError {
     EngineJsonlError::Io(std::io::Error::new(
         std::io::ErrorKind::InvalidData,
@@ -388,11 +470,12 @@ fn protocol_error(message: &str) -> EngineJsonlError {
     ))
 }
 
+#[cfg(unix)]
 fn nix_error(error: nix::errno::Errno) -> EngineJsonlError {
     EngineJsonlError::Io(std::io::Error::from_raw_os_error(error as i32))
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::{EngineLocalAuthority, EngineLocalCaller, default_m4_engine_runtime};
 

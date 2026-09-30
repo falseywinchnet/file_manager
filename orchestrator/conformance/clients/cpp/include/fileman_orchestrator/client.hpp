@@ -352,7 +352,7 @@ public:
     void shutdown();
 
 private:
-    explicit Client(int socket, SessionInfo session) noexcept;
+    explicit Client(std::intptr_t socket, SessionInfo session) noexcept;
     static Client connect_once(const std::filesystem::path& runtime_directory,
                                std::string client_name);
     [[nodiscard]] std::string call(std::string_view method,
@@ -362,7 +362,7 @@ private:
                                    std::string_view params_json = "{}",
                                    bool allow_partial = false);
 
-    int socket_{-1};
+    std::intptr_t socket_{-1};
     std::uint64_t next_request_id_{1};
     SessionInfo session_;
 };

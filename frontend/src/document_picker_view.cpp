@@ -238,7 +238,8 @@ DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
 
     subscriptions_.push_back(locations_->selected_index_changed().subscribe(
         [this](const std::optional<std::size_t> index) {
-            if (!reloading_ && index && *index < controller_.request().admitted_roots.size())
+            if (!reloading_ && index && *index < controller_.request().admitted_roots.size() &&
+                controller_.request().admitted_roots[*index] != controller_.request().protected_root)
                 navigate_path(controller_.request().admitted_roots[*index]);
         }));
     subscriptions_.push_back(name_filter_->committed().subscribe(
@@ -292,6 +293,7 @@ DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
         [this](const std::optional<std::size_t> index) {
             if (reloading_) return;
             if (!index || *index >= controller_.request().filters.size()) return;
+            if (controller_.request().filters[*index].id == controller_.active_filter_id()) return;
             if (controller_.set_active_filter(
                     controller_.request().filters[*index].id)) {
                 reload();
@@ -300,6 +302,7 @@ DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
     subscriptions_.push_back(hidden_->checked_changed().subscribe(
         [this](const bool checked) {
             if (reloading_) return;
+            if (checked == controller_.show_hidden()) return;
             if (controller_.set_show_hidden(checked)) reload();
         }));
     subscriptions_.push_back(filename_->text_changed().subscribe(
@@ -335,9 +338,7 @@ DocumentPickerView::completed() noexcept {
 
 void DocumentPickerView::set_orchestrator_session_valid(const bool valid) {
     controller_.set_orchestrator_session_valid(valid);
-    status_->set_text(valid ? "Selection session ready"
-                            : "Selection session unavailable Â· browsing only");
-    accept_->set_enabled(valid);
+    update_status();
 }
 
 void DocumentPickerView::set_authority_valid(const bool valid) {
@@ -351,12 +352,11 @@ void DocumentPickerView::confirm_overwrite() {
     accept(true);
 }
 
-void DocumentPickerView::present(
-    const std::filesystem::path& initial_location) {
+void DocumentPickerView::present(const std::filesystem::path& initial_location) {
+    finished_ = false;
     navigate_path(initial_location);
     objects_->clear_selection();
-    status_->set_text(std::to_string(controller_.browser().entries.size()) +
-                      " visible objects Â· direct filesystem");
+    if (auto* window = root_->attached_window()) attach_dialog(*window);
 }
 
 void DocumentPickerView::attach_dialog(gui_forms::Window& window) {
@@ -372,8 +372,8 @@ void DocumentPickerView::update_status() {
     status_->set_text(controller_.session_valid()
         ? std::to_string(controller_.browser().entries.size()) + " visible objects" +
             (controller_.request().authority == DocumentPickerAuthority::trusted_local_host
-                ? " · local host selection" : "")
-        : "Selection session unavailable · browsing only");
+                ? " - local host selection" : "")
+        : "Selection session unavailable - browsing only");
 }
 
 void DocumentPickerView::reload() {
@@ -401,6 +401,7 @@ void DocumentPickerView::reload() {
     }
     objects_->set_items(std::move(items));
     objects_->clear_selection();
+    (void)controller_.set_selection({});
     filename_->set_text(controller_.filename());
     std::vector<std::string> filters;
     filters.reserve(controller_.request().filters.size());
@@ -415,8 +416,8 @@ void DocumentPickerView::reload() {
     filter_->set_visible(!controller_.request().filters.empty());
     if (selected_filter) filter_->set_selected_index(*selected_filter);
     hidden_->set_checked(controller_.show_hidden());
-    status_->set_text(std::to_string(controller_.browser().entries.size()) +
-                      " visible objects Â· direct filesystem");
+    reloading_ = false;
+    update_status();
 }
 
 void DocumentPickerView::navigate_path(std::filesystem::path path) {
@@ -441,7 +442,10 @@ void DocumentPickerView::accept(const bool overwrite_confirmed) {
         }
     }
     if (save_profile(controller_.request().profile)) {
-        (void)controller_.set_filename(std::string(filename_->text()));
+        if (!controller_.set_filename(std::string(filename_->text()))) {
+            status_->set_text("Filename exceeds the supported byte limit");
+            return;
+        }
     }
     publish(controller_.accept(overwrite_confirmed));
 }
@@ -450,6 +454,7 @@ void DocumentPickerView::publish(DocumentPickerResult result) {
     if (finished_) return;
     if (result.accepted() || result.terminal == DocumentPickerTerminal::cancelled) {
         finished_ = true;
+        controller_.set_authority_valid(false);
         accept_->set_enabled(false);
     }
     if (result.terminal == DocumentPickerTerminal::validation_error ||

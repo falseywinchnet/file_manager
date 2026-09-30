@@ -81,10 +81,20 @@ int main() {
     require(!accept->enabled(), "reload must retain authority loss");
     view.set_orchestrator_session_valid(true);
     const auto objects = std::dynamic_pointer_cast<gui_forms::ObjectView>(window.find("file-manager.picker.objects"));
+    const auto file_for_reload = std::find_if(view.controller().browser().entries.begin(), view.controller().browser().entries.end(),
+        [](const auto& entry) { return entry.name == "open.txt"; });
+    objects->set_selected_ids({file_for_reload->stable_id});
+    const auto hidden = std::dynamic_pointer_cast<gui_forms::CheckBox>(window.find("file-manager.picker.hidden"));
+    hidden->set_checked(true);
+    require(objects->selected_ids().empty() && view.controller().selected_ids().empty(),
+        "refresh clears visible and semantic selection together");
     const auto folder = std::find_if(view.controller().browser().entries.begin(), view.controller().browser().entries.end(),
         [](const auto& entry) { return entry.directory; });
-    require(view.controller().set_selection({folder->stable_id}) && accept->perform_click() &&
-        view.controller().browser().location.filename() == "Folder", "Open button enters selected folder");
+    const bool folder_selected = view.controller().set_selection({folder->stable_id});
+    const bool folder_clicked = accept->perform_click();
+    if (!folder_selected || !folder_clicked || view.controller().browser().location.filename() != "Folder")
+        std::cerr << "folder selected=" << folder_selected << " clicked=" << folder_clicked << " location=" << view.controller().browser().location << " error=" << view.controller().last_error() << '\n';
+    require(folder_selected && folder_clicked && view.controller().browser().location.filename() == "Folder", "Open button enters selected folder");
     window.dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::l, gui_forms::Modifier::control});
     require(window.focused_control() == window.find("file-manager.picker.path"), "Ctrl+L focuses location");
     window.dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::up, gui_forms::Modifier::alt});

@@ -294,3 +294,52 @@ overflow, semantic activation and keyboard navigation. Pointer ownership follows
 the visible chevron nose instead of an overlapping rectangular approximation.
 This API is consumed through the development Windows SDK. Cross-platform source
 availability does not replace native platform evidence.
+
+## Plain-text multiline TextBox development extension — 2026-09-29
+
+Status: **GIVEN** current owner direction to build a traditional Notepad using
+GUI.Forms. **OBSERVED** additive development C++ implementation; not a stable
+C ABI addition or final large-document architecture decision.
+
+The provider adds `TextBox::set_multiline(bool)`, `set_word_wrap(bool)`,
+`set_newline_sequence(std::string)` and `set_accepts_tab(bool)`, with corresponding
+getters. Existing controls retain single-line defaults. Multiline/word-wrap/Tab
+insertion default false; the insertion newline defaults LF and accepts exactly
+LF, CR, or CRLF. Stored UTF-8 and existing line endings are preserved exactly.
+The existing font, selection, clipboard, text/selection events, read-only,
+maximum-length, and undo/redo APIs remain the common edit path.
+
+Multiline behavior includes visual-row Up/Down/Home/End/PageUp/PageDown,
+Ctrl+Home/End document navigation, Shift selection, two-dimensional hit testing,
+retained caret reveal, three-row wheel scrolling, and wrapping at spaces/tabs
+with grapheme fallback. Four-space tab stops are presentation only. Soft-wrap
+caret affinity retains the end of the preceding visual row when appropriate.
+Font metrics are resolved through the attached public TextMetricsProvider;
+visual-row geometry is cached by document revision, effective font, width and
+provider. Paint emits only visible rows and retains complete shaping runs
+between tabs instead of cutting arbitrary chunks through joining text.
+
+**CANDIDATE development limits, not accepted final Notepad semantics:**
+`maximum_multiline_bytes` is 1 MiB; `maximum_multiline_line_bytes` is 4096 UTF-8
+bytes excluding the logical line terminator. Static `validate_multiline_text`
+returns `MultilineValidation::{valid, invalid_utf8, document_too_large,
+line_too_long}` before a consumer replaces its current document. Oversized or
+invalid `set_text` throws without changing text/selection/history; edits/paste
+return false without truncation. Consumers must surface a truthful refusal or
+separate read-only route and preserve their current document. Password masking
+and multiline mode are mutually exclusive. Existing undo history remains
+bounded to 128 snapshots and 8 MiB in total.
+
+The current metric seam provides whole-text width and font metrics, not shaping
+cluster caret positions. Cold prefix measurement is quadratic within the
+4096-byte logical-line bound; repeated paints reuse geometry. Removing that
+provisional bound requires a negotiated cluster-position/line-layout metric
+extension and separate storage/history workload evidence. Logical Unicode
+grapheme editing is covered; visual bidi caret parity, full IME composition and
+accessible multiline text-range parity are not claimed. No native OS edit
+control, browser engine, or Notepad-specific state is introduced.
+
+`visual_line_count()` and `scroll_offset()` expose retained presentation facts
+for inspection. Focused evidence is in
+`../experiments/MULTILINE_TEXT_BOX_2026-09-29.md`. Canonical development registry
+and installed SDK publication remain parent-owned coordination steps.

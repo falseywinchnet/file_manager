@@ -26,9 +26,9 @@ pub mod release;
 pub mod runtime_health;
 mod service;
 pub mod settings;
-pub mod worker_pool;
 #[cfg(windows)]
 mod windows_local;
+pub mod worker_pool;
 
 pub use common::{ApiError, ApiErrorCode, Request, Response, TerminalStatus};
 pub use kernel::Kernel;

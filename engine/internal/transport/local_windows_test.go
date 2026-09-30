@@ -127,6 +127,12 @@ func TestWindowsNamedPipeLiveAuthorityAndLifecycle(t *testing.T) {
 	if err != nil || status.RootStates[0].Indexed {
 		t.Fatalf("live search created catalogue: %+v err=%v", status, err)
 	}
+	// A connected client that sends no hello must not keep shutdown blocked.
+	idle, err := winio.DialPipeAccessImpLevel(ctx, discovery.QueryPipe, windows.GENERIC_READ|windows.GENERIC_WRITE, winio.PipeImpLevelIdentification)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer idle.Close()
 	response, err = CallLocal(ctx, runtimeDir, AuthorityAdmin, Request{ID: "stop", Method: "engine.shutdown"})
 	if err != nil || response.Error != nil {
 		t.Fatalf("shutdown=%+v err=%v", response, err)

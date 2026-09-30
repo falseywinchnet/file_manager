@@ -454,3 +454,23 @@ This is a source-package layout change, not a frozen cross-process ABI or a new
 filesystem identity authority. Windows live IPC and installed service readiness
 remain Orchestrator-owned gates. See the native frontend evidence receipt under
 `../results/2026-09-29-shadow-windows/`.
+
+## Windows service and trusted local picker reconciliation — 2026-09-29
+
+**GIVEN:** current owner direction admits actual separate Engine search and an
+offline first-party picker. **OBSERVED:** the C++ source client now projects the
+unchanged API over authenticated current-user ORC1 pipes; Windows explicit-process
+semantics and remaining gates live in
+`../../orchestrator/spec/WINDOWS_LOCAL_PROJECTION.md`. The earlier unavailable
+client receipt above is historical. `FILEMAN_ORCHESTRATOR_RUNTIME_DIR` chooses
+an absolute private discovery directory for every default connection. It does
+not install services or change readiness. Real Go/Rust/C++ live-query evidence
+is separate from fixtures; supervisor restart and durable settings remain open.
+
+The owner-approved typed local picker grant is reconciled in
+`../../orchestrator/spec/contracts/DOCUMENT_PICKER_LOCAL.md`. The independently
+installed source package defaults unavailable, requires explicit first-party
+identity/root/purpose policy, and revokes each completed owned presentation.
+It returns only revalidated selection; the host revalidates before its own I/O.
+No daemon session, plugin privilege or inferred drive authority is fabricated.
+Consumer instructions/evidence live in `../docs/document_picker.md`.

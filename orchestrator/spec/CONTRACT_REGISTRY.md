@@ -79,6 +79,30 @@ practical UI improvement using the Paint toolkit. Provider negotiation and
 validation live in GUI.Forms/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md. These
 in-process presentation settings add no wire operation, service authority or
 stable ABI promise; existing Windows service availability remains unchanged.
+### Native Windows service and offline picker reconciliation — 2026-09-29
+
+**GIVEN:** the owner opened actual separate Engine integration and explicitly
+approved trusted first-party offline picker authority. The unavailable receipt
+above is the earlier checkpoint, superseded for explicit-process transport by
+[WINDOWS_LOCAL_PROJECTION.md](WINDOWS_LOCAL_PROJECTION.md). ORC-LIF-001,
+ORC-FE-001 and ORC-ENG-001/002/003/004 retain existing messages over current-user
+ORC1/ENG1 named pipes. Engine reply 008 is reconciled there. Supervision,
+durable settings and Windows release readiness remain open.
+
+ORC-PCK-001 now has the bounded first-party in-process development projection
+in [contracts/DOCUMENT_PICKER_LOCAL.md](contracts/DOCUMENT_PICKER_LOCAL.md).
+Its explicit typed local grant is independent of daemon/index availability;
+the future daemon/plugin capability service remains proposed.
+
+ORC-GUI-001 additionally admits first-party development consumption of public
+TextBox multiline/wrap/newline/Tab/validation APIs. The GUI.Forms negotiation
+receipt and `gui_forms/experiments/MULTILINE_TEXT_BOX_2026-09-29.md` record
+65/65 Windows tests and SDK installation. The 1 MiB document and 4096-byte logical
+line guards remain provisional provider limits, not final Notepad semantics.
+Consumers validate before replacement and report refusal without truncation.
+No stable C ABI, large-document decision, IME/bidi/accessibility parity or final
+application acceptance is inferred.
+
 ## Explicitly forbidden edges
 
 - plugin worker → Go engine writable/index API;

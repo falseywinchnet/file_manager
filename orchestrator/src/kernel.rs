@@ -622,7 +622,7 @@ impl Kernel {
                  "effect": "authoritative_metadata_scan"},
                 {"id": "rebuild", "title": "Rebuild projection", "available": true,
                  "effect": "checked_generation_replacement"},
-                {"id": "restart", "title": "Restart", "available": true,
+                {"id": "restart", "title": "Restart", "available": engine_supervisor_available(&status),
                  "effect": "new_instance_same_admitted_policy"}
             ]
         })
@@ -735,6 +735,13 @@ impl Kernel {
                 "checked_generation_replacement",
             ),
             "restart" if command.root_id.is_none() => {
+                if !engine_supervisor_available(&status) {
+                    return Err(ApiError::new(
+                        ApiErrorCode::Unavailable,
+                        TerminalStatus::Unavailable,
+                        "no admitted supervisor can restart this Engine instance",
+                    ));
+                }
                 ("engine.shutdown", json!({}), "launchd_keepalive_restart")
             }
             _ => {
@@ -791,6 +798,17 @@ fn unavailable_engine_service(reason: &str) -> Value {
         "reason": reason,
         "commands": []
     })
+}
+
+fn engine_supervisor_available(status: &Value) -> bool {
+    status["capabilities"]
+        .as_array()
+        .is_some_and(|capabilities| {
+            capabilities.iter().any(|capability| {
+                capability["id"] == "engine.supervisor.launchd"
+                    && capability["state"] == "available"
+            })
+        })
 }
 
 fn required_root_id(command: &ServiceCommandRequest) -> Result<&str, ApiError> {
@@ -1138,6 +1156,35 @@ mod tests {
     struct BlockingSearch {
         entered: mpsc::SyncSender<()>,
         release: mpsc::Receiver<()>,
+    }
+
+    #[test]
+    fn engine_restart_requires_actual_supervisor_without_sending_shutdown() {
+        struct UnsupervisedEngine;
+        impl crate::engine_jsonl::EngineJsonlCaller for UnsupervisedEngine {
+            fn call(
+                &mut self,
+                method: &str,
+                _params: &serde_json::Value,
+            ) -> Result<serde_json::Value, crate::engine_jsonl::EngineJsonlError> {
+                assert_eq!(
+                    method, "engine.status",
+                    "must not stop an unsupervised provider"
+                );
+                Ok(
+                    serde_json::json!({"lifecycle":{"instance_id":"engine-test","state":"ready"}, "roots":[], "capabilities":[{"id":"engine.supervisor.launchd","state":"unavailable"}]}),
+                )
+            }
+        }
+        let kernel = Kernel::for_local_daemon().with_installed_engine_admin(UnsupervisedEngine);
+        let snapshot = kernel
+            .handle(Request::local("services", "orchestrator.services.snapshot"))
+            .result
+            .expect("snapshot");
+        assert_eq!(snapshot["services"][1]["commands"][3]["available"], false);
+        let mut command = Request::local("restart", "orchestrator.services.command");
+        command.params = serde_json::json!({"service_id":"engine","command_id":"restart","expected_instance_id":"engine-test"});
+        assert_eq!(kernel.handle(command).status, TerminalStatus::Unavailable);
     }
 
     impl UnifiedEngineSearch for BlockingSearch {

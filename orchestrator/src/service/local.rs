@@ -33,7 +33,9 @@ pub(crate) fn serve_local(
     engine_runtime: Option<&Path>,
 ) -> Result<(), String> {
     if engine_runtime.is_some() {
-        return Err("explicit Engine runtime is not yet admitted by this Unix development host".to_owned());
+        return Err(
+            "explicit Engine runtime is not yet admitted by this Unix development host".to_owned(),
+        );
     }
     let endpoint = UnixEndpoint::bind(runtime_directory).map_err(|error| error.to_string())?;
     let mut kernel = Kernel::for_local_daemon();

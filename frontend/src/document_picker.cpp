@@ -39,6 +39,7 @@ FileSelectionController::FileSelectionController(DocumentPickerRequest request)
     if (request_.owner_application_id.empty()) {
         throw std::invalid_argument("picker owner application ID is empty");
     }
+    if (request_.protected_root.empty()) throw std::invalid_argument("picker requires an explicit root");
     const auto supplied_root = std::filesystem::absolute(
         request_.protected_root).lexically_normal();
     auto supplied_initial = request_.initial_location.empty()
@@ -318,12 +319,12 @@ DocumentPickerResult FileSelectionController::accept(
         return selection_error("location-changed", "Current folder changed; refresh before selecting");
     }
     if (profile_saves()) {
-        if (!show_hidden_ && !filename_.empty() && filename_.front() == '.') {
-            return selection_error("hidden-destination", "Enable Show hidden to select a hidden destination");
-        }
         if (!valid_platform_basename(filename_)) {
             return selection_error("invalid-filename",
                                    "save filename must be one valid basename");
+        }
+        if (!show_hidden_ && !filename_.empty() && filename_.front() == '.') {
+            return selection_error("hidden-destination", "Enable Show hidden to select a hidden destination");
         }
         auto name = filename_;
         auto extension = normalize_extension(request_.default_extension);

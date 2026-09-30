@@ -2238,7 +2238,7 @@ void require_inside(const gui_forms::Control::Ptr& control, const gui_forms::Siz
 void test_adaptive_layout_preserves_fields_commands_and_selection() {
     TemporaryTree fixture;
     const std::shared_ptr<file_manager::Application> application =
-        std::make_shared<file_manager::Application>(fixture.root(), std::nullopt, false, std::string{});
+        std::make_shared<file_manager::Application>(fixture.root(), std::nullopt, false, "fixture-adaptive-root");
     ApplicationStopGuard stop_guard(*application);
     const std::unique_ptr<gui_forms::Window> window = application->make_window();
     application->bind_host(adaptive_noop, adaptive_noop);
@@ -2267,6 +2267,15 @@ void test_adaptive_layout_preserves_fields_commands_and_selection() {
         for (const gui_forms::Size size : {gui_forms::Size{150,150}, {360,260}, {540,620}, {800,320}, {1340,850}, {1920,1080}}) {
             window->resize(size);
             window->perform_layout();
+            if (objects->absolute_bounds().height < 64.0) {
+                const std::shared_ptr<gui_forms::ResponsiveTrackPanel> shell =
+                    std::dynamic_pointer_cast<gui_forms::ResponsiveTrackPanel>(window->find("file-manager-app.shell"));
+                const gui_forms::ResponsiveLayoutSnapshot snapshot = shell->layout_snapshot();
+                std::cerr << "adaptive scale=" << scale << " viewport=" << size.width << ',' << size.height << '\n';
+                for (const gui_forms::ResponsiveTrackResult& track : snapshot.resolution.tracks) {
+                    std::cerr << "track min=" << track.minimum << " allocated=" << track.allocated << " collapsed=" << track.collapsed() << '\n';
+                }
+            }
             require_inside(objects, size, 64.0, "content");
             require_inside(path_host, size, 28.0, "location field");
             if (size.width >= 420 && size.height >= 360) require_inside(search_host, size, 28.0, "search field");
@@ -2287,6 +2296,7 @@ void test_adaptive_layout_preserves_fields_commands_and_selection() {
     window->perform_layout();
     require_inside(search_host, {150,150}, 28.0, "minimum search field");
     require(window->focused_control() == search && !path_host->effectively_visible(), "minimum search uses its own retained field");
+    search->set_text("unsubmitted query draft");
     require(window->dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::l, primary}),
             "Ctrl/Command+L must return to exact location from minimum search");
     window->perform_layout();
@@ -2299,7 +2309,8 @@ void test_adaptive_layout_preserves_fields_commands_and_selection() {
             "reflow must preserve the path draft and focus");
     window->resize({1340,850});
     window->perform_layout();
-    require(menu->items().size() == 7U && preview->effectively_visible() && objects->selected_id() == selected,
+    require(menu->items().size() == 7U && preview->effectively_visible() && objects->selected_id() == selected &&
+                search->text() == "unsubmitted query draft",
             "wide restoration must recover menu geography, preview and exact selection");
 }
 

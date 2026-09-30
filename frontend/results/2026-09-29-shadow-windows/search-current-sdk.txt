@@ -1,0 +1,2 @@
+live_search.initial,total_ms=21.7404,drain_ms=0.3382,max_drain_ms=0.3371,drains=2,final_layout_ms=0.4624,flushes=1,measure_passes=2,arrange_passes=2
+live_search,expected_file_present=true,elapsed_ms=15.3626

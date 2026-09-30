@@ -2,13 +2,17 @@
 
 #include <utility>
 
-#if defined(__unix__) || defined(__APPLE__)
+#if defined(__unix__) || defined(__APPLE__) || defined(_WIN32)
 
+#if defined(_WIN32)
+#include "client_windows.hpp"
+#else
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
+#endif
 
 #include <cerrno>
 #include <algorithm>
@@ -85,9 +89,11 @@ void validate_utf8(const std::string_view input) {
     }
 }
 
+#if !defined(_WIN32)
 std::string system_error(const std::string_view operation) {
     return std::string(operation) + ": " + std::strerror(errno);
 }
+#endif
 
 class JsonParser final {
 public:
@@ -385,6 +391,9 @@ std::string json_escape(const std::string_view input) {
 }
 
 std::string read_bounded_file(const std::filesystem::path& path, const std::size_t limit) {
+#if defined(_WIN32)
+    return windows_local::read_private(path, limit);
+#else
     std::ifstream input(path, std::ios::binary);
     if (!input) fail("cannot open " + path.string());
     std::string bytes;
@@ -394,6 +403,7 @@ std::string read_bounded_file(const std::filesystem::path& path, const std::size
     if (bytes.size() > limit) fail("file exceeds byte ceiling: " + path.string());
     if (!input.eof() && input.fail()) fail("cannot read " + path.string());
     return bytes;
+#endif
 }
 
 void validate_runtime_path(const std::filesystem::path& path) {
@@ -403,6 +413,7 @@ void validate_runtime_path(const std::filesystem::path& path) {
     }
 }
 
+#if !defined(_WIN32)
 struct stat checked_stat(const std::filesystem::path& path) {
     struct stat status {};
     if (::lstat(path.c_str(), &status) != 0) fail(system_error("lstat " + path.string()));
@@ -417,7 +428,7 @@ void validate_private(const std::filesystem::path& path, const uid_t owner, cons
     if ((status.st_mode & 0077) != 0) fail("endpoint object is not private: " + path.string());
 }
 
-void send_all(const int socket, const void* data, const std::size_t size) {
+void send_all(const std::intptr_t socket, const void* data, const std::size_t size) {
     const auto* bytes = static_cast<const char*>(data);
     std::size_t sent = 0;
     while (sent < size) {
@@ -432,7 +443,7 @@ void send_all(const int socket, const void* data, const std::size_t size) {
     }
 }
 
-void receive_all(const int socket, void* data, const std::size_t size) {
+void receive_all(const std::intptr_t socket, void* data, const std::size_t size) {
     auto* bytes = static_cast<char*>(data);
     std::size_t received = 0;
     while (received < size) {
@@ -444,29 +455,40 @@ void receive_all(const int socket, void* data, const std::size_t size) {
     }
 }
 
-void write_frame(const int socket, const std::string_view payload) {
+void local_close(std::intptr_t socket) noexcept { ::close(static_cast<int>(socket)); }
+#else
+void send_all(std::intptr_t socket, const void* data, std::size_t size) {
+    windows_local::transfer(socket, const_cast<void*>(data), size, true);
+}
+void receive_all(std::intptr_t socket, void* data, std::size_t size) {
+    windows_local::transfer(socket, data, size, false);
+}
+void local_close(std::intptr_t socket) noexcept { windows_local::close(socket); }
+#endif
+
+void write_frame(const std::intptr_t socket, const std::string_view payload) {
     if (payload.empty() || payload.size() > local_wire_max_frame_bytes) fail("outgoing frame violates byte ceiling");
-    const auto length = htonl(static_cast<std::uint32_t>(payload.size()));
+    const std::uint32_t length = static_cast<std::uint32_t>(payload.size());
     char header[8];
     std::memcpy(header, wire_magic.data(), wire_magic.size());
-    std::memcpy(header + 4, &length, sizeof(length));
+    for (unsigned index = 0; index < 4; ++index) header[4 + index] = static_cast<char>(length >> (24 - index * 8));
     send_all(socket, header, sizeof(header));
     send_all(socket, payload.data(), payload.size());
 }
 
-std::string read_frame(const int socket) {
+std::string read_frame(const std::intptr_t socket) {
     char header[8];
     receive_all(socket, header, sizeof(header));
     if (std::string_view(header, 4) != wire_magic) fail("local frame has invalid magic");
-    std::uint32_t network_length{};
-    std::memcpy(&network_length, header + 4, sizeof(network_length));
-    const auto length = ntohl(network_length);
+    std::uint32_t length{};
+    for (unsigned index = 0; index < 4; ++index) length = (length << 8) | static_cast<unsigned char>(header[4 + index]);
     if (length == 0 || length > local_wire_max_frame_bytes) fail("incoming frame violates byte ceiling");
     std::string payload(length, '\0');
     receive_all(socket, payload.data(), payload.size());
     return payload;
 }
 
+#if !defined(_WIN32)
 void set_timeouts(const int socket) {
     timeval timeout{};
     timeout.tv_sec = 5;
@@ -475,6 +497,7 @@ void set_timeouts(const int socket) {
         fail(system_error("configure local socket timeout"));
     }
 }
+#endif
 
 std::string trim_ascii(std::string value) {
     const auto whitespace = [](const unsigned char byte) {
@@ -809,7 +832,7 @@ std::vector<AvailabilityInfo> parse_availability(const JsonValue& value) {
 
 }  // namespace
 
-Client::Client(const int socket, SessionInfo session) noexcept
+Client::Client(const std::intptr_t socket, SessionInfo session) noexcept
     : socket_(socket), session_(std::move(session)) {}
 
 Client::Client(Client&& other) noexcept
@@ -819,7 +842,7 @@ Client::Client(Client&& other) noexcept
 
 Client& Client::operator=(Client&& other) noexcept {
     if (this != &other) {
-        if (socket_ >= 0) ::close(socket_);
+        if (socket_ >= 0) local_close(socket_);
         socket_ = std::exchange(other.socket_, -1);
         next_request_id_ = other.next_request_id_;
         session_ = std::move(other.session_);
@@ -828,10 +851,25 @@ Client& Client::operator=(Client&& other) noexcept {
 }
 
 Client::~Client() {
-    if (socket_ >= 0) ::close(socket_);
+    if (socket_ >= 0) local_close(socket_);
 }
 
 std::filesystem::path default_runtime_directory() {
+#if defined(_WIN32)
+    const wchar_t* configured = _wgetenv(L"FILEMAN_ORCHESTRATOR_RUNTIME_DIR");
+    if (configured != nullptr && *configured != L'\0') {
+        const std::filesystem::path runtime(configured);
+        validate_runtime_path(runtime);
+        return runtime;
+    }
+#else
+    const char* configured = std::getenv("FILEMAN_ORCHESTRATOR_RUNTIME_DIR");
+    if (configured != nullptr && *configured != '\0') {
+        const std::filesystem::path runtime(configured);
+        validate_runtime_path(runtime);
+        return runtime;
+    }
+#endif
 #if defined(__APPLE__)
     const char* home = std::getenv("HOME");
     if (home == nullptr || *home == '\0') fail("HOME is unavailable for macOS service discovery");
@@ -851,6 +889,9 @@ Client Client::connect_default(std::string client_name) {
 }
 
 Client Client::connect(const std::filesystem::path& runtime_directory, std::string client_name) {
+#if defined(_WIN32)
+    return connect_once(runtime_directory, std::move(client_name));
+#else
     try {
         return connect_once(runtime_directory, client_name);
     } catch (const ClientError& initial_error) {
@@ -862,15 +903,15 @@ Client Client::connect(const std::filesystem::path& runtime_directory, std::stri
         address.sun_family = AF_UNIX;
         const auto encoded_path = socket_path.string();
         if (encoded_path.size() >= sizeof(address.sun_path)) {
-            ::close(trigger);
+            local_close(trigger);
             throw;
         }
         std::memcpy(address.sun_path, encoded_path.c_str(), encoded_path.size() + 1);
         if (::connect(trigger, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0) {
-            ::close(trigger);
+            local_close(trigger);
             throw;
         }
-        ::close(trigger);
+        local_close(trigger);
 
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
         while (std::chrono::steady_clock::now() < deadline) {
@@ -883,11 +924,15 @@ Client Client::connect(const std::filesystem::path& runtime_directory, std::stri
         fail("local daemon activation did not publish a usable endpoint; initial error: " +
              initial_message);
     }
+#endif
 }
 
 Client Client::connect_once(const std::filesystem::path& runtime_directory,
                             std::string client_name) {
     validate_runtime_path(runtime_directory);
+#if defined(_WIN32)
+    windows_local::validate_directory(runtime_directory);
+#else
     const auto directory = checked_stat(runtime_directory);
     if ((directory.st_mode & S_IFMT) != S_IFDIR || directory.st_uid != ::geteuid()) {
         fail("runtime directory has unexpected type or owner");
@@ -895,13 +940,16 @@ Client Client::connect_once(const std::filesystem::path& runtime_directory,
     if ((directory.st_mode & 0077) != 0 || (directory.st_mode & 0700) != 0700) {
         fail("runtime directory is not private");
     }
+#endif
 
     const auto discovery_path = runtime_directory / "discovery.json";
     const auto credential_path = runtime_directory / "session.token";
+#if !defined(_WIN32)
     const auto socket_path = runtime_directory / "orchestrator.sock";
     validate_private(discovery_path, directory.st_uid, S_IFREG);
     validate_private(credential_path, directory.st_uid, S_IFREG);
     validate_private(socket_path, directory.st_uid, S_IFSOCK);
+#endif
 
     auto discovery_json = read_bounded_file(discovery_path, discovery_limit);
     const auto discovery_value = JsonParser(discovery_json).parse();
@@ -911,7 +959,9 @@ Client Client::connect_once(const std::filesystem::path& runtime_directory,
         unsigned_integer(field(discovery, "major"), "discovery.major") != local_wire_major ||
         unsigned_integer(field(discovery, "minor"), "discovery.minor") > local_wire_minor ||
         instance_id.empty() ||
+#if !defined(_WIN32)
         string(field(discovery, "endpoint"), "discovery.endpoint") != socket_path.string() ||
+#endif
         string(field(discovery, "credential_file"), "discovery.credential_file") != "session.token") {
         fail("discovery record does not match the local endpoint");
     }
@@ -922,9 +972,18 @@ Client Client::connect_once(const std::filesystem::path& runtime_directory,
         fail("client name is empty or too long");
     }
 
+#if defined(_WIN32)
+    if (string(field(discovery, "transport"), "discovery.transport") != "windows_named_pipe") fail("invalid Windows transport");
+    const std::intptr_t socket = windows_local::connect(
+        string(field(discovery, "endpoint"), "discovery.endpoint"),
+        narrow_u32(unsigned_integer(field(discovery, "server_pid"), "discovery.server_pid"), "server_pid"),
+        string(field(discovery, "user_sid"), "discovery.user_sid"));
+#else
     const int socket = ::socket(AF_UNIX, SOCK_STREAM, 0);
     if (socket < 0) fail(system_error("create Unix socket"));
+#endif
     try {
+#if !defined(_WIN32)
         set_timeouts(socket);
         sockaddr_un address{};
         address.sun_family = AF_UNIX;
@@ -934,6 +993,7 @@ Client Client::connect_once(const std::filesystem::path& runtime_directory,
         if (::connect(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0) {
             fail(system_error("connect Unix socket"));
         }
+#endif
 
         const std::string hello = "{\"family\":\"orchestrator.local\",\"major\":" +
                                   std::to_string(local_wire_major) + ",\"minor\":" +
@@ -961,7 +1021,7 @@ Client Client::connect_once(const std::filesystem::path& runtime_directory,
         }
         return Client(socket, std::move(session));
     } catch (...) {
-        ::close(socket);
+        local_close(socket);
         throw;
     }
 }
@@ -1477,7 +1537,7 @@ bool BootstrapSnapshot::orchestrator_gate_ready() const noexcept {
 
 void Client::shutdown() {
     (void)call("orchestrator.shutdown", "ORC-LIF-001", 1, 0);
-    ::close(std::exchange(socket_, -1));
+    local_close(std::exchange(socket_, -1));
 }
 
 }  // namespace fileman::orchestrator
@@ -1496,7 +1556,7 @@ Client Client::connect(const std::filesystem::path&, std::string) {
 Client Client::connect_default(std::string) {
     throw ClientError("the C++ conformance client currently requires a Unix-domain socket platform");
 }
-Client::Client(const int socket, SessionInfo session) noexcept : socket_(socket), session_(std::move(session)) {}
+Client::Client(const std::intptr_t socket, SessionInfo session) noexcept : socket_(socket), session_(std::move(session)) {}
 Client::Client(Client&&) noexcept = default;
 Client& Client::operator=(Client&&) noexcept = default;
 Client::~Client() = default;

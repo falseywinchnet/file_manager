@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.24)
+project(DocumentPickerConsumer LANGUAGES CXX)
+find_package(FileManagerDocumentPicker 1.0 REQUIRED CONFIG)
+add_executable(document_picker_consumer main.cpp)
+target_compile_features(document_picker_consumer PRIVATE cxx_std_20)
+target_link_libraries(document_picker_consumer PRIVATE FileManager::DocumentPickerView)
+enable_testing()
+add_test(NAME independent_picker_consumer COMMAND document_picker_consumer)

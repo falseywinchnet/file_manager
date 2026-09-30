@@ -199,9 +199,11 @@ std::optional<std::int64_t> parse_criteria_date(std::string_view value) {
         return character >= '0' && character <= '9' ? character - '0' : -1;
     };
     int parts[8]{};
-    for (const auto [source, target] :
+    for (const std::pair<unsigned, unsigned>& indices :
          {std::pair{0U, 0U}, {1U, 1U}, {2U, 2U}, {3U, 3U},
           {5U, 4U}, {6U, 5U}, {8U, 6U}, {9U, 7U}}) {
+        const unsigned source = indices.first;
+        const unsigned target = indices.second;
         parts[target] = digit(value[source]);
         if (parts[target] < 0) return {};
     }
@@ -1936,6 +1938,11 @@ void Application::update_command_state() {
         command_forward_->state().enabled);
     form_.file_manager_app_shell_location_navigation_up->set_enabled(
         command_up_->state().enabled);
+    (*command_focus_location_).set_enabled(files_active && !(*rename_box_).visible());
+    (*command_focus_search_).set_enabled(files_active && engine_search_available() && !(*rename_box_).visible());
+    (*command_focus_search_).set_availability_reason(engine_search_available()
+        ? (files_active ? std::string{} : hidden_workspace_reason)
+        : "Search unavailable for this root");
     search_box_->set_enabled(files_active && engine_search_available());
     search_box_->set_placeholder_text(engine_search_available()
         ? "Search this subtree"
@@ -1955,8 +1962,11 @@ void Application::update_adaptive_preview() {
     const double height = (*form_.file_manager_app_shell).committed_arranged_bounds().height;
     const bool expanded = selected && (height == 0.0 || height >= 560.0);
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface).set_visible(expanded);
-    (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview).set_minimum_size(
-        {0.0, expanded ? 224.0 : 54.0});
+    const double preview_height = expanded ? 224.0 : 54.0;
+    (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview).set_minimum_size({0.0, preview_height});
+    gui_forms::Rect requested = (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview).requested_bounds();
+    requested.height = preview_height;
+    (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview).set_requested_bounds(requested);
 }
 
 void Application::update_adaptive_layout(const gui_forms::Rect bounds) {
@@ -1985,6 +1995,9 @@ void Application::update_adaptive_layout(const gui_forms::Rect bounds) {
         (*form_.file_manager_app_shell_location_search_host).set_maximum_size({search_width, 30});
         const double location_height = stacked ? 79.0 : 42.0;
         (*form_.file_manager_app_shell_location).set_minimum_size({0, location_height});
+        gui_forms::Rect location_bounds = (*form_.file_manager_app_shell_location).requested_bounds();
+        location_bounds.height = location_height;
+        (*form_.file_manager_app_shell_location).set_requested_bounds(location_bounds);
         gui_forms::ResponsiveTrackSpec location_track = (*form_.file_manager_app_shell).track_specs()[3];
         location_track.minimum = location_height;
         location_track.preferred = location_height;
@@ -2022,7 +2035,7 @@ void Application::focus_search_command() { static_cast<void>(focus_search_accele
 void Application::focus_location_command() { static_cast<void>(focus_location_accelerator()); }
 
 bool Application::focus_search_accelerator() {
-    if (!window_ || settings_open_ || (*rename_box_).visible()) return false;
+    if (!window_ || settings_open_ || (*rename_box_).visible() || !(*search_box_).enabled()) return false;
     const std::shared_ptr<gui_forms::TextBox> editor =
         std::dynamic_pointer_cast<gui_forms::TextBox>((*window_).focused_control());
     if (editor && editor != path_box_ && editor != search_box_) return false;
@@ -3956,7 +3969,7 @@ void Application::apply_engine_search(
             path,
             result.name,
             directory ? "Folder" : format_bytes(result.size),
-            "Indexed observation",
+            page.source == "catalogue" ? "Indexed observation" : "Live filesystem observation",
             identity,
             kind,
             directory,
@@ -4520,6 +4533,8 @@ void Application::begin_rename() {
     rename_box_->set_text(found->second.name);
     breadcrumb_->set_visible(false);
     rename_box_->set_visible(true);
+    compact_search_active_ = false;
+    update_adaptive_layout((*form_.file_manager_app_shell).committed_arranged_bounds());
     rename_box_->select_all();
     update_mutation_controls();
     if (window_) window_->request_focus(rename_box_);

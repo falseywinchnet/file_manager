@@ -16,16 +16,15 @@
 namespace gui_forms {
 using namespace input_control_detail;
 
-namespace {
-bool admitted_multiline_text(std::string_view text) {
-    if (text.size() > TextBox::maximum_multiline_bytes || !validate_utf8(text).valid()) return false;
+TextBox::MultilineValidation TextBox::validate_multiline_text(std::string_view text) {
+    if (text.size() > maximum_multiline_bytes) return MultilineValidation::document_too_large;
+    if (!validate_utf8(text).valid()) return MultilineValidation::invalid_utf8;
     const TextStore candidate(text);
     for (std::size_t i = 0; i < candidate.line_count(); ++i) {
         const auto range = candidate.line_content_range(LineIndex(i));
-        if (range.end.value() - range.start.value() > TextBox::maximum_multiline_line_bytes) return false;
+        if (range.end.value() - range.start.value() > maximum_multiline_line_bytes) return MultilineValidation::line_too_long;
     }
-    return true;
-}
+    return MultilineValidation::valid;
 }
 
 TextBox::TextBox(StableId stable_id, std::string text)
@@ -53,7 +52,7 @@ BindingValue TextBox::text_property_value() const {
 
 void TextBox::set_text(std::string text) {
     require_mutable();
-    if (multiline_ && !admitted_multiline_text(text)) {
+    if (multiline_ && validate_multiline_text(text) != MultilineValidation::valid) {
         throw std::invalid_argument("Multiline TextBox requires valid UTF-8, at most 1 MiB total and 4096 bytes per line");
     }
     if (text == store_.utf8()) {
@@ -99,7 +98,7 @@ void TextBox::set_read_only(bool read_only) {
 void TextBox::set_multiline(bool enabled_value) {
     require_mutable();
     if (multiline_ == enabled_value) return;
-    if (enabled_value && (password_protected() || !admitted_multiline_text(text()))) {
+    if (enabled_value && (password_protected() || validate_multiline_text(text()) != MultilineValidation::valid)) {
         throw std::invalid_argument("Multiline TextBox requires unmasked valid UTF-8, at most 1 MiB total and 4096 bytes per line");
     }
     multiline_ = enabled_value;
@@ -244,6 +243,7 @@ bool TextBox::undo() {
     if (read_only_ || undo_.empty()) {
         return false;
     }
+    if (multiline_ && validate_multiline_text(undo_.back().text) != MultilineValidation::valid) return false;
     Snapshot target = std::move(undo_.back());
     history_bytes_ -= target.text.size();
     undo_.pop_back();
@@ -257,6 +257,7 @@ bool TextBox::redo() {
     if (read_only_ || redo_.empty()) {
         return false;
     }
+    if (multiline_ && validate_multiline_text(redo_.back().text) != MultilineValidation::valid) return false;
     Snapshot target = std::move(redo_.back());
     history_bytes_ -= target.text.size();
     redo_.pop_back();
@@ -281,7 +282,7 @@ bool TextBox::replace(Utf8Offset start, Utf8Offset end,
     if (multiline_) {
         std::string candidate(text());
         candidate.replace(start.value(), end.value() - start.value(), replacement);
-        if (!admitted_multiline_text(candidate)) return false;
+        if (validate_multiline_text(candidate) != MultilineValidation::valid) return false;
     }
     const std::size_t removed_scalars =
         store_.scalar_index(end).value() - store_.scalar_index(start).value();
@@ -356,16 +357,20 @@ bool TextBox::paste() {
 }
 
 void TextBox::set_selection(TextSelection selection, bool reveal_caret) {
+    const bool upstream = std::exchange(next_upstream_, false);
     if (selection_ == selection) {
         if (reveal_caret) {
             reset_caret_blink();
         }
+        caret_upstream_ = upstream;
+        invalidate(Dirty::paint);
         return;
     }
     selection_ = selection;
     if (reveal_caret) {
         reset_caret_blink();
     }
+    caret_upstream_ = upstream;
     invalidate(Dirty::paint | Dirty::semantics);
     publish_change(selection_changed_, selection_);
 }
@@ -519,8 +524,10 @@ std::size_t TextBox::caret_line() const {
         selection_.caret.value(), [](std::size_t value, const VisualLine& row) {
             return value < row.offsets.front();
         });
-    return found == visual_lines_.begin() ? 0U
+    std::size_t row = found == visual_lines_.begin() ? 0U
         : static_cast<std::size_t>(found - visual_lines_.begin() - 1);
+    if (caret_upstream_ && row > 0 && visual_lines_[row - 1].offsets.back() == selection_.caret.value()) --row;
+    return row;
 }
 
 double TextBox::multiline_boundary_x(std::size_t line, Utf8Offset offset) const {
@@ -545,8 +552,10 @@ Utf8Offset TextBox::position_in_line(std::size_t line, double x) const {
 Utf8Offset TextBox::multiline_position_at(double x, double y) {
     ensure_multiline_layout();
     const double row = std::max(0.0, std::floor((y - 4.0 + vertical_offset_) / line_height_));
-    return position_in_line(std::min(static_cast<std::size_t>(row), visual_lines_.size() - 1),
-        x - text_left_ + horizontal_offset_);
+    const std::size_t index = std::min(static_cast<std::size_t>(row), visual_lines_.size() - 1);
+    const Utf8Offset position = position_in_line(index, x - text_left_ + horizontal_offset_);
+    next_upstream_ = position.value() == visual_lines_[index].offsets.back();
+    return position;
 }
 
 void TextBox::reveal_multiline_caret() {
@@ -774,7 +783,7 @@ void TextBox::on_pointer(PointerEvent& event) {
     const double local_y = event.position.y - absolute.y;
     if (multiline_ && event.action == PointerAction::wheel) {
         ensure_multiline_layout();
-        vertical_offset_ = std::clamp(vertical_offset_ - event.wheel_delta.y,
+        vertical_offset_ = std::clamp(vertical_offset_ - event.wheel_delta.y * line_height_ * 3.0,
             0.0, std::max(0.0, visual_lines_.size() * line_height_ -
                 std::max(0.0, local_bounds().height - 8.0)));
         reveal_pending_ = false;
@@ -835,6 +844,7 @@ void TextBox::on_key(KeyEvent& event) {
             next = command ? (first ? Utf8Offset(0) : store_.utf8_size())
                 : Utf8Offset(first ? visual_lines_[row].offsets.front()
                                    : visual_lines_[row].offsets.back());
+            next_upstream_ = !command && !first;
         } else {
             if (goal < 0.0) goal = multiline_boundary_x(row, selection_.caret);
             const bool up = event.physical_key == PhysicalKey::up ||
@@ -846,6 +856,7 @@ void TextBox::on_key(KeyEvent& event) {
             const std::size_t target = up ? row - std::min(row, step)
                 : std::min(visual_lines_.size() - 1, row + step);
             next = position_in_line(target, goal);
+            next_upstream_ = next.value() == visual_lines_[target].offsets.back();
         }
         set_selection(extend ? TextSelection{selection_.anchor, next} : TextSelection{next, next});
         if (!home_end) preferred_x_ = goal;
@@ -982,6 +993,7 @@ void TextBox::on_text_input(TextInputEvent& event) {
 }
 
 void TextBox::reset_caret_blink() {
+    caret_upstream_ = false;
     reveal_pending_ = true;
     preferred_x_ = -1.0;
     caret_visible_ = true;
@@ -1034,8 +1046,7 @@ SemanticDescriptor TextBox::semantic_descriptor() const {
 
 bool TextBox::on_semantic_action(SemanticAction action, std::string_view value) {
     if (action == SemanticAction::set_value && !read_only_) {
-        select_all();
-        return replace_selection(value);
+        return replace(Utf8Offset(0), store_.utf8_size(), value);
     }
     return Panel::on_semantic_action(action, value);
 }
