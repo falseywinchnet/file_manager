@@ -147,3 +147,55 @@ arm64. The package therefore requires **macOS 26 or later** and startup was
 measured on **macOS 26.6.2**; earlier OS compatibility is not established. Later
 packages record the load-command/plist minimum explicitly in their receipt.
 This baseline predates the subsequent DPI and service-launcher corrections.
+
+## Published three-platform dogfood snapshot
+
+**MEASURED:** [native run 36679615538](https://github.com/falseywinchnet/file_manager/actions/runs/36679615538)
+passed at `342c42a48bc18532995d9bd5cf5854625a45bf98`:
+
+| Native target | GUI.Forms | Frontend |
+|---|---:|---:|
+| Windows x64 | 66/66, 9.32 s | 11/11, 1.59 s |
+| macOS arm64 | 73/73, 28.78 s | 11/11, 1.74 s |
+| Ubuntu 24.04 x64 | 68/68, 5.17 s | 10/10, 0.63 s |
+
+The [published prerelease](https://github.com/falseywinchnet/file_manager/releases/tag/v0.001-alpha.20260930)
+contains clean archives at that common source revision. Mac/Linux bytes come
+from native CI; Windows bytes come from the clean Shadow build with the tested
+local SDK. That Windows archive passed 11/11 frontend tests, all 44 extracted
+file hashes, a five-second startup with only Windows system directories on
+PATH, and both live/indexed explicit service-launch checks. Independent
+archive checks matched 42 Mac files and 40 Linux files and preserved executable
+permissions. Uploaded GitHub asset digests match these SHA-256 values:
+
+| Archive | SHA-256 |
+|---|---|
+| Windows x64 | `49fb74b224d71a8d0f99db1849550996f524642c873baaa8da38e6660a2bc856` |
+| macOS arm64 | `d0a1c571f2dc30ebed83e445b90b50b2ad5587195a53812089b582c87197fda9` |
+| Linux x64 | `3235fd722b6d648d247516b0e712c4ea80d82936ebfc616251040855d9ec49fa` |
+
+**OBSERVED / retained failure:** Windows CI's archive reported a dirty checkout
+and was excluded, never relabeled. Checkout used Git for Windows with system
+`core.autocrlf=true`; MSYS Git used a separate system configuration. On the same
+pristine checkout, Git for Windows reported zero changed paths, MSYS Git
+reported 3,038, and MSYS Git with the matching policy reported zero. An
+ignore-EOL comparison found no content differences. With actual tooling edits,
+both implementations under the matching policy reported those same dirty
+paths. The workflow now records the checkout-local policy before the MSYS
+build. Build/package source-state JSON records the Git implementation, relevant
+core policy, status and diff statistics; receipts retain a bounded status
+summary. It does not suppress real modifications or query authentication
+configuration. This follow-up does not change the published archive bytes.
+
+**OBSERVED / corrected runtime gaps:** native Windows CI exposed MinGW's
+incomplete symlink observation and unimplemented `read_symlink`. Operation-root
+admission now observes native no-follow identity; link copying reads bounded
+reparse data through a native handle and preserves dangling targets and
+directory-link kind. Unknown reparse tags are refused explicitly. Unconditional
+parser tests run without symlink privileges; the hosted runner passed the real
+link-copy/collision/undo cases that Shadow's token cannot create. Linux tests
+now reflect the admitted `/` root and explicitly unavailable Terminal Here;
+default Open uses `xdg-open`.
+
+These remain development archives, not production installers or general
+mutation/platform-accessibility promotion. Mac minimum remains 26.0.

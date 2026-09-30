@@ -15,7 +15,7 @@ import tempfile
 import time
 import tarfile
 import zipfile
-from build_native import sdk_fingerprint
+from build_native import sdk_fingerprint, record_source_state
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -141,8 +141,9 @@ def main():
     build, sdk = args.build.resolve(), args.gui_forms_sdk.resolve()
     host = {'Windows': 'windows', 'Darwin': 'macos', 'Linux': 'linux'}[platform.system()]
     arch = {'AMD64': 'x64', 'x86_64': 'x64', 'arm64': 'arm64', 'aarch64': 'arm64'}[platform.machine()]
-    revision = output('git', '-C', ROOT, 'rev-parse', 'HEAD')
-    dirty = bool(output('git', '-C', ROOT, 'status', '--porcelain', '--untracked-files=normal'))
+    source_state = record_source_state(build, 'package')
+    revision = source_state['source_revision']
+    dirty = source_state['source_dirty']
     distribution = build / 'dist'
     distribution.mkdir(exist_ok=True)
     # A new staging folder for every attempt prevents stale files or destructive cleanup.
@@ -208,6 +209,9 @@ def main():
     receipt = {
         'product': 'File Manager', 'version': '0.001-alpha', 'source_revision': revision,
         'source_dirty': dirty, 'platform': host, 'architecture': arch,
+        'source_status_porcelain': source_state['status_porcelain'][:40],
+        'source_status_path_count': len(source_state['status_porcelain']),
+        'source_status_truncated': len(source_state['status_porcelain']) > 40,
         'build_os': platform.platform(), 'components': components,
         'service_availability': 'Determined by live negotiation; bundling is not activation or readiness',
         'explicit_windows_search_launcher': 'launch_windows_search.ps1' if host == 'windows' and not args.skip_components else None,

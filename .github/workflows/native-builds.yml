@@ -27,6 +27,13 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+      - name: Preserve Windows checkout line-ending policy across Git implementations
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Checkout uses Git for Windows; the build uses MSYS Git, whose
+          # separate system config otherwise misreports CRLF files as changed.
+          git config --local core.autocrlf true
       - uses: actions/setup-go@v5
         with:
           go-version-file: engine/go.mod
@@ -116,4 +123,5 @@ jobs:
             .build/native-${{ matrix.platform }}/**/Testing/Temporary/LastTest.log
             .build/native-${{ matrix.platform }}/**/CMakeConfigureLog.yaml
             .build/native-${{ matrix.platform }}/package-check.json
+            .build/native-${{ matrix.platform }}/source-state-*.json
           if-no-files-found: ignore

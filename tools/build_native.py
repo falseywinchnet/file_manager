@@ -6,10 +6,38 @@ import json
 import os
 from pathlib import Path
 import platform
+import shutil
 import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def record_source_state(build, stage):
+    """Keep the exact Git view used for source cleanliness auditable."""
+    def git(*args):
+        return subprocess.check_output(['git', '-C', str(ROOT), *args],
+                                       text=True, encoding='utf-8', errors='replace').rstrip('\n')
+    status = git('status', '--porcelain=v1', '--untracked-files=normal')
+    config = subprocess.run(
+        ['git', '-C', str(ROOT), 'config', '--show-origin', '--get-regexp',
+         r'^core\.(autocrlf|eol|filemode|ignorecase)$'],
+        text=True, encoding='utf-8', errors='replace', capture_output=True)
+    if config.returncode not in (0, 1):
+        raise RuntimeError('Cannot inspect Git checkout policy: ' + config.stderr)
+    state = {
+        'git_executable': shutil.which('git'), 'git_version': git('--version'),
+        'source_revision': git('rev-parse', 'HEAD'), 'source_dirty': bool(status),
+        'status_porcelain': status.splitlines(),
+        'tracked_diff_stat': git('diff', 'HEAD', '--stat'),
+        'git_config': config.stdout.splitlines()
+    }
+    destination = build / ('source-state-' + stage + '.json')
+    destination.write_text(json.dumps(state, indent=2) + '\n', encoding='utf-8')
+    print(f'Source state ({stage}): {len(state["status_porcelain"])} changed paths; {destination}', flush=True)
+    for line in state['status_porcelain'][:40]:
+        print('  ' + line, flush=True)
+    return state
 
 
 def sdk_fingerprint(sdk):
@@ -43,6 +71,7 @@ def main():
     arch = {'AMD64': 'x64', 'x86_64': 'x64', 'arm64': 'arm64', 'aarch64': 'arm64'}[platform.machine()]
     build = ROOT / '.build' / f'native-{host}-{arch}'
     build.mkdir(parents=True, exist_ok=True)
+    record_source_state(build, 'before-build')
     sdk = args.gui_forms_sdk.resolve() if args.gui_forms_sdk else build / 'gui-forms-sdk'
     os.environ['BUILD_JOBS'] = str(args.jobs)
     toolkit = build / 'gui-forms'
