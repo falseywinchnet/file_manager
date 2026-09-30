@@ -8,15 +8,16 @@ struct ApplicationWindowState final {
     bool ready{};
     bool closed{};
     bool can_hide{};
-    std::function<void()> request_close;
-    std::function<void()> show;
-    std::function<void()> hide;
-    std::function<void()> toggle_full_screen;
+    std::function<void()> request_close{};
+    std::function<void()> show{};
+    std::function<void()> hide{};
+    std::function<void()> toggle_full_screen{};
 };
 struct ApplicationHandleAccess final {
     [[nodiscard]] static ApplicationWindowHandle make(
         const std::shared_ptr<ApplicationWindowState>& state) noexcept {
-        return ApplicationWindowHandle(state);
+        const ApplicationWindowHandle handle{state};
+        return handle;
     }
 };
 } // namespace gui_forms::detail

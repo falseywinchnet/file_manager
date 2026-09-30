@@ -20,45 +20,79 @@ param(
 $ErrorActionPreference = 'Stop'
 if ([Environment]::OSVersion.Platform -ne 'Win32NT') { throw 'This launcher requires Windows.' }
 
+class LaunchContext {
+    [string]$PackagePath
+    [string]$RunPath
+    LaunchContext([string]$PackagePath, [string]$RunPath) {
+        $this.PackagePath = $PackagePath
+        $this.RunPath = $RunPath
+    }
+}
 function Quote-Argument([string]$Value) {
-    $escaped = [regex]::Replace($Value, '(\\*)"', '$1$1\"')
-    return '"' + [regex]::Replace($escaped, '(\\+)$', '$1$1') + '"'
+    [string]$escaped = [regex]::Replace($Value, '(\\*)"', '$1$1\"')
+    [string]$trailingEscaped = [regex]::Replace($escaped, '(\\+)$', '$1$1')
+    [string]$quoted = '"' + $trailingEscaped + '"'
+    return $quoted
 }
-function Start-Owned([string]$Program, [string[]]$Arguments, [string]$Name, [switch]$Visible) {
-    $quoted = @($Arguments | ForEach-Object { Quote-Argument $_ })
-    $style = if ($Visible) { 'Normal' } else { 'Hidden' }
-    return Start-Process -FilePath $Program -ArgumentList $quoted -WorkingDirectory $packagePath `
-        -WindowStyle $style -PassThru -RedirectStandardOutput (Join-Path $runPath "$Name.stdout.log") `
-        -RedirectStandardError (Join-Path $runPath "$Name.stderr.log")
+function Start-Owned([LaunchContext]$Context, [string]$Program, [string[]]$Arguments, [string]$Name, [switch]$Visible) {
+    [string[]]$quoted = [string[]]::new($Arguments.Length)
+    for ([int]$index = 0; $index -lt $Arguments.Length; $index++) {
+        $quoted[$index] = Quote-Argument $Arguments[$index]
+    }
+    [string]$style = 'Hidden'
+    if ($Visible) { $style = 'Normal' }
+    [string]$stdout = Join-Path $Context.RunPath "$Name.stdout.log"
+    [string]$stderr = Join-Path $Context.RunPath "$Name.stderr.log"
+    [Diagnostics.Process]$owned = Start-Process -FilePath $Program -ArgumentList $quoted -WorkingDirectory $Context.PackagePath `
+        -WindowStyle $style -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    return $owned
 }
-function Wait-Discovery($Process, [string]$Directory) {
-    $deadline = [DateTime]::UtcNow.AddSeconds(310)
-    while (-not (Test-Path -LiteralPath (Join-Path $Directory 'discovery.json'))) {
-        if ($Process.HasExited) { throw "Service exited before discovery; inspect private logs in $runPath" }
-        if ([DateTime]::UtcNow -ge $deadline) { throw "Service startup timed out; inspect $runPath" }
+function Wait-Discovery([LaunchContext]$Context, [Diagnostics.Process]$Process, [string]$Directory) {
+    [DateTime]$deadline = [DateTime]::UtcNow.AddSeconds(310)
+    [string]$discoveryPath = Join-Path $Directory 'discovery.json'
+    while (-not (Test-Path -LiteralPath $discoveryPath)) {
+        if ($Process.HasExited) { throw "Service exited before discovery; inspect private logs in $($Context.RunPath)" }
+        if ([DateTime]::UtcNow -ge $deadline) { throw "Service startup timed out; inspect $($Context.RunPath)" }
         Start-Sleep -Milliseconds 200
     }
 }
-function Stop-Owned($Process, [string]$Program, [string[]]$Arguments, [string]$Name) {
+# The caller retains service ownership. The temporary shutdown client is always
+# disposed here, including failed or timed-out shutdown requests.
+function Stop-Owned([LaunchContext]$Context, [Diagnostics.Process]$Process, [string]$Program, [string[]]$Arguments, [string]$Name) {
     if ($null -eq $Process -or $Process.HasExited) { return }
+    [Diagnostics.Process]$stopper = $null
     try {
-        $stopper = Start-Owned $Program $Arguments "$Name-shutdown"
+        $stopper = Start-Owned $Context $Program $Arguments "$Name-shutdown"
         if (-not $stopper.WaitForExit(8000)) { $stopper.Kill(); $stopper.WaitForExit() }
-        $stopper.Dispose()
         if ($Process.WaitForExit(8000)) { return }
     } catch { Write-Warning "Graceful $Name shutdown failed: $_" }
+    finally { if ($null -ne $stopper) { $stopper.Dispose() } }
     Write-Warning "Stopping only this launcher's owned $Name process after its shutdown deadline."
     if (-not $Process.HasExited) { $Process.Kill(); $Process.WaitForExit() }
 }
 
-$packagePath = (Resolve-Path -LiteralPath $PackageDirectory).ProviderPath
-$rootPath = (Resolve-Path -LiteralPath $Root).ProviderPath
+# Short-lived commands have a separate owner; failure cannot leak a child or
+# its process handle into the long-lived service lifecycle.
+function Invoke-OwnedCommand([LaunchContext]$Context, [string]$Program, [string[]]$Arguments, [string]$Name, [int]$TimeoutMilliseconds) {
+    [Diagnostics.Process]$command = Start-Owned $Context $Program $Arguments $Name
+    try {
+        if (-not $command.WaitForExit($TimeoutMilliseconds)) {
+            $command.Kill()
+            $command.WaitForExit()
+            throw "$Name timed out; inspect $($Context.RunPath)"
+        }
+        if ($command.ExitCode -ne 0) { throw "$Name failed; inspect $($Context.RunPath)" }
+    } finally { $command.Dispose() }
+}
+
+[string]$packagePath = (Resolve-Path -LiteralPath $PackageDirectory).ProviderPath
+[string]$rootPath = (Resolve-Path -LiteralPath $Root).ProviderPath
 if (-not (Test-Path -LiteralPath $rootPath -PathType Container) -or $rootPath.StartsWith('\\')) {
     throw 'Root must be an explicitly chosen existing local directory.'
 }
-$application = Join-Path $packagePath 'File Manager.exe'
-$engine = Join-Path $packagePath 'components\fileman-engine.exe'
-$orchestrator = Join-Path $packagePath 'components\orchestrator.exe'
+[string]$application = Join-Path $packagePath 'File Manager.exe'
+[string]$engine = Join-Path $packagePath 'components\fileman-engine.exe'
+[string]$orchestrator = Join-Path $packagePath 'components\orchestrator.exe'
 foreach ($binary in @($application, $engine, $orchestrator)) {
     if (-not (Test-Path -LiteralPath $binary -PathType Leaf)) { throw "Missing packaged binary: $binary" }
 }
@@ -66,8 +100,8 @@ if ([string]::IsNullOrEmpty($StateDirectory)) {
     $StateDirectory = Join-Path ([IO.Path]::GetTempPath()) ('fileman-search-' + [Guid]::NewGuid().ToString('N'))
 }
 if (-not [IO.Path]::IsPathRooted($StateDirectory)) { throw 'StateDirectory must be absolute and new.' }
-$runPath = [IO.Path]::GetFullPath($StateDirectory)
-$rootPrefix = $rootPath.TrimEnd('\') + '\'
+[string]$runPath = [IO.Path]::GetFullPath($StateDirectory)
+[string]$rootPrefix = $rootPath.TrimEnd('\') + '\'
 if ($runPath.Equals($rootPath, [StringComparison]::OrdinalIgnoreCase) -or
     $runPath.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
     throw 'StateDirectory must be outside the searched root; choose another local location.'
@@ -77,63 +111,69 @@ if (-not (Test-Path -LiteralPath (Split-Path $runPath -Parent) -PathType Contain
     throw 'StateDirectory parent must already exist.'
 }
 New-Item -ItemType Directory -Path $runPath | Out-Null
-$sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
-$acl = New-Object Security.AccessControl.DirectorySecurity
+[Security.Principal.WindowsIdentity]$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+[Security.Principal.SecurityIdentifier]$sid = $identity.User
+$identity.Dispose()
+[Security.AccessControl.DirectorySecurity]$acl = [Security.AccessControl.DirectorySecurity]::new()
 $acl.SetOwner($sid)
 $acl.SetAccessRuleProtection($true, $false)
-$rule = New-Object Security.AccessControl.FileSystemAccessRule($sid, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
+[Security.AccessControl.FileSystemAccessRule]$rule = [Security.AccessControl.FileSystemAccessRule]::new($sid, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
 $acl.AddAccessRule($rule)
 Set-Acl -LiteralPath $runPath -AclObject $acl
 
-$engineRuntime = Join-Path $runPath 'engine-runtime'
-$orchestratorRuntime = Join-Path $runPath 'orchestrator-runtime'
-$manifest = Join-Path $runPath 'policy\manifest.json'
-$rootId = 'chosen-root'
-$engineProcess = $null
-$orchestratorProcess = $null
-$applicationProcess = $null
-$priorRuntime = $env:FILEMAN_ORCHESTRATOR_RUNTIME_DIR
+[LaunchContext]$context = [LaunchContext]::new($packagePath, $runPath)
+[string]$engineRuntime = Join-Path $runPath 'engine-runtime'
+[string]$orchestratorRuntime = Join-Path $runPath 'orchestrator-runtime'
+[string]$manifest = Join-Path $runPath 'policy\manifest.json'
+[string]$rootId = 'chosen-root'
+[Diagnostics.Process]$engineProcess = $null
+[Diagnostics.Process]$orchestratorProcess = $null
+[Diagnostics.Process]$applicationProcess = $null
+[string]$priorRuntime = $env:FILEMAN_ORCHESTRATOR_RUNTIME_DIR
 try {
-    $manifestArguments = @('create-windows-manifest', '--deployment-id', 'explicit-file-manager-launch',
+    [string[]]$manifestArguments = @('create-windows-manifest', '--deployment-id', 'explicit-file-manager-launch',
         '--root-id', $rootId, '--root-path', $rootPath, '--runtime-dir', $engineRuntime, '--output', $manifest)
     if ($IndexEnabled) { $manifestArguments += @('--index-enabled', '--store-root', (Join-Path $runPath 'store')) }
-    $creator = Start-Owned $engine $manifestArguments 'manifest'
-    if (-not $creator.WaitForExit(30000)) { $creator.Kill(); throw 'Manifest creation timed out.' }
-    if ($creator.ExitCode -ne 0) { throw "Root admission failed; inspect private logs in $runPath" }
-    $creator.Dispose()
+    Invoke-OwnedCommand $context $engine $manifestArguments 'manifest' 30000
     Write-Host "Private run state: $runPath"
     if ($IndexEnabled) { Write-Host 'Index enabled for exact criteria; text search uses live filename/path matching.' }
     else { Write-Host 'Live name/path substring search; no persistent catalogue.' }
-    $engineProcess = Start-Owned $engine @('serve-windows', '--manifest', $manifest) 'engine'
-    Wait-Discovery $engineProcess $engineRuntime
-    $orchestratorProcess = Start-Owned $orchestrator @('serve-local', '--runtime-dir', $orchestratorRuntime,
+    $engineProcess = Start-Owned $context $engine @('serve-windows', '--manifest', $manifest) 'engine'
+    Wait-Discovery $context $engineProcess $engineRuntime
+    $orchestratorProcess = Start-Owned $context $orchestrator @('serve-local', '--runtime-dir', $orchestratorRuntime,
         '--engine-runtime-dir', $engineRuntime) 'orchestrator'
-    Wait-Discovery $orchestratorProcess $orchestratorRuntime
+    Wait-Discovery $context $orchestratorProcess $orchestratorRuntime
     $env:FILEMAN_ORCHESTRATOR_RUNTIME_DIR = $orchestratorRuntime
-    $probe = Start-Owned $orchestrator @('call-local', 'status', '--json') 'status'
-    if (-not $probe.WaitForExit(15000)) { $probe.Kill(); throw 'Authenticated startup check timed out.' }
-    if ($probe.ExitCode -ne 0) { throw 'Authenticated startup check failed.' }
-    $probe.Dispose()
+    Invoke-OwnedCommand $context $orchestrator @('call-local', 'status', '--json') 'status' 15000
     if (-not $CheckOnly) {
-        $applicationProcess = Start-Owned $application @('--root', $rootPath, '--engine-root-id', $rootId) 'frontend' -Visible
+        $applicationProcess = Start-Owned $context $application @('--root', $rootPath, '--engine-root-id', $rootId) 'frontend' -Visible
         $applicationProcess.WaitForExit()
         if ($applicationProcess.ExitCode -ne 0) { throw "File Manager exited with code $($applicationProcess.ExitCode); inspect $runPath" }
     }
     Write-Host 'Explicit launch completed; stopping its services.'
 } finally {
     $env:FILEMAN_ORCHESTRATOR_RUNTIME_DIR = $priorRuntime
-    if ($null -ne $applicationProcess -and -not $applicationProcess.HasExited) {
-        [void]$applicationProcess.CloseMainWindow()
-        if (-not $applicationProcess.WaitForExit(8000)) {
-            Write-Warning 'Closing the owned frontend after its close deadline.'
-            $applicationProcess.Kill()
-            $applicationProcess.WaitForExit()
+    try {
+        try {
+            if ($null -ne $applicationProcess -and -not $applicationProcess.HasExited) {
+                [void]$applicationProcess.CloseMainWindow()
+                if (-not $applicationProcess.WaitForExit(8000)) {
+                    Write-Warning 'Closing the owned frontend after its close deadline.'
+                    $applicationProcess.Kill()
+                    $applicationProcess.WaitForExit()
+                }
+            }
+        } finally {
+            try {
+                Stop-Owned $context $orchestratorProcess $orchestrator @('call-local', 'shutdown', '--runtime-dir', $orchestratorRuntime, '--json') 'orchestrator'
+            } finally {
+                Stop-Owned $context $engineProcess $engine @('call-local', '--runtime-dir', $engineRuntime, '--authority', 'admin',
+                    '--request', '{"id":"launcher-stop","method":"engine.shutdown","params":{}}') 'engine'
+            }
         }
-    }
-    Stop-Owned $orchestratorProcess $orchestrator @('call-local', 'shutdown', '--runtime-dir', $orchestratorRuntime, '--json') 'orchestrator'
-    Stop-Owned $engineProcess $engine @('call-local', '--runtime-dir', $engineRuntime, '--authority', 'admin',
-        '--request', '{"id":"launcher-stop","method":"engine.shutdown","params":{}}') 'engine'
-    foreach ($process in @($applicationProcess, $orchestratorProcess, $engineProcess)) {
-        if ($null -ne $process) { $process.Dispose() }
+    } finally {
+        foreach ($process in @($applicationProcess, $orchestratorProcess, $engineProcess)) {
+            if ($null -ne $process) { $process.Dispose() }
+        }
     }
 }

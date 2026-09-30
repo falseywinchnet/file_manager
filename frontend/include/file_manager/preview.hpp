@@ -21,12 +21,12 @@ enum class PreviewKind : std::uint8_t {
 
 struct PreviewResult final {
     PreviewKind kind{PreviewKind::unsupported};
-    std::string code;
-    std::string message;
-    std::filesystem::path path;
-    ObjectIdentity identity;
-    std::string text_utf8;
-    std::vector<std::byte> png_bytes;
+    std::string code{};
+    std::string message{};
+    std::filesystem::path path{};
+    ObjectIdentity identity{};
+    std::string text_utf8{};
+    std::vector<std::byte> png_bytes{};
 };
 
 inline constexpr std::size_t maximum_text_preview_bytes = 64U * 1024U;

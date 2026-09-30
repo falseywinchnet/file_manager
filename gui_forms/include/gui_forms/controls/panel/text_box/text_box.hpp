@@ -19,18 +19,29 @@ struct TextSelection final {
     Utf8Offset caret{};
 
     [[nodiscard]] Utf8Offset start() const noexcept {
-        return Utf8Offset(std::min(anchor.value(), caret.value()));
+        const std::size_t first = std::min(anchor.value(), caret.value());
+        const Utf8Offset result(first);
+        return result;
     }
     [[nodiscard]] Utf8Offset end() const noexcept {
-        return Utf8Offset(std::max(anchor.value(), caret.value()));
+        const std::size_t last = std::max(anchor.value(), caret.value());
+        const Utf8Offset result(last);
+        return result;
     }
     [[nodiscard]] std::size_t length() const noexcept {
-        return end().value() - start().value();
+        const Utf8Offset first = start();
+        const Utf8Offset last = end();
+        const std::size_t result = last.value() - first.value();
+        return result;
     }
-    [[nodiscard]] bool empty() const noexcept { return anchor == caret; }
+    [[nodiscard]] bool empty() const noexcept {
+        const bool result = anchor == caret;
+        return result;
+    }
     friend constexpr bool operator==(const TextSelection& left,
                                      const TextSelection& right) noexcept {
-        return left.anchor == right.anchor && left.caret == right.caret;
+        const bool result = left.anchor == right.anchor && left.caret == right.caret;
+        return result;
     }
 };
 
@@ -38,7 +49,10 @@ class TextBox final : public Panel {
 public:
     explicit TextBox(StableId stable_id, std::string text = {});
 
-    [[nodiscard]] std::string_view text() const noexcept { return store_.utf8(); }
+    [[nodiscard]] std::string_view text() const noexcept {
+        const std::string_view result = store_.utf8();
+        return result;
+    }
     void set_text(std::string text);
     [[nodiscard]] std::string_view placeholder_text() const noexcept {
         return placeholder_;
@@ -67,7 +81,8 @@ public:
     [[nodiscard]] static MultilineValidation validate_multiline_text(std::string_view text);
     [[nodiscard]] std::size_t visual_line_count();
     [[nodiscard]] Point scroll_offset() const noexcept {
-        return {horizontal_offset_, vertical_offset_};
+        const Point result{.x = horizontal_offset_, .y = vertical_offset_};
+        return result;
     }
     [[nodiscard]] std::size_t maximum_length() const noexcept {
         return maximum_length_;
@@ -85,7 +100,8 @@ public:
     }
     void set_use_system_password_character(bool enabled);
     [[nodiscard]] bool password_protected() const noexcept {
-        return use_system_password_character_ || password_character_ != U'\0';
+        const bool result = use_system_password_character_ || password_character_ != U'\0';
+        return result;
     }
     [[nodiscard]] FontSpec font() const noexcept { return font_; }
     void set_font(FontSpec font);
@@ -93,8 +109,14 @@ public:
     void select(Utf8Offset anchor, Utf8Offset caret);
     void select_all();
     [[nodiscard]] std::string selected_text() const;
-    [[nodiscard]] bool can_undo() const noexcept { return !undo_.empty(); }
-    [[nodiscard]] bool can_redo() const noexcept { return !redo_.empty(); }
+    [[nodiscard]] bool can_undo() const noexcept {
+        const bool result = !undo_.empty();
+        return result;
+    }
+    [[nodiscard]] bool can_redo() const noexcept {
+        const bool result = !redo_.empty();
+        return result;
+    }
     bool undo();
     bool redo();
     // Establish a new history boundary without replacing text, moving the
@@ -132,13 +154,14 @@ protected:
 
 private:
     struct VisualRun final {
-        std::size_t start{}, end{};
+        std::size_t start{};
+        std::size_t end{};
         double x{};
     };
     struct VisualLine final {
-        std::vector<std::size_t> offsets;
-        std::vector<double> positions;
-        std::vector<VisualRun> runs;
+        std::vector<std::size_t> offsets{};
+        std::vector<double> positions{};
+        std::vector<VisualRun> runs{};
     };
     void ensure_multiline_layout();
     void paint_multiline(Painter& painter);
@@ -151,8 +174,8 @@ private:
     [[nodiscard]] BindingValue text_property_value() const;
 
     struct Snapshot final {
-        std::string text;
-        TextSelection selection;
+        std::string text{};
+        TextSelection selection{};
     };
 
     [[nodiscard]] Snapshot snapshot() const;
@@ -170,12 +193,12 @@ private:
     void push_history(std::deque<Snapshot>& history, Snapshot snapshot);
     void clear_redo() noexcept;
 
-    TextStore store_;
-    std::string placeholder_;
+    TextStore store_{};
+    std::string placeholder_{};
     FontSpec font_{FontRole::content, 12.0, 400, false};
     TextSelection selection_{};
-    std::vector<double> layout_positions_;
-    std::vector<std::uint64_t> layout_offsets_;
+    std::vector<double> layout_positions_{};
+    std::vector<std::uint64_t> layout_offsets_{};
     double layout_text_scale_{};
     double horizontal_offset_{};
     bool multiline_{};
@@ -190,7 +213,7 @@ private:
     double line_height_{14.4};
     double line_ascent_{12.0};
     double document_width_{};
-    std::vector<VisualLine> visual_lines_;
+    std::vector<VisualLine> visual_lines_{};
     std::uint64_t multiline_revision_{};
     FontSpec multiline_font_{};
     double multiline_width_{-1.0};
@@ -203,14 +226,14 @@ private:
     bool focused_{};
     bool selecting_{};
     bool caret_visible_{true};
-    FrameRequestToken caret_frame_;
-    std::deque<Snapshot> undo_;
-    std::deque<Snapshot> redo_;
+    FrameRequestToken caret_frame_{};
+    std::deque<Snapshot> undo_{};
+    std::deque<Snapshot> redo_{};
     std::size_t history_bytes_{};
-    Event<const std::string&> text_changed_;
-    Event<const TextSelection&> selection_changed_;
-    Event<const std::string&> committed_;
-    Event<> cancelled_;
+    Event<const std::string&> text_changed_{};
+    Event<const TextSelection&> selection_changed_{};
+    Event<const std::string&> committed_{};
+    Event<> cancelled_{};
 
     static constexpr double text_left_ = 6.0;
     static constexpr std::size_t maximum_history_entries_ = 128U;

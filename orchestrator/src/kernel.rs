@@ -801,14 +801,15 @@ fn unavailable_engine_service(reason: &str) -> Value {
 }
 
 fn engine_supervisor_available(status: &Value) -> bool {
-    status["capabilities"]
-        .as_array()
-        .is_some_and(|capabilities| {
-            capabilities.iter().any(|capability| {
-                capability["id"] == "engine.supervisor.launchd"
-                    && capability["state"] == "available"
-            })
-        })
+    let Some(capabilities) = status["capabilities"].as_array() else {
+        return false;
+    };
+    for capability in capabilities {
+        if capability["id"] == "engine.supervisor.launchd" && capability["state"] == "available" {
+            return true;
+        }
+    }
+    false
 }
 
 fn required_root_id(command: &ServiceCommandRequest) -> Result<&str, ApiError> {
@@ -1158,33 +1159,34 @@ mod tests {
         release: mpsc::Receiver<()>,
     }
 
+    struct UnsupervisedEngine;
+    impl crate::engine_jsonl::EngineJsonlCaller for UnsupervisedEngine {
+        fn call(
+            &mut self,
+            method: &str,
+            _params: &serde_json::Value,
+        ) -> Result<serde_json::Value, crate::engine_jsonl::EngineJsonlError> {
+            assert_eq!(
+                method, "engine.status",
+                "must not stop an unsupervised provider"
+            );
+            let status: serde_json::Value = serde_json::json!({"lifecycle":{"instance_id":"engine-test","state":"ready"}, "roots":[], "capabilities":[{"id":"engine.supervisor.launchd","state":"unavailable"}]});
+            Ok(status)
+        }
+    }
+
     #[test]
     fn engine_restart_requires_actual_supervisor_without_sending_shutdown() {
-        struct UnsupervisedEngine;
-        impl crate::engine_jsonl::EngineJsonlCaller for UnsupervisedEngine {
-            fn call(
-                &mut self,
-                method: &str,
-                _params: &serde_json::Value,
-            ) -> Result<serde_json::Value, crate::engine_jsonl::EngineJsonlError> {
-                assert_eq!(
-                    method, "engine.status",
-                    "must not stop an unsupervised provider"
-                );
-                Ok(
-                    serde_json::json!({"lifecycle":{"instance_id":"engine-test","state":"ready"}, "roots":[], "capabilities":[{"id":"engine.supervisor.launchd","state":"unavailable"}]}),
-                )
-            }
-        }
-        let kernel = Kernel::for_local_daemon().with_installed_engine_admin(UnsupervisedEngine);
-        let snapshot = kernel
-            .handle(Request::local("services", "orchestrator.services.snapshot"))
-            .result
-            .expect("snapshot");
+        let kernel: Kernel = Kernel::for_local_daemon();
+        let kernel: Kernel = kernel.with_installed_engine_admin(UnsupervisedEngine);
+        let request: Request = Request::local("services", "orchestrator.services.snapshot");
+        let response: crate::Response = kernel.handle(request);
+        let snapshot: serde_json::Value = response.result.expect("snapshot");
         assert_eq!(snapshot["services"][1]["commands"][3]["available"], false);
-        let mut command = Request::local("restart", "orchestrator.services.command");
+        let mut command: Request = Request::local("restart", "orchestrator.services.command");
         command.params = serde_json::json!({"service_id":"engine","command_id":"restart","expected_instance_id":"engine-test"});
-        assert_eq!(kernel.handle(command).status, TerminalStatus::Unavailable);
+        let response: crate::Response = kernel.handle(command);
+        assert_eq!(response.status, TerminalStatus::Unavailable);
     }
 
     impl UnifiedEngineSearch for BlockingSearch {

@@ -22,9 +22,9 @@ enum class DocumentPickerProfile : std::uint8_t {
 };
 
 struct DocumentTypeFilter final {
-    std::string id;
-    std::string label;
-    std::vector<std::string> extensions;
+    std::string id{};
+    std::string label{};
+    std::vector<std::string> extensions{};
 };
 
 // The local-host projection selects paths only, never grants file I/O or plugin authority.
@@ -36,28 +36,28 @@ enum class DocumentPickerAuthority : std::uint8_t {
 
 struct DocumentPickerRequest final {
     DocumentPickerProfile profile{DocumentPickerProfile::open_file};
-    std::filesystem::path protected_root;
-    std::filesystem::path initial_location;
-    std::string owner_application_id;
+    std::filesystem::path protected_root{};
+    std::filesystem::path initial_location{};
+    std::string owner_application_id{};
     std::size_t maximum_selection{1};
     bool show_hidden{};
     bool allow_create_folder{};
     bool allow_native_fallback{};
     bool orchestrator_session_valid{};
-    std::vector<DocumentTypeFilter> filters;
-    std::string active_filter_id;
-    std::string suggested_name;
-    std::string default_extension;
+    std::vector<DocumentTypeFilter> filters{};
+    std::string active_filter_id{};
+    std::string suggested_name{};
+    std::string default_extension{};
     // Additional roots from the same host policy/session; never inferred by the view.
-    std::vector<std::filesystem::path> admitted_roots;
-    std::filesystem::path home_location;
+    std::vector<std::filesystem::path> admitted_roots{};
+    std::filesystem::path home_location{};
     bool allow_hidden_toggle{true};
     DocumentPickerAuthority authority{DocumentPickerAuthority::unavailable};
 };
 
 struct DocumentSelectionObservation final {
-    std::filesystem::path path;
-    ObjectIdentity identity;
+    std::filesystem::path path{};
+    ObjectIdentity identity{};
     bool existing{};
 };
 
@@ -71,13 +71,14 @@ enum class DocumentPickerTerminal : std::uint8_t {
 
 struct DocumentPickerResult final {
     DocumentPickerTerminal terminal{DocumentPickerTerminal::validation_error};
-    std::string code;
-    std::string message;
-    std::vector<DocumentSelectionObservation> selections;
+    std::string code{};
+    std::string message{};
+    std::vector<DocumentSelectionObservation> selections{};
     bool native_fallback_permitted{};
 
     [[nodiscard]] bool accepted() const noexcept {
-        return terminal == DocumentPickerTerminal::accepted;
+        const bool is_accepted = terminal == DocumentPickerTerminal::accepted;
+        return is_accepted;
     }
 };
 
@@ -86,7 +87,7 @@ struct DocumentPickerResult final {
 // Engine. Acceptance requires an explicit current Orchestrator session or
 // trusted local-host selection grant and fails closed when that grant is revoked.
 class FileSelectionController final {
-public:
+  public:
     explicit FileSelectionController(DocumentPickerRequest request);
 
     [[nodiscard]] const DocumentPickerRequest& request() const noexcept;
@@ -109,31 +110,27 @@ public:
     void set_orchestrator_session_valid(bool valid) noexcept;
     void set_authority_valid(bool valid) noexcept;
 
-    [[nodiscard]] DocumentPickerResult accept(
-        bool overwrite_confirmed = false) const;
+    [[nodiscard]] DocumentPickerResult accept(bool overwrite_confirmed = false) const;
     [[nodiscard]] DocumentPickerResult cancel() const;
 
-private:
+  private:
     [[nodiscard]] bool profile_accepts_multiple() const noexcept;
     [[nodiscard]] bool profile_saves() const noexcept;
-    [[nodiscard]] bool entry_visible(const DirectoryEntry& entry) const;
-    [[nodiscard]] const DirectoryEntry* find_entry(
-        std::string_view stable_id) const noexcept;
-    [[nodiscard]] DocumentPickerResult selection_error(
-        std::string code, std::string message) const;
+    [[nodiscard]] const DirectoryEntry* find_entry(std::string_view stable_id) const noexcept;
+    [[nodiscard]] DocumentPickerResult selection_error(std::string code, std::string message) const;
 
-    DocumentPickerRequest request_;
-    DirectorySnapshot browser_;
-    std::vector<std::string> selected_ids_;
-    std::string filename_;
-    std::string name_filter_;
-    std::string active_filter_id_;
-    std::string last_error_;
+    DocumentPickerRequest request_{};
+    DirectorySnapshot browser_{};
+    std::vector<std::string> selected_ids_{};
+    std::string filename_{};
+    std::string name_filter_{};
+    std::string active_filter_id_{};
+    std::string last_error_{};
     bool show_hidden_{};
     bool orchestrator_session_valid_{};
     std::uint64_t generation_{};
-    ObjectIdentity location_identity_;
-    mutable std::optional<DocumentSelectionObservation> pending_overwrite_;
+    ObjectIdentity location_identity_{};
+    mutable std::optional<DocumentSelectionObservation> pending_overwrite_{};
 };
 
 } // namespace file_manager

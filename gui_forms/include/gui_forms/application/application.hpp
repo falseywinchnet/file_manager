@@ -31,10 +31,11 @@ struct ApplicationResult final {
     ApplicationError error{ApplicationError::none};
     int native_exit_code{};
     std::size_t window_index{std::numeric_limits<std::size_t>::max()};
-    std::exception_ptr callback_exception;
+    std::exception_ptr callback_exception{};
 
     [[nodiscard]] bool accepted() const noexcept {
-        return error == ApplicationError::none;
+        const bool accepted = error == ApplicationError::none;
+        return accepted;
     }
 };
 
@@ -53,7 +54,7 @@ private:
     friend struct detail::ApplicationHandleAccess;
     explicit ApplicationWindowHandle(
         std::weak_ptr<detail::ApplicationWindowState> state) noexcept;
-    std::weak_ptr<detail::ApplicationWindowState> state_;
+    std::weak_ptr<detail::ApplicationWindowState> state_{};
 };
 
 struct ApplicationWindowOptions final {
@@ -66,21 +67,21 @@ struct ApplicationWindowOptions final {
     bool print_metrics_on_close{};
     // Runs after this model has an attached host and services. Other windows
     // may not be ready yet. Keep a weak handle for native window requests.
-    std::function<void(Window&, ApplicationWindowHandle)> ready;
+    std::function<void(Window&, ApplicationWindowHandle)> ready{};
     // Published on the UI thread before ready. The supplied wake may be called
     // by workers while this window is alive; workers must stop before closed.
     // Wake schedules work only. dispatch_pending executes on the UI thread.
-    std::function<void(std::function<void()>)> wake_ready;
-    std::function<void()> dispatch_pending;
-    std::function<void(HostCloseRequest&)> closing;
-    std::function<void()> closed;
+    std::function<void(std::function<void()>)> wake_ready{};
+    std::function<void()> dispatch_pending{};
+    std::function<void(HostCloseRequest&)> closing{};
+    std::function<void()> closed{};
 };
 
 struct ApplicationWindow final {
-    std::string stable_id;
-    std::string owner_id;
-    std::unique_ptr<Window> model;
-    ApplicationWindowOptions options;
+    std::string stable_id{};
+    std::string owner_id{};
+    std::unique_ptr<Window> model{};
+    ApplicationWindowOptions options{};
     bool tool_window{};
 };
 

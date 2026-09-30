@@ -31,16 +31,18 @@ constexpr std::array<std::uint32_t, 64> round_constants{
 
 constexpr std::uint32_t rotate_right(const std::uint32_t value,
                                      const unsigned count) noexcept {
-    return (value >> count) | (value << (32U - count));
+    const std::uint32_t result = (value >> count) | (value << (32U - count));
+    return result;
 }
 
 class Sha256 final {
 public:
+    // Borrows count initialized bytes for this call; fixed block storage is reused.
     void update(const std::byte* bytes, std::size_t count) noexcept {
         total_bytes_ += count;
         while (count != 0U) {
-            const auto available = block_.size() - block_size_;
-            const auto consumed = std::min(count, available);
+            const std::size_t available = block_.size() - block_size_;
+            const std::size_t consumed = std::min(count, available);
             std::memcpy(block_.data() + block_size_, bytes, consumed);
             block_size_ += consumed;
             bytes += consumed;
@@ -53,7 +55,7 @@ public:
     }
 
     [[nodiscard]] std::array<std::uint8_t, 32> finish() noexcept {
-        const auto bit_count = static_cast<std::uint64_t>(total_bytes_) * 8U;
+        const std::uint64_t bit_count = static_cast<std::uint64_t>(total_bytes_) * 8U;
         block_[block_size_++] = std::byte{0x80};
         if (block_size_ > 56U) {
             std::fill(block_.begin() + static_cast<std::ptrdiff_t>(block_size_),
@@ -83,7 +85,7 @@ private:
     void transform(const std::byte* block) noexcept {
         std::array<std::uint32_t, 64> words{};
         for (std::size_t index = 0; index < 16U; ++index) {
-            const auto offset = index * 4U;
+            const std::size_t offset = index * 4U;
             words[index] =
                 (static_cast<std::uint32_t>(block[offset]) << 24U) |
                 (static_cast<std::uint32_t>(block[offset + 1U]) << 16U) |
@@ -91,34 +93,34 @@ private:
                 static_cast<std::uint32_t>(block[offset + 3U]);
         }
         for (std::size_t index = 16U; index < words.size(); ++index) {
-            const auto a = words[index - 15U];
-            const auto b = words[index - 2U];
-            const auto sigma0 = rotate_right(a, 7U) ^ rotate_right(a, 18U) ^
+            const std::uint32_t a = words[index - 15U];
+            const std::uint32_t b = words[index - 2U];
+            const std::uint32_t sigma0 = rotate_right(a, 7U) ^ rotate_right(a, 18U) ^
                 (a >> 3U);
-            const auto sigma1 = rotate_right(b, 17U) ^ rotate_right(b, 19U) ^
+            const std::uint32_t sigma1 = rotate_right(b, 17U) ^ rotate_right(b, 19U) ^
                 (b >> 10U);
             words[index] = words[index - 16U] + sigma0 +
                 words[index - 7U] + sigma1;
         }
 
-        auto a = state_[0];
-        auto b = state_[1];
-        auto c = state_[2];
-        auto d = state_[3];
-        auto e = state_[4];
-        auto f = state_[5];
-        auto g = state_[6];
-        auto h = state_[7];
+        std::uint32_t a = state_[0];
+        std::uint32_t b = state_[1];
+        std::uint32_t c = state_[2];
+        std::uint32_t d = state_[3];
+        std::uint32_t e = state_[4];
+        std::uint32_t f = state_[5];
+        std::uint32_t g = state_[6];
+        std::uint32_t h = state_[7];
         for (std::size_t index = 0; index < words.size(); ++index) {
-            const auto choose = (e & f) ^ (~e & g);
-            const auto majority = (a & b) ^ (a & c) ^ (b & c);
-            const auto sum0 = rotate_right(a, 2U) ^ rotate_right(a, 13U) ^
+            const std::uint32_t choose = (e & f) ^ (~e & g);
+            const std::uint32_t majority = (a & b) ^ (a & c) ^ (b & c);
+            const std::uint32_t sum0 = rotate_right(a, 2U) ^ rotate_right(a, 13U) ^
                 rotate_right(a, 22U);
-            const auto sum1 = rotate_right(e, 6U) ^ rotate_right(e, 11U) ^
+            const std::uint32_t sum1 = rotate_right(e, 6U) ^ rotate_right(e, 11U) ^
                 rotate_right(e, 25U);
-            const auto first = h + sum1 + choose + round_constants[index] +
+            const std::uint32_t first = h + sum1 + choose + round_constants[index] +
                 words[index];
-            const auto second = sum0 + majority;
+            const std::uint32_t second = sum0 + majority;
             h = g;
             g = f;
             f = e;
@@ -147,10 +149,10 @@ private:
     std::size_t total_bytes_{};
 };
 
-ChecksumResult failure(ChecksumTerminal terminal, std::string code,
+ChecksumResult failure(const ChecksumTerminal terminal, std::string code,
                        std::string message,
                        const std::filesystem::path& path) {
-    ChecksumResult result;
+    ChecksumResult result{};
     result.terminal = terminal;
     result.code = std::move(code);
     result.message = std::move(message);
@@ -159,12 +161,13 @@ ChecksumResult failure(ChecksumTerminal terminal, std::string code,
 }
 
 std::string hex_digest(const std::array<std::uint8_t, 32>& bytes) {
-    std::ostringstream stream;
+    std::ostringstream stream{};
     stream << std::hex << std::setfill('0');
-    for (const auto byte : bytes) {
+    for (const std::uint8_t byte : bytes) {
         stream << std::setw(2) << static_cast<unsigned>(byte);
     }
-    return stream.str();
+    const std::string result = stream.str();
+    return result;
 }
 
 } // namespace
@@ -175,61 +178,68 @@ ChecksumResult checksum_sha256(
     const ObjectIdentity& expected_identity,
     const CancellationCheck& cancelled,
     const ChecksumProgressCallback& progress) {
-    std::filesystem::path root;
+    std::filesystem::path root{};
     try {
         root = canonical_existing_directory(protected_root);
     } catch (const std::exception& error) {
-        return failure(ChecksumTerminal::unavailable, "root-unavailable",
+        const ChecksumResult result = failure(ChecksumTerminal::unavailable, "root-unavailable",
                        error.what(), selected_path);
+        return result;
     }
-    std::error_code absolute_error;
-    const auto supplied_root = std::filesystem::absolute(
+    std::error_code absolute_error{};
+    const std::filesystem::path supplied_root = std::filesystem::absolute(
         protected_root, absolute_error).lexically_normal();
-    const auto supplied_path = (selected_path.is_absolute()
+    const std::filesystem::path supplied_path = (selected_path.is_absolute()
         ? selected_path
         : supplied_root / selected_path).lexically_normal();
-    const auto path = (!absolute_error &&
+    const std::filesystem::path path = (!absolute_error &&
                        path_is_within(supplied_root, supplied_path))
         ? (root / supplied_path.lexically_relative(supplied_root))
               .lexically_normal()
         : supplied_path;
     if (!path_is_within(root, path)) {
-        return failure(ChecksumTerminal::refused, "outside-protected-root",
+        const ChecksumResult result = failure(ChecksumTerminal::refused, "outside-protected-root",
                        "checksum path is outside the protected root", path);
+        return result;
     }
     if (path_route_has_symlink(root, path)) {
-        return failure(ChecksumTerminal::refused, "symlink-refused",
+        const ChecksumResult result = failure(ChecksumTerminal::refused, "symlink-refused",
                        "checksum never follows a symbolic link", path);
+        return result;
     }
 
     NativeReadFile descriptor(path);
     if (!descriptor.available()) {
-        return failure(ChecksumTerminal::unavailable, "open-failed",
+        const ChecksumResult result = failure(ChecksumTerminal::unavailable, "open-failed",
                        std::string("cannot open file: ") + descriptor.error_message(),
                        path);
+        return result;
     }
     const ObjectIdentity before = descriptor.identity();
     if (!before.available()) {
-        return failure(ChecksumTerminal::unavailable, "inspect-failed",
+        const ChecksumResult result = failure(ChecksumTerminal::unavailable, "inspect-failed",
                        "cannot inspect opened file", path);
+        return result;
     }
     if (before.type != std::filesystem::file_type::regular) {
-        return failure(ChecksumTerminal::refused, "not-regular-file",
+        const ChecksumResult result = failure(ChecksumTerminal::refused, "not-regular-file",
                        "checksum accepts one regular file", path);
+        return result;
     }
     if (expected_identity.available() &&
         !expected_identity.same_revision(before)) {
-        return failure(ChecksumTerminal::changed, "selection-changed",
+        const ChecksumResult result = failure(ChecksumTerminal::changed, "selection-changed",
                        "selected file changed before checksum began", path);
+        return result;
     }
 
     constexpr std::size_t buffer_size = 256U * 1024U;
     std::array<std::byte, buffer_size> buffer{};
-    Sha256 hash;
+    Sha256 hash{};
     std::uint64_t bytes_read{};
     for (;;) {
         if (cancelled && cancelled()) {
-            auto result = failure(ChecksumTerminal::cancelled, "cancelled",
+            ChecksumResult result = failure(ChecksumTerminal::cancelled, "cancelled",
                                   "checksum cancelled", path);
             result.identity = before;
             result.bytes_read = bytes_read;
@@ -237,14 +247,14 @@ ChecksumResult checksum_sha256(
         }
         const std::ptrdiff_t count = descriptor.read(buffer.data(), buffer.size());
         if (count < 0) {
-            auto result = failure(ChecksumTerminal::unavailable, "read-failed",
+            ChecksumResult result = failure(ChecksumTerminal::unavailable, "read-failed",
                 std::string("cannot read file: ") + descriptor.error_message(), path);
             result.identity = before;
             result.bytes_read = bytes_read;
             return result;
         }
         if (count == 0) break;
-        const auto size = static_cast<std::size_t>(count);
+        const std::size_t size = static_cast<std::size_t>(count);
         hash.update(buffer.data(), size);
         bytes_read += static_cast<std::uint64_t>(size);
         if (progress) {
@@ -260,10 +270,10 @@ ChecksumResult checksum_sha256(
         result.bytes_read = bytes_read;
         return result;
     }
-    const auto path_after = observe_identity(path);
+    const ObjectIdentity path_after = observe_identity(path);
     if (!before.same_revision(after) || !after.same_revision(path_after) ||
         bytes_read != after.size) {
-        auto result = failure(ChecksumTerminal::changed,
+        ChecksumResult result = failure(ChecksumTerminal::changed,
             "changed-during-read",
             "file changed or was replaced while SHA-256 was reading it", path);
         result.identity = after;
@@ -271,11 +281,12 @@ ChecksumResult checksum_sha256(
         return result;
     }
 
-    ChecksumResult result;
+    ChecksumResult result{};
     result.terminal = ChecksumTerminal::completed;
     result.code = "ok";
     result.message = "SHA-256 completed over a stable file revision";
-    result.digest_hex = hex_digest(hash.finish());
+    const std::array<std::uint8_t, 32> digest = hash.finish();
+    result.digest_hex = hex_digest(digest);
     result.path = path;
     result.identity = after;
     result.bytes_read = bytes_read;

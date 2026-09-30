@@ -199,3 +199,78 @@ default Open uses `xdg-open`.
 
 These remain development archives, not production installers or general
 mutation/platform-accessibility promotion. Mac minimum remains 26.0.
+
+## House-style correction audit, 2026-09-30
+
+**GIVEN:** the owner rejected the delegated implementation's failure to apply
+`programming-house-style (2).md` and directed a complete correction within the
+assigned build/export and API-reference tooling scope. This source correction
+neither updates the published `342c42a` archives nor replaces the frozen
+`dbe3766` SDKs. Their historical evidence above remains unchanged.
+
+**OBSERVED baseline:** the seven original Python files (`build_native.py`,
+`package_native.py`, `collect_diagnostics.py`, GUI.Forms `api_reference.py`,
+`api_reference_render.py`, `verify_install.py`, and `api_reference_tests.py`)
+contained 7 lambdas, 42 comprehensions/generator expressions and 43 procedure
+interfaces without complete input/result annotations. Additional findings were
+captured mutable maps in nested generator helpers, repeated header reads during
+AST traversal, whole-member archive reads, child cleanup limited to the normal
+timeout path, anonymous PowerShell filtering, and anonymous emitted JavaScript
+search predicates. These are implementation findings, not merely formatting.
+
+The correction gives synchronous command/JSON boundaries explicit types; moves
+compiler extraction and reference rendering state onto named owners; preserves
+UTF-8 byte-offset handling; uses named loops and bounded reusable hash scratch;
+closes archive-member streams explicitly; and reaps only the acquired test child
+on both normal and exceptional exits. PowerShell PATH selection now uses explicit
+ordered collection traversal and named state. CI compiler-identity code lives in
+a named script rather than an embedded untyped block. The new Python modules are
+private tooling, not a new runtime or cross-project contract.
+
+**MEASURED focused checks on Shadow:**
+
+- `python -B tools/native_build_tests.py`: 8 tests passed. Generated fixtures
+  cover fingerprint compatibility and changed bytes, bounded stream reads,
+  ZIP/tar readback and negative hashes/permissions, diagnostic containment and
+  exclusive report creation, timeout escalation, exception cleanup, and reaping
+  a real owned Python child. No File Manager process or SDK was opened.
+- `python -B gui_forms/tests/api_reference_tests.py`: 5 tests passed using the
+  native Clang fixture. Against saved original generator source, the same fixture
+  inventory and all 24 unchanged emitted artifacts were byte-identical, including
+  reviewed contract sections and the UTF-8 source example. The checked-in golden
+  hashes use canonical UTF-8 text/newlines so the fixture can run across hosts.
+- `python -B gui_forms/tests/verify_install_tests.py`: 2 tests passed. Named
+  command fakes verify configure/build/test/rejected-component order, relocation
+  and emulator arguments. No consumer build or installed SDK write occurs.
+- `node gui_forms/tests/api_reference_search_tests.js`: order, total match count,
+  first-100 display bound, empty/no-match state, listener removal on page hide,
+  reconnection on page show and final disposal passed in a generated DOM fixture.
+- Both PowerShell files parse. Repeated toolchain entry preserves PATH and the
+  explicitly selected compiler's precedence within the test shell.
+
+**Authorized output delta:** the coordinator explicitly admitted rewriting only
+emitted `search.js` to named behavior, explicit document-owned listener state and
+bounded displayed-match storage. Inventory/HTML/CSS/search-data/coverage output
+must otherwise match for an unchanged input fixture. Committed generated docs
+are not rewritten until the coordinator confirms authoritative headers are
+stable. Concurrent C++ header changes may legitimately change declarations;
+fixture equivalence does not claim those live declarations are unchanged.
+
+**Audit limits:** the owned Python source and tests have zero lambdas,
+comprehensions/generator expressions or untyped procedure interfaces in the
+focused AST inventory. That mechanical result is not a whole-project compliance
+claim or a substitute for review of sequencing, ownership and bounds. No full
+platform build, live GUI acceptance, native Mac signing execution or release
+repackaging was performed for this correction. Full CI remains a coordinated
+follow-up after source review. Existing negative CI and provenance results are
+retained above.
+
+**Regeneration boundary correction:** after the coordinator reported authoritative
+headers stable, the compiler generator completed a full source extraction:
+569 types, 5,061 members and 233 functions (5,920 symbols), with zero authored
+contracts in its default destination. Inspection established that
+`gui_forms/docs/reference/` had no tracked inventory or pages in this checkout;
+`docs/library` is a different established projection. The new, verified-untracked
+attempt was moved intact to `.build/house-style-tooling/reference-current`.
+The coordinator explicitly declined admitting a new reference tree. No tracked
+inventory, existing library atlas, SDK or published artifact was changed.

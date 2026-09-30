@@ -20,7 +20,7 @@ void require_at(bool value, int line) { if (!value) { std::cerr << "failed at " 
 
 void compare(ImageSampling sampling, double zoom, double scale, bool edited) {
     const std::shared_ptr<gui_drawing::Bitmap> bitmap = std::make_shared<gui_drawing::Bitmap>(1025, 1025);
-    gui_drawing::BitmapEditView edit = bitmap->begin_edit({0, 0, 1025, 1025});
+    gui_drawing::BitmapEditView edit = (*bitmap).begin_edit({0, 0, 1025, 1025});
     for (int y = 0; y < 1025; ++y) for (int x = 0; x < 1025; ++x) {
         std::byte* pixel = edit.writable_data + y * edit.row_bytes + x * 4;
         const unsigned alpha = 80 + (x * 3 + y * 5) % 176;
@@ -29,13 +29,13 @@ void compare(ImageSampling sampling, double zoom, double scale, bool edited) {
         pixel[2] = std::byte(((x + y) % 251) * alpha / 255);
         pixel[3] = std::byte(alpha);
     }
-    static_cast<void>(bitmap->commit_edit(edit.token));
+    static_cast<void>((*bitmap).commit_edit(edit.token));
     const std::shared_ptr<RasterCanvas> canvas = make_control<RasterCanvas>(StableId("raster"));
-    canvas->set_bitmap(bitmap);
-    canvas->set_transparency_grid(false);
-    canvas->set_canvas_background(Color::rgba(23, 37, 51));
-    canvas->set_sampling(sampling);
-    canvas->set_view(zoom, {470.3, 480.7});
+    (*canvas).set_bitmap(bitmap);
+    (*canvas).set_transparency_grid(false);
+    (*canvas).set_canvas_background(Color::rgba(23, 37, 51));
+    (*canvas).set_sampling(sampling);
+    (*canvas).set_view(zoom, {470.3, 480.7});
     const Size size{180, 150};
     Window window(canvas, size);
     window.perform_layout();
@@ -48,15 +48,15 @@ void compare(ImageSampling sampling, double zoom, double scale, bool edited) {
     require(window.paint(tiled).has_value());
 
     if (edited) {
-        bitmap->set_pixel(511, 511, gui_drawing::Color::from_name("red"));
-        bitmap->set_pixel(512, 512, gui_drawing::Color::from_name("blue"));
-        require(canvas->synchronize_bitmap());
+        (*bitmap).set_pixel(511, 511, gui_drawing::Color::from_name("red"));
+        (*bitmap).set_pixel(512, 512, gui_drawing::Color::from_name("blue"));
+        require((*canvas).synchronize_bitmap());
         require(tiled.synchronize_images(window.image_resources()));
         tiled.begin_frame();
         require(window.paint(tiled).has_value());
     
     }
-    const gui_drawing::ImageSnapshot snapshot = bitmap->snapshot();
+    const gui_drawing::ImageSnapshot snapshot = (*bitmap).snapshot();
     ImageRegistry registry;
     const ImageLoadResult loaded = registry.load_bgra32_premultiplied(1025, 1025, snapshot.row_bytes(), snapshot.pixels());
     require(bool(loaded));

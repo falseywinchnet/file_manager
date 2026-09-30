@@ -20,19 +20,33 @@ std::atomic_flag running = ATOMIC_FLAG_INIT;
 class RunningScope final {
 public:
     RunningScope() noexcept : acquired_(!running.test_and_set()) {}
+    RunningScope(const RunningScope&) = delete;
+    RunningScope& operator=(const RunningScope&) = delete;
     ~RunningScope() { if (acquired_) running.clear(); }
     [[nodiscard]] bool acquired() const noexcept { return acquired_; }
 private:
     bool acquired_;
 };
 struct CallbackFailure final {
-    std::exception_ptr exception;
-    std::weak_ptr<detail::ApplicationWindowState> primary;
+    std::exception_ptr exception{};
+    std::weak_ptr<detail::ApplicationWindowState> primary{};
 
     void stop() noexcept {
         const std::shared_ptr<detail::ApplicationWindowState> state = primary.lock();
         if (!state || (*state).closed || !(*state).request_close) return;
-        try { (*state).request_close(); } catch (...) {}
+        // Failure shutdown consumes this request. Swap into an active owner
+        // without allocating; a synchronous close may clear the stored slot.
+        std::function<void()> request_close{};
+        request_close.swap((*state).request_close);
+        try {
+            request_close();
+        } catch (...) {
+            // Native delivery may fail. Preserve a retry only while the same
+            // open state has no replacement request; never revive closed state.
+            if (!(*state).closed && !(*state).request_close) {
+                request_close.swap((*state).request_close);
+            }
+        }
     }
     void capture() noexcept {
         if (!exception) exception = std::current_exception();
@@ -40,10 +54,10 @@ struct CallbackFailure final {
     }
 };
 struct WindowBridge final {
-    std::shared_ptr<detail::ApplicationWindowState> state;
-    std::shared_ptr<CallbackFailure> failure;
+    std::shared_ptr<detail::ApplicationWindowState> state{};
+    std::shared_ptr<CallbackFailure> failure{};
     Window* model{};
-    ApplicationWindowOptions options;
+    ApplicationWindowOptions options{};
     bool host_ready{};
     bool visibility_ready{};
     bool notified{};
@@ -54,12 +68,15 @@ struct WindowBridge final {
         (*state).ready = true;
         if ((*failure).exception) { (*failure).stop(); return; }
         try {
-            if (options.ready) options.ready(*model, detail::ApplicationHandleAccess::make(state));
+            if (options.ready) {
+                const ApplicationWindowHandle handle = detail::ApplicationHandleAccess::make(state);
+                options.ready(*model, handle);
+            }
         } catch (...) { (*failure).capture(); }
     }
 };
 struct HostReady final {
-    std::shared_ptr<WindowBridge> bridge;
+    std::shared_ptr<WindowBridge> bridge{};
     void operator()(std::function<void()> wake, std::function<void()> request_close,
                     std::function<HostDialogResult(const HostDialogRequest&)>,
                     std::function<HostServiceStatus(const HostTooltipRequest&)>,
@@ -76,7 +93,7 @@ struct HostReady final {
     }
 };
 struct DispatchPending final {
-    std::shared_ptr<WindowBridge> bridge;
+    std::shared_ptr<WindowBridge> bridge{};
     void operator()() const noexcept {
         if ((*(*bridge).state).closed || (*(*bridge).failure).exception) return;
         try {
@@ -85,13 +102,13 @@ struct DispatchPending final {
     }
 };
 struct FullScreenReady final {
-    std::shared_ptr<WindowBridge> bridge;
+    std::shared_ptr<WindowBridge> bridge{};
     void operator()(std::function<void()> toggle) const noexcept {
         (*(*bridge).state).toggle_full_screen = std::move(toggle);
     }
 };
 struct VisibilityReady final {
-    std::shared_ptr<WindowBridge> bridge;
+    std::shared_ptr<WindowBridge> bridge{};
     void operator()(std::function<void()> show, std::function<void()> hide) const noexcept {
         (*(*bridge).state).show = std::move(show);
         (*(*bridge).state).hide = std::move(hide);
@@ -100,7 +117,7 @@ struct VisibilityReady final {
     }
 };
 struct Closing final {
-    std::shared_ptr<WindowBridge> bridge;
+    std::shared_ptr<WindowBridge> bridge{};
     void operator()(HostCloseRequest& request) const noexcept {
         if ((*(*bridge).failure).exception) { request.cancel = false; return; }
         try {
@@ -112,7 +129,7 @@ struct Closing final {
     }
 };
 struct Closed final {
-    std::shared_ptr<WindowBridge> bridge;
+    std::shared_ptr<WindowBridge> bridge{};
     void operator()() const noexcept {
         if ((*(*bridge).state).closed) return;
         (*(*bridge).state).closed = true;
@@ -128,6 +145,9 @@ struct Closed final {
 };
 class BridgeScope final {
 public:
+    BridgeScope() = default;
+    BridgeScope(const BridgeScope&) = delete;
+    BridgeScope& operator=(const BridgeScope&) = delete;
     ~BridgeScope() {
         for (std::size_t index = 0U; index < windows.size(); ++index) {
             detail::ApplicationWindowState& state = *(*windows[index]).state;
@@ -139,13 +159,16 @@ public:
             state.toggle_full_screen = {};
         }
     }
-    std::vector<std::shared_ptr<WindowBridge>> windows;
+    std::vector<std::shared_ptr<WindowBridge>> windows{};
 };
 
 template <typename NativeWindow>
-std::vector<NativeWindow> prepare(std::vector<ApplicationWindow>& windows, BridgeScope& scope,
-                                  const std::shared_ptr<CallbackFailure>& failure) {
-    std::vector<NativeWindow> native;
+void prepare(std::vector<ApplicationWindow>& windows, BridgeScope& scope,
+             const std::shared_ptr<CallbackFailure>& failure,
+             std::vector<NativeWindow>& native) {
+    // Both destinations are fresh storage owned by this run. The native host
+    // owns model lifetimes during dispatch; bridge callbacks borrow those
+    // models only while the host is active. BridgeScope revokes handles on exit.
     native.reserve(windows.size());
     scope.windows.reserve(windows.size());
     for (std::size_t index = 0U; index < windows.size(); ++index) {
@@ -159,7 +182,7 @@ std::vector<NativeWindow> prepare(std::vector<ApplicationWindow>& windows, Bridg
         (*(*bridge).state).can_hide = !primary;
         if (primary) (*failure).primary = (*bridge).state;
         scope.windows.push_back(bridge);
-        NativeWindow entry;
+        NativeWindow entry{};
         entry.stable_id = std::move(source.stable_id);
         entry.owner_id = std::move(source.owner_id);
         entry.tool_window = source.tool_window;
@@ -179,48 +202,55 @@ std::vector<NativeWindow> prepare(std::vector<ApplicationWindow>& windows, Bridg
         entry.options.closed = Closed{bridge};
         native.push_back(std::move(entry));
     }
-    return native;
 }
 }
 
 HostCapabilities Application::capabilities() {
 #if defined(GUI_FORMS_APPLICATION_MACOS)
-    return host::macos_capabilities();
+    const HostCapabilities result = host::macos_capabilities();
 #elif defined(GUI_FORMS_APPLICATION_WINDOWS)
-    return host::windows_capabilities();
+    const HostCapabilities result = host::windows_capabilities();
 #elif defined(GUI_FORMS_APPLICATION_LINUX)
-    return host::linux_capabilities();
+    const HostCapabilities result = host::linux_capabilities();
 #else
-    return {HostCapabilities::current_protocol_version, "unsupported", HostCapability::none};
+    const HostCapabilities result{HostCapabilities::current_protocol_version, "unsupported", HostCapability::none};
 #endif
+    return result;
 }
 
 ApplicationResult Application::run(std::unique_ptr<Window> window, ApplicationWindowOptions options) {
-    std::vector<ApplicationWindow> windows;
-    ApplicationWindow entry;
+    std::vector<ApplicationWindow> windows{};
+    ApplicationWindow entry{};
     entry.stable_id = "main";
     entry.model = std::move(window);
     entry.options = std::move(options);
     windows.push_back(std::move(entry));
-    return run(std::move(windows));
+    const ApplicationResult result = run(std::move(windows));
+    return result;
 }
 
 ApplicationResult Application::run(std::vector<ApplicationWindow> windows) {
 #if defined(GUI_FORMS_APPLICATION_MACOS)
     if (pthread_main_np() == 0) return {ApplicationError::wrong_thread};
 #endif
-    const RunningScope running_scope;
+    const RunningScope running_scope{};
     if (!running_scope.acquired()) return {ApplicationError::already_running};
     ApplicationResult result = validate(windows);
     if (!result.accepted()) return result;
-    BridgeScope bridges;
+    BridgeScope bridges{};
     const std::shared_ptr<CallbackFailure> failure = std::make_shared<CallbackFailure>();
 #if defined(GUI_FORMS_APPLICATION_MACOS)
-    result.native_exit_code = host::run_macos_application(prepare<host::MacApplicationWindow>(windows, bridges, failure));
+    std::vector<host::MacApplicationWindow> native{};
+    prepare(windows, bridges, failure, native);
+    result.native_exit_code = host::run_macos_application(std::move(native));
 #elif defined(GUI_FORMS_APPLICATION_WINDOWS)
-    result.native_exit_code = host::run_windows_application(prepare<host::WindowsApplicationWindow>(windows, bridges, failure));
+    std::vector<host::WindowsApplicationWindow> native{};
+    prepare(windows, bridges, failure, native);
+    result.native_exit_code = host::run_windows_application(std::move(native));
 #elif defined(GUI_FORMS_APPLICATION_LINUX)
-    result.native_exit_code = host::run_linux_application(prepare<host::LinuxApplicationWindow>(windows, bridges, failure));
+    std::vector<host::LinuxApplicationWindow> native{};
+    prepare(windows, bridges, failure, native);
+    result.native_exit_code = host::run_linux_application(std::move(native));
 #else
     result.error = ApplicationError::unsupported;
 #endif

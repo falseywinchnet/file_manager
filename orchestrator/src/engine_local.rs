@@ -134,11 +134,12 @@ impl EngineLocalCaller {
             stream
         };
         #[cfg(windows)]
-        let mut stream = {
-            let name = socket_path
-                .to_str()
-                .ok_or_else(|| protocol_error("invalid pipe name"))?;
-            let mut stream = crate::windows_local::Pipe::connect(
+        let mut stream: crate::windows_local::Pipe = {
+            let Some(name) = socket_path.to_str() else {
+                let error: EngineJsonlError = protocol_error("invalid pipe name");
+                return Err(error);
+            };
+            let mut stream: crate::windows_local::Pipe = crate::windows_local::Pipe::connect(
                 name,
                 discovery.server_pid,
                 &discovery.user_sid,
@@ -229,20 +230,26 @@ impl InstalledEngineSearch {
     pub fn connect(runtime_directory: impl Into<PathBuf>) -> Result<Self, EngineJsonlError> {
         let mut caller = EngineLocalCaller::new(runtime_directory, EngineLocalAuthority::Query);
         let version = caller.call("engine.version", &serde_json::json!({}))?;
-        let available = |id: &str| {
-            version["capabilities"]
-                .as_array()
-                .is_some_and(|capabilities| {
-                    capabilities.iter().any(|capability| {
-                        capability["id"] == id && capability["state"] == "available"
-                    })
-                })
-        };
-        Ok(Self {
+        let live_available: bool = capability_available(&version, "engine.live.query")
+            && capability_available(&version, "contract.ORC-ENG-004");
+        let provider: Self = Self {
             adapter: EngineJsonlSearchAdapter::new(caller),
-            live_available: available("engine.live.query") && available("contract.ORC-ENG-004"),
-        })
+            live_available,
+        };
+        Ok(provider)
     }
+}
+
+fn capability_available(version: &Value, id: &str) -> bool {
+    let Some(capabilities) = version["capabilities"].as_array() else {
+        return false;
+    };
+    for capability in capabilities {
+        if capability["id"] == id && capability["state"] == "available" {
+            return true;
+        }
+    }
+    false
 }
 
 impl EngineSearchProvider for InstalledEngineSearch {
@@ -449,16 +456,32 @@ fn read_private_json<T: for<'de> Deserialize<'de>>(
     path: &Path,
     limit: usize,
 ) -> Result<T, EngineJsonlError> {
-    serde_json::from_slice(&crate::windows_local::read_private(path, limit)?)
-        .map_err(EngineJsonlError::Decode)
+    let bytes: Vec<u8> = crate::windows_local::read_private(path, limit)?;
+    let value: T = serde_json::from_slice(&bytes).map_err(EngineJsonlError::Decode)?;
+    Ok(value)
+}
+
+#[cfg(windows)]
+#[allow(clippy::let_and_return)] // House calculate-then-return rule.
+fn token_encoding_error(_: std::string::FromUtf8Error) -> EngineJsonlError {
+    let error: EngineJsonlError = protocol_error("Engine token is not UTF-8");
+    error
 }
 
 #[cfg(windows)]
 fn read_token(path: &Path) -> Result<String, EngineJsonlError> {
-    let token = String::from_utf8(crate::windows_local::read_private(path, TOKEN_BYTES)?)
-        .map_err(|_| protocol_error("Engine token is not UTF-8"))?;
-    if token.len() != TOKEN_BYTES || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return Err(protocol_error("Engine token must be 256-bit hexadecimal"));
+    let bytes: Vec<u8> = crate::windows_local::read_private(path, TOKEN_BYTES)?;
+    let token: String = String::from_utf8(bytes).map_err(token_encoding_error)?;
+    let mut valid: bool = token.len() == TOKEN_BYTES;
+    for byte in token.bytes() {
+        if !byte.is_ascii_hexdigit() {
+            valid = false;
+            break;
+        }
+    }
+    if !valid {
+        let error: EngineJsonlError = protocol_error("Engine token must be 256-bit hexadecimal");
+        return Err(error);
     }
     Ok(token)
 }

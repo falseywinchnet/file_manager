@@ -17,13 +17,13 @@ struct DragPointerObservation final {
     DragPointerPhase phase{DragPointerPhase::move};
     double x{};
     double y{};
-    std::string_view item_id;
+    std::string_view item_id{};
     bool copy_modifier{};
 };
 
 struct InternalDropIntent final {
-    std::string source_id;
-    std::string destination_id;
+    std::string source_id{};
+    std::string destination_id{};
     bool copy{};
 };
 
@@ -39,7 +39,7 @@ public:
 private:
     static constexpr double activation_distance = 7.0;
 
-    std::string source_id_;
+    std::string source_id_{};
     double origin_x_{};
     double origin_y_{};
     bool active_{};

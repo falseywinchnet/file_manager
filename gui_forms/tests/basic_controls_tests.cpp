@@ -1,6 +1,8 @@
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/diagnostic_controls.hpp"
 #include "gui_forms/window.hpp"
+#include "gui_forms/text.hpp"
+#include "../src/controls/basic/basic_control_rendering.hpp"
 #include "support/named_callbacks.hpp"
 
 #include <algorithm>
@@ -40,7 +42,8 @@ void require(bool condition, const char* message) {
 
 SurfaceMaterial solid_material(Color color) {
     const MaterialFillLayer fill = MaterialFillLayer::solid(color);
-    return SurfaceMaterial::from_parts(&fill, 1U, nullptr, 0U, nullptr, 0.0);
+    const SurfaceMaterial material = SurfaceMaterial::from_parts(&fill, 1U, nullptr, 0U, nullptr, 0.0);
+    return material;
 }
 
 class RecordingPainter final : public Painter {
@@ -106,16 +109,16 @@ public:
     Rect last_rounded_stroke_bounds{};
     Color last_rounded_stroke_color{};
     double last_rounded_stroke_width{};
-    std::vector<Color> fill_colors;
-    std::vector<std::string> texts;
-    std::vector<FontRole> roles;
-    std::vector<Point> text_origins;
-    std::vector<Point> line_starts;
-    std::vector<Point> line_ends;
-    std::vector<char> text_line_order;
-    std::vector<ImageId> images;
-    std::vector<Rect> image_destinations;
-    std::vector<double> image_opacities;
+    std::vector<Color> fill_colors{};
+    std::vector<std::string> texts{};
+    std::vector<FontRole> roles{};
+    std::vector<Point> text_origins{};
+    std::vector<Point> line_starts{};
+    std::vector<Point> line_ends{};
+    std::vector<char> text_line_order{};
+    std::vector<ImageId> images{};
+    std::vector<Rect> image_destinations{};
+    std::vector<double> image_opacities{};
 };
 
 class FocusSink final : public Control {
@@ -155,7 +158,7 @@ public:
     }
 
 private:
-    std::shared_ptr<Button> button_;
+    std::shared_ptr<Button> button_{};
 };
 
 class TraceCheckState final {
@@ -183,8 +186,8 @@ public:
 
 private:
     std::string& trace_;
-    std::string_view true_text_;
-    std::string_view false_text_;
+    std::string_view true_text_{};
+    std::string_view false_text_{};
 };
 
 class RecordDrawingPaint final {
@@ -216,17 +219,19 @@ void attempt_label_mutation(const std::shared_ptr<Label>& label,
 
 Point center(const Control::Ptr& control) {
     const Rect bounds = (*control).absolute_bounds();
-    return {bounds.x + bounds.width * 0.5, bounds.y + bounds.height * 0.5};
+    const Point center{.x = bounds.x + bounds.width * 0.5,
+                       .y = bounds.y + bounds.height * 0.5};
+    return center;
 }
 
 void click(Window& window, const Control::Ptr& control) {
     const Point point = center(control);
-    require(window.dispatch_pointer(
-                {PointerAction::down, PointerButton::primary, point}),
-            "reusable control must handle primary down");
-    require(window.dispatch_pointer(
-                {PointerAction::up, PointerButton::primary, point}),
-            "reusable control must handle primary up");
+    const bool operation_check_1 = window.dispatch_pointer(
+                {PointerAction::down, PointerButton::primary, point});
+    require(operation_check_1, "reusable control must handle primary down");
+    const bool operation_check_2 = window.dispatch_pointer(
+                {PointerAction::up, PointerButton::primary, point});
+    require(operation_check_2, "reusable control must handle primary up");
 }
 
 void test_public_controls_render_with_role_policy() {
@@ -255,7 +260,7 @@ void test_public_controls_render_with_role_policy() {
     Window window(panel, {360.0, 180.0});
     window.perform_layout();
 
-    RecordingPainter painter;
+    RecordingPainter painter{};
     window.paint(painter, {0.0, 0.0, 360.0, 180.0});
     require(painter.saves == painter.restores && painter.clips >= 6 &&
                 painter.gradients >= 4 && painter.rounded_clips >= 3 &&
@@ -284,13 +289,17 @@ void test_button_pointer_and_keyboard_activation() {
     click(window, button);
     require(clicks == 1 && window.focused_control() == button,
             "matching pointer press/release must click and focus Button once");
-    KeyEvent down;
+    KeyEvent down{};
     down.action = KeyAction::down;
     down.physical_key = PhysicalKey::space;
     KeyEvent up = down;
     up.action = KeyAction::up;
-    require(window.dispatch_key(down) && window.dispatch_key(up) && clicks == 2,
-            "focused Button must activate once on normalized Space release");
+    const bool operation_check_3 = window.dispatch_key(down);
+    require(operation_check_3, "focused Button must activate once on normalized Space release");
+    const bool operation_check_4 = window.dispatch_key(up);
+    require(operation_check_4, "focused Button must activate once on normalized Space release");
+    const bool operation_check_5 = clicks == 2;
+    require(operation_check_5, "focused Button must activate once on normalized Space release");
     require(!(*button).pressed_visual(),
             "Button keyboard visual must clear after activation");
 }
@@ -328,29 +337,44 @@ void test_button_focus_cue_tracks_input_modality() {
                 (*first).visual_outsets() == Insets{},
             "primary-pointer focus must suppress focus-visible without losing focus");
 
-    KeyEvent tab;
+    KeyEvent tab{};
     tab.action = KeyAction::down;
     tab.physical_key = PhysicalKey::tab;
-    require(window.dispatch_key(tab) && window.focused_control() == second &&
-                window.focus_cue_visible() && (*second).focus_cue_visible() &&
-                (*second).visual_outsets() == Insets{5.0, 5.0, 5.0, 5.0},
-            "keyboard traversal must expose focus-visible on the moved focus");
+    const bool operation_check_6 = window.dispatch_key(tab);
+    require(operation_check_6, "keyboard traversal must expose focus-visible on the moved focus");
+    const bool operation_check_7 = window.focused_control() == second;
+    require(operation_check_7, "keyboard traversal must expose focus-visible on the moved focus");
+    const bool operation_check_8 = window.focus_cue_visible();
+    require(operation_check_8, "keyboard traversal must expose focus-visible on the moved focus");
+    const bool operation_check_9 = (*second).focus_cue_visible();
+    require(operation_check_9, "keyboard traversal must expose focus-visible on the moved focus");
+    const bool operation_check_10 = (*second).visual_outsets() == Insets{5.0, 5.0, 5.0, 5.0};
+    require(operation_check_10, "keyboard traversal must expose focus-visible on the moved focus");
 
-    require(window.perform_semantic_action(
-                "focus-visible.first", SemanticAction::focus) &&
-                window.focused_control() == first &&
-                window.focus_cue_visible() && (*first).focus_cue_visible() &&
-                (*first).visual_outsets() == Insets{5.0, 5.0, 5.0, 5.0},
-            "semantic focus navigation must retain a visible accessibility cue");
+    const bool operation_check_11 = window.perform_semantic_action(
+                "focus-visible.first", SemanticAction::focus);
+    require(operation_check_11, "semantic focus navigation must retain a visible accessibility cue");
+    const bool operation_check_12 = window.focused_control() == first;
+    require(operation_check_12, "semantic focus navigation must retain a visible accessibility cue");
+    const bool operation_check_13 = window.focus_cue_visible();
+    require(operation_check_13, "semantic focus navigation must retain a visible accessibility cue");
+    const bool operation_check_14 = (*first).focus_cue_visible();
+    require(operation_check_14, "semantic focus navigation must retain a visible accessibility cue");
+    const bool operation_check_15 = (*first).visual_outsets() == Insets{5.0, 5.0, 5.0, 5.0};
+    require(operation_check_15, "semantic focus navigation must retain a visible accessibility cue");
 
     click(window, second);
     require(window.focused_control() == second && !window.focus_cue_visible() &&
                 (*second).visual_outsets() == Insets{},
             "a later primary-pointer focus must return to pointer modality");
-    require(window.request_focus(first) && window.focused_control() == first &&
-                !window.focus_cue_visible() &&
-                (*first).visual_outsets() == Insets{},
-            "programmatic focus must preserve the current modality deterministically");
+    const bool operation_check_16 = window.request_focus(first);
+    require(operation_check_16, "programmatic focus must preserve the current modality deterministically");
+    const bool operation_check_17 = window.focused_control() == first;
+    require(operation_check_17, "programmatic focus must preserve the current modality deterministically");
+    const bool operation_check_18 = !window.focus_cue_visible();
+    require(operation_check_18, "programmatic focus must preserve the current modality deterministically");
+    const bool operation_check_19 = (*first).visual_outsets() == Insets{};
+    require(operation_check_19, "programmatic focus must preserve the current modality deterministically");
 }
 
 void test_button_authored_state_recipes_are_owned_and_retained() {
@@ -390,13 +414,13 @@ void test_button_authored_state_recipes_are_owned_and_retained() {
     Window window(button, {120.0, 32.0});
     window.perform_layout();
 
-    RecordingPainter normal_painter;
+    RecordingPainter normal_painter{};
     (*button).on_paint(normal_painter, (*button).absolute_bounds());
     require(normal_painter.last_fill_color == normal_color,
             "Button must own its authored normal-state material");
 
     (*button).on_focus_changed(true);
-    RecordingPainter focus_painter;
+    RecordingPainter focus_painter{};
     (*button).on_paint(focus_painter, (*button).absolute_bounds());
     require(focus_painter.last_rounded_stroke_bounds ==
                 Rect{-4.0, -4.0, 128.0, 40.0} &&
@@ -411,7 +435,7 @@ void test_button_authored_state_recipes_are_owned_and_retained() {
     }
     (*button).set_visual_recipes(inset_recipes);
     (*button).on_focus_changed(true);
-    RecordingPainter inset_focus_painter;
+    RecordingPainter inset_focus_painter{};
     (*button).on_paint(inset_focus_painter, (*button).absolute_bounds());
     require(inset_focus_painter.last_rounded_stroke_bounds ==
                 Rect{2.0, 2.0, 116.0, 28.0} &&
@@ -420,20 +444,20 @@ void test_button_authored_state_recipes_are_owned_and_retained() {
     (*button).on_focus_changed(false);
     (*button).set_visual_recipes(recipes);
 
-    PointerEvent enter;
+    PointerEvent enter{};
     enter.action = PointerAction::enter;
     (*button).on_pointer(enter);
-    RecordingPainter hot_painter;
+    RecordingPainter hot_painter{};
     (*button).on_paint(hot_painter, (*button).absolute_bounds());
     require(hot_painter.last_fill_color == hot_color,
             "Button hover must resolve the authored hot-state material");
 
-    PointerEvent down;
+    PointerEvent down{};
     down.action = PointerAction::down;
     down.button = PointerButton::primary;
     down.position = center(button);
     (*button).on_pointer(down);
-    RecordingPainter pressed_painter;
+    RecordingPainter pressed_painter{};
     (*button).on_paint(pressed_painter, (*button).absolute_bounds());
     require(pressed_painter.last_fill_color == pressed_color,
             "Button press must resolve the authored pressed-state material");
@@ -442,7 +466,7 @@ void test_button_authored_state_recipes_are_owned_and_retained() {
             "authored pressed transform must move the whole visual without changing layout");
 
     (*button).set_enabled(false);
-    RecordingPainter disabled_painter;
+    RecordingPainter disabled_painter{};
     (*button).on_paint(disabled_painter, (*button).absolute_bounds());
     require(disabled_painter.last_fill_color == disabled_color,
             "Button disabled state must resolve the authored disabled material");
@@ -482,7 +506,7 @@ void test_nested_authored_surfaces_are_control_background_layers() {
     Window window(root, {100.0, 60.0});
     window.perform_layout();
 
-    RecordingPainter reveal_painter;
+    RecordingPainter reveal_painter{};
     window.paint(reveal_painter, {0.0, 0.0, 100.0, 60.0});
     require(std::count(reveal_painter.fill_colors.begin(),
                        reveal_painter.fill_colors.end(), root_color) == 1 &&
@@ -491,7 +515,7 @@ void test_nested_authored_surfaces_are_control_background_layers() {
             "a child without an authored surface must reveal its retained parent surface");
 
     (*child).set_authored_surface_material(solid_material(child_color));
-    RecordingPainter owned_painter;
+    RecordingPainter owned_painter{};
     window.paint(owned_painter, {0.0, 0.0, 100.0, 60.0});
     require(std::count(owned_painter.fill_colors.begin(),
                        owned_painter.fill_colors.end(), root_color) == 1 &&
@@ -508,7 +532,7 @@ void test_nested_authored_surfaces_are_control_background_layers() {
     } catch (const std::invalid_argument&) {
         rejected = true;
     }
-    RecordingPainter restored_reveal_painter;
+    RecordingPainter restored_reveal_painter{};
     window.paint(restored_reveal_painter, {0.0, 0.0, 100.0, 60.0});
     require(rejected && !(*child).authored_surface_material() &&
                 std::count(restored_reveal_painter.fill_colors.begin(),
@@ -573,7 +597,7 @@ void test_mnemonics_and_dialog_buttons_are_retained_commands() {
                 window.cancel_button() == cancel &&
                 (*cancel).dialog_result() == DialogResult::cancel,
             "assigning a Window accept button must retain the target and publish its default cue");
-    RecordingPainter mnemonic_painter;
+    RecordingPainter mnemonic_painter{};
     (*run).on_paint(mnemonic_painter, (*run).client_rectangle());
     require(std::find(mnemonic_painter.texts.begin(), mnemonic_painter.texts.end(),
                       "Run") != mnemonic_painter.texts.end() &&
@@ -581,53 +605,74 @@ void test_mnemonics_and_dialog_buttons_are_retained_commands() {
                 (*label).semantic_descriptor().name == "Name",
             "mnemonic markers must not leak into Button or Label paint and semantics");
 
-    KeyEvent mnemonic;
+    KeyEvent mnemonic{};
     mnemonic.action = KeyAction::down;
     mnemonic.physical_key = PhysicalKey::r;
     mnemonic.modifiers = Modifier::alt;
     (*run).set_causes_validation(false);
-    require(window.dispatch_key(mnemonic) && run_clicks == 1U,
-            "Alt plus a marked character must invoke the first eligible retained command");
+    const bool operation_check_20 = window.dispatch_key(mnemonic);
+    require(operation_check_20, "Alt plus a marked character must invoke the first eligible retained command");
+    const bool operation_check_21 = run_clicks == 1U;
+    require(operation_check_21, "Alt plus a marked character must invoke the first eligible retained command");
     (*run_duplicate).set_causes_validation(false);
-    require(window.dispatch_key(mnemonic) && duplicate_clicks == 1U &&
-                window.dispatch_key(mnemonic) && run_clicks == 2U,
-            "duplicate mnemonics must advance through one stable retained arbitration ring");
+    const bool operation_check_22 = window.dispatch_key(mnemonic);
+    require(operation_check_22, "duplicate mnemonics must advance through one stable retained arbitration ring");
+    const bool operation_check_23 = duplicate_clicks == 1U;
+    require(operation_check_23, "duplicate mnemonics must advance through one stable retained arbitration ring");
+    const bool operation_check_24 = window.dispatch_key(mnemonic);
+    require(operation_check_24, "duplicate mnemonics must advance through one stable retained arbitration ring");
+    const bool operation_check_25 = run_clicks == 2U;
+    require(operation_check_25, "duplicate mnemonics must advance through one stable retained arbitration ring");
 
     mnemonic.physical_key = PhysicalKey::n;
-    require(window.dispatch_key(mnemonic) && window.focused_control() == field,
-            "a Label mnemonic must focus the next selectable retained control");
+    const bool operation_check_26 = window.dispatch_key(mnemonic);
+    require(operation_check_26, "a Label mnemonic must focus the next selectable retained control");
+    const bool operation_check_27 = window.focused_control() == field;
+    require(operation_check_27, "a Label mnemonic must focus the next selectable retained control");
 
     SubscriptionToken rejecting =
         (*field).validating().subscribe(CancelValidation());
     (*accept).set_dialog_result(DialogResult::yes);
-    std::string dialog_trace;
+    std::string dialog_trace{};
     SubscriptionToken accept_order = (*accept).clicked().subscribe(
         callbacks::AppendLiteral<ButtonBase&>(dialog_trace, "click\n"));
     SubscriptionToken cancel_order = (*cancel).clicked().subscribe(
         callbacks::AppendLiteral<ButtonBase&>(dialog_trace, "cancel-click\n"));
     SubscriptionToken result_order =
         window.dialog_result_changed().subscribe(TraceDialogResult(dialog_trace));
-    KeyEvent enter;
+    KeyEvent enter{};
     enter.action = KeyAction::down;
     enter.physical_key = PhysicalKey::enter;
-    require(window.dispatch_key(enter) && accept_clicks == 0U &&
-                window.focused_control() == field,
-            "a rejected default command must be consumed without activation or focus theft");
+    const bool operation_check_28 = window.dispatch_key(enter);
+    require(operation_check_28, "a rejected default command must be consumed without activation or focus theft");
+    const bool operation_check_29 = accept_clicks == 0U;
+    require(operation_check_29, "a rejected default command must be consumed without activation or focus theft");
+    const bool operation_check_30 = window.focused_control() == field;
+    require(operation_check_30, "a rejected default command must be consumed without activation or focus theft");
     (*accept).set_causes_validation(false);
-    require(window.dispatch_key(enter) && accept_clicks == 1U &&
-                window.focused_control() == field &&
-                window.dialog_result() == DialogResult::yes &&
-                dialog_trace == "click\nresult:6\n",
-            "CausesValidation false must run Click before publishing the retained dialog result");
+    const bool operation_check_31 = window.dispatch_key(enter);
+    require(operation_check_31, "CausesValidation false must run Click before publishing the retained dialog result");
+    const bool operation_check_32 = accept_clicks == 1U;
+    require(operation_check_32, "CausesValidation false must run Click before publishing the retained dialog result");
+    const bool operation_check_33 = window.focused_control() == field;
+    require(operation_check_33, "CausesValidation false must run Click before publishing the retained dialog result");
+    const bool operation_check_34 = window.dialog_result() == DialogResult::yes;
+    require(operation_check_34, "CausesValidation false must run Click before publishing the retained dialog result");
+    const bool operation_check_35 = dialog_trace == "click\nresult:6\n";
+    require(operation_check_35, "CausesValidation false must run Click before publishing the retained dialog result");
 
     window.set_dialog_result(DialogResult::none);
     dialog_trace.clear();
     KeyEvent escape = enter;
     escape.physical_key = PhysicalKey::escape;
-    require(window.dispatch_key(escape) && cancel_clicks == 1U &&
-                window.dialog_result() == DialogResult::cancel &&
-                dialog_trace == "cancel-click\nresult:2\n",
-            "Escape must invoke the retained cancel command and publish Cancel after Click");
+    const bool operation_check_36 = window.dispatch_key(escape);
+    require(operation_check_36, "Escape must invoke the retained cancel command and publish Cancel after Click");
+    const bool operation_check_37 = cancel_clicks == 1U;
+    require(operation_check_37, "Escape must invoke the retained cancel command and publish Cancel after Click");
+    const bool operation_check_38 = window.dialog_result() == DialogResult::cancel;
+    require(operation_check_38, "Escape must invoke the retained cancel command and publish Cancel after Click");
+    const bool operation_check_39 = dialog_trace == "cancel-click\nresult:2\n";
+    require(operation_check_39, "Escape must invoke the retained cancel command and publish Cancel after Click");
 
     bool invalid_result_rejected{};
     try {
@@ -647,9 +692,14 @@ void test_mnemonics_and_dialog_buttons_are_retained_commands() {
     (*root).add_child(scope);
     const FocusScopeId scope_id = window.begin_focus_scope(scope, scope_field);
     mnemonic.physical_key = PhysicalKey::r;
-    require(!window.dispatch_key(mnemonic) && run_clicks == 2U &&
-                !window.dispatch_key(enter) && accept_clicks == 1U,
-            "an active contained focus scope must suppress outer mnemonics and default commands");
+    const bool operation_check_40 = !window.dispatch_key(mnemonic);
+    require(operation_check_40, "an active contained focus scope must suppress outer mnemonics and default commands");
+    const bool operation_check_41 = run_clicks == 2U;
+    require(operation_check_41, "an active contained focus scope must suppress outer mnemonics and default commands");
+    const bool operation_check_42 = !window.dispatch_key(enter);
+    require(operation_check_42, "an active contained focus scope must suppress outer mnemonics and default commands");
+    const bool operation_check_43 = accept_clicks == 1U;
+    require(operation_check_43, "an active contained focus scope must suppress outer mnemonics and default commands");
     require(window.end_focus_scope(scope_id),
             "dialog command focus-scope fixture must close deterministically");
 
@@ -667,9 +717,10 @@ void test_mnemonics_and_dialog_buttons_are_retained_commands() {
     (*accept).set_dialog_result(DialogResult::yes);
     SubscriptionToken replace_result_during_click =
         (*accept).clicked().subscribe(ReplaceButtonDialogResult(accept));
-    require((*accept).perform_click() &&
-                window.dialog_result() == DialogResult::no,
-            "Button must publish the post-Click DialogResult chosen by application code");
+    const bool operation_check_44 = (*accept).perform_click();
+    require(operation_check_44, "Button must publish the post-Click DialogResult chosen by application code");
+    const bool operation_check_45 = window.dialog_result() == DialogResult::no;
+    require(operation_check_45, "Button must publish the post-Click DialogResult chosen by application code");
 
     const DialogKeySnapshot snapshot = window.dialog_key_snapshot();
     require(snapshot.mnemonic_attempts == 5U && snapshot.mnemonics_handled == 4U &&
@@ -686,7 +737,7 @@ void test_checkbox_state_and_click_order() {
     std::shared_ptr<gui_forms::CheckBox> check = make_control<CheckBox>(StableId("check"), "Precise");
     (*check).set_requested_bounds({0.0, 0.0, 140.0, 24.0});
     Window window(check, {140.0, 24.0});
-    std::string order;
+    std::string order{};
     SubscriptionToken state =
         (*check).check_state_changed().subscribe(TraceCheckState(order));
     SubscriptionToken checked = (*check).checked_changed().subscribe(
@@ -731,7 +782,7 @@ void test_radio_group_scope_and_order() {
     (*independent).set_checked(true);
     Window window(group, {360.0, 70.0});
 
-    std::string order;
+    std::string order{};
     SubscriptionToken first_changed = (*first).checked_changed().subscribe(
         TraceBoolean(order, "first:on\n", "first:off\n"));
     SubscriptionToken second_changed = (*second).checked_changed().subscribe(
@@ -789,7 +840,7 @@ void test_fixed_label_text_is_paint_only() {
     (*label).set_requested_bounds({0.0, 0.0, 120.0, 24.0});
     Window window(label, {120.0, 24.0});
     window.perform_layout();
-    RecordingPainter painter;
+    RecordingPainter painter{};
     window.paint(painter, {0.0, 0.0, 120.0, 24.0});
     window.reset_activity_metrics();
 
@@ -822,7 +873,7 @@ void test_label_multiline_wrapping_and_alignment() {
     (*label).set_vertical_alignment(VerticalAlignment::near);
     (*label).set_alignment(HorizontalAlignment::far);
     Window window(label, {120.0, 80.0});
-    RecordingPainter painter;
+    RecordingPainter painter{};
     window.paint(painter, {0.0, 0.0, 120.0, 80.0});
     require(painter.texts.size() == 4U && painter.texts.front() == "Retained labels" &&
                 painter.texts[2] == "and preserve" && painter.texts.back() == "breaks",
@@ -841,17 +892,17 @@ void test_label_multiline_wrapping_and_alignment() {
             "Label must reject invalid line spacing without mutation");
 
     (*label).set_text("画布工具可以使用键盘调整坐标并绘制连续线条");
-    RecordingPainter cjk;
+    RecordingPainter cjk{};
     window.paint(cjk, {0.0, 0.0, 120.0, 80.0});
     require(cjk.texts.size() > 1, "unspaced CJK paragraphs wrap instead of overflowing");
-    std::string joined;
+    std::string joined{};
     for (const std::string& line : cjk.texts) { joined += line; }
     require(joined == (*label).text(), "CJK wrapping preserves every UTF-8 character");
 
     (*label).set_text("Visual source");
     (*label).set_text_wrapping(TextWrapping::no_wrap);
     (*label).set_text_case_transform(TextCaseTransform::uppercase_ascii);
-    RecordingPainter transformed_painter;
+    RecordingPainter transformed_painter{};
     window.paint(transformed_painter, {0.0, 0.0, 120.0, 80.0});
     require(transformed_painter.texts.size() == 1U &&
                 transformed_painter.texts[0] == "VISUAL SOURCE" &&
@@ -859,11 +910,65 @@ void test_label_multiline_wrapping_and_alignment() {
             "Label text transforms must change retained display without rewriting semantic source text");
 }
 
+struct LabelGraphemeWidth final {
+    double operator()(const std::string_view text) const {
+        const TextStore store(text);
+        const GraphemeIndex count = store.grapheme_count();
+        const double width = static_cast<double>(count.value()) * 10.0;
+        return width;
+    }
+};
+
+void test_label_wrapping_reuses_live_text_without_retaining_paragraph_storage() {
+    const FontSpec font{};
+    const TextWidthResolver resolve_width{LabelGraphemeWidth{}};
+    std::string padded(65536U, ' ');
+    padded.reserve(131076U);
+    padded.append("\tx\t");
+    padded.append(65536U, ' ');
+    const std::vector<std::string> compact =
+        label_lines(padded, font, 30.0, TextWrapping::word, resolve_width);
+    require(compact.size() == 1U && compact[0] == "x",
+            "whitespace-heavy wrapped paragraph must retain only its visible word");
+    // A broad capacity ceiling detects exporting the 128 KiB paragraph scratch;
+    // it does not depend on a particular library's small-string capacity.
+    require(compact[0].capacity() < 1024U,
+            "short final label line must not own paragraph-sized scratch storage");
+
+    const std::vector<std::string> repeated = label_lines(
+        "ab abcdef\t  abcdef  z", font, 30.0, TextWrapping::word, resolve_width);
+    const std::vector<std::string> expected_words{"ab", "abc", "def", "abc", "def", "z"};
+    require(repeated == expected_words,
+            "long-word wrapping must restore the prior line before publishing and reuse it for later words");
+
+    // Each word has five graphemes: combining a, joined astronaut, b, c, d.
+    const std::string combining = "a\xCC\x81";
+    const std::string astronaut = "\xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x9A\x80";
+    std::string first_line = combining;
+    first_line.append(astronaut);
+    first_line.push_back('b');
+    std::string source = first_line;
+    source.append("cd ");
+    source.append(first_line);
+    source.append("cd");
+    const std::vector<std::string> grapheme_lines =
+        label_lines(source, font, 30.0, TextWrapping::word, resolve_width);
+    const std::vector<std::string> expected_graphemes{first_line, "cd", first_line, "cd"};
+    require(grapheme_lines == expected_graphemes,
+            "repeated long words must preserve combining and joined-emoji graphemes at wrap boundaries");
+
+    const std::vector<std::string> explicit_breaks = label_lines(
+        "  ab\t cd  \n\n  ef  ", font, 30.0, TextWrapping::word, resolve_width);
+    const std::vector<std::string> expected_breaks{"ab", "cd", "", "ef"};
+    require(explicit_breaks == expected_breaks,
+            "scratch reuse must preserve explicit empty paragraphs and normalized word spacing");
+}
+
 void test_owner_decoration_is_retained_and_owner_relative() {
     std::shared_ptr<gui_forms::Button> button = make_control<Button>(
         StableId("decoration.owner"), "Owner");
     const MaterialBorder edge{Color::rgba(141U, 214U, 223U), 1.0};
-    OwnerDecorationRecipe before_recipe;
+    OwnerDecorationRecipe before_recipe{};
     before_recipe.layer = OwnerDecorationLayer::before_content;
     before_recipe.size = {10.0, 10.0};
     before_recipe.top = 14.0;
@@ -878,7 +983,7 @@ void test_owner_decoration_is_retained_and_owner_relative() {
     const OwnerDecorationRecipe recipes[]{before_recipe, after_recipe};
     (*button).set_owned_decorations(recipes, 2U);
     Window window(button, {80.0, 40.0});
-    RecordingPainter first;
+    RecordingPainter first{};
     window.paint(first, {0.0, 0.0, 80.0, 40.0});
     const std::vector<char> expected_order{'L', 'L', 'T', 'L', 'L'};
     require(first.lines == 4U && (*button).owned_decorations().size() == 2U &&
@@ -886,7 +991,7 @@ void test_owner_decoration_is_retained_and_owner_relative() {
             "owner decorations must paint in distinct before-content and after-content layers");
 
     window.resize({120.0, 40.0});
-    RecordingPainter second;
+    RecordingPainter second{};
     window.paint(second, {0.0, 0.0, 120.0, 40.0});
     require(second.lines == 4U &&
                 std::abs(second.line_starts[2].x -
@@ -916,7 +1021,7 @@ void test_basic_control_layout_customization_is_bounded_and_atomic() {
             "Label MaximumLines must bound content-sized desired height");
     (*label).set_requested_bounds({0.0, 0.0, 72.0, 80.0});
     Window label_window(label, {72.0, 80.0});
-    RecordingPainter label_painter;
+    RecordingPainter label_painter{};
     label_window.paint(label_painter, {0.0, 0.0, 72.0, 80.0});
     require(label_painter.texts.size() == 2U,
             "Label MaximumLines must bound actual retained painting");
@@ -1037,7 +1142,7 @@ void test_picture_box_modes_registry_and_semantics() {
         (*picture).set_size_mode(mode_and_bounds.first);
         require((*picture).image_bounds() == mode_and_bounds.second,
                 "PictureBox sizing mode must compute deterministic image geometry");
-        RecordingPainter painter;
+        RecordingPainter painter{};
         window.paint(painter, {0.0, 0.0, 100.0, 100.0});
         require(painter.images.size() == 1U &&
                     painter.images.front() == loaded.image &&
@@ -1050,7 +1155,7 @@ void test_picture_box_modes_registry_and_semantics() {
                 (*picture).image_bounds() == Rect{1.0, 1.0, 4.0, 2.0},
             "PictureBox AutoSize must measure to intrinsic pixels plus its border");
     (*picture).set_image_opacity(0.42);
-    RecordingPainter opacity_painter;
+    RecordingPainter opacity_painter{};
     window.paint(opacity_painter, {0.0, 0.0, 100.0, 100.0});
     require(opacity_painter.image_opacities.size() == 1U &&
                 opacity_painter.image_opacities.front() == 0.42,
@@ -1073,14 +1178,14 @@ void test_picture_box_modes_registry_and_semantics() {
             "PictureBox must reject invalid opacity without mutation");
     require(window.remove_image(loaded.image) && !(*picture).has_valid_image(),
             "PictureBox must reject a removed generational image ID safely");
-    RecordingPainter stale_painter;
+    RecordingPainter stale_painter{};
     window.paint(stale_painter, {0.0, 0.0, 100.0, 100.0});
     require(stale_painter.images.empty(),
             "PictureBox must never submit a stale ImageId to a renderer");
 }
 
 void test_public_drawing_metrics_and_control_tag() {
-    std::weak_ptr<int> released_anchor;
+    std::weak_ptr<int> released_anchor{};
     {
         std::shared_ptr<gui_forms::Panel> tagged = make_control<Panel>(StableId("controls.tagged"));
         std::shared_ptr<int> anchor = std::make_shared<int>(42);
@@ -1103,8 +1208,8 @@ void test_public_drawing_metrics_and_control_tag() {
     (*drawing).set_accessible_name("Public owner drawing");
     (*drawing).set_background(Color::rgba(8, 9, 10));
     std::uint64_t callback_count = 0U;
-    Rect callback_bounds;
-    Rect callback_damage;
+    Rect callback_bounds{};
+    Rect callback_damage{};
     (*drawing).set_paint_callback(
         RecordDrawingPaint(callback_count, callback_bounds, callback_damage));
     std::shared_ptr<gui_forms::MetricsView> metrics = make_control<MetricsView>(
@@ -1115,7 +1220,7 @@ void test_public_drawing_metrics_and_control_tag() {
     (*root).add_child(metrics);
     Window window(root, {240.0, 150.0});
     window.perform_layout();
-    RecordingPainter painter;
+    RecordingPainter painter{};
     window.paint(painter, {0.0, 0.0, 240.0, 150.0});
     require(callback_count == 1U &&
                 callback_bounds == Rect{0.0, 0.0, 120.0, 60.0} &&
@@ -1147,9 +1252,10 @@ void test_button_disclosure_semantics() {
     std::size_t activations{};
     SubscriptionToken clicked = (*button).clicked().subscribe(
         callbacks::IncrementCounter<std::size_t, ButtonBase&>(activations));
-    require((*button).on_semantic_action(SemanticAction::expand, {}) &&
-                activations == 1U,
-            "semantic expand must route through the button's shared activation");
+    const bool operation_check_46 = (*button).on_semantic_action(SemanticAction::expand, {});
+    require(operation_check_46, "semantic expand must route through the button's shared activation");
+    const bool operation_check_47 = activations == 1U;
+    require(operation_check_47, "semantic expand must route through the button's shared activation");
     (*button).set_expanded_state(true);
     const SemanticDescriptor expanded = (*button).semantic_descriptor();
     require(has_semantic_state(expanded.states, SemanticState::expanded) &&
@@ -1159,7 +1265,7 @@ void test_button_disclosure_semantics() {
 }
 
 void test_button_selected_state() {
-    auto button = make_control<Button>(StableId("button.selected"), "Selected tab");
+    std::shared_ptr<Button> button = make_control<Button>(StableId("button.selected"), "Selected tab");
     require(!(*button).selected() &&
                 !has_semantic_state((*button).semantic_descriptor().states,
                                     SemanticState::selected),
@@ -1172,79 +1278,94 @@ void test_button_selected_state() {
 }
 
 void test_drop_down_button_routes_pointer_keyboard_and_semantics() {
-    auto ordinary = make_control<Button>(StableId("button.drop-down.measure-control"),
+    std::shared_ptr<Button> ordinary = make_control<Button>(StableId("button.drop-down.measure-control"),
                                          "View");
-    const Size ordinary_desired = ordinary->measure({400.0, 100.0});
-    auto auto_sized = make_control<DropDownButton>(
+    const Size ordinary_desired = (*ordinary).measure({400.0, 100.0});
+    std::shared_ptr<DropDownButton> auto_sized = make_control<DropDownButton>(
         StableId("button.drop-down.auto-size"), "View",
         DropDownButtonMode::menu);
-    const Size drop_down_desired = auto_sized->measure({400.0, 100.0});
+    const Size drop_down_desired = (*auto_sized).measure({400.0, 100.0});
     require(drop_down_desired.width == ordinary_desired.width + 16.0,
             "auto-sized drop-down must reserve its disclosure width exactly once");
 
-    auto root = make_control<Panel>(StableId("button.drop-down.root"));
-    auto menu = make_control<DropDownButton>(
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("button.drop-down.root"));
+    std::shared_ptr<DropDownButton> menu = make_control<DropDownButton>(
         StableId("button.drop-down.menu"), "View",
         DropDownButtonMode::menu);
-    auto split = make_control<DropDownButton>(
+    std::shared_ptr<DropDownButton> split = make_control<DropDownButton>(
         StableId("button.drop-down.split"), "Refresh",
         DropDownButtonMode::split);
     (*menu).set_requested_bounds({10.0, 10.0, 100.0, 32.0});
     (*split).set_requested_bounds({120.0, 10.0, 120.0, 32.0});
-    root->add_child(menu);
-    root->add_child(split);
+    (*root).add_child(menu);
+    (*root).add_child(split);
     Window window(root, {250.0, 52.0});
     window.perform_layout();
 
     std::size_t menu_requests{};
     std::size_t split_requests{};
     std::size_t split_clicks{};
-    SubscriptionToken menu_requested = menu->drop_down_requested().subscribe(
+    SubscriptionToken menu_requested = (*menu).drop_down_requested().subscribe(
         callbacks::IncrementCounter<std::size_t, DropDownButton&>(menu_requests));
-    SubscriptionToken split_requested = split->drop_down_requested().subscribe(
+    SubscriptionToken split_requested = (*split).drop_down_requested().subscribe(
         callbacks::IncrementCounter<std::size_t, DropDownButton&>(split_requests));
-    SubscriptionToken split_clicked = split->clicked().subscribe(
+    SubscriptionToken split_clicked = (*split).clicked().subscribe(
         callbacks::IncrementCounter<std::size_t, ButtonBase&>(split_clicks));
 
     click(window, menu);
     require(menu_requests == 1U,
             "menu-mode drop-down button must route ordinary activation to disclosure");
 
-    const Rect split_bounds = split->absolute_bounds();
+    const Rect split_bounds = (*split).absolute_bounds();
     const Point primary{split_bounds.x + 12.0,
                         split_bounds.y + split_bounds.height * 0.5};
-    require(window.dispatch_pointer(
-                {PointerAction::down, PointerButton::primary, primary}) &&
-                window.dispatch_pointer(
-                {PointerAction::up, PointerButton::primary, primary}) &&
-                split_clicks == 1U && split_requests == 0U,
-            "split drop-down primary region must preserve the ordinary Click path");
+    const bool operation_check_48 = window.dispatch_pointer(
+                {PointerAction::down, PointerButton::primary, primary});
+    require(operation_check_48, "split drop-down primary region must preserve the ordinary Click path");
+    const bool operation_check_49 = window.dispatch_pointer(
+                {PointerAction::up, PointerButton::primary, primary});
+    require(operation_check_49, "split drop-down primary region must preserve the ordinary Click path");
+    const bool operation_check_50 = split_clicks == 1U;
+    require(operation_check_50, "split drop-down primary region must preserve the ordinary Click path");
+    const bool operation_check_51 = split_requests == 0U;
+    require(operation_check_51, "split drop-down primary region must preserve the ordinary Click path");
     const Point disclosure{split_bounds.x + split_bounds.width - 3.0,
                            split_bounds.y + split_bounds.height * 0.5};
-    require(window.dispatch_pointer(
-                {PointerAction::down, PointerButton::primary, disclosure}) &&
-                window.dispatch_pointer(
-                {PointerAction::up, PointerButton::primary, disclosure}) &&
-                split_clicks == 1U && split_requests == 1U,
-            "split drop-down trailing region must request its menu without primary Click");
-    require(window.dispatch_pointer(
-                {PointerAction::down, PointerButton::primary, primary}) &&
-                window.dispatch_pointer(
-                {PointerAction::up, PointerButton::primary, disclosure}) &&
-                split_clicks == 2U && split_requests == 1U,
-            "split activation ownership must follow the pressed region rather than release drift");
+    const bool operation_check_52 = window.dispatch_pointer(
+                {PointerAction::down, PointerButton::primary, disclosure});
+    require(operation_check_52, "split drop-down trailing region must request its menu without primary Click");
+    const bool operation_check_53 = window.dispatch_pointer(
+                {PointerAction::up, PointerButton::primary, disclosure});
+    require(operation_check_53, "split drop-down trailing region must request its menu without primary Click");
+    const bool operation_check_54 = split_clicks == 1U;
+    require(operation_check_54, "split drop-down trailing region must request its menu without primary Click");
+    const bool operation_check_55 = split_requests == 1U;
+    require(operation_check_55, "split drop-down trailing region must request its menu without primary Click");
+    const bool operation_check_56 = window.dispatch_pointer(
+                {PointerAction::down, PointerButton::primary, primary});
+    require(operation_check_56, "split activation ownership must follow the pressed region rather than release drift");
+    const bool operation_check_57 = window.dispatch_pointer(
+                {PointerAction::up, PointerButton::primary, disclosure});
+    require(operation_check_57, "split activation ownership must follow the pressed region rather than release drift");
+    const bool operation_check_58 = split_clicks == 2U;
+    require(operation_check_58, "split activation ownership must follow the pressed region rather than release drift");
+    const bool operation_check_59 = split_requests == 1U;
+    require(operation_check_59, "split activation ownership must follow the pressed region rather than release drift");
 
-    require(window.request_focus(menu) &&
-                window.dispatch_key({KeyAction::down, PhysicalKey::down,
-                                     Modifier::alt}) &&
-                menu_requests == 2U,
-            "Alt+Down must request the focused drop-down menu");
-    require(menu->on_semantic_action(SemanticAction::show_menu, {}) &&
-                menu_requests == 3U,
-            "semantic show-menu must share the validated disclosure route");
+    const bool operation_check_60 = window.request_focus(menu);
+    require(operation_check_60, "Alt+Down must request the focused drop-down menu");
+    const bool operation_check_61 = window.dispatch_key({KeyAction::down, PhysicalKey::down,
+                                     Modifier::alt});
+    require(operation_check_61, "Alt+Down must request the focused drop-down menu");
+    const bool operation_check_62 = menu_requests == 2U;
+    require(operation_check_62, "Alt+Down must request the focused drop-down menu");
+    const bool operation_check_63 = (*menu).on_semantic_action(SemanticAction::show_menu, {});
+    require(operation_check_63, "semantic show-menu must share the validated disclosure route");
+    const bool operation_check_64 = menu_requests == 3U;
+    require(operation_check_64, "semantic show-menu must share the validated disclosure route");
 
-    menu->set_drop_down_open(true);
-    const SemanticDescriptor open = menu->semantic_descriptor();
+    (*menu).set_drop_down_open(true);
+    const SemanticDescriptor open = (*menu).semantic_descriptor();
     require(has_semantic_state(open.states, SemanticState::expanded) &&
                 std::find(open.actions.begin(), open.actions.end(),
                           SemanticAction::show_menu) != open.actions.end() &&
@@ -1252,28 +1373,31 @@ void test_drop_down_button_routes_pointer_keyboard_and_semantics() {
                           SemanticAction::collapse) != open.actions.end(),
             "open drop-down button must expose menu, expanded, and collapse semantics");
     std::size_t close_requests{};
-    SubscriptionToken close_requested = menu->drop_down_close_requested().subscribe(
+    SubscriptionToken close_requested = (*menu).drop_down_close_requested().subscribe(
         callbacks::IncrementCounter<std::size_t, DropDownButton&>(close_requests));
-    require(menu->on_semantic_action(SemanticAction::collapse, {}) &&
-                close_requests == 1U,
-            "semantic collapse must request closure from the popup owner");
+    const bool operation_check_65 = (*menu).on_semantic_action(SemanticAction::collapse, {});
+    require(operation_check_65, "semantic collapse must request closure from the popup owner");
+    const bool operation_check_66 = close_requests == 1U;
+    require(operation_check_66, "semantic collapse must request closure from the popup owner");
 
-    RecordingPainter painter;
-    menu->on_paint(painter, menu->absolute_bounds());
+    RecordingPainter painter{};
+    (*menu).on_paint(painter, (*menu).absolute_bounds());
     require(painter.lines >= 1U && painter.fills >= 4U,
             "open drop-down paint includes a filled indicator and bounded open edge");
 
-    menu->set_enabled(false);
-    require(!menu->perform_drop_down() && menu_requests == 3U,
-            "disabled drop-down button must retain discoverability without invocation");
+    (*menu).set_enabled(false);
+    const bool operation_check_67 = !(*menu).perform_drop_down();
+    require(operation_check_67, "disabled drop-down button must retain discoverability without invocation");
+    const bool operation_check_68 = menu_requests == 3U;
+    require(operation_check_68, "disabled drop-down button must retain discoverability without invocation");
 
     bool width_rejected{};
     try {
-        split->set_drop_down_width(8.0);
+        (*split).set_drop_down_width(8.0);
     } catch (const std::invalid_argument&) {
         width_rejected = true;
     }
-    require(width_rejected && split->drop_down_width() == 16.0,
+    require(width_rejected && (*split).drop_down_width() == 16.0,
             "drop-down width must reject invalid geometry without mutation");
 }
 
@@ -1302,7 +1426,7 @@ void test_bottom_disclosure_and_multiline_button_content() {
     (*button).set_text("Edit\ncolors");
     (*button).set_use_mnemonic(false);
     (*button).set_text_alignment(ContentAlignment::middle_center);
-    RecordingPainter painter;
+    RecordingPainter painter{};
     (*button).on_paint(painter, {0,0,64,80});
     require(painter.texts.size() == 2 && painter.texts[0] == "Edit" && painter.texts[1] == "colors" &&
         painter.text_origins[1].y > painter.text_origins[0].y && painter.text_origins[0].x > painter.text_origins[1].x,
@@ -1339,7 +1463,7 @@ void test_image_list_state_density_ownership_and_button_layout() {
     (*button).set_text_alignment(ContentAlignment::middle_center);
     window.perform_layout();
 
-    RecordingPainter normal;
+    RecordingPainter normal{};
     (*button).on_paint(normal, {0.0, 0.0, 150.0, 36.0});
     require(normal.images.size() == 1U && normal.images.front() == normal_1x &&
                 normal.image_destinations.front().width == 16.0 &&
@@ -1347,19 +1471,19 @@ void test_image_list_state_density_ownership_and_button_layout() {
                     normal.image_destinations.front().x + 16.0,
             "Button must lay out keyed ImageList content before text using logical image size");
 
-    PointerEvent enter;
+    PointerEvent enter{};
     enter.action = PointerAction::enter;
     (*button).on_pointer(enter);
-    RecordingPainter hot;
+    RecordingPainter hot{};
     (*button).on_paint(hot, {0.0, 0.0, 150.0, 36.0});
     require(hot.images.size() == 1U && hot.images.front() == hot_1x,
             "Button hover must resolve a real ImageList hot-state raster");
 
-    PointerEvent leave;
+    PointerEvent leave{};
     leave.action = PointerAction::leave;
     (*button).on_pointer(leave);
     window.set_scale(2.0);
-    RecordingPainter dense;
+    RecordingPainter dense{};
     (*button).on_paint(dense, {0.0, 0.0, 150.0, 36.0});
     require(dense.images.size() == 1U && dense.images.front() == normal_2x &&
                 dense.image_destinations.front().width == 16.0,
@@ -1367,7 +1491,7 @@ void test_image_list_state_density_ownership_and_button_layout() {
 
     (*button).set_enabled(false);
     window.set_scale(1.0);
-    RecordingPainter disabled;
+    RecordingPainter disabled{};
     (*button).on_paint(disabled, {0.0, 0.0, 150.0, 36.0});
     require(disabled.images.size() == 1U &&
                 disabled.images.front() == disabled_1x &&
@@ -1422,6 +1546,7 @@ int main() {
         test_wrong_thread_property_mutation_is_rejected();
         test_fixed_label_text_is_paint_only();
         test_label_multiline_wrapping_and_alignment();
+        test_label_wrapping_reuses_live_text_without_retaining_paragraph_storage();
         test_owner_decoration_is_retained_and_owner_relative();
         test_basic_control_layout_customization_is_bounded_and_atomic();
         test_label_inherits_theme_typography_until_explicitly_overridden();

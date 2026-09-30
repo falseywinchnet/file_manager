@@ -9,7 +9,7 @@ gui_forms::SurfaceMaterial title_material() {
     using gui_forms::Color;
     using gui_forms::GradientStop;
     using gui_forms::MaterialFillLayer;
-    gui_forms::SurfaceMaterial material;
+    gui_forms::SurfaceMaterial material{};
     material.fills = {
         MaterialFillLayer::linear_css_angle(92.0, {
             GradientStop{0.0, Color::rgba(23, 52, 127)},
@@ -60,43 +60,46 @@ AboutView::AboutView()
           "COMPOSITION  Web.Forms source → retained GUI.Forms C++")),
       close_(std::make_shared<gui_forms::Button>(
           gui_forms::StableId("file-manager.about.close"), "Close")) {
-    root_->set_requested_bounds({0, 0, 540, 330});
-    root_->set_design_size({540, 330});
-    root_->set_background(gui_forms::Color::rgba(231, 237, 246));
-    root_->set_border_style(gui_forms::BorderStyle::line);
+    (*root_).set_requested_bounds({0, 0, 540, 330});
+    (*root_).set_design_size({540, 330});
+    (*root_).set_background(gui_forms::Color::rgba(231, 237, 246));
+    (*root_).set_border_style(gui_forms::BorderStyle::line);
 
-    title_bar_->set_authored_surface_material(title_material());
-    title_bar_->set_accessible_name("About window title bar");
-    title_->set_font({gui_forms::FontRole::control, 15.0, 700, false});
-    title_->set_foreground(gui_forms::Color::rgba(255, 255, 255));
-    title_->set_hit_test_transparent(true);
-    heading_->set_font({gui_forms::FontRole::control, 25.0, 700, false});
-    heading_->set_foreground(gui_forms::Color::rgba(29, 45, 75));
-    version_->set_font({gui_forms::FontRole::control, 11.0, 700, false});
-    version_->set_foreground(gui_forms::Color::rgba(62, 97, 163));
-    description_->set_text_wrapping(gui_forms::TextWrapping::word);
-    description_->set_maximum_lines(3);
-    description_->set_font({gui_forms::FontRole::control, 12.0, 400, false});
-    authority_->set_font({gui_forms::FontRole::control, 10.0, 700, false});
-    composition_->set_font({gui_forms::FontRole::control, 10.0, 700, false});
+    (*title_bar_).set_authored_surface_material(title_material());
+    (*title_bar_).set_accessible_name("About window title bar");
+    (*title_).set_font({gui_forms::FontRole::control, 15.0, 700, false});
+    (*title_).set_foreground(gui_forms::Color::rgba(255, 255, 255));
+    (*title_).set_hit_test_transparent(true);
+    (*heading_).set_font({gui_forms::FontRole::control, 25.0, 700, false});
+    (*heading_).set_foreground(gui_forms::Color::rgba(29, 45, 75));
+    (*version_).set_font({gui_forms::FontRole::control, 11.0, 700, false});
+    (*version_).set_foreground(gui_forms::Color::rgba(62, 97, 163));
+    (*description_).set_text_wrapping(gui_forms::TextWrapping::word);
+    (*description_).set_maximum_lines(3);
+    (*description_).set_font({gui_forms::FontRole::control, 12.0, 400, false});
+    (*authority_).set_font({gui_forms::FontRole::control, 10.0, 700, false});
+    (*composition_).set_font({gui_forms::FontRole::control, 10.0, 700, false});
 
-    root_->add_at(title_bar_, {1, 1, 538, 40});
-    root_->add_at(title_, {76, 9, 250, 23});
-    root_->add_at(heading_, {28, 66, 360, 38});
-    root_->add_at(version_, {30, 108, 360, 22});
-    root_->add_at(description_, {30, 146, 480, 58});
-    root_->add_at(authority_, {30, 218, 480, 22});
-    root_->add_at(composition_, {30, 244, 480, 22});
-    root_->add_at(close_, {432, 280, 78, 32});
+    (*root_).add_at(title_bar_, {1, 1, 538, 40});
+    (*root_).add_at(title_, {76, 9, 250, 23});
+    (*root_).add_at(heading_, {28, 66, 360, 38});
+    (*root_).add_at(version_, {30, 108, 360, 22});
+    (*root_).add_at(description_, {30, 146, 480, 58});
+    (*root_).add_at(authority_, {30, 218, 480, 22});
+    (*root_).add_at(composition_, {30, 244, 480, 22});
+    (*root_).add_at(close_, {432, 280, 78, 32});
 
-    subscriptions_.push_back(close_->clicked().subscribe(
-        [this](gui_forms::ButtonBase&) {
-            if (hide_) hide_();
-        }));
+    gui_forms::SubscriptionToken close_connection = (*close_).clicked().subscribe(
+        std::bind_front(&AboutView::close_clicked, this));
+    subscriptions_.push_back(std::move(close_connection));
 }
 
 std::shared_ptr<gui_forms::Control> AboutView::root_control() const {
     return root_;
+}
+
+void AboutView::close_clicked(gui_forms::ButtonBase&) {
+    if (hide_) hide_();
 }
 
 void AboutView::bind_hide(std::function<void()> hide) {

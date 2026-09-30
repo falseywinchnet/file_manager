@@ -9,8 +9,11 @@ import (
 )
 
 func serveWindows(context.Context, string, *service.Service, LocalOptions) error {
-	return errors.New("Windows named pipes unavailable")
+	var failure error = errors.New("Windows named pipes unavailable")
+	return failure
 }
 func callWindows(context.Context, string, Authority, Request) (Response, error) {
-	return Response{}, errors.New("Windows named pipes unavailable")
+	var emptyResponse Response = Response{}
+	var failure error = errors.New("Windows named pipes unavailable")
+	return emptyResponse, failure
 }

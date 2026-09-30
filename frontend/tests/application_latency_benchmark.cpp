@@ -30,7 +30,8 @@ class ApplicationLatencyProbe final {
 public:
     static std::uint64_t navigate(Application& application, const std::filesystem::path& path) {
         application.request_navigation(path, true);
-        return application.requested_generation_.load();
+        const std::uint64_t generation = application.requested_generation_.load();
+        return generation;
     }
     static std::uint64_t applied(const Application& application) {
         return application.applied_generation_;
@@ -55,15 +56,17 @@ public:
 namespace {
 using Clock = std::chrono::steady_clock;
 double milliseconds(const Clock::duration duration) {
-    return std::chrono::duration<double, std::milli>(duration).count();
+    const std::chrono::duration<double, std::milli> elapsed(duration);
+    const double count = elapsed.count();
+    return count;
 }
 void noop() {}
 void print_process_memory() {
 #if defined(_WIN32)
     PROCESS_MEMORY_COUNTERS_EX memory{};
-    memory.cb = sizeof(memory);
+    memory.cb = static_cast<DWORD>(sizeof(memory));
     if (GetProcessMemoryInfo(GetCurrentProcess(),
-            reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&memory), sizeof(memory))) {
+            reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&memory), static_cast<DWORD>(sizeof(memory)))) {
         std::cout << ",private_bytes=" << memory.PrivateUsage
                   << ",working_set_bytes=" << memory.WorkingSetSize
                   << ",peak_working_set_bytes=" << memory.PeakWorkingSetSize;
@@ -73,6 +76,8 @@ void print_process_memory() {
 class StopGuard final {
 public:
     explicit StopGuard(file_manager::Application& application) : application_(application) {}
+    StopGuard(const StopGuard&) = delete;
+    StopGuard& operator=(const StopGuard&) = delete;
     ~StopGuard() { application_.stop(); }
 private:
     file_manager::Application& application_;
@@ -114,17 +119,17 @@ void run_case(const std::filesystem::path& root, const std::filesystem::path& de
     StopGuard guard(*application);
     const double constructor_ms = milliseconds(Clock::now() - constructor_start);
     const Clock::time_point window_start = Clock::now();
-    const std::unique_ptr<gui_forms::Window> window = application->make_window();
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
     const double window_ms = milliseconds(Clock::now() - window_start);
     std::cout << label << ",constructor_ms=" << constructor_ms << ",make_window_ms=" << window_ms
-              << ",make_window_flushes=" << window->metrics_snapshot().flush_count << '\n';
-    window->reset_activity_metrics();
+              << ",make_window_flushes=" << (*window).metrics_snapshot().flush_count << '\n';
+    (*window).reset_activity_metrics();
     const Clock::time_point initial_start = Clock::now();
-    application->bind_host(noop, noop);
+    (*application).bind_host(noop, noop);
     await_generation(*application, *window, 1, initial_start, label + ".initial");
     for (int iteration = 0; iteration < 5; ++iteration) {
         const std::filesystem::path target = iteration % 2 == 0 ? destination : root;
-        window->reset_activity_metrics();
+        (*window).reset_activity_metrics();
         const Clock::time_point start = Clock::now();
         const std::uint64_t generation = file_manager::ApplicationLatencyProbe::navigate(*application, target);
         await_generation(*application, *window, generation, start, label + ".navigate" + std::to_string(iteration));
@@ -136,11 +141,13 @@ public:
     explicit NativeBenchmark(const std::filesystem::path& root, const bool partial)
         : started_(Clock::now()), application_(std::make_shared<file_manager::Application>(
               root, std::nullopt, false, std::string{})), partial_(partial) {}
-    ~NativeBenchmark() { application_->stop(); }
+    NativeBenchmark(const NativeBenchmark&) = delete;
+    NativeBenchmark& operator=(const NativeBenchmark&) = delete;
+    ~NativeBenchmark() { timer_.disconnect(); (*application_).stop(); }
     void wake_ready(std::function<void()> wake) { wake_ = std::move(wake); }
     void close() { static_cast<void>(handle_.request_close()); }
-    void closed() { application_->stop(); }
-    void drain() { application_->drain_ui(); }
+    void closed() { (*application_).stop(); }
+    void drain() { (*application_).drain_ui(); }
     void ready(gui_forms::Window& window, gui_forms::ApplicationWindowHandle handle) {
         window_ = &window;
         handle_ = handle;
@@ -148,11 +155,11 @@ public:
             ? window.find("file-manager-app.shell.location.navigation.back") : window.root();
         if (!repaint_control_) throw std::runtime_error("native benchmark repaint control missing");
         std::cout << "native,ready_ms=" << milliseconds(Clock::now() - started_) << std::endl;
-        application_->bind_host(wake_, std::bind_front(&NativeBenchmark::close, this));
+        (*application_).bind_host(wake_, std::bind_front(&NativeBenchmark::close, this));
         timer_ = window.schedule_ui_timer(*window.root(), std::chrono::milliseconds(10),
             Clock::now() + std::chrono::milliseconds(10), std::bind_front(&NativeBenchmark::tick, this));
     }
-    void tick(gui_forms::FrameTime now) {
+    void tick(const gui_forms::FrameTime now) {
         if (now - started_ > std::chrono::seconds(180)) {
             timed_out_ = true;
             std::cout << "native,timeout=true" << std::endl;
@@ -160,7 +167,7 @@ public:
             close();
             return;
         }
-        const gui_forms::MetricsSnapshot metrics = window_->metrics_snapshot();
+        const gui_forms::MetricsSnapshot metrics = (*window_).metrics_snapshot();
         if (file_manager::ApplicationLatencyProbe::applied(*application_) == 0 ||
             metrics.frames_presented <= prior_frames_) return;
         std::cout << "native,sample=" << samples_ << ",elapsed_ms=" << milliseconds(now - started_)
@@ -180,11 +187,11 @@ public:
             timer_.disconnect();
             close();
         } else {
-            repaint_control_->invalidate(gui_forms::Dirty::paint);
+            (*repaint_control_).invalidate(gui_forms::Dirty::paint);
         }
     }
     int run() {
-        gui_forms::ApplicationWindowOptions options;
+        gui_forms::ApplicationWindowOptions options{};
         options.title = "File Manager — repaint benchmark (self-closing)";
         options.initial_size = {1340, 850};
         options.print_metrics_on_close = true;
@@ -193,22 +200,40 @@ public:
         options.dispatch_pending = std::bind_front(&NativeBenchmark::drain, this);
         options.closed = std::bind_front(&NativeBenchmark::closed, this);
         const gui_forms::ApplicationResult result = gui_forms::Application::run(
-            application_->make_window(), std::move(options));
+            (*application_).make_window(), std::move(options));
         if (result.callback_exception) std::rethrow_exception(result.callback_exception);
-        return result.accepted() && !timed_out_ && samples_ == 5 ? 0 : 1;
+        const int status = result.accepted() && !timed_out_ && samples_ == 5 ? 0 : 1;
+        return status;
     }
 private:
-    Clock::time_point started_;
-    std::shared_ptr<file_manager::Application> application_;
+    Clock::time_point started_{};
+    std::shared_ptr<file_manager::Application> application_{};
     gui_forms::Window* window_{};
-    gui_forms::ApplicationWindowHandle handle_;
-    gui_forms::FrameRequestToken timer_;
-    std::function<void()> wake_;
+    gui_forms::ApplicationWindowHandle handle_{};
+    gui_forms::FrameRequestToken timer_{};
+    std::function<void()> wake_{};
     std::uint64_t prior_frames_{};
     unsigned int samples_{};
     bool timed_out_{};
     bool partial_{};
-    gui_forms::Control::Ptr repaint_control_;
+    gui_forms::Control::Ptr repaint_control_{};
+};
+
+struct DisposableFixture final {
+    std::filesystem::path path{};
+    DisposableFixture() {
+        const Clock::duration elapsed = Clock::now().time_since_epoch();
+        const std::string name = "fm-latency-" + std::to_string(elapsed.count());
+        path = std::filesystem::temp_directory_path() / name;
+        const bool created = std::filesystem::create_directory(path);
+        if (!created) throw std::runtime_error("benchmark fixture already exists");
+    }
+    ~DisposableFixture() {
+        std::error_code ignored{};
+        std::filesystem::remove_all(path, ignored);
+    }
+    DisposableFixture(const DisposableFixture&) = delete;
+    DisposableFixture& operator=(const DisposableFixture&) = delete;
 };
 
 void run_live_search(const std::filesystem::path& root, const std::string& root_id,
@@ -253,19 +278,22 @@ int main(int argc, char** argv) {
             const bool partial = std::string_view(argv[2]) == "--native-partial";
             if (!partial && std::string_view(argv[2]) != "--native") throw std::runtime_error("unknown benchmark mode");
             NativeBenchmark native(file_manager::path_from_utf8(argv[1]), partial);
-            return native.run();
+            const int status = native.run();
+            return status;
         }
         run_case(file_manager::user_home_directory(), file_manager::path_from_utf8(argv[1]), "real_home_repo");
         // Only this uniquely created disposable directory is written or removed.
-        const std::filesystem::path fixture = std::filesystem::temp_directory_path() /
-            ("fm-latency-" + std::to_string(Clock::now().time_since_epoch().count()));
-        std::filesystem::create_directories(fixture / "large");
+        const DisposableFixture fixture{};
+        const std::filesystem::path large = fixture.path / "large";
+        std::filesystem::create_directory(large);
         for (int index = 0; index < 2000; ++index) {
-            std::ofstream(fixture / "large" / ("item-" + std::to_string(index) + ".txt"), std::ios::binary) << "benchmark\n";
+            const std::string filename = "item-" + std::to_string(index) + ".txt";
+            const std::filesystem::path path = large / filename;
+            std::ofstream output(path, std::ios::binary);
+            output << "benchmark\n";
+            if (!output) throw std::runtime_error("cannot write benchmark fixture");
         }
-        try { run_case(fixture, fixture / "large", "synthetic_2000"); }
-        catch (...) { std::filesystem::remove_all(fixture); throw; }
-        std::filesystem::remove_all(fixture);
+        run_case(fixture.path, large, "synthetic_2000");
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

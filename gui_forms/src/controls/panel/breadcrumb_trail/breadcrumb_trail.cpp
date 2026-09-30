@@ -14,11 +14,28 @@ namespace gui_forms {
 
 using namespace collection_detail;
 
+namespace {
+// Non-owning spans are used only during this call; indices address widths.
+double breadcrumb_occupied_width(const std::span<const std::size_t> indices,
+                                  const std::span<const double> widths,
+                                  const bool overflow, const double overlap) {
+    double total = 0.0;
+    bool first = true;
+    for (const std::size_t index : indices) {
+        const double shared_edge = first ? 0.0 : overlap;
+        total += widths[index] - shared_edge;
+        first = false;
+    }
+    if (overflow) total += 42.0 - (first ? 0.0 : overlap);
+    return total;
+}
+} // namespace
+
 BreadcrumbTrail::BreadcrumbTrail(StableId stable_id,
                                  std::string editor_stable_id)
     : Panel(std::move(stable_id)),
       editor_stable_id_(std::move(editor_stable_id)) {
-    const std::string prefix(this->stable_id().value());
+    const std::string prefix((*this).stable_id().value());
     if (editor_stable_id_.empty()) editor_stable_id_ = prefix + ".editor";
     overflow_stable_id_ = prefix + ".overflow";
     edit_stable_id_ = prefix + ".edit";
@@ -39,6 +56,8 @@ void BreadcrumbTrail::initialize_control_tree() {
     add_child(editor_);
     const std::weak_ptr<BreadcrumbTrail> weak =
         std::static_pointer_cast<BreadcrumbTrail>(shared_from_this());
+    // The trail owns the editor and tokens. Callbacks observe the trail weakly;
+    // locking keeps it alive for one invocation and expired targets do nothing.
     editor_commit_ = (*editor_).committed().subscribe(
         *this, EditorCommitCallback{weak});
     editor_cancel_ = (*editor_).cancelled().subscribe(
@@ -96,14 +115,16 @@ void BreadcrumbTrail::editor_cancelled() {
 
 void BreadcrumbTrail::set_segments(std::vector<BreadcrumbSegment> segments) {
     require_mutable();
-    std::unordered_set<std::string> identities;
+    std::unordered_set<std::string> identities{};
     for (const BreadcrumbSegment& segment : segments) {
         validate_identity_text(segment.stable_id, segment.text);
+        const std::pair<std::unordered_set<std::string>::iterator, bool> insertion =
+            identities.insert(segment.stable_id);
         if (!validate_utf8(segment.description).valid() ||
             segment.description.size() > 4096U ||
             segment.stable_id == overflow_stable_id_ ||
             segment.stable_id == edit_stable_id_ ||
-            !identities.insert(segment.stable_id).second) {
+            !insertion.second) {
             throw std::invalid_argument(
                 "BreadcrumbTrail requires unique segment IDs, valid text, and bounded descriptions");
         }
@@ -120,13 +141,14 @@ void BreadcrumbTrail::set_segments(std::vector<BreadcrumbSegment> segments) {
 
 std::optional<std::size_t> BreadcrumbTrail::segment_index(
     std::string_view stable_id) const noexcept {
-    const auto found = std::find_if(
-        segments_.begin(), segments_.end(),
-        [stable_id](const BreadcrumbSegment& segment) {
-            return segment.stable_id == stable_id;
-        });
-    if (found == segments_.end()) return {};
-    return static_cast<std::size_t>(std::distance(segments_.begin(), found));
+    const std::size_t count = segments_.size();
+    for (std::size_t index = 0U; index < count; ++index) {
+        if (segments_[index].stable_id == stable_id) {
+            const std::optional<std::size_t> result(index);
+            return result;
+        }
+    }
+    return {};
 }
 
 void BreadcrumbTrail::set_active_id(std::string_view stable_id) {
@@ -181,12 +203,19 @@ double BreadcrumbTrail::natural_width(
     const double text_width =
         resolve_text_layout_utf8(segment.text, font).logical_size.width;
     const double padding = appearance_ == BreadcrumbAppearance::raised ? 33.0 : 23.0;
-    return std::clamp(padding + text_width, 38.0, 220.0);
+    const double result = std::clamp(padding + text_width, 38.0, 220.0);
+    return result;
 }
 
 void BreadcrumbTrail::rebuild_layout(double width, double height) {
     visible_items_.clear();
     hidden_segment_ids_.clear();
+    const std::size_t segment_count_bound = segments_.size();
+    if (segment_count_bound > visible_items_.max_size() - 2U) {
+        throw std::length_error("BreadcrumbTrail layout exceeds vector capacity");
+    }
+    visible_items_.reserve(segment_count_bound + 2U);
+    hidden_segment_ids_.reserve(segment_count_bound);
     hovered_visible_.reset();
     pressed_visible_.reset();
     if (width <= 0.0 || height <= 0.0) return;
@@ -195,39 +224,39 @@ void BreadcrumbTrail::rebuild_layout(double width, double height) {
     const double inner_height = std::max(0.0, height - 2.0);
     const double edit_x = std::max(1.0, width - edit_width_ - 1.0);
     const double segment_extent = std::max(0.0, edit_x - 1.0);
-    std::vector<std::size_t> visible_segments;
+    std::vector<std::size_t> visible_segments{};
     visible_segments.reserve(segments_.size());
 
-    auto occupied_width = [this](const std::vector<std::size_t>& indices,
-                                 bool overflow) {
-        double total{};
-        bool first = true;
-        for (const std::size_t index : indices) {
-            total += natural_width(segments_[index]) - (first ? 0.0 : edge_overlap_);
-            first = false;
-        }
-        if (overflow) total += 42.0 - (first ? 0.0 : edge_overlap_);
-        return total;
-    };
+    const std::size_t segment_count = segments_.size();
+    std::vector<double> natural_widths(segment_count, 0.0);
+    for (std::size_t index = 0U; index < segment_count; ++index) {
+        natural_widths[index] = natural_width(segments_[index]);
+    }
+    // Temporary proposal storage is allocated once and reused in the suffix walk.
+    std::vector<std::size_t> proposed{};
+    proposed.reserve(segment_count);
 
     for (std::size_t index = 0; index < segments_.size(); ++index) {
         visible_segments.push_back(index);
     }
-    bool overflow = occupied_width(visible_segments, false) > segment_extent;
+    bool overflow = breadcrumb_occupied_width(visible_segments, natural_widths, false, edge_overlap_) > segment_extent;
     if (overflow && segments_.size() > 2U) {
         visible_segments = {0U, segments_.size() - 1U};
         for (std::size_t candidate = segments_.size() - 1U;
              candidate > 1U; --candidate) {
-            std::vector<std::size_t> proposed = visible_segments;
+            proposed = visible_segments;
             proposed.insert(proposed.begin() + 1,
                             candidate - 1U);
-            if (occupied_width(proposed, true) > segment_extent) break;
-            visible_segments = std::move(proposed);
+            if (breadcrumb_occupied_width(proposed, natural_widths, true, edge_overlap_) > segment_extent) break;
+            // Both allocations retain their capacity for the next proposal.
+            visible_segments.swap(proposed);
         }
-        std::unordered_set<std::size_t> visible_set(
-            visible_segments.begin(), visible_segments.end());
-        for (std::size_t index = 0; index < segments_.size(); ++index) {
-            if (!visible_set.contains(index)) {
+        std::size_t visible_position = 0U;
+        for (std::size_t index = 0U; index < segment_count; ++index) {
+            if (visible_position < visible_segments.size() &&
+                visible_segments[visible_position] == index) {
+                ++visible_position;
+            } else {
                 hidden_segment_ids_.push_back(segments_[index].stable_id);
             }
         }
@@ -239,20 +268,22 @@ void BreadcrumbTrail::rebuild_layout(double width, double height) {
     }
 
     double x = 1.0;
-    auto append_item = [&](VisibleKind kind, std::size_t segment_index,
-                           double natural) {
-        const double remaining = std::max(0.0, edit_x - x);
-        const double item_width = std::min(natural, remaining + edge_overlap_);
-        visible_items_.push_back(
-            {kind, segment_index, {x, inner_y, item_width, inner_height}});
-        x += std::max(0.0, item_width - edge_overlap_);
-    };
-    for (std::size_t position = 0; position < visible_segments.size(); ++position) {
+    for (std::size_t position = 0U; position < visible_segments.size(); ++position) {
         if (overflow && position == 1U) {
-            append_item(VisibleKind::overflow, 0U, 42.0);
+            const double remaining = std::max(0.0, edit_x - x);
+            const double item_width = std::min(42.0, remaining + edge_overlap_);
+            const VisibleItem item{.kind = VisibleKind::overflow, .segment_index = 0U,
+                .bounds = {x, inner_y, item_width, inner_height}};
+            visible_items_.push_back(item);
+            x += std::max(0.0, item_width - edge_overlap_);
         }
         const std::size_t index = visible_segments[position];
-        append_item(VisibleKind::segment, index, natural_width(segments_[index]));
+        const double remaining = std::max(0.0, edit_x - x);
+        const double item_width = std::min(natural_widths[index], remaining + edge_overlap_);
+        const VisibleItem item{.kind = VisibleKind::segment, .segment_index = index,
+            .bounds = {x, inner_y, item_width, inner_height}};
+        visible_items_.push_back(item);
+        x += std::max(0.0, item_width - edge_overlap_);
     }
     visible_items_.push_back(
         {VisibleKind::edit, 0U,
@@ -264,20 +295,22 @@ void BreadcrumbTrail::normalize_active() {
         active_id_.clear();
         return;
     }
-    const bool visible = std::any_of(
-        visible_items_.begin(), visible_items_.end(),
-        [this](const VisibleItem& item) {
-            return visible_stable_id(item) == active_id_;
-        });
-    if (!visible) {
-        const auto last_segment = std::find_if(
-            visible_items_.rbegin(), visible_items_.rend(),
-            [](const VisibleItem& item) {
-                return item.kind == VisibleKind::segment;
-            });
-        active_id_ = last_segment == visible_items_.rend()
-            ? edit_stable_id_
-            : segments_[last_segment->segment_index].stable_id;
+    bool visible = false;
+    for (const VisibleItem& item : visible_items_) {
+        const std::string_view identity = visible_stable_id(item);
+        if (identity == active_id_) {
+            visible = true;
+            break;
+        }
+    }
+    if (visible) return;
+    active_id_ = edit_stable_id_;
+    for (std::size_t remaining = visible_items_.size(); remaining > 0U; --remaining) {
+        const VisibleItem& item = visible_items_[remaining - 1U];
+        if (item.kind == VisibleKind::segment) {
+            active_id_ = segments_[item.segment_index].stable_id;
+            break;
+        }
     }
 }
 
@@ -321,7 +354,7 @@ void BreadcrumbTrail::on_paint(Painter& painter, Rect damage) {
         const bool hovered = hovered_visible_ == index;
         Color face = style().paper;
         Color foreground = style().text;
-        std::string_view text;
+        std::string_view text{};
         if (item.kind == VisibleKind::edit) {
             const Color terminal_top = hovered || active
                 ? style().accent_light
@@ -489,7 +522,8 @@ std::optional<std::size_t> BreadcrumbTrail::visible_index_at(
                 if (local.x < previous_edge) continue;
             }
         }
-        return index - 1U;
+        const std::optional<std::size_t> result(index - 1U);
+        return result;
     }
     return {};
 }
@@ -512,7 +546,7 @@ void BreadcrumbTrail::activate_visible(std::size_t index) {
 void BreadcrumbTrail::on_pointer(PointerEvent& event) {
     if (!eligible_for_input() || editing_) return;
     if (event.action == PointerAction::move) {
-        const auto hovered = visible_index_at(event.position);
+        const std::optional<std::size_t> hovered = visible_index_at(event.position);
         if (hovered != hovered_visible_) {
             hovered_visible_ = hovered;
             invalidate(Dirty::paint);
@@ -530,7 +564,7 @@ void BreadcrumbTrail::on_pointer(PointerEvent& event) {
         pressed_visible_ = visible_index_at(event.position);
         event.handled = pressed_visible_.has_value();
     } else if (event.action == PointerAction::up) {
-        const auto released = visible_index_at(event.position);
+        const std::optional<std::size_t> released = visible_index_at(event.position);
         if (released && released == pressed_visible_) activate_visible(*released);
         event.handled = released.has_value();
         pressed_visible_.reset();
@@ -551,14 +585,12 @@ void BreadcrumbTrail::on_key(KeyEvent& event) {
     if (!focused_ || !enabled() || editing_ ||
         event.action != KeyAction::down || visible_items_.empty()) return;
     std::size_t active{};
-    const auto found = std::find_if(
-        visible_items_.begin(), visible_items_.end(),
-        [this](const VisibleItem& item) {
-            return visible_stable_id(item) == active_id_;
-        });
-    if (found != visible_items_.end()) {
-        active = static_cast<std::size_t>(
-            std::distance(visible_items_.begin(), found));
+    for (std::size_t index = 0U; index < visible_items_.size(); ++index) {
+        const std::string_view identity = visible_stable_id(visible_items_[index]);
+        if (identity == active_id_) {
+            active = index;
+            break;
+        }
     }
     if (event.physical_key == PhysicalKey::enter ||
         event.physical_key == PhysicalKey::space) {
@@ -585,7 +617,7 @@ void BreadcrumbTrail::on_focus_changed(bool focused) {
 }
 
 SemanticDescriptor BreadcrumbTrail::semantic_descriptor() const {
-    SemanticDescriptor descriptor;
+    SemanticDescriptor descriptor{};
     descriptor.role = SemanticRole::group;
     descriptor.name = accessible_name();
     descriptor.value = editor_ ? std::string((*editor_).text()) : std::string{};
@@ -597,12 +629,12 @@ SemanticDescriptor BreadcrumbTrail::semantic_descriptor() const {
 }
 
 std::vector<SemanticNode> BreadcrumbTrail::semantic_virtual_children() const {
-    std::vector<SemanticNode> nodes;
+    std::vector<SemanticNode> nodes{};
     if (editing_) return nodes;
     nodes.reserve(visible_items_.size());
     const Rect trail = absolute_bounds();
     for (const VisibleItem& item : visible_items_) {
-        SemanticNode node;
+        SemanticNode node{};
         node.stable_id = std::string(visible_stable_id(item));
         node.runtime_id = virtual_runtime_id(node.stable_id);
         node.role = SemanticRole::button;
@@ -639,17 +671,16 @@ std::vector<SemanticNode> BreadcrumbTrail::semantic_virtual_children() const {
 bool BreadcrumbTrail::on_semantic_child_action(
     std::string_view stable_id, SemanticAction action, std::string_view) {
     if (editing_) return false;
-    const auto found = std::find_if(
-        visible_items_.begin(), visible_items_.end(),
-        [this, stable_id](const VisibleItem& item) {
-            return visible_stable_id(item) == stable_id;
-        });
-    if (found == visible_items_.end()) return false;
+    std::size_t index = 0U;
+    while (index < visible_items_.size()) {
+        const std::string_view identity = visible_stable_id(visible_items_[index]);
+        if (identity == stable_id) break;
+        ++index;
+    }
+    if (index == visible_items_.size()) return false;
     if (action != SemanticAction::focus && action != SemanticAction::press &&
         action != SemanticAction::show_menu) return false;
     if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));
-    const std::size_t index = static_cast<std::size_t>(
-        std::distance(visible_items_.begin(), found));
     active_id_ = std::string(stable_id);
     if (action == SemanticAction::press || action == SemanticAction::show_menu) {
         activate_visible(index);

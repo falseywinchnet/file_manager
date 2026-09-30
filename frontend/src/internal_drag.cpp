@@ -21,20 +21,21 @@ InternalDragController::observe(const DragPointerObservation& observation) {
     }
     if (source_id_.empty()) return std::nullopt;
 
-    const auto distance = std::hypot(observation.x - origin_x_,
+    const double distance = std::hypot(observation.x - origin_x_,
                                      observation.y - origin_y_);
     if (!active_ && distance >= activation_distance) active_ = true;
     if (observation.phase != DragPointerPhase::up) return std::nullopt;
 
-    const auto source = source_id_;
+    const std::string source = source_id_;
     const bool activated = active_;
     reset();
     if (!activated || observation.item_id.empty() ||
         observation.item_id == source) {
         return std::nullopt;
     }
-    return InternalDropIntent{source, std::string(observation.item_id),
-                              observation.copy_modifier};
+    const InternalDropIntent result{source, std::string(observation.item_id),
+                                    observation.copy_modifier};
+    return result;
 }
 
 void InternalDragController::reset() noexcept {

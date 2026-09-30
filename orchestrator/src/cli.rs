@@ -17,92 +17,108 @@ use std::path::PathBuf;
 ///
 /// Returns a bounded user-facing diagnostic when arguments, service startup,
 /// transport, or response presentation fails.
+#[allow(clippy::let_and_return)] // House calculate-then-return rule.
 pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<(), String> {
     let mut arguments: Vec<String> = arguments.into_iter().collect();
-    let json_output = remove_flag(&mut arguments, "--json");
-    let runtime_directory = remove_option(&mut arguments, "--runtime-dir")?;
-    let settings_directory = remove_option(&mut arguments, "--settings-dir")?;
-    let engine_options = remove_engine_options(&mut arguments)?;
-    let engine_runtime = remove_option(&mut arguments, "--engine-runtime-dir")?.map(PathBuf::from);
+    let json_output: bool = remove_flag(&mut arguments, "--json");
+    let runtime_directory: Option<String> = remove_option(&mut arguments, "--runtime-dir")?;
+    let settings_directory: Option<String> = remove_option(&mut arguments, "--settings-dir")?;
+    let engine_options: Option<EngineProviderConfig> = remove_engine_options(&mut arguments)?;
+    let engine_runtime: Option<PathBuf> =
+        remove_option(&mut arguments, "--engine-runtime-dir")?.map(PathBuf::from);
     let Some(command) = arguments.first().map(String::as_str) else {
         print_help();
         return Ok(());
     };
 
     if engine_runtime.is_some() && (command != "serve-local" || engine_options.is_some()) {
-        return Err(
+        let message: String =
             "--engine-runtime-dir requires serve-local without development Engine options"
-                .to_owned(),
-        );
+                .to_owned();
+        return Err(message);
     }
     match command {
         "serve-local" => {
             if json_output || arguments.len() != 1 {
-                return Err(
-                    "serve-local accepts only runtime, settings, and Engine options".to_owned(),
-                );
+                let message: String =
+                    "serve-local accepts only runtime, settings, and Engine options".to_owned();
+                return Err(message);
             }
-            let runtime = resolve_runtime_directory(runtime_directory)?;
-            let settings = settings_directory.map(PathBuf::from);
-            return serve_local(
+            let runtime: PathBuf = resolve_runtime_directory(runtime_directory)?;
+            let settings: Option<PathBuf> = settings_directory.map(PathBuf::from);
+            let result: Result<(), String> = serve_local(
                 &runtime,
                 engine_options,
                 settings.as_deref(),
                 engine_runtime.as_deref(),
             );
+            return result;
         }
         "call-local" => {
             if engine_options.is_some() {
-                return Err("Engine provider options are valid only with serve-local".to_owned());
+                let message: String =
+                    "Engine provider options are valid only with serve-local".to_owned();
+                return Err(message);
             }
             if settings_directory.is_some() {
-                return Err("--settings-dir is invalid for call-local clients".to_owned());
+                let message: String = "--settings-dir is invalid for call-local clients".to_owned();
+                return Err(message);
             }
-            let runtime = resolve_runtime_directory(runtime_directory)?;
-            let operation = arguments
-                .get(1)
-                .ok_or_else(|| "call-local requires an operation".to_owned())?;
-            let request = local_request_for_arguments(&arguments)?;
-            let response = call_local(&runtime, &request)?;
-            return render_response(operation, &response, json_output);
+            let runtime: PathBuf = resolve_runtime_directory(runtime_directory)?;
+            let Some(operation) = arguments.get(1) else {
+                let message: String = "call-local requires an operation".to_owned();
+                return Err(message);
+            };
+            let request: Request = local_request_for_arguments(&arguments)?;
+            let response: Response = call_local(&runtime, &request)?;
+            let result: Result<(), String> = render_response(operation, &response, json_output);
+            return result;
         }
         "serve-launchd" => {
             if engine_options.is_some() {
-                return Err(
+                let message: String =
                     "the launchd projection does not yet admit the development Engine transport"
-                        .to_owned(),
-                );
+                        .to_owned();
+                return Err(message);
             }
             if json_output || arguments.len() != 1 {
-                return Err("serve-launchd accepts only --runtime-dir".to_owned());
+                let message: String = "serve-launchd accepts only --runtime-dir".to_owned();
+                return Err(message);
             }
-            let runtime = resolve_runtime_directory(runtime_directory)?;
-            let settings = resolve_settings_directory(settings_directory)?;
-            return serve_launchd(&runtime, &settings);
+            let runtime: PathBuf = resolve_runtime_directory(runtime_directory)?;
+            let settings: PathBuf = resolve_settings_directory(settings_directory)?;
+            let result: Result<(), String> = serve_launchd(&runtime, &settings);
+            return result;
         }
         "launchd-plist" => {
             if engine_options.is_some() {
-                return Err("Engine provider options are valid only with serve-local".to_owned());
+                let message: String =
+                    "Engine provider options are valid only with serve-local".to_owned();
+                return Err(message);
             }
             if json_output || arguments.len() != 1 {
-                return Err("launchd-plist accepts only --runtime-dir".to_owned());
+                let message: String = "launchd-plist accepts only --runtime-dir".to_owned();
+                return Err(message);
             }
-            let runtime = resolve_runtime_directory(runtime_directory)?;
-            let settings = resolve_settings_directory(settings_directory)?;
-            return print_launchd_plist(&runtime, &settings);
+            let runtime: PathBuf = resolve_runtime_directory(runtime_directory)?;
+            let settings: PathBuf = resolve_settings_directory(settings_directory)?;
+            let result: Result<(), String> = print_launchd_plist(&runtime, &settings);
+            return result;
         }
         _ => {}
     }
 
-    run_in_process(
+    let result: Result<(), String> = run_in_process(
         &arguments,
         runtime_directory.as_ref(),
         settings_directory.as_ref(),
         engine_options.as_ref(),
         json_output,
-    )
+    );
+    result
 }
 
+#[allow(clippy::let_and_return)] // House calculate-then-return rule.
 fn run_in_process(
     arguments: &[String],
     runtime_directory: Option<&String>,
@@ -110,40 +126,47 @@ fn run_in_process(
     engine_options: Option<&EngineProviderConfig>,
     json_output: bool,
 ) -> Result<(), String> {
-    let command = arguments[0].as_str();
+    let command: &str = arguments[0].as_str();
     if runtime_directory.is_some() {
-        return Err(
-            "--runtime-dir is valid only with serve-local, call-local, serve-launchd, or launchd-plist"
-                .to_owned(),
-        );
+        let message: String = "--runtime-dir is valid only with serve-local, call-local, serve-launchd, or launchd-plist"
+                .to_owned();
+        return Err(message);
     }
     if settings_directory.is_some() {
-        return Err(
+        let message: String =
             "--settings-dir is valid only with serve-local, serve-launchd, or launchd-plist"
-                .to_owned(),
-        );
+                .to_owned();
+        return Err(message);
     }
     if engine_options.is_some() {
-        return Err("Engine provider options are valid only with serve-local".to_owned());
+        let message: String = "Engine provider options are valid only with serve-local".to_owned();
+        return Err(message);
     }
     if arguments.len() != 1 {
-        return Err("expected one command and optional --json".to_owned());
+        let message: String = "expected one command and optional --json".to_owned();
+        return Err(message);
     }
     if command == "serve-stdio" {
         if json_output {
-            return Err("serve-stdio is already structured; --json is invalid".to_owned());
+            let message: String = "serve-stdio is already structured; --json is invalid".to_owned();
+            return Err(message);
         }
-        return serve_stdio();
+        let result: Result<(), String> = serve_stdio();
+        return result;
     }
     if matches!(command, "help" | "--help" | "-h") {
         print_help();
         return Ok(());
     }
-    let method =
-        method_for_command(command).ok_or_else(|| format!("unknown command: {command}"))?;
-    let kernel = Kernel::new();
-    let response = kernel.handle(Request::local("cli-1", method));
-    render_response(command, &response, json_output)
+    let Some(method) = method_for_command(command) else {
+        let message: String = format!("unknown command: {command}");
+        return Err(message);
+    };
+    let kernel: Kernel = Kernel::new();
+    let request: Request = Request::local("cli-1", method);
+    let response: Response = kernel.handle(request);
+    let result: Result<(), String> = render_response(command, &response, json_output);
+    result
 }
 
 fn remove_engine_options(
@@ -180,24 +203,36 @@ fn remove_engine_options(
     Ok(Some(options))
 }
 
-#[cfg(unix)]
 fn resolve_runtime_directory(explicit: Option<String>) -> Result<PathBuf, String> {
-    explicit
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("FILEMAN_ORCHESTRATOR_RUNTIME_DIR").map(PathBuf::from))
-        .map_or_else(
-            || {
-                crate::local_endpoint::default_runtime_directory()
-                    .map_err(|error| error.to_string())
-            },
-            |path| {
-                if path.is_absolute() {
-                    Ok(path)
-                } else {
-                    Err("runtime directory must be absolute".to_owned())
-                }
-            },
-        )
+    let path: PathBuf;
+    if let Some(value) = explicit {
+        path = PathBuf::from(value);
+    } else if let Some(value) = std::env::var_os("FILEMAN_ORCHESTRATOR_RUNTIME_DIR") {
+        path = PathBuf::from(value);
+    } else {
+        #[cfg(unix)]
+        {
+            path = crate::local_endpoint::default_runtime_directory()
+                .map_err(runtime_directory_error)?;
+        }
+        #[cfg(not(unix))]
+        {
+            let temporary: PathBuf = std::env::temp_dir();
+            path = temporary.join("fo-orchestrator");
+        }
+    }
+    if !path.is_absolute() {
+        let message: String = "runtime directory must be absolute".to_owned();
+        return Err(message);
+    }
+    Ok(path)
+}
+
+#[cfg(unix)]
+#[allow(clippy::let_and_return)] // House calculate-then-return rule.
+fn runtime_directory_error(error: impl std::fmt::Display) -> String {
+    let message: String = error.to_string();
+    message
 }
 
 #[cfg(target_os = "macos")]
@@ -212,18 +247,6 @@ fn resolve_settings_directory(explicit: Option<String>) -> Result<PathBuf, Strin
     explicit
         .map(Into::into)
         .ok_or_else(|| "this platform requires --settings-dir PATH".to_owned())
-}
-
-#[cfg(not(unix))]
-fn resolve_runtime_directory(explicit: Option<String>) -> Result<PathBuf, String> {
-    let path = explicit
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("FILEMAN_ORCHESTRATOR_RUNTIME_DIR").map(PathBuf::from))
-        .unwrap_or_else(|| std::env::temp_dir().join("fo-orchestrator"));
-    if !path.is_absolute() {
-        return Err("runtime directory must be absolute".to_owned());
-    }
-    Ok(path)
 }
 
 fn remove_flag(arguments: &mut Vec<String>, flag: &str) -> bool {

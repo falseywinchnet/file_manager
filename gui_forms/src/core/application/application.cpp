@@ -7,13 +7,15 @@
 namespace gui_forms {
 namespace {
 bool valid_text(std::string_view value, std::size_t limit, bool allow_empty) {
-    return (allow_empty || !value.empty()) && value.size() <= limit &&
+    const bool valid = (allow_empty || !value.empty()) && value.size() <= limit &&
         value.find('\0') == std::string_view::npos && validate_utf8(value).valid();
+    return valid;
 }
 bool valid_size(Size size) noexcept {
-    return std::isfinite(size.width) && std::isfinite(size.height) &&
+    const bool valid = std::isfinite(size.width) && std::isfinite(size.height) &&
         size.width >= 1.0 && size.height >= 1.0 &&
         size.width <= 32768.0 && size.height <= 32768.0;
+    return valid;
 }
 HostServiceStatus request(const std::weak_ptr<detail::ApplicationWindowState>& weak,
                           std::function<void()> detail::ApplicationWindowState::* operation,
@@ -42,20 +44,26 @@ ApplicationWindowHandle::ApplicationWindowHandle(
 
 bool ApplicationWindowHandle::active() const noexcept {
     const std::shared_ptr<detail::ApplicationWindowState> state = state_.lock();
-    return state && (*state).thread == std::this_thread::get_id() && (*state).ready && !(*state).closed;
+    const bool active = state && (*state).thread == std::this_thread::get_id() &&
+        (*state).ready && !(*state).closed;
+    return active;
 }
 HostServiceStatus ApplicationWindowHandle::request_close() const {
-    return request(state_, &detail::ApplicationWindowState::request_close, false);
+    const HostServiceStatus result = request(state_, &detail::ApplicationWindowState::request_close, false);
+    return result;
 }
 HostServiceStatus ApplicationWindowHandle::show() const {
-    return request(state_, &detail::ApplicationWindowState::show, false);
+    const HostServiceStatus result = request(state_, &detail::ApplicationWindowState::show, false);
+    return result;
 }
 HostServiceStatus ApplicationWindowHandle::hide() const {
-    return request(state_, &detail::ApplicationWindowState::hide, true);
+    const HostServiceStatus result = request(state_, &detail::ApplicationWindowState::hide, true);
+    return result;
 }
 
 HostServiceStatus ApplicationWindowHandle::toggle_full_screen() const {
-    return request(state_, &detail::ApplicationWindowState::toggle_full_screen, false);
+    const HostServiceStatus result = request(state_, &detail::ApplicationWindowState::toggle_full_screen, false);
+    return result;
 }
 
 ApplicationResult Application::validate(const std::vector<ApplicationWindow>& windows) {

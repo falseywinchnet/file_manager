@@ -20,6 +20,16 @@ namespace {
 using namespace gui_forms;
 using namespace std::chrono_literals;
 
+bool is_background_face(const char operation) {
+    const bool result = operation == 'F' || operation == 'G';
+    return result;
+}
+
+bool icon_label_inside_cell(const Point point) {
+    const bool result = point.x >= 4.0 && point.x < 186.0;
+    return result;
+}
+
 class ImageRecordingPainter final : public Painter {
 public:
     void save() override {}
@@ -57,16 +67,16 @@ public:
         opacities.push_back(opacity);
     }
 
-    std::vector<ImageId> images;
-    std::vector<Rect> destinations;
-    std::vector<double> opacities;
-    std::vector<Rect> fills;
-    std::vector<Rect> strokes;
-    std::vector<std::string> texts;
-    std::vector<FontSpec> fonts;
-    std::vector<Point> text_origins;
-    std::vector<std::pair<Point, Point>> lines;
-    std::vector<char> paint_order;
+    std::vector<ImageId> images{};
+    std::vector<Rect> destinations{};
+    std::vector<double> opacities{};
+    std::vector<Rect> fills{};
+    std::vector<Rect> strokes{};
+    std::vector<std::string> texts{};
+    std::vector<FontSpec> fonts{};
+    std::vector<Point> text_origins{};
+    std::vector<std::pair<Point, Point>> lines{};
+    std::vector<char> paint_order{};
 };
 
 void require(bool condition, const char* message) {
@@ -106,11 +116,12 @@ public:
         : stable_id_(stable_id) {}
 
     bool operator()(const SemanticNode& node) const {
-        return node.stable_id == stable_id_;
+        const bool matches = node.stable_id == stable_id_;
+        return matches;
     }
 
 private:
-    std::string_view stable_id_;
+    std::string_view stable_id_{};
 };
 
 class RecordObjectContextId final {
@@ -127,7 +138,8 @@ private:
 };
 
 bool semantic_node_is_selected(const SemanticNode& node) {
-    return has_semantic_state(node.states, SemanticState::selected);
+    const bool selected = has_semantic_state(node.states, SemanticState::selected);
+    return selected;
 }
 
 class AppendCommandInvocation final {
@@ -171,75 +183,92 @@ void test_breadcrumb_identity_overflow_edit_and_input() {
                 constrained.back().stable_id == (*trail).edit_stable_id(),
             "BreadcrumbTrail overflow must preserve root/current identities and expose overflow/edit actuators");
 
-    std::string activated;
+    std::string activated{};
     std::size_t overflow_count{};
-    std::string committed;
+    std::string committed{};
     std::size_t cancelled{};
     std::size_t starts{};
     SubscriptionToken activation = (*trail).segment_activated().subscribe(
         test_support::RecordValue<std::string>(activated));
     SubscriptionToken overflow = (*trail).overflow_activated().subscribe(
-        [&overflow_count] { ++overflow_count; });
+        test_support::IncrementCounter<std::size_t>(overflow_count));
     SubscriptionToken commit = (*trail).edit_committed().subscribe(
         test_support::RecordValue<std::string>(committed));
     SubscriptionToken cancel = (*trail).edit_cancelled().subscribe(
-        [&cancelled] { ++cancelled; });
+        test_support::IncrementCounter<std::size_t>(cancelled));
     SubscriptionToken start = (*trail).edit_started().subscribe(
-        [&starts](const std::string&) { ++starts; });
+        test_support::IncrementCounter<std::size_t, const std::string&>(starts));
     std::size_t completions{};
     SubscriptionToken completion = (*trail).edit_completion_requested().subscribe(
-        [&completions] { ++completions; });
-    require((*trail).on_semantic_child_action(
-                "path.root", SemanticAction::press, {}) &&
-                activated == "path.root",
-            "breadcrumb semantic segment press must share typed activation");
-    require((*trail).on_semantic_child_action(
-                (*trail).overflow_stable_id(), SemanticAction::show_menu, {}) &&
-                overflow_count == 1U,
-            "breadcrumb overflow semantic action must enter the operational overflow path");
+        test_support::IncrementCounter<std::size_t>(completions));
+    const bool operation_check_1 = (*trail).on_semantic_child_action(
+                "path.root", SemanticAction::press, {});
+    require(operation_check_1, "breadcrumb semantic segment press must share typed activation");
+    const bool operation_check_2 = activated == "path.root";
+    require(operation_check_2, "breadcrumb semantic segment press must share typed activation");
+    const bool operation_check_3 = (*trail).on_semantic_child_action(
+                (*trail).overflow_stable_id(), SemanticAction::show_menu, {});
+    require(operation_check_3, "breadcrumb overflow semantic action must enter the operational overflow path");
+    const bool operation_check_4 = overflow_count == 1U;
+    require(operation_check_4, "breadcrumb overflow semantic action must enter the operational overflow path");
 
-    require(window.request_focus(trail),
-            "BreadcrumbTrail must accept retained keyboard focus");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::home}) &&
-                window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
-                activated == "path.root",
-            "Home and Enter must activate the first stable breadcrumb segment");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::end}) &&
-                window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
-                (*trail).editing() && (*trail).editor()->visible() &&
-                starts == 1U,
-            "End and Enter must replace the trail presentation with its owned editor");
+    const bool operation_check_5 = window.request_focus(trail);
+    require(operation_check_5, "BreadcrumbTrail must accept retained keyboard focus");
+    const bool operation_check_6 = window.dispatch_key({KeyAction::down, PhysicalKey::home});
+    require(operation_check_6, "Home and Enter must activate the first stable breadcrumb segment");
+    const bool operation_check_7 = window.dispatch_key({KeyAction::down, PhysicalKey::enter});
+    require(operation_check_7, "Home and Enter must activate the first stable breadcrumb segment");
+    const bool operation_check_8 = activated == "path.root";
+    require(operation_check_8, "Home and Enter must activate the first stable breadcrumb segment");
+    const bool operation_check_9 = window.dispatch_key({KeyAction::down, PhysicalKey::end});
+    require(operation_check_9, "End and Enter must replace the trail presentation with its owned editor");
+    const bool operation_check_10 = window.dispatch_key({KeyAction::down, PhysicalKey::enter});
+    require(operation_check_10, "End and Enter must replace the trail presentation with its owned editor");
+    const bool operation_check_11 = (*trail).editing();
+    require(operation_check_11, "End and Enter must replace the trail presentation with its owned editor");
+    const bool operation_check_12 = (*(*trail).editor()).visible();
+    require(operation_check_12, "End and Enter must replace the trail presentation with its owned editor");
+    const bool operation_check_13 = starts == 1U;
+    require(operation_check_13, "End and Enter must replace the trail presentation with its owned editor");
     window.perform_layout();
     const Rect trail_bounds = (*trail).committed_arranged_bounds();
-    const Rect editor_bounds = (*trail).editor()->committed_arranged_bounds();
+    const Rect editor_bounds = (*(*trail).editor()).committed_arranged_bounds();
     require(editor_bounds.x == 1.0 && editor_bounds.y == 1.0 &&
                 editor_bounds.width == trail_bounds.width - 2.0 &&
                 editor_bounds.height == trail_bounds.height - 2.0,
             "breadcrumb editing must preserve outer identity and row geometry");
-    (*trail).editor()->set_text("/Users/example/Projects");
+    (*(*trail).editor()).set_text("/Users/example/Projects");
     (*trail).set_tab_completion_available(true);
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::tab}) &&
-                completions == 1U && (*trail).editing(),
-            "Tab must enter the typed completion route without traversing focus when a suggestion is available");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
-                committed == "/Users/example/Projects" && (*trail).editing(),
-            "path commit must publish exact editor text while the caller decides admissibility");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::escape}) &&
-                !(*trail).editing() && cancelled == 1U,
-            "Escape must roll back presentation and restore the breadcrumb row");
+    const bool operation_check_14 = window.dispatch_key({KeyAction::down, PhysicalKey::tab});
+    require(operation_check_14, "Tab must enter the typed completion route without traversing focus when a suggestion is available");
+    const bool operation_check_15 = completions == 1U;
+    require(operation_check_15, "Tab must enter the typed completion route without traversing focus when a suggestion is available");
+    const bool operation_check_16 = (*trail).editing();
+    require(operation_check_16, "Tab must enter the typed completion route without traversing focus when a suggestion is available");
+    const bool operation_check_17 = window.dispatch_key({KeyAction::down, PhysicalKey::enter});
+    require(operation_check_17, "path commit must publish exact editor text while the caller decides admissibility");
+    const bool operation_check_18 = committed == "/Users/example/Projects";
+    require(operation_check_18, "path commit must publish exact editor text while the caller decides admissibility");
+    const bool operation_check_19 = (*trail).editing();
+    require(operation_check_19, "path commit must publish exact editor text while the caller decides admissibility");
+    const bool operation_check_20 = window.dispatch_key({KeyAction::down, PhysicalKey::escape});
+    require(operation_check_20, "Escape must roll back presentation and restore the breadcrumb row");
+    const bool operation_check_21 = !(*trail).editing();
+    require(operation_check_21, "Escape must roll back presentation and restore the breadcrumb row");
+    const bool operation_check_22 = cancelled == 1U;
+    require(operation_check_22, "Escape must roll back presentation and restore the breadcrumb row");
 
-    ImageRecordingPainter painter;
+    ImageRecordingPainter painter{};
     window.paint(painter, {0.0, 0.0, 160.0, 28.0});
-    const auto final_face = std::find(
-        painter.paint_order.rbegin(), painter.paint_order.rend(), 'G').base();
-    const auto joint_lines = static_cast<std::size_t>(std::count(
-        final_face, painter.paint_order.end(), 'L'));
+    const std::vector<char>::const_reverse_iterator final_background = std::find(
+        painter.paint_order.crbegin(), painter.paint_order.crend(), 'G');
+    const std::vector<char>::const_iterator final_face = final_background.base();
+    const std::size_t joint_lines = static_cast<std::size_t>(std::count(
+        final_face, painter.paint_order.cend(), 'L'));
     require(final_face != painter.paint_order.begin() &&
                 joint_lines == (constrained.size() - 1U) * 2U &&
-                std::find_if(final_face, painter.paint_order.end(),
-                    [](char operation) {
-                        return operation == 'F' || operation == 'G';
-                    }) ==
+                std::find_if(final_face, painter.paint_order.cend(),
+                    is_background_face) ==
                     painter.paint_order.end(),
             "BreadcrumbTrail must paint two connected lines per shared chevron edge after every overlapping face");
 
@@ -261,15 +290,15 @@ void test_breadcrumb_readable_raised_geometry() {
     Window window(trail, {500, 32});
     window.perform_layout();
     const double original_width = (*trail).semantic_virtual_children().front().bounds.width;
-    (*trail).editor()->set_text("draft path");
+    (*(*trail).editor()).set_text("draft path");
     (*trail).set_font({FontRole::content, 13, 400, false});
     (*trail).set_appearance(BreadcrumbAppearance::raised);
     window.perform_layout();
     const std::vector<SemanticNode> nodes = (*trail).semantic_virtual_children();
     require(nodes.front().bounds.width > original_width &&
-            (*trail).editor()->font().size == 13 && (*trail).editor()->text() == "draft path",
+            (*(*trail).editor()).font().size == 13 && (*(*trail).editor()).text() == "draft path",
             "larger breadcrumb type must expand hit geometry and preserve the inline editor draft");
-    std::string activated;
+    std::string activated{};
     SubscriptionToken token = (*trail).segment_activated().subscribe(test_support::RecordValue<std::string>(activated));
     const Rect first = nodes.front().bounds;
     const Point nose{first.x + first.width - 2.0, first.y + first.height * 0.5};
@@ -280,7 +309,7 @@ void test_breadcrumb_readable_raised_geometry() {
     static_cast<void>(window.dispatch_pointer({PointerAction::down, PointerButton::primary, next_face}));
     static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, next_face}));
     require(activated == "leaf", "the area above a chevron tip must belong to the following visible face");
-    ImageRecordingPainter painter;
+    ImageRecordingPainter painter{};
     window.paint(painter, {0, 0, 500, 32});
     require(!painter.fonts.empty() && painter.fonts.back().size == 13 &&
             std::count(painter.paint_order.begin(), painter.paint_order.end(), 'G') > 3,
@@ -316,7 +345,7 @@ void test_tree_visibility_identity_and_navigation() {
     require(collapsed.size() == 5U && collapsed.back().stable_id == "tree.volumes",
             "collapsed TreeView descendants must leave the visible semantic window");
 
-    std::string trace;
+    std::string trace{};
     SubscriptionToken expansion = (*tree).expansion_changed().subscribe(
         AppendTreeExpansion(trace));
     SubscriptionToken selection = (*tree).selection_changed().subscribe(
@@ -324,12 +353,16 @@ void test_tree_visibility_identity_and_navigation() {
     (*tree).set_expanded("tree.work", true);
     require((*tree).semantic_virtual_children().size() == 5U,
             "TreeView semantic realization must remain clipped to visible rows");
-    require(window.request_focus(tree), "TreeView must accept retained focus");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::right}) &&
-                (*tree).selected_id() == "tree.projects",
-            "TreeView Right must enter the first expanded child");
-    require(window.dispatch_text({"ref"}) && (*tree).selected_id() == "tree.reference",
-            "TreeView type-to-select must use stable visible-row navigation");
+    const bool operation_check_23 = window.request_focus(tree);
+    require(operation_check_23, "TreeView must accept retained focus");
+    const bool operation_check_24 = window.dispatch_key({KeyAction::down, PhysicalKey::right});
+    require(operation_check_24, "TreeView Right must enter the first expanded child");
+    const bool operation_check_25 = (*tree).selected_id() == "tree.projects";
+    require(operation_check_25, "TreeView Right must enter the first expanded child");
+    const bool operation_check_26 = window.dispatch_text({"ref"});
+    require(operation_check_26, "TreeView type-to-select must use stable visible-row navigation");
+    const bool operation_check_27 = (*tree).selected_id() == "tree.reference";
+    require(operation_check_27, "TreeView type-to-select must use stable visible-row navigation");
     require(trace == "tree.work:open\ntree.projects:selected\ntree.reference:selected\n",
             "TreeView expansion and selection events must be deterministic");
 }
@@ -371,7 +404,7 @@ void test_tree_and_object_view_consume_keyed_image_list() {
                          "1 item", "Fixture",
                          ObjectGlyph::folder, true, "folder"}});
     window.perform_layout();
-    ImageRecordingPainter painter;
+    ImageRecordingPainter painter{};
     window.paint(painter, {0.0, 0.0, 360.0, 100.0});
     require(painter.images.size() == 2U &&
                 painter.images[0] == loaded.image &&
@@ -402,7 +435,7 @@ void test_object_label_wrapping_focus_and_full_name_inspection() {
     Window window(objects, {190.0, 170.0});
     window.perform_layout();
 
-    ImageRecordingPainter rest;
+    ImageRecordingPainter rest{};
     window.paint(rest, {0.0, 0.0, 190.0, 170.0});
     require(rest.texts.size() == 4U &&
                 rest.texts[0] == "Résumé資料" &&
@@ -413,17 +446,15 @@ void test_object_label_wrapping_focus_and_full_name_inspection() {
     require(rest.text_origins[1].y > rest.text_origins[0].y &&
                 rest.text_origins[3].y > rest.text_origins[2].y &&
                 std::all_of(rest.text_origins.begin(), rest.text_origins.end(),
-                    [](const Point point) {
-                        return point.x >= 4.0 && point.x < 186.0;
-                    }),
+                    icon_label_inside_cell),
             "two-line icon labels must retain stable baselines inside their cells");
 
     const Point first = semantic_center(*objects, "labels.long");
     static_cast<void>(window.dispatch_pointer(
         {PointerAction::move, PointerButton::none, first}));
-    ImageRecordingPainter hovered;
+    ImageRecordingPainter hovered{};
     window.paint(hovered, {0.0, 0.0, 190.0, 170.0});
-    std::string inspected_name;
+    std::string inspected_name{};
     for (std::size_t index = 4U; index < hovered.texts.size(); ++index) {
         if (!inspected_name.empty()) inspected_name += ' ';
         inspected_name += hovered.texts[index];
@@ -440,37 +471,43 @@ void test_object_label_wrapping_focus_and_full_name_inspection() {
 
     PointerEvent down{PointerAction::down, PointerButton::primary, first};
     PointerEvent up{PointerAction::up, PointerButton::primary, first};
-    require(window.dispatch_pointer(down) && window.dispatch_pointer(up),
-            "pointer fixture must focus and select its item");
+    const bool operation_check_28 = window.dispatch_pointer(down);
+    require(operation_check_28, "pointer fixture must focus and select its item");
+    const bool operation_check_29 = window.dispatch_pointer(up);
+    require(operation_check_29, "pointer fixture must focus and select its item");
     static_cast<void>(window.dispatch_pointer(
         {PointerAction::leave, PointerButton::none, {189.0, 169.0}}));
-    ImageRecordingPainter pointer_focused;
+    ImageRecordingPainter pointer_focused{};
     window.paint(pointer_focused, {0.0, 0.0, 190.0, 170.0});
     require(pointer_focused.lines.empty() && pointer_focused.strokes.size() == 3U,
             "pointer focus must preserve the selection boundary without masquerading as keyboard focus");
 
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::right,
-                                 Modifier::control}) &&
-                (*objects).focused_id() == "labels.wrap" &&
-                (*objects).selected_id() == "labels.long",
-            "modified keyboard navigation must move focus independently of stable selection");
-    ImageRecordingPainter keyboard_short;
+    const bool operation_check_30 = window.dispatch_key({KeyAction::down, PhysicalKey::right,
+                                 Modifier::control});
+    require(operation_check_30, "modified keyboard navigation must move focus independently of stable selection");
+    const bool operation_check_31 = (*objects).focused_id() == "labels.wrap";
+    require(operation_check_31, "modified keyboard navigation must move focus independently of stable selection");
+    const bool operation_check_32 = (*objects).selected_id() == "labels.long";
+    require(operation_check_32, "modified keyboard navigation must move focus independently of stable selection");
+    ImageRecordingPainter keyboard_short{};
     window.paint(keyboard_short, {0.0, 0.0, 190.0, 170.0});
     require(keyboard_short.lines.size() >= 40U &&
                 keyboard_short.strokes.size() == 3U,
             "selection boundary and dotted keyboard focus must remain visibly distinct on separate cells");
 
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::left,
-                                 Modifier::control}) &&
-                (*objects).focused_id() == "labels.long" &&
-                (*objects).selected_id() == "labels.long",
-            "keyboard fixture must return independent focus without rewriting selection");
+    const bool operation_check_33 = window.dispatch_key({KeyAction::down, PhysicalKey::left,
+                                 Modifier::control});
+    require(operation_check_33, "keyboard fixture must return independent focus without rewriting selection");
+    const bool operation_check_34 = (*objects).focused_id() == "labels.long";
+    require(operation_check_34, "keyboard fixture must return independent focus without rewriting selection");
+    const bool operation_check_35 = (*objects).selected_id() == "labels.long";
+    require(operation_check_35, "keyboard fixture must return independent focus without rewriting selection");
     static_cast<void>(window.dispatch_pointer(
         {PointerAction::move, PointerButton::none,
          semantic_center(*objects, "labels.wrap")}));
-    ImageRecordingPainter keyboard_long;
+    ImageRecordingPainter keyboard_long{};
     window.paint(keyboard_long, {0.0, 0.0, 190.0, 170.0});
-    std::string keyboard_inspected_name;
+    std::string keyboard_inspected_name{};
     for (std::size_t index = 4U; index < keyboard_long.texts.size(); ++index) {
         if (!keyboard_inspected_name.empty()) keyboard_inspected_name += ' ';
         keyboard_inspected_name += keyboard_long.texts[index];
@@ -480,7 +517,7 @@ void test_object_label_wrapping_focus_and_full_name_inspection() {
             "non-truncated hover must not suppress complete-name inspection for the keyboard-focused item");
 
     (*objects).set_view_mode(ObjectViewMode::details);
-    ImageRecordingPainter details;
+    ImageRecordingPainter details{};
     window.paint(details, {0.0, 0.0, 190.0, 170.0});
     require(!details.texts.empty() && details.texts.front().ends_with("…") &&
                 details.text_origins.front().x == 42.0,
@@ -502,7 +539,7 @@ void test_object_label_wrapping_focus_and_full_name_inspection() {
     });
     Window grapheme_window(grapheme_objects, {94.0, 90.0});
     grapheme_window.perform_layout();
-    ImageRecordingPainter graphemes;
+    ImageRecordingPainter graphemes{};
     grapheme_window.paint(graphemes, {0.0, 0.0, 94.0, 90.0});
     require(graphemes.texts.size() == 2U &&
                 graphemes.texts[0] == "Prefix" &&
@@ -517,7 +554,7 @@ void test_object_virtualization_view_preservation_and_input() {
             "ObjectView must retain secondary-text visibility policy");
     (*objects).set_show_secondary_text(true);
     (*objects).set_requested_bounds({0.0, 0.0, 420.0, 190.0});
-    std::vector<ObjectViewItem> model;
+    std::vector<ObjectViewItem> model{};
     model.reserve(1000U);
     for (std::size_t index = 0; index < 1000U; ++index) {
         model.push_back({"object." + std::to_string(index),
@@ -535,24 +572,28 @@ void test_object_virtualization_view_preservation_and_input() {
             "ObjectView must not allocate one retained control per logical item");
     require((*objects).semantic_virtual_children().size() <= 12U,
             "ObjectView semantic realization must remain bounded for 1000 items");
-    require(window.request_focus(objects), "ObjectView must accept retained focus");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::right}) &&
-                (*objects).selected_id() == "object.6",
-            "ObjectView Right must use deterministic spatial navigation");
-    require(window.dispatch_text({"quartz"}) &&
-                (*objects).selected_id() == "object.777",
-            "ObjectView type-to-select must reach an unrealized stable item");
+    const bool operation_check_36 = window.request_focus(objects);
+    require(operation_check_36, "ObjectView must accept retained focus");
+    const bool operation_check_37 = window.dispatch_key({KeyAction::down, PhysicalKey::right});
+    require(operation_check_37, "ObjectView Right must use deterministic spatial navigation");
+    const bool operation_check_38 = (*objects).selected_id() == "object.6";
+    require(operation_check_38, "ObjectView Right must use deterministic spatial navigation");
+    const bool operation_check_39 = window.dispatch_text({"quartz"});
+    require(operation_check_39, "ObjectView type-to-select must reach an unrealized stable item");
+    const bool operation_check_40 = (*objects).selected_id() == "object.777";
+    require(operation_check_40, "ObjectView type-to-select must reach an unrealized stable item");
     (*objects).set_view_mode(ObjectViewMode::details);
     require((*objects).selected_id() == "object.777" &&
                 (*objects).semantic_virtual_children().size() <= 8U,
             "ObjectView mode changes must preserve stable selection and bounded semantics");
 
-    std::string activated;
+    std::string activated{};
     SubscriptionToken activation = (*objects).item_activated().subscribe(
         test_support::RecordValue<std::string>(activated));
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
-                activated == "object.777",
-            "ObjectView Enter must activate the focused stable item");
+    const bool operation_check_41 = window.dispatch_key({KeyAction::down, PhysicalKey::enter});
+    require(operation_check_41, "ObjectView Enter must activate the focused stable item");
+    const bool operation_check_42 = activated == "object.777";
+    require(operation_check_42, "ObjectView Enter must activate the focused stable item");
     activated.clear();
     const std::vector<SemanticNode> visible = (*objects).semantic_virtual_children();
     const std::vector<SemanticNode>::const_iterator target = std::find_if(
@@ -566,19 +607,26 @@ void test_object_virtualization_view_preservation_and_input() {
             "ObjectView must map root-client drag coordinates to stable item identity");
     PointerEvent single_down{PointerAction::down, PointerButton::primary, center};
     PointerEvent single_up{PointerAction::up, PointerButton::primary, center};
-    require(window.dispatch_pointer(single_down) && window.dispatch_pointer(single_up) &&
-                activated.empty(),
-            "ObjectView single click must select without invoking the default action");
+    const bool operation_check_43 = window.dispatch_pointer(single_down);
+    require(operation_check_43, "ObjectView single click must select without invoking the default action");
+    const bool operation_check_44 = window.dispatch_pointer(single_up);
+    require(operation_check_44, "ObjectView single click must select without invoking the default action");
+    const bool operation_check_45 = activated.empty();
+    require(operation_check_45, "ObjectView single click must select without invoking the default action");
     PointerEvent double_down{PointerAction::down, PointerButton::primary, center};
     double_down.click_count = 2U;
     PointerEvent double_up{PointerAction::up, PointerButton::primary, center};
     double_up.click_count = 2U;
-    require(window.dispatch_pointer(double_down) && window.dispatch_pointer(double_up) &&
-                activated == "object.777",
-            "ObjectView native double click must invoke exactly one default action");
-    require((*objects).on_semantic_child_action("object.777", SemanticAction::select, {}) &&
-                (*objects).selected_id() == "object.777",
-            "ObjectView semantic selection must share the ordinary selection path");
+    const bool operation_check_46 = window.dispatch_pointer(double_down);
+    require(operation_check_46, "ObjectView native double click must invoke exactly one default action");
+    const bool operation_check_47 = window.dispatch_pointer(double_up);
+    require(operation_check_47, "ObjectView native double click must invoke exactly one default action");
+    const bool operation_check_48 = activated == "object.777";
+    require(operation_check_48, "ObjectView native double click must invoke exactly one default action");
+    const bool operation_check_49 = (*objects).on_semantic_child_action("object.777", SemanticAction::select, {});
+    require(operation_check_49, "ObjectView semantic selection must share the ordinary selection path");
+    const bool operation_check_50 = (*objects).selected_id() == "object.777";
+    require(operation_check_50, "ObjectView semantic selection must share the ordinary selection path");
 }
 
 Point semantic_center(const ObjectView& view, std::string_view stable_id) {
@@ -594,8 +642,10 @@ void pointer_click(Window& window, Point point, PointerButton button,
                    Modifier modifiers = Modifier::none) {
     PointerEvent down{PointerAction::down, button, point, {}, modifiers};
     PointerEvent up{PointerAction::up, button, point, {}, modifiers};
-    require(window.dispatch_pointer(down) && window.dispatch_pointer(up),
-            "collection pointer click must be retained and handled");
+    const bool operation_check_51 = window.dispatch_pointer(down);
+    require(operation_check_51, "collection pointer click must be retained and handled");
+    const bool operation_check_52 = window.dispatch_pointer(up);
+    require(operation_check_52, "collection pointer click must be retained and handled");
 }
 
 void require_selection(const ObjectView& view,
@@ -616,7 +666,7 @@ void test_object_multiselection_pointer_keyboard_and_semantics() {
     std::shared_ptr<gui_forms::ObjectView> objects = make_control<ObjectView>(StableId("objects.multi"));
     (*objects).set_requested_bounds({0.0, 0.0, 320.0, 270.0});
     (*objects).set_icon_cell_size({100.0, 80.0});
-    std::vector<ObjectViewItem> model;
+    std::vector<ObjectViewItem> model{};
     for (std::size_t index = 0; index < 8U; ++index) {
         model.push_back({"multi." + std::to_string(index),
                          "Item " + std::to_string(index), {}, {},
@@ -624,10 +674,10 @@ void test_object_multiselection_pointer_keyboard_and_semantics() {
     }
     (*objects).set_items(model);
     Window window(objects, {320.0, 270.0});
-    require(window.request_focus(objects),
-            "multi-selection collection must accept focus");
+    const bool operation_check_53 = window.request_focus(objects);
+    require(operation_check_53, "multi-selection collection must accept focus");
 
-    std::vector<ObjectSelectionChange> changes;
+    std::vector<ObjectSelectionChange> changes{};
     SubscriptionToken changed = (*objects).selection_changed().subscribe(
         test_support::PushBack<std::vector<ObjectSelectionChange>,
                                const ObjectSelectionChange&>(changes));
@@ -655,7 +705,7 @@ void test_object_multiselection_pointer_keyboard_and_semantics() {
                 (*objects).focused_id() == "multi.6",
             "range selection must preserve anchor and move independent focus");
 
-    std::string context_id;
+    std::string context_id{};
     SubscriptionToken context = (*objects).context_requested().subscribe(
         RecordObjectContextId(context_id));
     pointer_click(window, semantic_center(*objects, "multi.4"),
@@ -674,17 +724,18 @@ void test_object_multiselection_pointer_keyboard_and_semantics() {
                           SemanticAction::show_menu) != (*semantic_menu_node).actions.end(),
             "object rows must publish a distinct semantic Show Menu action");
     context_id.clear();
-    require((*objects).on_semantic_child_action(
-                "multi.4", SemanticAction::show_menu, {}) &&
-                context_id == "multi.4",
-            "semantic Show Menu must enter the same stable context-request path");
+    const bool operation_check_54 = (*objects).on_semantic_child_action(
+                "multi.4", SemanticAction::show_menu, {});
+    require(operation_check_54, "semantic Show Menu must enter the same stable context-request path");
+    const bool operation_check_55 = context_id == "multi.4";
+    require(operation_check_55, "semantic Show Menu must enter the same stable context-request path");
     pointer_click(window, semantic_center(*objects, "multi.0"),
                   PointerButton::secondary);
     require_selection(*objects, {"multi.0"},
                       "right click outside selection must select its context target");
 
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::a, Modifier::control}),
-            "Control+A must be consumed by the focused collection");
+    const bool operation_check_56 = window.dispatch_key({KeyAction::down, PhysicalKey::a, Modifier::control});
+    require(operation_check_56, "Control+A must be consumed by the focused collection");
     require((*objects).selected_ids().size() == 8U,
             "Select All must select every logical enabled item");
     const std::vector<SemanticNode> all_nodes = (*objects).semantic_virtual_children();
@@ -692,14 +743,16 @@ void test_object_multiselection_pointer_keyboard_and_semantics() {
                         semantic_node_is_selected),
             "every realized member of a multiselection must publish selected semantics");
 
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::right,
-                                 Modifier::control}) &&
-                (*objects).focused_id() == "multi.1" &&
-                (*objects).selected_ids().size() == 8U,
-            "Control+Arrow must move focus without mutating selection");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::space,
-                                 Modifier::control}),
-            "Control+Space must toggle the focused stable item");
+    const bool operation_check_57 = window.dispatch_key({KeyAction::down, PhysicalKey::right,
+                                 Modifier::control});
+    require(operation_check_57, "Control+Arrow must move focus without mutating selection");
+    const bool operation_check_58 = (*objects).focused_id() == "multi.1";
+    require(operation_check_58, "Control+Arrow must move focus without mutating selection");
+    const bool operation_check_59 = (*objects).selected_ids().size() == 8U;
+    require(operation_check_59, "Control+Arrow must move focus without mutating selection");
+    const bool operation_check_60 = window.dispatch_key({KeyAction::down, PhysicalKey::space,
+                                 Modifier::control});
+    require(operation_check_60, "Control+Space must toggle the focused stable item");
     require_selection(*objects,
                       {"multi.0", "multi.2", "multi.3", "multi.4",
                        "multi.5", "multi.6", "multi.7"},
@@ -730,16 +783,18 @@ void test_shared_command_binding() {
     CommandBinding status_binding(command, status);
     require((*ribbon).text() == "Icons  ▼" && (*status).text() == "Icons  ▼",
             "shared command must initialize every bound presentation");
-    std::string trace;
+    std::string trace{};
     SubscriptionToken invoked = (*command).invoked().subscribe(
         AppendCommandInvocation(trace));
-    require((*ribbon).perform_click() && (*status).perform_click(),
-            "enabled command presentations must accept public click execution");
+    const bool operation_check_61 = (*ribbon).perform_click();
+    require(operation_check_61, "enabled command presentations must accept public click execution");
+    const bool operation_check_62 = (*status).perform_click();
+    require(operation_check_62, "enabled command presentations must accept public click execution");
     require(trace == "view.mode@ribbon.view\nview.mode@status.view\n",
             "bound presentations must converge on one ordered command path");
     (*command).set_enabled(false);
-    require(!(*ribbon).perform_click(),
-            "disabled command presentation must reject public click execution");
+    const bool operation_check_63 = !(*ribbon).perform_click();
+    require(operation_check_63, "disabled command presentation must reject public click execution");
     require(!(*ribbon).enabled() && !(*status).enabled() &&
                 trace == "view.mode@ribbon.view\nview.mode@status.view\n",
             "disabled command state must synchronize and reject execution");
@@ -748,7 +803,7 @@ void test_shared_command_binding() {
     std::shared_ptr<gui_forms::Button> local_button = make_control<Button>(StableId("local.enabled.button"),
                                              "Local");
     (*local_button).set_enabled(false);
-    CommandBindingOptions local_options;
+    CommandBindingOptions local_options{};
     local_options.synchronize_enabled = false;
     CommandBinding local_binding(local_command, local_button, local_options);
     (*local_command).set_enabled(false);
@@ -765,7 +820,7 @@ void test_shared_command_binding() {
 }
 
 std::vector<CorrespondenceItem> correspondence_fixture(std::size_t count) {
-    std::vector<CorrespondenceItem> items;
+    std::vector<CorrespondenceItem> items{};
     items.reserve(count);
     for (std::size_t index = 0; index < count; ++index) {
         items.push_back({
@@ -858,27 +913,36 @@ void test_correspondence_keyboard_pin_semantics_and_activation() {
     (*records).set_selected_id("correspondence.10");
     (*records).set_pinned_id("correspondence.0");
     Window window(records, {820.0, 360.0});
-    require(window.request_focus(records) &&
-                (*records).focused_id() == "correspondence.10" &&
-                (*records).expanded("correspondence.10") &&
-                (*records).expanded("correspondence.0"),
-            "keyboard focus must expand independently from one persistent pin");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::down}) &&
-                (*records).focused_id() == "correspondence.11" &&
-                (*records).selected_id() == "correspondence.11" &&
-                (*records).expanded("correspondence.11"),
-            "Down must move stable focus/selection and expand the keyboard-active row");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::space}) &&
-                (*records).pinned_id() == "correspondence.11" &&
-                !(*records).expanded("correspondence.0"),
-            "Space must replace the sole persistent pin without losing focus");
+    const bool operation_check_64 = window.request_focus(records);
+    require(operation_check_64, "keyboard focus must expand independently from one persistent pin");
+    const bool operation_check_65 = (*records).focused_id() == "correspondence.10";
+    require(operation_check_65, "keyboard focus must expand independently from one persistent pin");
+    const bool operation_check_66 = (*records).expanded("correspondence.10");
+    require(operation_check_66, "keyboard focus must expand independently from one persistent pin");
+    const bool operation_check_67 = (*records).expanded("correspondence.0");
+    require(operation_check_67, "keyboard focus must expand independently from one persistent pin");
+    const bool operation_check_68 = window.dispatch_key({KeyAction::down, PhysicalKey::down});
+    require(operation_check_68, "Down must move stable focus/selection and expand the keyboard-active row");
+    const bool operation_check_69 = (*records).focused_id() == "correspondence.11";
+    require(operation_check_69, "Down must move stable focus/selection and expand the keyboard-active row");
+    const bool operation_check_70 = (*records).selected_id() == "correspondence.11";
+    require(operation_check_70, "Down must move stable focus/selection and expand the keyboard-active row");
+    const bool operation_check_71 = (*records).expanded("correspondence.11");
+    require(operation_check_71, "Down must move stable focus/selection and expand the keyboard-active row");
+    const bool operation_check_72 = window.dispatch_key({KeyAction::down, PhysicalKey::space});
+    require(operation_check_72, "Space must replace the sole persistent pin without losing focus");
+    const bool operation_check_73 = (*records).pinned_id() == "correspondence.11";
+    require(operation_check_73, "Space must replace the sole persistent pin without losing focus");
+    const bool operation_check_74 = !(*records).expanded("correspondence.0");
+    require(operation_check_74, "Space must replace the sole persistent pin without losing focus");
 
-    std::string activated;
+    std::string activated{};
     SubscriptionToken activation = (*records).item_activated().subscribe(
         test_support::RecordValue<std::string>(activated));
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
-                activated == "correspondence.11",
-            "Enter must activate rather than toggle the active correspondence pin");
+    const bool operation_check_75 = window.dispatch_key({KeyAction::down, PhysicalKey::enter});
+    require(operation_check_75, "Enter must activate rather than toggle the active correspondence pin");
+    const bool operation_check_76 = activated == "correspondence.11";
+    require(operation_check_76, "Enter must activate rather than toggle the active correspondence pin");
     const std::vector<SemanticNode> nodes = (*records).semantic_virtual_children();
     const std::vector<SemanticNode>::const_iterator active = std::find_if(
         nodes.begin(), nodes.end(),
@@ -893,15 +957,18 @@ void test_correspondence_keyboard_pin_semantics_and_activation() {
                 (*active).children[4].role == SemanticRole::group,
             "expanded virtual semantics must expose default action, factual metric, metadata, excerpt, and provider lanes");
     activated.clear();
-    require((*records).on_semantic_child_action(
-                "correspondence.11.activate", SemanticAction::press, {}) &&
-                activated == "correspondence.11",
-            "the explicit correspondence default-action child must share item activation");
-    require((*records).on_semantic_child_action(
-                "correspondence.12", SemanticAction::expand, {}) &&
-                (*records).pinned_id() == "correspondence.12" &&
-                (*records).expanded("correspondence.12"),
-            "semantic expansion must enter the same one-pin state path for unavailable evidence");
+    const bool operation_check_77 = (*records).on_semantic_child_action(
+                "correspondence.11.activate", SemanticAction::press, {});
+    require(operation_check_77, "the explicit correspondence default-action child must share item activation");
+    const bool operation_check_78 = activated == "correspondence.11";
+    require(operation_check_78, "the explicit correspondence default-action child must share item activation");
+    const bool operation_check_79 = (*records).on_semantic_child_action(
+                "correspondence.12", SemanticAction::expand, {});
+    require(operation_check_79, "semantic expansion must enter the same one-pin state path for unavailable evidence");
+    const bool operation_check_80 = (*records).pinned_id() == "correspondence.12";
+    require(operation_check_80, "semantic expansion must enter the same one-pin state path for unavailable evidence");
+    const bool operation_check_81 = (*records).expanded("correspondence.12");
+    require(operation_check_81, "semantic expansion must enter the same one-pin state path for unavailable evidence");
 }
 
 void test_correspondence_background_pointer_contract() {
@@ -913,32 +980,42 @@ void test_correspondence_background_pointer_contract() {
     Window window(records, {820.0, 360.0});
     window.perform_layout();
 
-    std::vector<ObjectContextRequest> requests;
+    std::vector<ObjectContextRequest> requests{};
     SubscriptionToken context = (*records).context_requested().subscribe(
-        [&requests](const ObjectContextRequest& request) {
-            requests.push_back(request);
-        });
+        test_support::PushBack<std::vector<ObjectContextRequest>, const ObjectContextRequest&>(requests));
     const Rect bounds = (*records).absolute_bounds();
     const Point background{bounds.x + bounds.width * .5,
                            bounds.y + bounds.height - 12.0};
-    require(window.dispatch_pointer(
-                {PointerAction::down, PointerButton::primary, background}) &&
-                window.dispatch_pointer(
-                    {PointerAction::up, PointerButton::primary, background}) &&
-                (*records).selected_id().empty() && requests.empty() &&
-                window.focused_control() == records,
-            "primary correspondence background click must focus the collection and clear selection without opening a menu");
+    const bool operation_check_82 = window.dispatch_pointer(
+                {PointerAction::down, PointerButton::primary, background});
+    require(operation_check_82, "primary correspondence background click must focus the collection and clear selection without opening a menu");
+    const bool operation_check_83 = window.dispatch_pointer(
+                    {PointerAction::up, PointerButton::primary, background});
+    require(operation_check_83, "primary correspondence background click must focus the collection and clear selection without opening a menu");
+    const bool operation_check_84 = (*records).selected_id().empty();
+    require(operation_check_84, "primary correspondence background click must focus the collection and clear selection without opening a menu");
+    const bool operation_check_85 = requests.empty();
+    require(operation_check_85, "primary correspondence background click must focus the collection and clear selection without opening a menu");
+    const bool operation_check_86 = window.focused_control() == records;
+    require(operation_check_86, "primary correspondence background click must focus the collection and clear selection without opening a menu");
 
     (*records).set_selected_id("correspondence.0");
-    require(window.dispatch_pointer(
-                {PointerAction::down, PointerButton::secondary, background}) &&
-                window.dispatch_pointer(
-                    {PointerAction::up, PointerButton::secondary, background}) &&
-                (*records).selected_id().empty() && requests.size() == 1U &&
-                requests.front().stable_id.empty() &&
-                requests.front().screen_position.x == background.x &&
-                requests.front().screen_position.y == background.y,
-            "secondary correspondence background click must clear selection and emit one exact empty-target context request");
+    const bool operation_check_87 = window.dispatch_pointer(
+                {PointerAction::down, PointerButton::secondary, background});
+    require(operation_check_87, "secondary correspondence background click must clear selection and emit one exact empty-target context request");
+    const bool operation_check_88 = window.dispatch_pointer(
+                    {PointerAction::up, PointerButton::secondary, background});
+    require(operation_check_88, "secondary correspondence background click must clear selection and emit one exact empty-target context request");
+    const bool operation_check_89 = (*records).selected_id().empty();
+    require(operation_check_89, "secondary correspondence background click must clear selection and emit one exact empty-target context request");
+    const bool operation_check_90 = requests.size() == 1U;
+    require(operation_check_90, "secondary correspondence background click must clear selection and emit one exact empty-target context request");
+    const bool operation_check_91 = requests.front().stable_id.empty();
+    require(operation_check_91, "secondary correspondence background click must clear selection and emit one exact empty-target context request");
+    const bool operation_check_92 = requests.front().screen_position.x == background.x;
+    require(operation_check_92, "secondary correspondence background click must clear selection and emit one exact empty-target context request");
+    const bool operation_check_93 = requests.front().screen_position.y == background.y;
+    require(operation_check_93, "secondary correspondence background click must clear selection and emit one exact empty-target context request");
 }
 
 } // namespace

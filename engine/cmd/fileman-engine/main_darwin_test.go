@@ -16,51 +16,83 @@ import (
 )
 
 func TestChangedInstalledExclusionsReconcileBeforeServingRecoveredGeneration(t *testing.T) {
-	container := t.TempDir()
-	source := filepath.Join(container, "source")
-	store := filepath.Join(container, "store")
-	runtimeDir := filepath.Join(container, "runtime")
-	if err := os.MkdirAll(filepath.Join(source, "private"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	for _, path := range []string{store, runtimeDir} {
-		if err := os.Mkdir(path, 0o700); err != nil {
+	var container string = t.TempDir()
+	var source string = filepath.Join(container, "source")
+	var store string = filepath.Join(container, "store")
+	var runtimeDir string = filepath.Join(container, "runtime")
+	{
+		var err error = nil
+		err = os.MkdirAll(filepath.Join(source, "private"), 0o700)
+		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(source, "private", "secret.txt"), []byte("fixture"), 0o600); err != nil {
-		t.Fatal(err)
+	{
+		var path string = ""
+		for _, path = range []string{store, runtimeDir} {
+			{
+				var err error = nil
+				err = os.Mkdir(path, 0o700)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
 	}
-	canonicalSource, err := filepath.EvalSymlinks(source)
+	{
+		var err error = nil
+		err = os.WriteFile(filepath.Join(source, "private", "secret.txt"), []byte("fixture"), 0o600)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	var canonicalSource string = ""
+	var err error = nil
+	canonicalSource, err = filepath.EvalSymlinks(source)
 	if err != nil {
 		t.Fatal(err)
 	}
-	objectID, err := deployment.RootObjectID(canonicalSource)
+	var objectID string = ""
+	objectID, err = deployment.RootObjectID(canonicalSource)
 	if err != nil {
 		t.Fatal(err)
 	}
-	manifest := deployment.Manifest{
+	var manifest deployment.Manifest = deployment.Manifest{
 		Schema: deployment.ManifestSchema, SchemaMajor: deployment.ManifestMajor,
 		DeploymentID: "test-installed", HostUUID: "TEST", UID: os.Getuid(),
 		StoreRoot: store, RuntimeDir: runtimeDir,
 		Roots: []deployment.Root{{ID: "docs", Path: canonicalSource, ObjectID: objectID}},
 	}
-	guard, err := sandbox.NewApproved("test-installed", []sandbox.ApprovedRoot{{ID: "docs", Path: canonicalSource, ObjectID: objectID}})
+	var guard *sandbox.Guard = nil
+	guard, err = sandbox.NewApproved("test-installed", []sandbox.ApprovedRoot{{ID: "docs", Path: canonicalSource, ObjectID: objectID}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	first, err := service.NewPersistent(guard, store)
+	var first *service.Service = nil
+	first, err = service.NewPersistent(guard, store)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := first.ApplyRoots(context.Background(), manifest.RootSpecs()); err != nil {
-		t.Fatal(err)
+	{
+		var err error = nil
+		_, err = first.ApplyRoots(context.Background(), manifest.RootSpecs())
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := ensureManifestAdmission(context.Background(), first, manifest); err != nil {
-		t.Fatal(err)
+	{
+		var err error = nil
+		err = ensureManifestAdmission(context.Background(), first, manifest)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := first.Close(); err != nil {
-		t.Fatal(err)
+	{
+		var err error = nil
+		err = first.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	manifest.Roots[0].Exclusions = []string{"private"}
@@ -68,29 +100,41 @@ func TestChangedInstalledExclusionsReconcileBeforeServingRecoveredGeneration(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := service.NewPersistent(guard, store)
+	var second *service.Service = nil
+	second, err = service.NewPersistent(guard, store)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer second.Close()
-	if _, err := second.ApplyRoots(context.Background(), manifest.RootSpecs()); err != nil {
-		t.Fatal(err)
+	{
+		var err error = nil
+		_, err = second.ApplyRoots(context.Background(), manifest.RootSpecs())
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
-	before, err := second.Status(context.Background())
+	var before api.Status = api.Status{}
+	before, err = second.Status(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureManifestAdmission(context.Background(), second, manifest); err != nil {
-		t.Fatal(err)
+	{
+		var err error = nil
+		err = ensureManifestAdmission(context.Background(), second, manifest)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
-	after, err := second.Status(context.Background())
+	var after api.Status = api.Status{}
+	after, err = second.Status(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if after.Generation <= before.Generation {
 		t.Fatalf("changed exclusion did not replace recovered generation: before=%d after=%d", before.Generation, after.Generation)
 	}
-	response, err := second.Query(context.Background(), api.Query{
+	var response api.QueryResponse = api.QueryResponse{}
+	response, err = second.Query(context.Background(), api.Query{
 		Scope: api.Scope{Root: "docs", Descendants: true}, Filters: map[string]string{"name": "secret.txt"}, Limit: 10,
 	})
 	if err != nil {
@@ -102,19 +146,24 @@ func TestChangedInstalledExclusionsReconcileBeforeServingRecoveredGeneration(t *
 }
 
 func TestManifestAdmissionCommitterAdvancesSuccessfulReconciliation(t *testing.T) {
-	storeRoot := t.TempDir()
-	manifest := deployment.Manifest{
+	var storeRoot string = t.TempDir()
+	var manifest deployment.Manifest = deployment.Manifest{
 		Schema: deployment.ManifestSchema, SchemaMajor: deployment.ManifestMajor,
 		DeploymentID: "test-installed", HostUUID: "host", UID: os.Getuid(), StoreRoot: storeRoot,
 	}
-	commit := manifestAdmissionCommitter(manifest)
-	if err := commit(
-		transport.Request{Method: "engine.scan_reconcile"},
-		transport.Response{Result: api.ReconcileReport{Generation: 7}},
-	); err != nil {
-		t.Fatal(err)
+	var commit func(transport.Request, transport.Response) error = manifestAdmissionCommitter(manifest)
+	{
+		var err error = nil
+		if err = commit(
+			transport.Request{Method: "engine.scan_reconcile"},
+			transport.Response{Result: api.ReconcileReport{Generation: 7}},
+		); err != nil {
+			t.Fatal(err)
+		}
 	}
-	matches, err := deployment.AdmissionMatches(storeRoot, manifest.AdmissionDigest(), 7)
+	var matches bool = false
+	var err error = nil
+	matches, err = deployment.AdmissionMatches(storeRoot, manifest.AdmissionDigest(), 7)
 	if err != nil || !matches {
 		t.Fatalf("admission match=%t err=%v", matches, err)
 	}

@@ -8,7 +8,9 @@ import (
 )
 
 func TestInstalledProfileRejectsUnsupportedHost(t *testing.T) {
-	host, err := CurrentHost()
+	var host Host = Host{}
+	var err error = nil
+	host, err = CurrentHost()
 	if err == nil || !strings.Contains(err.Error(), "supported only on macOS") {
 		t.Fatalf("unsupported installed profile returned host=%+v error=%v", host, err)
 	}

@@ -30,7 +30,8 @@ std::uint64_t menu_virtual_runtime_id(std::string_view id) noexcept {
         hash ^= byte;
         hash *= 1099511628211ULL;
     }
-    return hash | (1ULL << 63U);
+    const std::uint64_t result = hash | (1ULL << 63U);
+    return result;
 }
 
 } // namespace
@@ -42,6 +43,8 @@ MenuStrip::MenuStrip(StableId stable_id)
     set_focusable(true);
     set_cursor(CursorKind::arrow);
     set_paint_plane(PaintPlane::control);
+    // This owner retains the popup and subscriptions. Bound handlers borrow
+    // this MenuStrip; disposal closes the popup before owner teardown.
     (*popup_).set_root_navigation_handler(
         detail::BoundMemberFunction<bool (MenuStrip::*)(int)>(
             *this, &MenuStrip::navigate_root));
@@ -79,24 +82,29 @@ MenuStrip::~MenuStrip() {
 
 void MenuStrip::set_items(std::vector<MenuStripItemSpec> items) {
     require_mutable();
-    std::unordered_set<std::string> identities;
+    std::unordered_set<std::string> identities{};
     for (const gui_forms::MenuStripItemSpec& item : items) {
+        const std::pair<std::unordered_set<std::string>::iterator, bool> insertion =
+            identities.insert(item.stable_id);
         if (item.stable_id.empty() || !validate_utf8(item.stable_id).valid() ||
             item.text.empty() || !validate_utf8(item.text).valid() ||
-            item.items.empty() || !identities.insert(item.stable_id).second) {
+            item.items.empty() || !insertion.second) {
             throw std::invalid_argument(
                 "MenuStrip items require unique IDs, text, and menu contents");
         }
-        std::unordered_set<std::string> child_identities;
+        std::unordered_set<std::string> child_identities{};
         std::size_t count{};
         validate_specs(item.items, child_identities, 1U, count);
     }
     close();
     items_ = std::move(items);
-    const bool selection_retained = std::any_of(
-        items_.begin(), items_.end(), [this](const MenuStripItemSpec& item) {
-            return item.stable_id == selected_item_id_ && item.visible;
-        });
+    bool selection_retained = false;
+    for (const MenuStripItemSpec& item : items_) {
+        if (item.stable_id == selected_item_id_ && item.visible) {
+            selection_retained = true;
+            break;
+        }
+    }
     if (!selection_retained) selected_item_id_.clear();
     hot_index_.reset();
     invalidate(Dirty::measure | Dirty::paint | Dirty::hit_test | Dirty::semantics);
@@ -105,11 +113,14 @@ void MenuStrip::set_items(std::vector<MenuStripItemSpec> items) {
 void MenuStrip::set_selected_item_id(std::string_view stable_id) {
     require_mutable();
     if (!stable_id.empty()) {
-        const auto found = std::find_if(
-            items_.begin(), items_.end(), [stable_id](const MenuStripItemSpec& item) {
-                return item.stable_id == stable_id;
-            });
-        if (found == items_.end() || !found->visible) {
+        bool visible = false;
+        for (const MenuStripItemSpec& item : items_) {
+            if (item.stable_id == stable_id) {
+                visible = item.visible;
+                break;
+            }
+        }
+        if (!visible) {
             throw std::out_of_range(
                 "MenuStrip selected item must identify a visible top-level item");
         }
@@ -178,19 +189,25 @@ void MenuStrip::close() noexcept {
 }
 
 bool MenuStrip::is_open() const noexcept {
-    return popup_ && (*popup_).is_open();
+    const bool result = popup_ && (*popup_).is_open();
+    return result;
 }
 
 Size MenuStrip::measure(Size available) {
-    return {available.width, std::min(available.height, preferred_height())};
+    const double preferred = preferred_height();
+    const double height = std::min(available.height, preferred);
+    const Size result{.width = available.width, .height = height};
+    return result;
 }
 
 double MenuStrip::preferred_height() const {
     FontSpec font = effective_font(font_);
     font.weight = std::max<std::uint16_t>(font.weight, 700U);
-    const double text_height = resolve_text_layout_utf8("Mg", font).logical_size.height;
-    return std::max(menu_strip_height * effective_text_scale(),
-                    text_height + 10.0 * effective_text_scale());
+    const ResolvedTextLayout metrics = resolve_text_layout_utf8("Mg", font);
+    const double text_scale = effective_text_scale();
+    const double result = std::max(menu_strip_height * text_scale,
+                    metrics.logical_size.height + 10.0 * text_scale);
+    return result;
 }
 
 std::vector<Rect> MenuStrip::item_bounds() const {
@@ -205,9 +222,9 @@ std::vector<Rect> MenuStrip::item_bounds() const {
         if (!items_[index].visible) continue;
         const std::string display = use_mnemonic_
             ? menu_display_text(items_[index].text) : items_[index].text;
-        const double text_width = std::max(
-            resolve_text_layout_utf8(display, normal_font).logical_size.width,
-            resolve_text_layout_utf8(display, selected_font).logical_size.width);
+        const ResolvedTextLayout normal = resolve_text_layout_utf8(display, normal_font);
+        const ResolvedTextLayout selected = resolve_text_layout_utf8(display, selected_font);
+        const double text_width = std::max(normal.logical_size.width, selected.logical_size.width);
         const double width = std::max(42.0 * scale,
             item_padding_ * 2.0 * scale + text_width);
         result[index] = {x, 0.0, width, height};
@@ -244,7 +261,9 @@ std::optional<std::size_t> MenuStrip::next_enabled(
 bool MenuStrip::navigate_root(int direction) {
     if (!active_index_) return false;
     const std::optional<std::size_t> next = next_enabled(*active_index_, direction);
-    return next && open(*next);
+    if (!next) return false;
+    const bool opened = open(*next);
+    return opened;
 }
 
 bool MenuStrip::handle_popup_pointer(const PointerEvent& event) {
@@ -254,7 +273,8 @@ bool MenuStrip::handle_popup_pointer(const PointerEvent& event) {
     if (!index || !items_[*index].enabled) return false;
     set_hot(index);
     if (event.action == PointerAction::move && active_index_ != index) {
-        return open(*index);
+        const bool opened = open(*index);
+        return opened;
     }
     if (event.action == PointerAction::down) {
         if (active_index_ == index) close();
@@ -395,7 +415,7 @@ void MenuStrip::on_focus_changed(bool focused) {
 }
 
 SemanticDescriptor MenuStrip::semantic_descriptor() const {
-    SemanticDescriptor descriptor;
+    SemanticDescriptor descriptor{};
     descriptor.role = SemanticRole::menu_bar;
     descriptor.name = accessible_name().empty() ? "Application menu" : accessible_name();
     descriptor.description = accessible_description();
@@ -405,12 +425,13 @@ SemanticDescriptor MenuStrip::semantic_descriptor() const {
 }
 
 std::vector<SemanticNode> MenuStrip::semantic_virtual_children() const {
-    std::vector<SemanticNode> nodes;
+    std::vector<SemanticNode> nodes{};
+    nodes.reserve(items_.size());
     const Rect absolute = absolute_bounds();
     const std::vector<Rect> bounds = item_bounds();
     for (std::size_t index = 0; index < items_.size(); ++index) {
         if (!items_[index].visible) continue;
-        SemanticNode node;
+        SemanticNode node{};
         node.stable_id = items_[index].stable_id;
         node.runtime_id = menu_virtual_runtime_id(node.stable_id);
         node.role = SemanticRole::menu_bar_item;
@@ -453,7 +474,10 @@ bool MenuStrip::on_semantic_child_action(std::string_view id,
         action != SemanticAction::expand) return false;
     if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));
     set_hot(index);
-    if (action != SemanticAction::focus) return open(index);
+    if (action != SemanticAction::focus) {
+        const bool opened = open(index);
+        return opened;
+    }
     return true;
 }
 
@@ -468,7 +492,7 @@ bool MenuStrip::mnemonic_matches(char32_t character) const noexcept {
 
 bool MenuStrip::process_mnemonic_self(char32_t character) {
     if (!mnemonic_matches(character)) return false;
-    std::vector<std::size_t> matches;
+    std::vector<std::size_t> matches{};
     for (std::size_t index = 0U; index < items_.size(); ++index) {
         if (items_[index].visible && items_[index].enabled &&
             is_mnemonic(character, items_[index].text)) {
@@ -493,7 +517,8 @@ bool MenuStrip::process_mnemonic_self(char32_t character) {
         return true;
     }
     set_hot(selected);
-    return open(selected);
+    const bool opened = open(selected);
+    return opened;
 }
 
 void MenuStrip::on_dispose() noexcept {

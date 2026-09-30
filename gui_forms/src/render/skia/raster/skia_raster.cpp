@@ -293,25 +293,31 @@ SkiaRaster::~SkiaRaster() = default;
 bool SkiaRaster::register_typeface(FontRole role, std::uint16_t weight,
                                    bool italic, std::span<const std::byte> encoded) {
     if (encoded.empty() || encoded.size() > 64U * 1024U * 1024U) return false;
-    return (*impl_).register_font_data(role, weight, italic,
-        SkData::MakeWithCopy(encoded.data(), encoded.size()));
+    sk_sp<SkData> data = SkData::MakeWithCopy(encoded.data(), encoded.size());
+    const bool registered = (*impl_).register_font_data(role, weight, italic, std::move(data));
+    return registered;
 }
 
 bool SkiaRaster::register_fallback_typeface(
     std::uint16_t weight, bool italic, std::span<const std::byte> encoded) {
     if (encoded.empty() || encoded.size() > 64U * 1024U * 1024U) return false;
-    return (*impl_).register_font_data(std::nullopt, weight, italic,
-        SkData::MakeWithCopy(encoded.data(), encoded.size()));
+    sk_sp<SkData> data = SkData::MakeWithCopy(encoded.data(), encoded.size());
+    const bool registered = (*impl_).register_font_data(std::nullopt, weight, italic, std::move(data));
+    return registered;
 }
 
 bool SkiaRaster::register_typeface_file(FontRole role, std::uint16_t weight,
                                         bool italic, const char* path) {
-    return (*impl_).register_font_data(role, weight, italic, SkData::MakeFromFileName(path));
+    sk_sp<SkData> data = SkData::MakeFromFileName(path);
+    const bool registered = (*impl_).register_font_data(role, weight, italic, std::move(data));
+    return registered;
 }
 
 bool SkiaRaster::register_fallback_typeface_file(
     std::uint16_t weight, bool italic, const char* path) {
-    return (*impl_).register_font_data(std::nullopt, weight, italic, SkData::MakeFromFileName(path));
+    sk_sp<SkData> data = SkData::MakeFromFileName(path);
+    const bool registered = (*impl_).register_font_data(std::nullopt, weight, italic, std::move(data));
+    return registered;
 }
 
 bool SkiaRaster::resize(Size logical_size, double scale) {

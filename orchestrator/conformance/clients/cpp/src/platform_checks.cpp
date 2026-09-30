@@ -5,15 +5,15 @@
 
 int main() {
     namespace orc = fileman::orchestrator;
-    orc::SettingsSnapshotInfo settings;
+    orc::SettingsSnapshotInfo settings{};
     settings.values.push_back({"navigation.show_hidden", true});
     if (settings.find("navigation.show_hidden") != &settings.values.front().value ||
         settings.find("missing") != nullptr) {
         std::cerr << "settings snapshot lookup failed\n";
         return 1;
     }
-    orc::ServicesSnapshotInfo services;
-    orc::ServiceInfo service;
+    orc::ServicesSnapshotInfo services{};
+    orc::ServiceInfo service{};
     service.id = "engine";
     services.services.push_back(service);
     if (services.find("engine") != &services.services.front() ||

@@ -8,6 +8,16 @@
 #include <utility>
 
 namespace gui_forms {
+namespace {
+struct EstimatedWidth final {
+    FontSpec font{};
+
+    [[nodiscard]] double operator()(std::string_view candidate) const noexcept {
+        const double width = estimated_text_width(candidate, font);
+        return width;
+    }
+};
+}
 
 std::shared_ptr<const PropertyEnumDescriptor> picture_box_size_mode_enum() {
     static const std::shared_ptr<const gui_forms::PropertyEnumDescriptor> value = std::make_shared<const PropertyEnumDescriptor>(
@@ -39,7 +49,8 @@ double estimated_text_width(std::string_view text, FontSpec font) noexcept {
             ++scalars;
         }
     }
-    return static_cast<double>(scalars) * font.size * 0.56;
+    const double width = static_cast<double>(scalars) * font.size * 0.56;
+    return width;
 }
 
 bool valid_content_alignment(ContentAlignment alignment) noexcept {
@@ -105,17 +116,16 @@ Rect aligned_rect(Rect bounds, Size size,
 
 std::vector<std::string> label_lines(std::string_view text, FontSpec font,
                                      double width, TextWrapping wrapping) {
-    return label_lines(
-        text, font, width, wrapping,
-        [font](std::string_view candidate) {
-            return estimated_text_width(candidate, font);
-        });
+    const TextWidthResolver resolve_width{EstimatedWidth{font}};
+    std::vector<std::string> lines = label_lines(text, font, width, wrapping, resolve_width);
+    return lines;
 }
 
 std::vector<std::string> label_lines(
     std::string_view text, FontSpec font, double width, TextWrapping wrapping,
     const TextWidthResolver& resolve_width) {
-    std::vector<std::string> lines;
+    std::vector<std::string> lines{};
+    const bool wrap_paragraphs = wrapping != TextWrapping::no_wrap && !(width <= 4.0);
     std::size_t paragraph_start{};
     while (paragraph_start <= text.size()) {
         const std::size_t newline = text.find('\n', paragraph_start);
@@ -123,10 +133,13 @@ std::vector<std::string> label_lines(
             ? text.size() : newline;
         const std::string_view paragraph =
             text.substr(paragraph_start, paragraph_end - paragraph_start);
-        if (wrapping == TextWrapping::no_wrap || width <= 4.0 || paragraph.empty()) {
+        if (!wrap_paragraphs || paragraph.empty()) {
             lines.emplace_back(paragraph);
         } else {
-            std::string line;
+            // Build and measure in reusable line storage. Its capacity grows
+            // only for a larger candidate, not for whitespace or paragraph size.
+            // Published lines own just their live text rather than this scratch.
+            std::string line{};
             std::size_t cursor{};
             while (cursor < paragraph.size()) {
                 while (cursor < paragraph.size() &&
@@ -148,34 +161,36 @@ std::vector<std::string> label_lines(
                 if (resolve_width(word) > width) {
                     const TextStore store(word);
                     if (!line.empty()) { line.push_back(' '); }
-                    for (std::size_t index = 0; index < store.grapheme_count().value(); ++index) {
+                    const std::size_t graphemes = store.grapheme_count().value();
+                    for (std::size_t index = 0; index < graphemes; ++index) {
                         const Utf8Range range = store.grapheme_range(GraphemeIndex(index));
                         const std::string_view cluster = word.substr(range.start.value(), range.end.value() - range.start.value());
-                        const std::string joined = line + std::string(cluster);
-                        if (!line.empty() && resolve_width(joined) > width) {
-                            if (line.back() == ' ') { line.pop_back(); }
-                            lines.push_back(std::move(line)); line.clear();
-                        }
+                        const std::size_t previous_length = line.size();
                         line.append(cluster);
+                        if (previous_length != 0U && resolve_width(line) > width) {
+                            line.resize(previous_length);
+                            if (line.back() == ' ') { line.pop_back(); }
+                            lines.push_back(line);
+                            line.assign(cluster);
+                        }
                     }
                     cursor = word_end;
                     continue;
                 }
-                std::string candidate = line;
-                if (!candidate.empty()) {
-                    candidate.push_back(' ');
+                const std::size_t previous_length = line.size();
+                if (previous_length != 0U) {
+                    line.push_back(' ');
                 }
-                candidate.append(word);
-                if (!line.empty() && resolve_width(candidate) > width) {
-                    lines.push_back(std::move(line));
+                line.append(word);
+                if (previous_length != 0U && resolve_width(line) > width) {
+                    line.resize(previous_length);
+                    lines.push_back(line);
                     line.assign(word);
-                } else {
-                    line = std::move(candidate);
                 }
                 cursor = word_end;
             }
             if (!line.empty()) {
-                lines.push_back(std::move(line));
+                lines.push_back(line);
             } else if (paragraph.empty()) {
                 lines.emplace_back();
             }

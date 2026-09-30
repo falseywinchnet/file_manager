@@ -188,7 +188,12 @@ void tiled_updates_include_sampling_gutters_and_recover_resources() {
     std::vector<ImageId> ids = window.image_resources().image_ids();
     CHECK(ids.size() == 9);
     std::vector<std::uint64_t> revisions;
-    for (const ImageId id : ids) revisions.push_back(window.image_resources().find(id)->content_hash);
+    revisions.reserve(ids.size());
+    for (const ImageId id : ids) {
+        const std::optional<ImageResourceView> resource = window.image_resources().find(id);
+        CHECK(resource.has_value());
+        revisions.push_back((*resource).content_hash);
+    }
     (*bitmap).set_pixel(511, 511, gui_drawing::Color::from_name("red"));
     CHECK((*canvas).synchronize_bitmap());
     ids = window.image_resources().image_ids();
@@ -204,8 +209,11 @@ void tiled_updates_include_sampling_gutters_and_recover_resources() {
     CHECK((*canvas).synchronize_bitmap());
     changed = 0;
     ids = window.image_resources().image_ids();
-    for (std::size_t index = 0; index < ids.size(); ++index)
-        if (window.image_resources().find(ids[index])->content_hash != revisions[index]) ++changed;
+    for (std::size_t index = 0; index < ids.size(); ++index) {
+        const std::optional<ImageResourceView> resource = window.image_resources().find(ids[index]);
+        CHECK(resource.has_value());
+        if ((*resource).content_hash != revisions[index]) ++changed;
+    }
     CHECK(changed == 1);
     CHECK(window.remove_image(ids[3]));
     CHECK((*canvas).synchronize_bitmap()); // No additional document mutation is needed.
@@ -245,7 +253,12 @@ void hundred_megapixel_publication_probe() {
     std::vector<ImageId> ids = window.image_resources().image_ids();
     CHECK(ids.size() == 400);
     std::vector<std::uint64_t> revisions;
-    for (const ImageId id : ids) revisions.push_back(window.image_resources().find(id)->content_hash);
+    revisions.reserve(ids.size());
+    for (const ImageId id : ids) {
+        const std::optional<ImageResourceView> resource = window.image_resources().find(id);
+        CHECK(resource.has_value());
+        revisions.push_back((*resource).content_hash);
+    }
     (*bitmap).set_pixel(333, 333, gui_drawing::Color::from_name("red"));
     CHECK((*canvas).synchronize_bitmap());
     const std::chrono::steady_clock::time_point updated = std::chrono::steady_clock::now();

@@ -226,9 +226,10 @@ void test_shared_cjk_and_emoji_fallback_across_roles() {
         read_file(GUI_FORMS_TEST_NOTO_CJK_REGULAR);
     const std::vector<std::byte> noto_emoji =
         read_file(GUI_FORMS_TEST_NOTO_EMOJI);
-    require(engine.register_typeface(FontRole::control, 400, false, rapids) &&
-                engine.register_typeface(FontRole::content, 400, false, carlito) &&
-                engine.register_typeface(FontRole::monospace, 400, false, cousine),
+    const std::optional<FontFaceId> control = engine.register_typeface(FontRole::control, 400, false, rapids);
+    const std::optional<FontFaceId> content = engine.register_typeface(FontRole::content, 400, false, carlito);
+    const std::optional<FontFaceId> monospace = engine.register_typeface(FontRole::monospace, 400, false, cousine);
+    require(control && content && monospace,
             "each public font role must have an explicit primary face");
     const std::optional<FontFaceId> cjk = engine.register_fallback_typeface(
         400, false, noto_cjk);
@@ -300,8 +301,9 @@ void test_letter_spacing_is_a_shaped_layout_input() {
 void test_rejection_and_missing_role_are_honest() {
     HarfBuzzFontEngine engine;
     const std::vector<std::byte> invalid(64U, std::byte{0x7f});
-    require(!engine.register_typeface(FontRole::content, 400, false, {}) &&
-                !engine.register_typeface(FontRole::content, 400, false, invalid) &&
+    const std::optional<FontFaceId> empty_face = engine.register_typeface(FontRole::content, 400, false, {});
+    const std::optional<FontFaceId> invalid_face = engine.register_typeface(FontRole::content, 400, false, invalid);
+    require(!empty_face && !invalid_face &&
                 engine.face_count() == 0U,
             "empty and malformed font data must be rejected without partial state");
     const ShapedText missing = engine.shape(
@@ -323,28 +325,29 @@ void test_public_resolution_record_names_actual_bundled_runs() {
         read_file(GUI_FORMS_TEST_NOTO_CJK_REGULAR);
     const std::vector<std::byte> noto_emoji =
         read_file(GUI_FORMS_TEST_NOTO_EMOJI);
-    require(engine.register_typeface(FontRole::control, 400, false, rapids) &&
-                engine.register_typeface(FontRole::content, 400, false, carlito) &&
-                engine.register_typeface(FontRole::monospace, 400, false, cousine) &&
-                engine.register_fallback_typeface(400, false, noto_cjk) &&
-                engine.register_fallback_typeface(400, false, noto_emoji),
+    const std::optional<FontFaceId> control = engine.register_typeface(FontRole::control, 400, false, rapids);
+    const std::optional<FontFaceId> content = engine.register_typeface(FontRole::content, 400, false, carlito);
+    const std::optional<FontFaceId> monospace = engine.register_typeface(FontRole::monospace, 400, false, cousine);
+    const std::optional<FontFaceId> cjk = engine.register_fallback_typeface(400, false, noto_cjk);
+    const std::optional<FontFaceId> emoji = engine.register_fallback_typeface(400, false, noto_emoji);
+    require(control && content && monospace && cjk && emoji,
             "resolution-record fixture pack must register completely");
 
     const std::string sample = "Report 日本語 · launch 🚀";
     const ResolvedTextLayout resolved = engine.resolve(
         sample, {FontRole::content, 12.0, 400, false});
+    bool cjk_fallback = false;
+    bool emoji_fallback = false;
+    for (const ResolvedFontRun& run : resolved.runs) {
+        if (!run.fallback) continue;
+        if (run.family == "Noto Sans CJK JP") cjk_fallback = true;
+        if (run.family == "Noto Emoji") emoji_fallback = true;
+    }
     require(resolved.status == TextResolutionStatus::exact &&
                 resolved.primary_family == "Carlito" &&
                 resolved.logical_size.width > 0.0 && resolved.ascent > 0.0 &&
                 resolved.descent >= 0.0 && resolved.missing_clusters == 0U &&
-                std::any_of(resolved.runs.begin(), resolved.runs.end(),
-                    [](const ResolvedFontRun& run) {
-                        return run.family == "Noto Sans CJK JP" && run.fallback;
-                    }) &&
-                std::any_of(resolved.runs.begin(), resolved.runs.end(),
-                    [](const ResolvedFontRun& run) {
-                        return run.family == "Noto Emoji" && run.fallback;
-                    }),
+                cjk_fallback && emoji_fallback,
             "resolution record must name only faces selected by actual shaped runs");
     std::cout << std::fixed << std::setprecision(3)
               << "resolution corpus bytes=" << sample.size()

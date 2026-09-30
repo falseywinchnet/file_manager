@@ -23,21 +23,22 @@ struct ShapedGlyph final {
     float advance_y{};
     friend constexpr bool operator==(const ShapedGlyph& left,
                                      const ShapedGlyph& right) noexcept {
-        return left.glyph == right.glyph && left.cluster == right.cluster &&
+        const bool equal = left.glyph == right.glyph && left.cluster == right.cluster &&
                left.x == right.x && left.y == right.y &&
                left.advance_x == right.advance_x &&
                left.advance_y == right.advance_y;
+        return equal;
     }
 };
 
 struct ShapedFontRun final {
     FontFaceId face{};
     Utf8Range source_range{};
-    std::vector<ShapedGlyph> glyphs;
+    std::vector<ShapedGlyph> glyphs{};
 };
 
 struct ShapedText final {
-    std::vector<ShapedFontRun> runs;
+    std::vector<ShapedFontRun> runs{};
     double width{};
     double height{};
     double ascent{};

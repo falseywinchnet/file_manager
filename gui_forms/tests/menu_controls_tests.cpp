@@ -31,9 +31,28 @@ const SemanticNode* find_semantic(const std::vector<SemanticNode>& nodes,
 }
 
 bool has_action(const SemanticNode& node, const SemanticAction action) {
-    return std::find(node.actions.begin(), node.actions.end(), action) !=
-           node.actions.end();
+    const std::vector<SemanticAction>::const_iterator found =
+        std::find(node.actions.begin(), node.actions.end(), action);
+    const bool present = found != node.actions.end();
+    return present;
 }
+
+// The subscription ends before the borrowed Window. Root owns the target;
+// an expired destination causes no focus request.
+class FocusDestination final {
+public:
+    FocusDestination(Window& window, const Control::Ptr& destination)
+        : window_(window), destination_(destination) {}
+    void operator()(const CommandInvocation&) const {
+        const Control::Ptr target = destination_.lock();
+        if (!target) return;
+        const bool focused = window_.request_focus(target);
+        static_cast<void>(focused);
+    }
+private:
+    Window& window_;
+    std::weak_ptr<Control> destination_{};
+};
 
 class RecordCommandIdAndSource final {
 public:
@@ -82,7 +101,8 @@ void test_context_menu_command_snapshot_keyboard_nesting_and_restore() {
     (*root).add_child(owner);
     (*root).set_cell_position(*owner, {0U, 0U});
     Window window(root, {400.0, 300.0});
-    require(window.request_focus(owner), "menu invoker must accept initial focus");
+    const bool operation_check_1 = window.request_focus(owner);
+    require(operation_check_1, "menu invoker must accept initial focus");
 
     std::shared_ptr<gui_forms::Command> open = std::make_shared<Command>("file.open", "Open");
     (*open).set_default_action(true);
@@ -113,7 +133,7 @@ void test_context_menu_command_snapshot_keyboard_nesting_and_restore() {
         }},
     });
 
-    std::string command_trace;
+    std::string command_trace{};
     SubscriptionToken copy_invoked = (*copy).invoked().subscribe(
         RecordCommandIdAndSource(command_trace));
     std::size_t open_changes{};
@@ -145,46 +165,70 @@ void test_context_menu_command_snapshot_keyboard_nesting_and_restore() {
                 delete_node && (*delete_node).description.find("read-only") !=
                     std::string::npos,
             "menu semantics must publish menu/item/check and availability facts");
-    require(delete_row && !(*delete_row).focusable() && !(*delete_row).cursor() &&
-                !has_semantic_state((*delete_node).states,
-                                    SemanticState::enabled) &&
-                !has_action(*delete_node, SemanticAction::focus) &&
-                !has_action(*delete_node, SemanticAction::press) &&
-                !window.request_focus(delete_row) &&
-                !window.perform_semantic_action(
-                    "object.context.popup.row.delete", SemanticAction::press),
-            "disabled menu rows must explain unavailability without a hand cursor or actionable semantics");
+    const bool operation_check_2 = static_cast<bool>(delete_row);
+    require(operation_check_2, "disabled menu rows must explain unavailability without a hand cursor or actionable semantics");
+    const bool operation_check_3 = !(*delete_row).focusable();
+    require(operation_check_3, "disabled menu rows must explain unavailability without a hand cursor or actionable semantics");
+    const bool operation_check_4 = !(*delete_row).cursor();
+    require(operation_check_4, "disabled menu rows must explain unavailability without a hand cursor or actionable semantics");
+    const bool operation_check_5 = !has_semantic_state((*delete_node).states,
+                                    SemanticState::enabled);
+    require(operation_check_5, "disabled menu rows must explain unavailability without a hand cursor or actionable semantics");
+    const bool operation_check_6 = !has_action(*delete_node, SemanticAction::focus);
+    require(operation_check_6, "disabled menu rows must explain unavailability without a hand cursor or actionable semantics");
+    const bool operation_check_7 = !has_action(*delete_node, SemanticAction::press);
+    require(operation_check_7, "disabled menu rows must explain unavailability without a hand cursor or actionable semantics");
+    const bool operation_check_8 = !window.request_focus(delete_row);
+    require(operation_check_8, "disabled menu rows must explain unavailability without a hand cursor or actionable semantics");
+    const bool operation_check_9 = !window.perform_semantic_action(
+                    "object.context.popup.row.delete", SemanticAction::press);
+    require(operation_check_9, "disabled menu rows must explain unavailability without a hand cursor or actionable semantics");
 
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::down}) &&
-                (*window.focused_control()).stable_id().value() ==
-                    "object.context.popup.row.copy",
-            "Down must skip a separator and reach the next enabled command");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::down}) &&
-                (*window.focused_control()).stable_id().value() ==
-                    "object.context.popup.row.details",
-            "keyboard traversal must skip disabled command rows");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::up}) &&
-                window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
-                !menu.is_open() && window.focus_scope_depth() == 0U &&
-                window.focused_control() == owner &&
-                command_trace.starts_with("edit.copy@object.context.popup.row.copy"),
-            "Enter must execute shared command once, close, and restore invoker focus");
+    const bool operation_check_10 = window.dispatch_key({KeyAction::down, PhysicalKey::down});
+    require(operation_check_10, "Down must skip a separator and reach the next enabled command");
+    const bool operation_check_11 = (*window.focused_control()).stable_id().value() ==
+                    "object.context.popup.row.copy";
+    require(operation_check_11, "Down must skip a separator and reach the next enabled command");
+    const bool operation_check_12 = window.dispatch_key({KeyAction::down, PhysicalKey::down});
+    require(operation_check_12, "keyboard traversal must skip disabled command rows");
+    const bool operation_check_13 = (*window.focused_control()).stable_id().value() ==
+                    "object.context.popup.row.details";
+    require(operation_check_13, "keyboard traversal must skip disabled command rows");
+    const bool operation_check_14 = window.dispatch_key({KeyAction::down, PhysicalKey::up});
+    require(operation_check_14, "Enter must execute shared command once, close, and restore invoker focus");
+    const bool operation_check_15 = window.dispatch_key({KeyAction::down, PhysicalKey::enter});
+    require(operation_check_15, "Enter must execute shared command once, close, and restore invoker focus");
+    const bool operation_check_16 = !menu.is_open();
+    require(operation_check_16, "Enter must execute shared command once, close, and restore invoker focus");
+    const bool operation_check_17 = window.focus_scope_depth() == 0U;
+    require(operation_check_17, "Enter must execute shared command once, close, and restore invoker focus");
+    const bool operation_check_18 = window.focused_control() == owner;
+    require(operation_check_18, "Enter must execute shared command once, close, and restore invoker focus");
+    const bool operation_check_19 = command_trace.starts_with("edit.copy@object.context.popup.row.copy");
+    require(operation_check_19, "Enter must execute shared command once, close, and restore invoker focus");
 
-    std::string nested_trace;
+    std::string nested_trace{};
     SubscriptionToken icons_invoked = (*icons).invoked().subscribe(
         RecordCommandId(nested_trace));
     menu.show(owner, {120.0, 80.0});
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::end}) &&
-                (*window.focused_control()).stable_id().value() ==
-                    "object.context.popup.row.view" &&
-                window.dispatch_key({KeyAction::down, PhysicalKey::right}) &&
-                window.find("object.context.popup.panel.1") != nullptr &&
-                (*window.focused_control()).stable_id().value() ==
-                    "object.context.popup.row.view.icons",
-            "Right must open a bounded nested submenu and focus its first command");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
-                nested_trace == "view.icons" && !menu.is_open(),
-            "nested keyboard activation must converge on shared command authority");
+    const bool operation_check_20 = window.dispatch_key({KeyAction::down, PhysicalKey::end});
+    require(operation_check_20, "Right must open a bounded nested submenu and focus its first command");
+    const bool operation_check_21 = (*window.focused_control()).stable_id().value() ==
+                    "object.context.popup.row.view";
+    require(operation_check_21, "Right must open a bounded nested submenu and focus its first command");
+    const bool operation_check_22 = window.dispatch_key({KeyAction::down, PhysicalKey::right});
+    require(operation_check_22, "Right must open a bounded nested submenu and focus its first command");
+    const bool operation_check_23 = window.find("object.context.popup.panel.1") != nullptr;
+    require(operation_check_23, "Right must open a bounded nested submenu and focus its first command");
+    const bool operation_check_24 = (*window.focused_control()).stable_id().value() ==
+                    "object.context.popup.row.view.icons";
+    require(operation_check_24, "Right must open a bounded nested submenu and focus its first command");
+    const bool operation_check_25 = window.dispatch_key({KeyAction::down, PhysicalKey::enter});
+    require(operation_check_25, "nested keyboard activation must converge on shared command authority");
+    const bool operation_check_26 = nested_trace == "view.icons";
+    require(operation_check_26, "nested keyboard activation must converge on shared command authority");
+    const bool operation_check_27 = !menu.is_open();
+    require(operation_check_27, "nested keyboard activation must converge on shared command authority");
 
     (*icons).set_enabled(false);
     (*details).set_enabled(false);
@@ -196,28 +240,39 @@ void test_context_menu_command_snapshot_keyboard_nesting_and_restore() {
         "object.context.popup.row.view");
     const Control::Ptr disabled_submenu_row = window.find(
         "object.context.popup.row.view");
-    require(disabled_submenu && disabled_submenu_row &&
-                !disabled_submenu_row->focusable() &&
-                !disabled_submenu_row->cursor() &&
-                disabled_submenu->description.find(
+    const bool operation_check_28 = disabled_submenu;
+    require(operation_check_28, "submenu with no actionable descendant must explain and enforce its disabled state");
+    const bool operation_check_29 = static_cast<bool>(disabled_submenu_row);
+    require(operation_check_29, "submenu with no actionable descendant must explain and enforce its disabled state");
+    const bool operation_check_30 = !(*disabled_submenu_row).focusable();
+    require(operation_check_30, "submenu with no actionable descendant must explain and enforce its disabled state");
+    const bool operation_check_31 = !(*disabled_submenu_row).cursor();
+    require(operation_check_31, "submenu with no actionable descendant must explain and enforce its disabled state");
+    const bool operation_check_32 = (*disabled_submenu).description.find(
                     "No commands are currently available") !=
-                    std::string::npos &&
-                disabled_submenu->actions.empty() &&
-                !window.perform_semantic_action(
+                    std::string::npos;
+    require(operation_check_32, "submenu with no actionable descendant must explain and enforce its disabled state");
+    const bool operation_check_33 = (*disabled_submenu).actions.empty();
+    require(operation_check_33, "submenu with no actionable descendant must explain and enforce its disabled state");
+    const bool operation_check_34 = !window.perform_semantic_action(
                     "object.context.popup.row.view",
-                    SemanticAction::expand) &&
-                window.find("object.context.popup.panel.1") == nullptr,
-            "submenu with no actionable descendant must explain and enforce its disabled state");
+                    SemanticAction::expand);
+    require(operation_check_34, "submenu with no actionable descendant must explain and enforce its disabled state");
+    const bool operation_check_35 = window.find("object.context.popup.panel.1") == nullptr;
+    require(operation_check_35, "submenu with no actionable descendant must explain and enforce its disabled state");
     menu.close();
     (*icons).set_enabled(true);
     (*details).set_enabled(true);
 
     menu.show(owner, {120.0, 80.0});
-    require(window.dispatch_pointer({PointerAction::down,
+    const bool operation_check_36 = window.dispatch_pointer({PointerAction::down,
                                      PointerButton::primary,
-                                     {2.0, 2.0}}) &&
-                !menu.is_open() && window.focused_control() == owner,
-            "click-away must revoke the popup and restore focus");
+                                     {2.0, 2.0}});
+    require(operation_check_36, "click-away must revoke the popup and restore focus");
+    const bool operation_check_37 = !menu.is_open();
+    require(operation_check_37, "click-away must revoke the popup and restore focus");
+    const bool operation_check_38 = window.focused_control() == owner;
+    require(operation_check_38, "click-away must revoke the popup and restore focus");
     require(open_changes == 8U,
             "four complete open/close cycles must publish eight ordered state changes");
 
@@ -228,14 +283,15 @@ void test_context_menu_command_snapshot_keyboard_nesting_and_restore() {
     std::shared_ptr<gui_forms::Command> focus_command =
         std::make_shared<Command>("command.focus", "Focus destination");
     SubscriptionToken focus_invoked = (*focus_command).invoked().subscribe(
-        [&window, destination](const CommandInvocation&) {
-            static_cast<void>(window.request_focus(destination));
-        });
+        FocusDestination(window, destination));
     menu.set_items({{"focus", MenuItemKind::command, focus_command}});
     menu.show(owner, {120.0, 80.0});
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
-                !menu.is_open() && window.focused_control() == destination,
-            "menu teardown must not overwrite the focus destination deliberately chosen by an invoked command");
+    const bool operation_check_39 = window.dispatch_key({KeyAction::down, PhysicalKey::enter});
+    require(operation_check_39, "menu teardown must not overwrite the focus destination deliberately chosen by an invoked command");
+    const bool operation_check_40 = !menu.is_open();
+    require(operation_check_40, "menu teardown must not overwrite the focus destination deliberately chosen by an invoked command");
+    const bool operation_check_41 = window.focused_control() == destination;
+    require(operation_check_41, "menu teardown must not overwrite the focus destination deliberately chosen by an invoked command");
 }
 
 void test_context_menu_scroll_and_validation_bounds() {
@@ -244,10 +300,11 @@ void test_context_menu_scroll_and_validation_bounds() {
     (*owner).set_requested_bounds({4.0, 4.0, 80.0, 30.0});
     (*root).add_child(owner);
     Window window(root, {320.0, 190.0});
-    require(window.request_focus(owner), "scroll menu owner must focus");
+    const bool operation_check_42 = window.request_focus(owner);
+    require(operation_check_42, "scroll menu owner must focus");
 
-    std::vector<MenuItemSpec> specs;
-    std::vector<std::shared_ptr<Command>> commands;
+    std::vector<MenuItemSpec> specs{};
+    std::vector<std::shared_ptr<Command>> commands{};
     for (std::size_t index = 0; index < 30U; ++index) {
         std::shared_ptr<gui_forms::Command> command = std::make_shared<Command>(
             "long." + std::to_string(index), "Command " + std::to_string(index));
@@ -261,18 +318,20 @@ void test_context_menu_scroll_and_validation_bounds() {
     const Control::Ptr panel = window.find("long.menu.popup.panel.0");
     require(panel && (*panel).absolute_bounds().height <= 182.0,
             "long menu must use a bounded on-screen scroll viewport");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::end}) &&
-                (*window.focused_control()).stable_id().value() ==
-                    "long.menu.popup.row.item.29",
-            "End must scroll the last logical command into the visible menu viewport");
+    const bool operation_check_43 = window.dispatch_key({KeyAction::down, PhysicalKey::end});
+    require(operation_check_43, "End must scroll the last logical command into the visible menu viewport");
+    const bool operation_check_44 = (*window.focused_control()).stable_id().value() ==
+                    "long.menu.popup.row.item.29";
+    require(operation_check_44, "End must scroll the last logical command into the visible menu viewport");
     const Rect focused_bounds = (*window.focused_control()).absolute_bounds();
     require((*panel).absolute_bounds().contains(Point{
                 focused_bounds.x + focused_bounds.width * .5,
                 focused_bounds.y + focused_bounds.height * .5}),
             "End must reveal the last logical command inside the menu viewport");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::escape}) &&
-                !menu.is_open(),
-            "Escape must close a scrolled menu without selecting a command");
+    const bool operation_check_45 = window.dispatch_key({KeyAction::down, PhysicalKey::escape});
+    require(operation_check_45, "Escape must close a scrolled menu without selecting a command");
+    const bool operation_check_46 = !menu.is_open();
+    require(operation_check_46, "Escape must close a scrolled menu without selecting a command");
 
     bool duplicate_rejected{};
     try {
@@ -331,11 +390,16 @@ void test_menu_strip_retained_switching_commands_and_semantics() {
                                     SemanticState::expanded),
             "closed MenuStrip must publish selected category without falsely expanding it");
 
-    require(window.request_focus(strip), "menu strip must accept keyboard focus");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::down}) &&
-                (*strip).is_open() && (*strip).active_index() == 0U &&
-                window.focus_scope_depth() == 1U,
-            "Down on the menu bar must open its focused retained menu");
+    const bool operation_check_47 = window.request_focus(strip);
+    require(operation_check_47, "menu strip must accept keyboard focus");
+    const bool operation_check_48 = window.dispatch_key({KeyAction::down, PhysicalKey::down});
+    require(operation_check_48, "Down on the menu bar must open its focused retained menu");
+    const bool operation_check_49 = (*strip).is_open();
+    require(operation_check_49, "Down on the menu bar must open its focused retained menu");
+    const bool operation_check_50 = (*strip).active_index() == 0U;
+    require(operation_check_50, "Down on the menu bar must open its focused retained menu");
+    const bool operation_check_51 = window.focus_scope_depth() == 1U;
+    require(operation_check_51, "Down on the menu bar must open its focused retained menu");
     const std::vector<SemanticNode> file_open =
         (*strip).semantic_virtual_children();
     require(has_semantic_state(file_open[0].states,
@@ -347,20 +411,29 @@ void test_menu_strip_retained_switching_commands_and_semantics() {
                 !has_semantic_state(file_open[1].states,
                                     SemanticState::expanded),
             "transient File expansion must not steal or falsely expand the selected View category");
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::right}) &&
-                (*strip).is_open() && (*strip).active_index() == 1U &&
-                (*window.focused_control()).stable_id().value() ==
-                    "menustrip.menu.popup.row.view.icons",
-            "Right from a root command must switch top-level menus in one popup scope");
+    const bool operation_check_52 = window.dispatch_key({KeyAction::down, PhysicalKey::right});
+    require(operation_check_52, "Right from a root command must switch top-level menus in one popup scope");
+    const bool operation_check_53 = (*strip).is_open();
+    require(operation_check_53, "Right from a root command must switch top-level menus in one popup scope");
+    const bool operation_check_54 = (*strip).active_index() == 1U;
+    require(operation_check_54, "Right from a root command must switch top-level menus in one popup scope");
+    const bool operation_check_55 = (*window.focused_control()).stable_id().value() ==
+                    "menustrip.menu.popup.row.view.icons";
+    require(operation_check_55, "Right from a root command must switch top-level menus in one popup scope");
 
-    std::string trace;
+    std::string trace{};
     SubscriptionToken invoked = (*strip).item_invoked().subscribe(
         RecordMenuStripInvocation(trace));
-    require(window.dispatch_key({KeyAction::down, PhysicalKey::down}) &&
-                window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
-                trace == "menustrip.view/view.details" && !(*strip).is_open() &&
-                window.focused_control() == strip,
-            "menu-bar keyboard invocation must execute and restore bar focus");
+    const bool operation_check_56 = window.dispatch_key({KeyAction::down, PhysicalKey::down});
+    require(operation_check_56, "menu-bar keyboard invocation must execute and restore bar focus");
+    const bool operation_check_57 = window.dispatch_key({KeyAction::down, PhysicalKey::enter});
+    require(operation_check_57, "menu-bar keyboard invocation must execute and restore bar focus");
+    const bool operation_check_58 = trace == "menustrip.view/view.details";
+    require(operation_check_58, "menu-bar keyboard invocation must execute and restore bar focus");
+    const bool operation_check_59 = !(*strip).is_open();
+    require(operation_check_59, "menu-bar keyboard invocation must execute and restore bar focus");
+    const bool operation_check_60 = window.focused_control() == strip;
+    require(operation_check_60, "menu-bar keyboard invocation must execute and restore bar focus");
 
     const SemanticSnapshot snapshot = window.semantic_snapshot();
     const SemanticNode* bar = find_semantic(snapshot.roots, "menustrip");
@@ -368,20 +441,25 @@ void test_menu_strip_retained_switching_commands_and_semantics() {
     require(bar && (*bar).role == SemanticRole::menu_bar && file &&
                 (*file).role == SemanticRole::menu_bar_item,
             "menu strip must publish distinct bar and top-level item roles");
-    require(window.perform_semantic_action("menustrip.file",
-                                           SemanticAction::expand) &&
-                (*strip).is_open() && (*strip).active_index() == 0U,
-            "semantic expansion must open the same retained popup path");
+    const bool operation_check_61 = window.perform_semantic_action("menustrip.file",
+                                           SemanticAction::expand);
+    require(operation_check_61, "semantic expansion must open the same retained popup path");
+    const bool operation_check_62 = (*strip).is_open();
+    require(operation_check_62, "semantic expansion must open the same retained popup path");
+    const bool operation_check_63 = (*strip).active_index() == 0U;
+    require(operation_check_63, "semantic expansion must open the same retained popup path");
     (*strip).close();
 
-    require(window.dispatch_pointer({PointerAction::down, PointerButton::primary,
-                                     {70.0, 12.0}}) &&
-                (*strip).active_index() == 1U,
-            "pointer activation must open the top-level item under its geometry");
-    require(window.dispatch_pointer({PointerAction::move, PointerButton::none,
-                                     {12.0, 12.0}}) &&
-                (*strip).active_index() == 0U,
-            "moving across the open menu bar must switch menus without click-through");
+    const bool operation_check_64 = window.dispatch_pointer({PointerAction::down, PointerButton::primary,
+                                     {70.0, 12.0}});
+    require(operation_check_64, "pointer activation must open the top-level item under its geometry");
+    const bool operation_check_65 = (*strip).active_index() == 1U;
+    require(operation_check_65, "pointer activation must open the top-level item under its geometry");
+    const bool operation_check_66 = window.dispatch_pointer({PointerAction::move, PointerButton::none,
+                                     {12.0, 12.0}});
+    require(operation_check_66, "moving across the open menu bar must switch menus without click-through");
+    const bool operation_check_67 = (*strip).active_index() == 0U;
+    require(operation_check_67, "moving across the open menu bar must switch menus without click-through");
     (*strip).close();
 
     (*strip).set_items({
@@ -445,13 +523,19 @@ void test_menu_mnemonics_strip_markers_and_popup_activation() {
 
     KeyEvent alt_f{KeyAction::down, PhysicalKey::f};
     alt_f.modifiers = Modifier::alt;
-    require(window.dispatch_key(alt_f) && (*strip).is_open() &&
-                (*strip).active_index() == 0U,
-            "a top-level menu mnemonic must focus and open its retained popup");
+    const bool operation_check_68 = window.dispatch_key(alt_f);
+    require(operation_check_68, "a top-level menu mnemonic must focus and open its retained popup");
+    const bool operation_check_69 = (*strip).is_open();
+    require(operation_check_69, "a top-level menu mnemonic must focus and open its retained popup");
+    const bool operation_check_70 = (*strip).active_index() == 0U;
+    require(operation_check_70, "a top-level menu mnemonic must focus and open its retained popup");
     (*strip).close();
-    require(window.dispatch_key(alt_f) && (*strip).is_open() &&
-                (*strip).active_index() == 1U,
-            "duplicate top-level menu mnemonics must cycle deterministically");
+    const bool operation_check_71 = window.dispatch_key(alt_f);
+    require(operation_check_71, "duplicate top-level menu mnemonics must cycle deterministically");
+    const bool operation_check_72 = (*strip).is_open();
+    require(operation_check_72, "duplicate top-level menu mnemonics must cycle deterministically");
+    const bool operation_check_73 = (*strip).active_index() == 1U;
+    require(operation_check_73, "duplicate top-level menu mnemonics must cycle deterministically");
     (*strip).close();
 
     std::shared_ptr<gui_forms::Command> copy = std::make_shared<Command>("copy", "Copy");
@@ -469,12 +553,16 @@ void test_menu_mnemonics_strip_markers_and_popup_activation() {
             "popup menu rows must expose marker-free authored text");
     KeyEvent alt_c{KeyAction::down, PhysicalKey::c};
     alt_c.modifiers = Modifier::alt;
-    require(window.dispatch_key(alt_c) && copy_count == 1U && !popup.is_open(),
-            "an active popup mnemonic must execute through shared command authority");
+    const bool operation_check_74 = window.dispatch_key(alt_c);
+    require(operation_check_74, "an active popup mnemonic must execute through shared command authority");
+    const bool operation_check_75 = copy_count == 1U;
+    require(operation_check_75, "an active popup mnemonic must execute through shared command authority");
+    const bool operation_check_76 = !popup.is_open();
+    require(operation_check_76, "an active popup mnemonic must execute through shared command authority");
 
     (*strip).set_use_mnemonic(false);
-    require(!window.dispatch_key(alt_f),
-            "UseMnemonic false must leave the ampersand literal and revoke activation");
+    const bool operation_check_77 = !window.dispatch_key(alt_f);
+    require(operation_check_77, "UseMnemonic false must leave the ampersand literal and revoke activation");
 }
 
 class MenuFontMetrics final : public TextMetricsProvider {
@@ -490,7 +578,7 @@ public:
 };
 
 void test_menu_font_controls_geometry_paint_and_hit_testing() {
-    MenuFontMetrics metrics;
+    MenuFontMetrics metrics{};
     const std::shared_ptr<MenuStrip> strip = make_control<MenuStrip>(StableId("font.menu"));
     const std::shared_ptr<Command> command = std::make_shared<Command>("font.open", "Open");
     (*strip).set_items({
@@ -512,16 +600,17 @@ void test_menu_font_controls_geometry_paint_and_hit_testing() {
                 nodes.front().bounds.width > old_width &&
                 (*strip).measure({600.0, 100.0}).height == 40.0,
             "menu measurement and semantic bounds must use the chosen font metrics");
-    test_support::TypographyPainter painter;
+    test_support::TypographyPainter painter{};
     (*strip).on_paint(painter, {0.0, 0.0, 600.0, 80.0});
     const test_support::PaintedText* first = painter.find("First");
     const test_support::PaintedText* second = painter.find("Second");
     require(first && second && (*first).font == chosen && (*second).font == chosen,
             "selected and normal menu labels must preserve the chosen heavier weight and typography");
-    require(window.dispatch_pointer({PointerAction::down, PointerButton::primary,
-                                     {old_width + 2.0, 12.0}}) &&
-                (*strip).active_index() == 0U,
-            "font-expanded menu area must hit the same first item painted there");
+    const bool operation_check_78 = window.dispatch_pointer({PointerAction::down, PointerButton::primary,
+                                     {old_width + 2.0, 12.0}});
+    require(operation_check_78, "font-expanded menu area must hit the same first item painted there");
+    const bool operation_check_79 = (*strip).active_index() == 0U;
+    require(operation_check_79, "font-expanded menu area must hit the same first item painted there");
     (*strip).close();
     window.set_text_scale(1.5);
     window.perform_layout();

@@ -4,27 +4,257 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <string_view>
+#include <stdexcept>
 #include <unistd.h>
 
 namespace {
 
+class FixtureDirectory final {
+public:
+    explicit FixtureDirectory(const std::filesystem::path& path) : path_(path) {
+        const bool acquired = std::filesystem::create_directory(path_);
+        if (!acquired) throw std::runtime_error("picker view fixture directory already exists");
+    }
+    FixtureDirectory(const FixtureDirectory&) = delete;
+    FixtureDirectory& operator=(const FixtureDirectory&) = delete;
+    ~FixtureDirectory() {
+        std::error_code ignored{};
+        std::filesystem::remove_all(path_, ignored);
+    }
+private:
+    // Borrows the stable canonical-temp child through this test call; owns its
+    // newly created directory. The path outlives this guard and is never changed.
+    const std::filesystem::path& path_;
+};
+
+struct ResultRecorder final {
+    file_manager::DocumentPickerResult result{};
+    bool completed{};
+    void receive(const file_manager::DocumentPickerResult& value) {
+        result = value;
+        completed = true;
+    }
+};
+
+bool is_open_file(const file_manager::DirectoryEntry& entry) {
+    const bool matches = entry.name == "open.txt";
+    return matches;
+}
+
+bool is_directory(const file_manager::DirectoryEntry& entry) {
+    return entry.directory;
+}
+
 void require(const bool condition, const std::string_view message) {
     if (!condition) {
-        std::cerr << "document picker view test failed: " << message << '\n';
-        std::exit(1);
+        const std::string diagnostic(message);
+        throw std::runtime_error(diagnostic);
     }
+}
+
+// The window retains controls after the view has revoked its borrowed delegates.
+// This checks the boundary rather than merely counting named callback methods.
+void verify_disconnected_controls(const file_manager::DocumentPickerRequest& request) {
+    std::unique_ptr<file_manager::DocumentPickerView> picker =
+        std::make_unique<file_manager::DocumentPickerView>(request);
+    gui_forms::Window window((*picker).root_control(), {760, 560});
+    window.perform_layout();
+    const gui_forms::Control::Ptr control = window.find("file-manager.picker.cancel");
+    const std::shared_ptr<gui_forms::Button> cancel =
+        std::dynamic_pointer_cast<gui_forms::Button>(control);
+    require(cancel != nullptr, "teardown fixture requires Cancel");
+    ResultRecorder recorder{};
+    const gui_forms::Delegate<const file_manager::DocumentPickerResult&> callback =
+        gui_forms::Delegate<const file_manager::DocumentPickerResult&>::bind<
+            ResultRecorder, &ResultRecorder::receive>(recorder);
+    gui_forms::SubscriptionToken connection = (*picker).completed().subscribe(callback);
+    picker.reset();
+    require(!connection.connected(), "view destruction revokes completion observers");
+    const gui_forms::EventStatistics before = (*cancel).clicked().statistics();
+    const bool clicked = (*cancel).perform_click();
+    const gui_forms::EventStatistics after = (*cancel).clicked().statistics();
+    require(clicked && !recorder.completed && before.callbacks_emitted == after.callbacks_emitted,
+            "retained controls cannot call a destroyed picker view");
+}
+
+struct DisposingHost final {
+    std::unique_ptr<file_manager::DocumentPickerView> picker{};
+    unsigned int completion_count{};
+    void completed(const file_manager::DocumentPickerResult&) {
+        ++completion_count;
+        picker.reset();
+    }
+};
+
+void verify_teardown_during_completion(const file_manager::DocumentPickerRequest& request) {
+    DisposingHost host{};
+    host.picker = std::make_unique<file_manager::DocumentPickerView>(request);
+    gui_forms::Window window((*host.picker).root_control(), {760, 560});
+    window.perform_layout();
+    const gui_forms::Control::Ptr control = window.find("file-manager.picker.cancel");
+    const std::shared_ptr<gui_forms::Button> cancel =
+        std::dynamic_pointer_cast<gui_forms::Button>(control);
+    require(cancel != nullptr, "completion teardown fixture requires Cancel");
+    const gui_forms::Delegate<const file_manager::DocumentPickerResult&> callback =
+        gui_forms::Delegate<const file_manager::DocumentPickerResult&>::bind<
+            DisposingHost, &DisposingHost::completed>(host);
+    gui_forms::SubscriptionToken connection = (*host.picker).completed().subscribe(callback);
+    const bool first_click = (*cancel).perform_click();
+    require(first_click && host.picker == nullptr && !connection.connected(),
+            "completion may tear down view while its controls remain retained");
+    const bool second_click = (*cancel).perform_click();
+    require(second_click && host.completion_count == 1U,
+            "teardown during emission revokes future callbacks");
+}
+
+struct CancelDuringLocationUpdate final {
+    DisposingHost& host;
+    bool survived_update{};
+    void changed(const std::string&) {
+        if (host.picker == nullptr)
+            return;
+        (*host.picker).cancel();
+        survived_update = host.picker != nullptr && host.completion_count == 0U;
+    }
+};
+
+void verify_cancel_during_reload(const file_manager::DocumentPickerRequest& request) {
+    DisposingHost host{};
+    host.picker = std::make_unique<file_manager::DocumentPickerView>(request);
+    gui_forms::Window window((*host.picker).root_control(), {760, 560});
+    window.perform_layout();
+    const gui_forms::Delegate<const file_manager::DocumentPickerResult&> completion =
+        gui_forms::Delegate<const file_manager::DocumentPickerResult&>::bind<
+            DisposingHost, &DisposingHost::completed>(host);
+    gui_forms::SubscriptionToken completion_connection =
+        (*host.picker).completed().subscribe(completion);
+    CancelDuringLocationUpdate listener{.host = host};
+    const gui_forms::Delegate<const std::string&> callback =
+        gui_forms::Delegate<const std::string&>::bind<CancelDuringLocationUpdate,
+                                                      &CancelDuringLocationUpdate::changed>(
+            listener);
+    const gui_forms::Control::Ptr control = window.find("file-manager.picker.path");
+    const std::shared_ptr<gui_forms::TextBox> path =
+        std::dynamic_pointer_cast<gui_forms::TextBox>(control);
+    require(path != nullptr, "reload fixture requires path control");
+    gui_forms::SubscriptionToken change_connection = (*path).text_changed().subscribe(callback);
+    const std::filesystem::path child = request.protected_root / "Folder";
+    (*host.picker).present(child);
+    require(listener.survived_update && host.picker == nullptr && host.completion_count == 1U,
+            "cancel during reload emits exactly once after the outer update releases its borrows");
+}
+
+struct NestedLocationUpdate final {
+    file_manager::DocumentPickerView& view;
+    const std::filesystem::path& destination;
+    bool nested{};
+    void changed(const std::string&) {
+        if (nested)
+            return;
+        nested = true;
+        view.present(destination);
+    }
+};
+
+void verify_nested_reload(const file_manager::DocumentPickerRequest& request) {
+    file_manager::DocumentPickerView view(request);
+    gui_forms::Window window(view.root_control(), {760, 560});
+    window.perform_layout();
+    NestedLocationUpdate listener{.view = view, .destination = request.protected_root};
+    const gui_forms::Delegate<const std::string&> callback =
+        gui_forms::Delegate<const std::string&>::bind<NestedLocationUpdate,
+                                                      &NestedLocationUpdate::changed>(listener);
+    const gui_forms::Control::Ptr path_control = window.find("file-manager.picker.path");
+    const std::shared_ptr<gui_forms::TextBox> path =
+        std::dynamic_pointer_cast<gui_forms::TextBox>(path_control);
+    require(path != nullptr, "nested fixture requires path control");
+    gui_forms::SubscriptionToken connection = (*path).text_changed().subscribe(callback);
+    const std::filesystem::path child = request.protected_root / "Folder";
+    view.present(child);
+    const std::filesystem::path canonical_root = std::filesystem::canonical(request.protected_root);
+    require(listener.nested && view.controller().browser().location == canonical_root,
+            "nested reload preserves the last explicitly requested location");
+    const gui_forms::Control::Ptr hidden_control = window.find("file-manager.picker.hidden");
+    const std::shared_ptr<gui_forms::CheckBox> hidden =
+        std::dynamic_pointer_cast<gui_forms::CheckBox>(hidden_control);
+    require(hidden != nullptr, "nested fixture requires hidden control");
+    (*hidden).set_checked(true);
+    require(view.controller().show_hidden(), "nested reload restores the outer update flag");
+}
+
+struct ThrowingLocationUpdate final {
+    file_manager::DocumentPickerView* cancel_before_throw{};
+    bool threw{};
+    void changed(const std::string&) {
+        if (threw)
+            return;
+        threw = true;
+        if (cancel_before_throw != nullptr)
+            (*cancel_before_throw).cancel();
+        throw std::runtime_error("injected picker subscriber failure");
+    }
+};
+
+void verify_exception_reset(const file_manager::DocumentPickerRequest& request,
+                            const bool cancel_first) {
+    file_manager::DocumentPickerView view(request);
+    gui_forms::Window window(view.root_control(), {760, 560});
+    window.perform_layout();
+    ResultRecorder recorder{};
+    const gui_forms::Delegate<const file_manager::DocumentPickerResult&> completion =
+        gui_forms::Delegate<const file_manager::DocumentPickerResult&>::bind<
+            ResultRecorder, &ResultRecorder::receive>(recorder);
+    gui_forms::SubscriptionToken completion_connection = view.completed().subscribe(completion);
+    ThrowingLocationUpdate listener{};
+    if (cancel_first)
+        listener.cancel_before_throw = &view;
+    const gui_forms::Delegate<const std::string&> callback =
+        gui_forms::Delegate<const std::string&>::bind<ThrowingLocationUpdate,
+                                                      &ThrowingLocationUpdate::changed>(listener);
+    const gui_forms::Control::Ptr path_control = window.find("file-manager.picker.path");
+    const std::shared_ptr<gui_forms::TextBox> path =
+        std::dynamic_pointer_cast<gui_forms::TextBox>(path_control);
+    require(path != nullptr, "exception fixture requires path control");
+    gui_forms::SubscriptionToken change_connection = (*path).text_changed().subscribe(callback);
+    bool caught = false;
+    try {
+        const std::filesystem::path child = request.protected_root / "Folder";
+        view.present(child);
+    } catch (const std::runtime_error&) {
+        caught = true;
+    }
+    require(caught && listener.threw && !recorder.completed,
+            "exception unwinding restores flags without emitting a terminal result");
+    const gui_forms::Control::Ptr hidden_control = window.find("file-manager.picker.hidden");
+    const std::shared_ptr<gui_forms::CheckBox> hidden =
+        std::dynamic_pointer_cast<gui_forms::CheckBox>(hidden_control);
+    require(hidden != nullptr, "exception fixture requires hidden control");
+    (*hidden).set_checked(true);
+    require(view.controller().show_hidden(), "control callbacks still run after failed reload");
+    view.cancel();
+    require(recorder.completed &&
+                recorder.result.terminal == file_manager::DocumentPickerTerminal::cancelled,
+            "host can cancel normally after failed reload");
 }
 
 } // namespace
 
-int main() {
-    const auto root = std::filesystem::temp_directory_path() /
-        ("file-manager-picker-view-" + std::to_string(::getpid()));
+int run_tests() {
+    const std::filesystem::path parent =
+        std::filesystem::canonical(std::filesystem::temp_directory_path());
+    const std::string name_prefix = "file-manager-picker-view-" + std::to_string(::getpid());
+    const std::filesystem::path root = parent / name_prefix;
+    const FixtureDirectory fixture(root);
     std::filesystem::create_directories(root / "Folder");
-    std::ofstream(root / "open.txt") << "open";
+    {
+        std::ofstream stream(root / "open.txt");
+        stream << "open";
+        require(static_cast<bool>(stream), "fixture write must succeed");
+    }
 
-    file_manager::DocumentPickerRequest request;
+    file_manager::DocumentPickerRequest request{};
     request.profile = file_manager::DocumentPickerProfile::open_file;
     request.protected_root = root;
     request.initial_location = root;
@@ -37,76 +267,90 @@ int main() {
     window.perform_layout();
     view.attach_dialog(window);
 
-    const auto picker_title = window.find("file-manager.picker.title");
-    require(picker_title && picker_title->authored_surface_material() &&
-                picker_title->committed_arranged_bounds().height == 40.0 &&
-                window.find("file-manager.picker.title.name") &&
-                window.find("file-manager.picker.navigation") &&
-                window.find("file-manager.picker.path") &&
-                window.find("file-manager.picker.objects") &&
-                window.find("file-manager.picker.accept") &&
-                window.find("file-manager.picker.cancel"),
-            "installed view must compose the bounded File Manager DNA control set");
+    const gui_forms::Control::Ptr picker_title = window.find("file-manager.picker.title");
+    require(
+        picker_title && (*picker_title).authored_surface_material() &&
+            (*picker_title).committed_arranged_bounds().height == 40.0 &&
+            window.find("file-manager.picker.title.name") &&
+            window.find("file-manager.picker.navigation") &&
+            window.find("file-manager.picker.path") && window.find("file-manager.picker.objects") &&
+            window.find("file-manager.picker.accept") && window.find("file-manager.picker.cancel"),
+        "installed view must compose the bounded File Manager DNA control set");
     require(view.controller().browser().entries.size() == 2U,
             "view must expose direct-filesystem folder and filtered file rows");
 
-    const auto selected = std::find_if(
-        view.controller().browser().entries.begin(),
-        view.controller().browser().entries.end(),
-        [](const file_manager::DirectoryEntry& entry) {
-            return entry.name == "open.txt";
-        });
-    require(selected != view.controller().browser().entries.end() &&
-                view.controller().set_selection({selected->stable_id}),
-            "view fixture must select an admitted file");
-    file_manager::DocumentPickerResult result;
-    bool completed{};
-    auto subscription = view.completed().subscribe(
-        [&result, &completed](const file_manager::DocumentPickerResult& value) {
-            result = value;
-            completed = true;
-        });
-    const auto accept = std::dynamic_pointer_cast<gui_forms::Button>(
-        window.find("file-manager.picker.accept"));
-    require(accept && accept->perform_click() && completed && result.accepted() &&
+    const std::vector<file_manager::DirectoryEntry>::const_iterator selected =
+        std::find_if(view.controller().browser().entries.begin(),
+                     view.controller().browser().entries.end(), is_open_file);
+    require(selected != view.controller().browser().entries.end(), "fixture open.txt must exist");
+    const bool selected_file = view.controller().set_selection({(*selected).stable_id});
+    require(selected_file, "view fixture must select an admitted file");
+    ResultRecorder recorder{};
+    file_manager::DocumentPickerResult& result = recorder.result;
+    bool& completed = recorder.completed;
+    const gui_forms::Delegate<const file_manager::DocumentPickerResult&> completion =
+        gui_forms::Delegate<const file_manager::DocumentPickerResult&>::bind<
+            ResultRecorder, &ResultRecorder::receive>(recorder);
+    gui_forms::SubscriptionToken subscription = view.completed().subscribe(completion);
+    const std::shared_ptr<gui_forms::Button> accept =
+        std::dynamic_pointer_cast<gui_forms::Button>(window.find("file-manager.picker.accept"));
+    require(accept != nullptr, "fixture Accept button must exist");
+    const bool accepted_click = (*accept).perform_click();
+    require(accept && accepted_click && completed && result.accepted() &&
                 result.selections.front().path.filename() == "open.txt",
             "GUI.Forms Accept command must emit the revalidated selection result");
 
     view.set_orchestrator_session_valid(false);
     completed = false;
-    require(!accept->enabled() && !accept->perform_click() && !completed,
+    const bool unavailable_click = (*accept).perform_click();
+    require(!(*accept).enabled() && !unavailable_click && !completed,
             "lost Orchestrator session must disable acceptance while browsing remains");
 
     view.present(root);
-    require(!accept->enabled(), "reload must retain authority loss");
+    require(!(*accept).enabled(), "reload must retain authority loss");
     view.set_orchestrator_session_valid(true);
-    const auto objects = std::dynamic_pointer_cast<gui_forms::ObjectView>(window.find("file-manager.picker.objects"));
-    const auto file_for_reload = std::find_if(view.controller().browser().entries.begin(), view.controller().browser().entries.end(),
-        [](const auto& entry) { return entry.name == "open.txt"; });
-    objects->set_selected_ids({file_for_reload->stable_id});
-    const auto hidden = std::dynamic_pointer_cast<gui_forms::CheckBox>(window.find("file-manager.picker.hidden"));
-    hidden->set_checked(true);
-    require(objects->selected_ids().empty() && view.controller().selected_ids().empty(),
-        "refresh clears visible and semantic selection together");
-    const auto folder = std::find_if(view.controller().browser().entries.begin(), view.controller().browser().entries.end(),
-        [](const auto& entry) { return entry.directory; });
-    const bool folder_selected = view.controller().set_selection({folder->stable_id});
-    const bool folder_clicked = accept->perform_click();
-    if (!folder_selected || !folder_clicked || view.controller().browser().location.filename() != "Folder")
-        std::cerr << "folder selected=" << folder_selected << " clicked=" << folder_clicked << " location=" << view.controller().browser().location << " error=" << view.controller().last_error() << '\n';
-    require(folder_selected && folder_clicked && view.controller().browser().location.filename() == "Folder", "Open button enters selected folder");
-    window.dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::l, gui_forms::Modifier::control});
-    require(window.focused_control() == window.find("file-manager.picker.path"), "Ctrl+L focuses location");
-    window.dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::up, gui_forms::Modifier::alt});
-    require(view.controller().browser().location == std::filesystem::canonical(root), "Alt+Up enters parent");
+    const std::shared_ptr<gui_forms::ObjectView> objects =
+        std::dynamic_pointer_cast<gui_forms::ObjectView>(
+            window.find("file-manager.picker.objects"));
+    const std::vector<file_manager::DirectoryEntry>::const_iterator file_for_reload =
+        std::find_if(view.controller().browser().entries.begin(),
+                     view.controller().browser().entries.end(), is_open_file);
+    (*objects).set_selected_ids({(*file_for_reload).stable_id});
+    const std::shared_ptr<gui_forms::CheckBox> hidden =
+        std::dynamic_pointer_cast<gui_forms::CheckBox>(window.find("file-manager.picker.hidden"));
+    (*hidden).set_checked(true);
+    require((*objects).selected_ids().empty() && view.controller().selected_ids().empty(),
+            "refresh clears visible and semantic selection together");
+    const std::vector<file_manager::DirectoryEntry>::const_iterator folder =
+        std::find_if(view.controller().browser().entries.begin(),
+                     view.controller().browser().entries.end(), is_directory);
+    const bool folder_selected = view.controller().set_selection({(*folder).stable_id});
+    const bool folder_clicked = (*accept).perform_click();
+    if (!folder_selected || !folder_clicked ||
+        view.controller().browser().location.filename() != "Folder")
+        std::cerr << "folder selected=" << folder_selected << " clicked=" << folder_clicked
+                  << " location=" << view.controller().browser().location
+                  << " error=" << view.controller().last_error() << '\n';
+    require(folder_selected && folder_clicked &&
+                view.controller().browser().location.filename() == "Folder",
+            "Open button enters selected folder");
+    window.dispatch_key(
+        {gui_forms::KeyAction::down, gui_forms::PhysicalKey::l, gui_forms::Modifier::control});
+    require(window.focused_control() == window.find("file-manager.picker.path"),
+            "Ctrl+L focuses location");
+    window.dispatch_key(
+        {gui_forms::KeyAction::down, gui_forms::PhysicalKey::up, gui_forms::Modifier::alt});
+    require(view.controller().browser().location == std::filesystem::canonical(root),
+            "Alt+Up enters parent");
     window.request_focus(objects);
     completed = false;
     window.dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::escape});
-    require(completed && result.terminal == file_manager::DocumentPickerTerminal::cancelled, "Escape cancels picker");
+    require(completed && result.terminal == file_manager::DocumentPickerTerminal::cancelled,
+            "Escape cancels picker");
     completed = false;
     view.cancel();
     require(!completed, "terminal completion is emitted once per presentation");
-    file_manager::DocumentPickerRequest save_request;
+    file_manager::DocumentPickerRequest save_request{};
     save_request.protected_root = root;
     save_request.owner_application_id = "save-host";
     save_request.authority = file_manager::DocumentPickerAuthority::trusted_local_host;
@@ -115,16 +359,36 @@ int main() {
     gui_forms::Window save_window(save.root_control(), {580, 420});
     save_window.perform_layout();
     save.attach_dialog(save_window);
-    const auto name = save_window.find("file-manager.picker.filename");
-    require(save_window.focused_control() == name && name->committed_arranged_bounds().height == 32,
-        "compact save layout retains usable filename height and initial focus");
-    const auto save_objects = std::dynamic_pointer_cast<gui_forms::ObjectView>(save_window.find("file-manager.picker.objects"));
-    const auto save_file = std::find_if(save.controller().browser().entries.begin(), save.controller().browser().entries.end(),
-        [](const auto& entry) { return entry.name == "open.txt"; });
-    save_objects->set_selected_ids({save_file->stable_id});
-    require(std::dynamic_pointer_cast<gui_forms::TextBox>(name)->text() == "open.txt", "save selection updates visible filename");
-    std::error_code ignored;
-    std::filesystem::remove_all(root, ignored);
+    const gui_forms::Control::Ptr name = save_window.find("file-manager.picker.filename");
+    require(save_window.focused_control() == name &&
+                (*name).committed_arranged_bounds().height == 32,
+            "compact save layout retains usable filename height and initial focus");
+    const std::shared_ptr<gui_forms::ObjectView> save_objects =
+        std::dynamic_pointer_cast<gui_forms::ObjectView>(
+            save_window.find("file-manager.picker.objects"));
+    const std::vector<file_manager::DirectoryEntry>::const_iterator save_file =
+        std::find_if(save.controller().browser().entries.begin(),
+                     save.controller().browser().entries.end(), is_open_file);
+    (*save_objects).set_selected_ids({(*save_file).stable_id});
+    const std::shared_ptr<gui_forms::TextBox> filename_box =
+        std::dynamic_pointer_cast<gui_forms::TextBox>(name);
+    require((*filename_box).text() == "open.txt", "save selection updates visible filename");
+    verify_cancel_during_reload(save_request);
+    verify_nested_reload(save_request);
+    verify_exception_reset(save_request, false);
+    verify_exception_reset(save_request, true);
+    verify_disconnected_controls(save_request);
+    verify_teardown_during_completion(save_request);
     std::cout << "document picker view tests passed\n";
     return 0;
+}
+
+int main() {
+    try {
+        const int status = run_tests();
+        return status;
+    } catch (const std::exception& error) {
+        std::cerr << "document picker view test failed: " << error.what() << '\n';
+        return 1;
+    }
 }

@@ -24,16 +24,17 @@ struct ChecksumProgress final {
 
 struct ChecksumResult final {
     ChecksumTerminal terminal{ChecksumTerminal::refused};
-    std::string code;
-    std::string message;
+    std::string code{};
+    std::string message{};
     std::string algorithm{"SHA-256"};
-    std::string digest_hex;
-    std::filesystem::path path;
-    ObjectIdentity identity;
+    std::string digest_hex{};
+    std::filesystem::path path{};
+    ObjectIdentity identity{};
     std::uint64_t bytes_read{};
 
     [[nodiscard]] bool succeeded() const noexcept {
-        return terminal == ChecksumTerminal::completed;
+        const bool completed = terminal == ChecksumTerminal::completed;
+        return completed;
     }
 };
 

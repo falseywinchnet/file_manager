@@ -16,17 +16,17 @@ enum class PlatformCommandKind : std::uint8_t {
 
 struct PlatformCommandPlan final {
     PlatformCommandKind kind{PlatformCommandKind::open_default};
-    std::filesystem::path protected_root;
-    std::filesystem::path selected_path;
-    ObjectIdentity expected_identity;
-    std::filesystem::path executable;
-    std::vector<std::string> arguments;
+    std::filesystem::path protected_root{};
+    std::filesystem::path selected_path{};
+    ObjectIdentity expected_identity{};
+    std::filesystem::path executable{};
+    std::vector<std::string> arguments{};
 };
 
 struct PlatformCommandResult final {
     bool launched{};
-    std::string code;
-    std::string message;
+    std::string code{};
+    std::string message{};
     int exit_status{};
 };
 

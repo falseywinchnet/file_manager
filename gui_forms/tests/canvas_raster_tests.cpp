@@ -16,7 +16,7 @@ void require_at(bool value, int line) { if (!value) { std::cerr << "failed at " 
 
 void compare(ImageSampling sampling, double zoom, double scale, bool edited) {
     const std::shared_ptr<gui_drawing::Bitmap> bitmap = std::make_shared<gui_drawing::Bitmap>(1025, 1025);
-    gui_drawing::BitmapEditView edit = bitmap->begin_edit({0, 0, 1025, 1025});
+    gui_drawing::BitmapEditView edit = (*bitmap).begin_edit({0, 0, 1025, 1025});
     for (int y = 0; y < 1025; ++y) for (int x = 0; x < 1025; ++x) {
         std::byte* pixel = edit.writable_data + y * edit.row_bytes + x * 4;
         const unsigned alpha = 80 + (x * 3 + y * 5) % 176;
@@ -25,13 +25,13 @@ void compare(ImageSampling sampling, double zoom, double scale, bool edited) {
         pixel[2] = std::byte(((x + y) % 251) * alpha / 255);
         pixel[3] = std::byte(alpha);
     }
-    static_cast<void>(bitmap->commit_edit(edit.token));
+    static_cast<void>((*bitmap).commit_edit(edit.token));
     const std::shared_ptr<RasterCanvas> canvas = make_control<RasterCanvas>(StableId("raster"));
-    canvas->set_bitmap(bitmap);
-    canvas->set_transparency_grid(false);
-    canvas->set_canvas_background(Color::rgba(23, 37, 51));
-    canvas->set_sampling(sampling);
-    canvas->set_view(zoom, {470.3, 480.7});
+    (*canvas).set_bitmap(bitmap);
+    (*canvas).set_transparency_grid(false);
+    (*canvas).set_canvas_background(Color::rgba(23, 37, 51));
+    (*canvas).set_sampling(sampling);
+    (*canvas).set_view(zoom, {470.3, 480.7});
     const Size size{180, 150};
     Window window(canvas, size);
     window.perform_layout();
@@ -44,15 +44,15 @@ void compare(ImageSampling sampling, double zoom, double scale, bool edited) {
     require(window.paint(tiled).has_value());
     tiled.end_frame();
     if (edited) {
-        bitmap->set_pixel(511, 511, gui_drawing::Color::from_name("red"));
-        bitmap->set_pixel(512, 512, gui_drawing::Color::from_name("blue"));
-        require(canvas->synchronize_bitmap());
+        (*bitmap).set_pixel(511, 511, gui_drawing::Color::from_name("red"));
+        (*bitmap).set_pixel(512, 512, gui_drawing::Color::from_name("blue"));
+        require((*canvas).synchronize_bitmap());
         require(tiled.synchronize_images(window.image_resources()));
         tiled.begin_frame(damage);
         require(window.paint(tiled).has_value());
         tiled.end_frame();
     }
-    const gui_drawing::ImageSnapshot snapshot = bitmap->snapshot();
+    const gui_drawing::ImageSnapshot snapshot = (*bitmap).snapshot();
     ImageRegistry registry;
     const ImageLoadResult loaded = registry.load_bgra32_premultiplied(1025, 1025, snapshot.row_bytes(), snapshot.pixels());
     require(bool(loaded));
@@ -84,8 +84,8 @@ void large_native_probe() {
     const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
     const std::shared_ptr<gui_drawing::Bitmap> bitmap = std::make_shared<gui_drawing::Bitmap>(10000, 10000);
     const std::shared_ptr<RasterCanvas> canvas = make_control<RasterCanvas>(StableId("large.raster"));
-    canvas->set_bitmap(bitmap);
-    canvas->set_transparency_grid(false);
+    (*canvas).set_bitmap(bitmap);
+    (*canvas).set_transparency_grid(false);
     ImageRegistryLimits limits;
     limits.maximum_total_encoded_bytes = 512ULL * 1024ULL * 1024ULL;
     limits.maximum_total_decoded_bytes = 512ULL * 1024ULL * 1024ULL;
@@ -100,8 +100,8 @@ void large_native_probe() {
     require(window.paint(raster).has_value());
     raster.end_frame();
     const std::chrono::steady_clock::time_point initial = std::chrono::steady_clock::now();
-    bitmap->set_pixel(333, 333, gui_drawing::Color::from_name("red"));
-    require(canvas->synchronize_bitmap());
+    (*bitmap).set_pixel(333, 333, gui_drawing::Color::from_name("red"));
+    require((*canvas).synchronize_bitmap());
     const std::chrono::steady_clock::time_point published = std::chrono::steady_clock::now();
     require(raster.synchronize_images(window.image_resources()));
     const std::chrono::steady_clock::time_point cached = std::chrono::steady_clock::now();

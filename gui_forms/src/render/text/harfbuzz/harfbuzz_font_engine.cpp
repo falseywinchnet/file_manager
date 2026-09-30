@@ -23,6 +23,9 @@ struct BidiOwner final {
     SBAlgorithmRef algorithm = nullptr;
     SBParagraphRef paragraph = nullptr;
     SBLineRef line = nullptr;
+    BidiOwner() = default;
+    BidiOwner(const BidiOwner&) = delete;
+    BidiOwner& operator=(const BidiOwner&) = delete;
     ~BidiOwner() {
         if (line) { SBLineRelease(line); }
         if (paragraph) { SBParagraphRelease(paragraph); }
@@ -33,11 +36,11 @@ struct BidiOwner final {
         if (paragraph) { SBParagraphRelease(paragraph); paragraph = nullptr; }
     }
 };
-struct DirectionRun final { Utf8Range range; bool rtl; };
+struct DirectionRun final { Utf8Range range{}; bool rtl{}; };
 std::vector<DirectionRun> visual_direction_runs(std::string_view utf8) {
-    std::vector<DirectionRun> runs;
+    std::vector<DirectionRun> runs{};
     const SBCodepointSequence sequence{SBStringEncodingUTF8, utf8.data(), utf8.size()};
-    BidiOwner owner;
+    BidiOwner owner{};
     owner.algorithm = SBAlgorithmCreate(&sequence);
     if (!owner.algorithm) { throw std::bad_alloc(); }
     std::size_t offset = 0;
@@ -62,18 +65,32 @@ std::vector<DirectionRun> visual_direction_runs(std::string_view utf8) {
 struct LibraryOwner final {
     FT_Library value{};
     LibraryOwner() {
-        if (FT_Init_FreeType(&value) != 0 || value == nullptr) {
+        const FT_Error initialized = FT_Init_FreeType(&value);
+        if (initialized != 0 || value == nullptr) {
             throw std::runtime_error("FreeType initialization failed");
         }
     }
+    LibraryOwner(const LibraryOwner&) = delete;
+    LibraryOwner& operator=(const LibraryOwner&) = delete;
     ~LibraryOwner() {
         if (value != nullptr) FT_Done_FreeType(value);
     }
 };
 
-[[nodiscard]] std::vector<char32_t> decode_scalars(std::string_view utf8,
-                                                    Utf8Range range) {
-    std::vector<char32_t> scalars;
+struct ReleaseFace final {
+    void operator()(FT_Face face) const noexcept {
+        if (face != nullptr) FT_Done_Face(face);
+    }
+};
+using FreeTypeFaceOwner = std::unique_ptr<FT_FaceRec, ReleaseFace>;
+using HarfBuzzFontOwner = std::unique_ptr<hb_font_t, void (*)(hb_font_t*)>;
+using HarfBuzzBufferOwner = std::unique_ptr<hb_buffer_t, void (*)(hb_buffer_t*)>;
+
+// utf8 is already validated; range contains complete scalars. The caller owns
+// scratch storage and reserves at least range.length bytes as a scalar bound.
+void decode_scalars(std::string_view utf8, Utf8Range range,
+                    std::vector<char32_t>& scalars) {
+    scalars.clear();
     std::size_t offset = range.start.value();
     while (offset < range.end.value()) {
         const unsigned char first = static_cast<unsigned char>(utf8[offset]);
@@ -99,13 +116,13 @@ struct LibraryOwner final {
         scalars.push_back(value);
         offset += count;
     }
-    return scalars;
 }
 
 [[nodiscard]] bool ignorable_for_coverage(char32_t scalar) noexcept {
-    return scalar == U'\u200c' || scalar == U'\u200d' ||
+    const bool ignorable = scalar == U'\u200c' || scalar == U'\u200d' ||
            (scalar >= U'\ufe00' && scalar <= U'\ufe0f') ||
            (scalar >= U'\U000e0100' && scalar <= U'\U000e01ef');
+    return ignorable;
 }
 
 } // namespace
@@ -144,7 +161,7 @@ public:
     };
 
     struct FacePreference final {
-        FontSpec font;
+        FontSpec font{};
 
         [[nodiscard]] int tier(const Face& face) const noexcept {
             if (face.role && *face.role == font.role) return 0;
@@ -156,23 +173,30 @@ public:
                                       const Face* right) const noexcept {
             const int left_tier = tier(*left);
             const int right_tier = tier(*right);
-            if (left_tier != right_tier) return left_tier < right_tier;
+            if (left_tier != right_tier) {
+                const bool preferred = left_tier < right_tier;
+                return preferred;
+            }
             const int left_italic = (*left).italic == font.italic ? 0 : 1;
             const int right_italic = (*right).italic == font.italic ? 0 : 1;
             if (left_italic != right_italic) {
-                return left_italic < right_italic;
+                const bool preferred = left_italic < right_italic;
+                return preferred;
             }
-            return std::abs(static_cast<int>((*left).weight) - font.weight) <
-                   std::abs(static_cast<int>((*right).weight) - font.weight);
+            const int left_distance = std::abs(static_cast<int>((*left).weight) - font.weight);
+            const int right_distance = std::abs(static_cast<int>((*right).weight) - font.weight);
+            const bool preferred = left_distance < right_distance;
+            return preferred;
         }
     };
 
-    LibraryOwner library;
-    std::vector<Face> faces;
+    LibraryOwner library{};
+    std::vector<Face> faces{};
     std::uint64_t next_face_id{1U};
 
     [[nodiscard]] std::vector<Face*> candidates(FontSpec font) {
-        std::vector<Face*> result;
+        std::vector<Face*> result{};
+        result.reserve(faces.size());
         for (Face& face : faces) {
             // The body face is the house text fallback for control and
             // monospace roles. This keeps Portsmouth as the preferred control
@@ -190,9 +214,10 @@ public:
     }
 
     [[nodiscard]] bool has_primary(FontRole role) const noexcept {
-        return std::any_of(faces.begin(), faces.end(), [role](const Face& face) {
-            return face.role && *face.role == role;
-        });
+        for (const Face& face : faces) {
+            if (face.role && *face.role == role) return true;
+        }
+        return false;
     }
 
     [[nodiscard]] static bool covers(Face& face,
@@ -219,18 +244,22 @@ public:
             library.value, reinterpret_cast<const FT_Byte*>(bytes.data()),
             static_cast<FT_Long>(bytes.size()), static_cast<FT_Long>(face_index),
             &native);
+        FreeTypeFaceOwner pending_face{native};
         if (opened != 0 || native == nullptr || (*native).num_glyphs <= 0 ||
             (*native).num_glyphs > maximum_glyphs ||
-            ((*native).face_flags & FT_FACE_FLAG_SCALABLE) == 0 ||
-            FT_Select_Charmap(native, FT_ENCODING_UNICODE) != 0) {
-            if (native != nullptr) FT_Done_Face(native);
+            ((*native).face_flags & FT_FACE_FLAG_SCALABLE) == 0) {
             return std::nullopt;
         }
+        const FT_Error charmap_selected = FT_Select_Charmap(native, FT_ENCODING_UNICODE);
+        if (charmap_selected != 0) return std::nullopt;
+        // Retain native cleanup until the owning Face has been constructed.
+        // Family-name allocation and vector growth can both throw.
         const FontFaceId id{next_face_id++};
         std::string family = (*native).family_name != nullptr
             ? (*native).family_name : "unknown bundled face";
         faces.emplace_back(id, role, weight, italic, !role.has_value(),
                            std::move(family), std::move(owned), native);
+        static_cast<void>(pending_face.release());
         return id;
     }
 
@@ -239,13 +268,15 @@ public:
                     bool add_trailing_spacing, bool rtl) {
         const FT_F26Dot6 size = static_cast<FT_F26Dot6>(
             std::llround(std::clamp(font.size, 1.0, 4096.0) * 64.0));
-        if (FT_Set_Char_Size(face.face, 0, size, 72U, 72U) != 0) return;
-        hb_font_t* hb_font = hb_ft_font_create_referenced(face.face);
+        const FT_Error size_set = FT_Set_Char_Size(face.face, 0, size, 72U, 72U);
+        if (size_set != 0) return;
+        HarfBuzzFontOwner font_owner{hb_ft_font_create_referenced(face.face), hb_font_destroy};
+        hb_font_t* hb_font = font_owner.get();
         if (hb_font == nullptr) return;
         hb_ft_font_set_load_flags(hb_font, FT_LOAD_DEFAULT | FT_LOAD_NO_BITMAP);
-        hb_buffer_t* buffer = hb_buffer_create();
+        HarfBuzzBufferOwner buffer_owner{hb_buffer_create(), hb_buffer_destroy};
+        hb_buffer_t* buffer = buffer_owner.get();
         if (buffer == nullptr) {
-            hb_font_destroy(hb_font);
             return;
         }
         hb_buffer_set_cluster_level(buffer,
@@ -262,7 +293,7 @@ public:
         const hb_glyph_info_t* infos = hb_buffer_get_glyph_infos(buffer, &count);
         const hb_glyph_position_t* positions =
             hb_buffer_get_glyph_positions(buffer, &count);
-        ShapedFontRun run;
+        ShapedFontRun run{};
         run.face = face.id;
         run.source_range = range;
         run.glyphs.reserve(count);
@@ -306,8 +337,6 @@ public:
             result.height = result.ascent + result.descent;
         }
         result.runs.push_back(std::move(run));
-        hb_buffer_destroy(buffer);
-        hb_font_destroy(hb_font);
     }
 };
 
@@ -319,14 +348,18 @@ std::optional<FontFaceId> HarfBuzzFontEngine::register_shared_typeface(
     std::shared_ptr<const std::vector<std::byte>> encoded, std::uint32_t face_index) {
     if (!encoded) return std::nullopt;
     const std::span<const std::byte> bytes(*encoded);
-    return register_owned_typeface(role, weight, italic, bytes, std::move(encoded), face_index);
+    const std::optional<FontFaceId> result =
+        register_owned_typeface(role, weight, italic, bytes, std::move(encoded), face_index);
+    return result;
 }
 
 std::optional<FontFaceId> HarfBuzzFontEngine::register_owned_typeface(
     std::optional<FontRole> role, std::uint16_t weight, bool italic,
     std::span<const std::byte> encoded, std::shared_ptr<const void> owner,
     std::uint32_t face_index) {
-    return (*impl_).register_face(role, weight, italic, encoded, std::move(owner), face_index);
+    const std::optional<FontFaceId> result =
+        (*impl_).register_face(role, weight, italic, encoded, std::move(owner), face_index);
+    return result;
 }
 
 std::optional<FontFaceId> HarfBuzzFontEngine::register_typeface(
@@ -334,8 +367,11 @@ std::optional<FontFaceId> HarfBuzzFontEngine::register_typeface(
     std::span<const std::byte> encoded, std::uint32_t face_index) {
     if (encoded.empty() || encoded.size() > maximum_face_bytes ||
         (*impl_).faces.size() >= maximum_faces || face_index > 255U) return std::nullopt;
-    return register_shared_typeface(role, weight, italic,
-        std::make_shared<const std::vector<std::byte>>(encoded.begin(), encoded.end()), face_index);
+    std::shared_ptr<const std::vector<std::byte>> owner =
+        std::make_shared<const std::vector<std::byte>>(encoded.begin(), encoded.end());
+    const std::optional<FontFaceId> result =
+        register_shared_typeface(role, weight, italic, std::move(owner), face_index);
+    return result;
 }
 
 std::optional<FontFaceId> HarfBuzzFontEngine::register_fallback_typeface(
@@ -343,13 +379,15 @@ std::optional<FontFaceId> HarfBuzzFontEngine::register_fallback_typeface(
     std::uint32_t face_index) {
     if (encoded.empty() || encoded.size() > maximum_face_bytes ||
         (*impl_).faces.size() >= maximum_faces || face_index > 255U) return std::nullopt;
-    return register_shared_typeface(
-        std::nullopt, weight, italic,
-        std::make_shared<const std::vector<std::byte>>(encoded.begin(), encoded.end()), face_index);
+    std::shared_ptr<const std::vector<std::byte>> owner =
+        std::make_shared<const std::vector<std::byte>>(encoded.begin(), encoded.end());
+    const std::optional<FontFaceId> result =
+        register_shared_typeface(std::nullopt, weight, italic, std::move(owner), face_index);
+    return result;
 }
 
 ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
-    ShapedText result;
+    ShapedText result{};
     if (utf8.empty()) {
         result.height = font.size;
         return result;
@@ -365,10 +403,21 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
 
     TextStore store(utf8);
     struct Segment final { Impl::Face* face{}; Utf8Range range{}; };
-    std::vector<Segment> segments;
-    for (std::size_t index = 0U; index < store.grapheme_count().value(); ++index) {
+    const std::size_t graphemes = store.grapheme_count().value();
+    std::size_t maximum_cluster_bytes = 0U;
+    for (std::size_t index = 0U; index < graphemes; ++index) {
         const Utf8Range range = store.grapheme_range(GraphemeIndex(index));
-        const std::vector<char32_t> scalars = decode_scalars(utf8, range);
+        const std::size_t bytes = range.end.value() - range.start.value();
+        maximum_cluster_bytes = std::max(maximum_cluster_bytes, bytes);
+    }
+    std::vector<char32_t> scalars{};
+    scalars.reserve(maximum_cluster_bytes);
+    std::vector<Segment> segments{};
+    // Grow only when a distinct font run is published. Most text coalesces
+    // into one run; reserving one Segment per grapheme wastes input-sized space.
+    for (std::size_t index = 0U; index < graphemes; ++index) {
+        const Utf8Range range = store.grapheme_range(GraphemeIndex(index));
+        decode_scalars(utf8, range, scalars);
         Impl::Face* selected = nullptr;
         for (Impl::Face* candidate : candidates) {
             if (Impl::covers(*candidate, scalars)) {
@@ -392,10 +441,12 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
     // directional runs, then shape font fragments with the resolved direction;
     // never reverse UTF-8 bytes or reorder stored application text.
     const std::vector<DirectionRun> directions = visual_direction_runs(utf8);
-    struct VisualSegment final { Impl::Face* face; Utf8Range range; bool rtl; };
-    std::vector<VisualSegment> visual;
+    struct VisualSegment final { Impl::Face* face{}; Utf8Range range{}; bool rtl{}; };
+    std::vector<VisualSegment> visual{};
+    std::vector<VisualSegment> parts{};
+    parts.reserve(segments.size());
     for (const DirectionRun& direction : directions) {
-        std::vector<VisualSegment> parts;
+        parts.clear();
         for (const Segment& segment : segments) {
             const std::size_t start = std::max(segment.range.start.value(), direction.range.start.value());
             const std::size_t end = std::min(segment.range.end.value(), direction.range.end.value());
@@ -416,12 +467,13 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
 }
 
 std::size_t HarfBuzzFontEngine::face_count() const noexcept {
-    return (*impl_).faces.size();
+    const std::size_t count = (*impl_).faces.size();
+    return count;
 }
 
 ResolvedTextLayout HarfBuzzFontEngine::resolve(std::string_view utf8,
                                                FontSpec font) {
-    ResolvedTextLayout result;
+    ResolvedTextLayout result{};
     result.effective_font = font;
     if (!validate_utf8(utf8).valid() || !valid_font_spec(font)) {
         result.status = TextResolutionStatus::invalid_request;

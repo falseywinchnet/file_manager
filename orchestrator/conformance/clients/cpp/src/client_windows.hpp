@@ -16,7 +16,9 @@
 namespace fileman::orchestrator::windows_local {
 
 [[noreturn]] inline void fail(const char* message) {
-    throw ClientError(std::string(message) + " (Windows error " + std::to_string(GetLastError()) + ")");
+    const DWORD code = GetLastError();
+    const std::string detail = std::string(message) + " (Windows error " + std::to_string(code) + ")";
+    throw ClientError(detail);
 }
 
 class Handle final {
@@ -24,11 +26,15 @@ public:
     explicit Handle(HANDLE value) : value_(value) {
         if (value == nullptr || value == INVALID_HANDLE_VALUE) fail("open local handle");
     }
-    ~Handle() { CloseHandle(value_); }
+    ~Handle() { if (value_ != nullptr) CloseHandle(value_); }
     Handle(const Handle&) = delete;
     Handle& operator=(const Handle&) = delete;
-    HANDLE get() const noexcept { return value_; }
-    HANDLE release() noexcept { HANDLE result = value_; value_ = nullptr; return result; }
+    [[nodiscard]] HANDLE get() const noexcept { return value_; }
+    [[nodiscard]] HANDLE release() noexcept {
+        const HANDLE result = value_;
+        value_ = nullptr;
+        return result;
+    }
 private:
     HANDLE value_;
 };
@@ -47,7 +53,8 @@ inline std::wstring sid_text(PSID sid) {
     LPWSTR value = nullptr;
     if (!ConvertSidToStringSidW(sid, &value)) fail("read local SID");
     const Allocation allocation(value);
-    return value;
+    const std::wstring identity(value);
+    return identity;
 }
 
 inline std::wstring process_sid(HANDLE process) {
@@ -57,9 +64,14 @@ inline std::wstring process_sid(HANDLE process) {
     DWORD size = 0;
     GetTokenInformation(token.get(), TokenUser, nullptr, 0, &size);
     if (size == 0 || size > 65536) fail("invalid process token bound");
-    std::vector<std::uintptr_t> bytes((size + sizeof(std::uintptr_t) - 1) / sizeof(std::uintptr_t));
+    // Bounded byte count is rounded up to aligned TOKEN_USER storage.
+    const std::size_t token_bytes = static_cast<std::size_t>(size);
+    const std::size_t word_count = (token_bytes + sizeof(std::uintptr_t) - 1) / sizeof(std::uintptr_t);
+    std::vector<std::uintptr_t> bytes(word_count, 0);
     if (!GetTokenInformation(token.get(), TokenUser, bytes.data(), size, &size)) fail("read process token");
-    return sid_text((*reinterpret_cast<const TOKEN_USER*>(bytes.data())).User.Sid);
+    const TOKEN_USER& user = *reinterpret_cast<const TOKEN_USER*>(bytes.data());
+    const std::wstring identity = sid_text(user.User.Sid);
+    return identity;
 }
 
 inline void validate_acl(HANDLE handle) {
@@ -69,7 +81,8 @@ inline void validate_acl(HANDLE handle) {
     if (GetSecurityInfo(handle, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
                         &owner, nullptr, &acl, nullptr, &descriptor) != ERROR_SUCCESS) fail("read local object security");
     const Allocation allocation(descriptor);
-    const std::wstring user = process_sid(GetCurrentProcess());
+    const HANDLE current_process = GetCurrentProcess();
+    const std::wstring user = process_sid(current_process);
     if (owner == nullptr || acl == nullptr || sid_text(owner) != user || (*acl).AceCount == 0) fail("local object is not private");
     for (DWORD index = 0; index < (*acl).AceCount; ++index) {
         void* raw = nullptr;
@@ -102,15 +115,18 @@ inline void validate_directory(const std::filesystem::path& path) {
         if (parent == ancestor) break;
         ancestor = parent;
     }
-    const Handle directory(CreateFileW(path.c_str(), GENERIC_READ | READ_CONTROL,
+    const HANDLE raw_directory = CreateFileW(path.c_str(), GENERIC_READ | READ_CONTROL,
         FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
-        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
+        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+    const Handle directory(raw_directory);
     validate_kind(directory.get(), true);
 }
 
-inline std::string read_private(const std::filesystem::path& path, std::size_t limit) {
-    const Handle file(CreateFileW(path.c_str(), GENERIC_READ | READ_CONTROL, FILE_SHARE_READ,
-        nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
+inline std::string read_private(const std::filesystem::path& path, const std::size_t limit) {
+    if (limit >= std::numeric_limits<DWORD>::max()) fail("private record bound exceeds DWORD");
+    const HANDLE raw_file = CreateFileW(path.c_str(), GENERIC_READ | READ_CONTROL, FILE_SHARE_READ,
+        nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+    const Handle file(raw_file);
     validate_kind(file.get(), false);
     std::string bytes(limit + 1, '\0');
     DWORD count = 0;
@@ -121,6 +137,7 @@ inline std::string read_private(const std::filesystem::path& path, std::size_t l
 }
 
 inline std::wstring utf16(const std::string& value) {
+    if (value.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) fail("UTF-8 metadata exceeds native count");
     const int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0);
     if (count <= 0) fail("invalid UTF-8 pipe metadata");
     std::wstring result(static_cast<std::size_t>(count), L'\0');
@@ -144,16 +161,32 @@ inline std::intptr_t connect(const std::string& endpoint, std::uint32_t expected
     Handle pipe(raw);
     ULONG pid = 0;
     if (!GetNamedPipeServerProcessId(pipe.get(), &pid) || pid != expected_pid) fail("pipe server PID mismatch");
-    const Handle process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid));
+    const HANDLE raw_process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    const Handle process(raw_process);
     if (process_sid(process.get()) != utf16(user_sid)) fail("pipe server SID mismatch");
-    return reinterpret_cast<std::intptr_t>(pipe.release());
+    const HANDLE transferred = pipe.release();
+    const std::intptr_t result = reinterpret_cast<std::intptr_t>(transferred);
+    return result;
 }
 
 inline void close(std::intptr_t pipe) noexcept { CloseHandle(reinterpret_cast<HANDLE>(pipe)); }
 
+// Both adapters borrow the supplied buffer only until native completion/drain.
+using BeginTransfer = BOOL (*)(HANDLE, void*, DWORD, OVERLAPPED*);
+inline BOOL begin_read(HANDLE pipe, void* bytes, DWORD count, OVERLAPPED* overlap) {
+    const BOOL started = ReadFile(pipe, bytes, count, nullptr, overlap);
+    return started;
+}
+inline BOOL begin_write(HANDLE pipe, void* bytes, DWORD count, OVERLAPPED* overlap) {
+    const BOOL started = WriteFile(pipe, bytes, count, nullptr, overlap);
+    return started;
+}
 inline void transfer(std::intptr_t pipe_value, void* buffer, std::size_t size, bool writing) {
+    if (size > std::numeric_limits<DWORD>::max()) fail("local transfer exceeds DWORD");
+    const BeginTransfer begin = writing ? begin_write : begin_read;
     HANDLE pipe = reinterpret_cast<HANDLE>(pipe_value);
-    const Handle event(CreateEventW(nullptr, TRUE, FALSE, nullptr));
+    const HANDLE raw_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    const Handle event(raw_event);
     const std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
     std::size_t offset = 0;
     while (offset < size) {
@@ -163,11 +196,10 @@ inline void transfer(std::intptr_t pipe_value, void* buffer, std::size_t size, b
         }
         OVERLAPPED overlap{};
         overlap.hEvent = event.get();
-        ResetEvent(event.get());
+        if (!ResetEvent(event.get())) fail("reset local completion event");
         DWORD amount = static_cast<DWORD>(size - offset);
         char* bytes = static_cast<char*>(buffer) + offset;
-        const BOOL started = writing ? WriteFile(pipe, bytes, amount, nullptr, &overlap)
-                                     : ReadFile(pipe, bytes, amount, nullptr, &overlap);
+        const BOOL started = begin(pipe, bytes, amount, &overlap);
         if (!started && GetLastError() != ERROR_IO_PENDING) fail("local pipe I/O");
         const std::chrono::milliseconds remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
         const DWORD wait = remaining.count() > 0 ? static_cast<DWORD>(remaining.count()) : 0;

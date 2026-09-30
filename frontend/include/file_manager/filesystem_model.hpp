@@ -30,46 +30,52 @@ struct ObjectIdentity final {
 
     std::uint64_t inode_high{}; // Upper 64 bits of Windows FILE_ID_128; zero on POSIX.
 
-    [[nodiscard]] bool available() const noexcept { return inode != 0 || inode_high != 0; }
+    [[nodiscard]] bool available() const noexcept {
+        const bool identified = inode != 0 || inode_high != 0;
+        return identified;
+    }
     [[nodiscard]] bool same_revision(const ObjectIdentity& other) const noexcept {
-        return *this == other && size == other.size &&
+        const bool same = *this == other && size == other.size &&
             modified_nanoseconds == other.modified_nanoseconds;
+        return same;
     }
     friend bool operator==(const ObjectIdentity& left,
                            const ObjectIdentity& right) noexcept {
-        return left.device == right.device && left.inode == right.inode &&
+        const bool same = left.device == right.device && left.inode == right.inode &&
             left.inode_high == right.inode_high &&
             left.type == right.type;
+        return same;
     }
 };
 
 struct DirectoryEntry final {
-    std::string stable_id;
-    std::filesystem::path path;
-    std::string name;
-    std::string secondary_text;
-    std::string modified_text;
-    ObjectIdentity identity;
+    std::string stable_id{};
+    std::filesystem::path path{};
+    std::string name{};
+    std::string secondary_text{};
+    std::string modified_text{};
+    ObjectIdentity identity{};
     EntryKind kind{EntryKind::other};
     bool directory{};
 };
 
 struct DirectorySnapshot final {
-    std::filesystem::path root;
-    std::filesystem::path location;
-    std::vector<DirectoryEntry> entries;
-    std::string error;
+    std::filesystem::path root{};
+    std::filesystem::path location{};
+    std::vector<DirectoryEntry> entries{};
+    std::string error{};
     std::uint64_t generation{};
     bool cancelled{};
 
     [[nodiscard]] bool available() const noexcept {
-        return !cancelled && error.empty();
+        const bool ready = !cancelled && error.empty();
+        return ready;
     }
 };
 
 struct NavigationTarget final {
-    std::filesystem::path root;
-    std::filesystem::path path;
+    std::filesystem::path root{};
+    std::filesystem::path path{};
 };
 
 using CancellationCheck = std::function<bool()>;

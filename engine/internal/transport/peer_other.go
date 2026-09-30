@@ -8,5 +8,6 @@ import (
 )
 
 func peerUID(net.Conn) (int, error) {
-	return 0, errors.New("local peer credentials are unavailable on this platform")
+	var failure error = errors.New("local peer credentials are unavailable on this platform")
+	return 0, failure
 }

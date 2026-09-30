@@ -38,7 +38,12 @@ enum class Icon : std::uint8_t {
     properties,
 };
 
-inline constexpr std::array<std::pair<Icon, std::string_view>, 17> icon_keys{{
+struct IconKey final {
+    Icon icon{};
+    std::string_view name{};
+};
+
+inline constexpr std::array<IconKey, 17> icon_keys{{
     {Icon::folder, "folder"},
     {Icon::document, "document"},
     {Icon::image, "image"},
@@ -59,8 +64,8 @@ inline constexpr std::array<std::pair<Icon, std::string_view>, 17> icon_keys{{
 }};
 
 [[nodiscard]] inline std::string_view key(const Icon icon) noexcept {
-    for (const auto& [candidate, name] : icon_keys) {
-        if (candidate == icon) return name;
+    for (const IconKey& entry : icon_keys) {
+        if (entry.icon == icon) return entry.name;
     }
     return "document";
 }
@@ -68,17 +73,17 @@ inline constexpr std::array<std::pair<Icon, std::string_view>, 17> icon_keys{{
 [[nodiscard]] inline std::string_view object_key(
     const EntryKind kind) noexcept {
     switch (kind) {
-        case EntryKind::folder: return key(Icon::folder);
-        case EntryKind::image: return key(Icon::image);
-        case EntryKind::archive: return key(Icon::archive);
-        case EntryKind::audio: return key(Icon::audio);
-        case EntryKind::code: return key(Icon::code);
+        case EntryKind::folder: return "folder";
+        case EntryKind::image: return "image";
+        case EntryKind::archive: return "archive";
+        case EntryKind::audio: return "audio";
+        case EntryKind::code: return "code";
         case EntryKind::document:
         case EntryKind::symlink:
         case EntryKind::other:
-            return key(Icon::document);
+            return "document";
     }
-    return key(Icon::document);
+    return "document";
 }
 
 namespace detail {
@@ -89,23 +94,25 @@ struct Raster final {
     explicit Raster(const std::uint32_t extent)
         : extent(extent), pixels(static_cast<std::size_t>(extent) * extent * 4U) {}
 
-    std::uint32_t extent;
-    std::vector<std::byte> pixels;
+    std::uint32_t extent{};
+    std::vector<std::byte> pixels{};
 
     static std::uint8_t mix(const std::uint8_t first,
                             const std::uint8_t second,
                             const double position) noexcept {
-        return static_cast<std::uint8_t>(std::lround(
+        const std::uint8_t result = static_cast<std::uint8_t>(std::lround(
             static_cast<double>(first) * (1.0 - position) +
             static_cast<double>(second) * position));
+        return result;
     }
 
     static Color blend(const Color first, const Color second,
                        const double position) noexcept {
-        return Color::rgba(mix(first.red, second.red, position),
+        const Color result = Color::rgba(mix(first.red, second.red, position),
                            mix(first.green, second.green, position),
                            mix(first.blue, second.blue, position),
                            mix(first.alpha, second.alpha, position));
+        return result;
     }
 
     void pixel(const int x, const int y, const Color source) noexcept {
@@ -120,17 +127,14 @@ struct Raster final {
         const double output_alpha = source_alpha +
             static_cast<double>(destination_alpha) / 255.0 *
                 (1.0 - source_alpha);
-        const auto composite = [&](const std::uint8_t channel,
-                                   const std::size_t component) {
+        const std::array<std::uint8_t, 3> channels{source.blue, source.green, source.red};
+        for (std::size_t component = 0; component < channels.size(); ++component) {
             const double destination =
                 static_cast<double>(static_cast<std::uint8_t>(pixels[offset + component]));
-            return static_cast<std::byte>(std::lround(
-                static_cast<double>(channel) * source_alpha +
-                destination * (1.0 - source_alpha)));
-        };
-        pixels[offset] = composite(source.blue, 0U);
-        pixels[offset + 1U] = composite(source.green, 1U);
-        pixels[offset + 2U] = composite(source.red, 2U);
+            const double composite = static_cast<double>(channels[component]) * source_alpha +
+                destination * (1.0 - source_alpha);
+            pixels[offset + component] = static_cast<std::byte>(std::lround(composite));
+        }
         pixels[offset + 3U] = static_cast<std::byte>(
             std::lround(output_alpha * 255.0));
     }
@@ -167,8 +171,8 @@ struct Raster final {
         const int delta_y = -std::abs(y1 - y0);
         const int step_y = y0 < y1 ? 1 : -1;
         int error = delta_x + delta_y;
+        const int radius = std::max(0, width - 1);
         for (;;) {
-            const int radius = std::max(0, width - 1);
             rect(x0 - radius, y0 - radius, x0 + radius + 1,
                  y0 + radius + 1, color);
             if (x0 == x1 && y0 == y1) break;
@@ -189,6 +193,13 @@ struct Raster final {
         }
     }
 
+    static double edge(const gui_forms::Point a, const gui_forms::Point b,
+                       const gui_forms::Point point) noexcept {
+        const double signed_area = (point.x - a.x) * (b.y - a.y) -
+            (point.y - a.y) * (b.x - a.x);
+        return signed_area;
+    }
+
     void triangle(gui_forms::Point first, gui_forms::Point second,
                   gui_forms::Point third, const Color color) noexcept {
         const int minimum_x = static_cast<int>(std::floor(
@@ -199,12 +210,6 @@ struct Raster final {
             std::min({first.y, second.y, third.y})));
         const int maximum_y = static_cast<int>(std::ceil(
             std::max({first.y, second.y, third.y})));
-        const auto edge = [](const gui_forms::Point a,
-                             const gui_forms::Point b,
-                             const gui_forms::Point point) {
-            return (point.x - a.x) * (b.y - a.y) -
-                   (point.y - a.y) * (b.x - a.x);
-        };
         for (int y = minimum_y; y <= maximum_y; ++y) {
             for (int x = minimum_x; x <= maximum_x; ++x) {
                 const gui_forms::Point point{
@@ -223,16 +228,28 @@ struct Raster final {
     }
 };
 
+// Converts the fixed 48-unit authored grid using nearest-integer rounding.
+struct IconScale final {
+    double scale;
+    int coordinate(const double value) const noexcept {
+        const int result = static_cast<int>(std::lround(value * scale));
+        return result;
+    }
+    int stroke(const double value = 1.0) const noexcept {
+        const int rounded = coordinate(value);
+        const int result = std::max(1, rounded);
+        return result;
+    }
+};
+
 [[nodiscard]] inline Raster make_icon(const Icon icon,
                                       const std::uint32_t extent) {
+    if (extent == 0U || extent > 4096U) {
+        throw std::invalid_argument("House icon extent must be 1 through 4096 pixels");
+    }
     Raster raster(extent);
     const double scale = static_cast<double>(extent) / 48.0;
-    const auto coordinate = [scale](const double value) {
-        return static_cast<int>(std::lround(value * scale));
-    };
-    const auto stroke = [scale](const double value = 1.0) {
-        return std::max(1, static_cast<int>(std::lround(value * scale)));
-    };
+    const IconScale metrics{scale};
     const Color shadow = Color::rgba(21, 38, 55, 68);
     const Color dark_blue = Color::rgba(39, 83, 119);
     const Color blue_top = Color::rgba(168, 220, 255);
@@ -251,8 +268,8 @@ struct Raster final {
     if (icon == Icon::back || icon == Icon::forward || icon == Icon::up) {
         const Color top = icon == Icon::up ? green_top : blue_top;
         const Color bottom = icon == Icon::up ? green_bottom : blue_bottom;
-        const int top_edge = coordinate(7);
-        const int bottom_edge = coordinate(41);
+        const int top_edge = metrics.coordinate(7);
+        const int bottom_edge = metrics.coordinate(41);
         for (int y = top_edge; y < bottom_edge; ++y) {
             const double position = static_cast<double>(y - top_edge) /
                 std::max(1, bottom_edge - top_edge - 1);
@@ -261,8 +278,8 @@ struct Raster final {
                 raster.triangle({24.0 * scale, 6.0 * scale},
                                 {5.0 * scale, 25.0 * scale},
                                 {43.0 * scale, 25.0 * scale}, color);
-                raster.rect(coordinate(17), coordinate(22), coordinate(31),
-                            coordinate(42), color);
+                raster.rect(metrics.coordinate(17), metrics.coordinate(22), metrics.coordinate(31),
+                            metrics.coordinate(42), color);
             } else {
                 const bool forward = icon == Icon::forward;
                 const double tip_x = (forward ? 43.0 : 5.0) * scale;
@@ -270,36 +287,36 @@ struct Raster final {
                 raster.triangle({tip_x, 24.0 * scale},
                                 {shoulder_x, 6.0 * scale},
                                 {shoulder_x, 42.0 * scale}, color);
-                raster.rect(forward ? coordinate(5) : coordinate(24),
-                            coordinate(17),
-                            forward ? coordinate(29) : coordinate(43),
-                            coordinate(31), color);
+                raster.rect(forward ? metrics.coordinate(5) : metrics.coordinate(24),
+                            metrics.coordinate(17),
+                            forward ? metrics.coordinate(29) : metrics.coordinate(43),
+                            metrics.coordinate(31), color);
             }
         }
         return raster;
     }
 
     if (icon == Icon::folder || icon == Icon::app) {
-        raster.rect(coordinate(5), coordinate(12), coordinate(42), coordinate(43), shadow);
-        raster.gradient_rect(coordinate(4), coordinate(9), coordinate(40),
-                             coordinate(19), folder_top, folder_bottom);
-        raster.rect(coordinate(4), coordinate(9), coordinate(19), coordinate(17), folder_top);
-        raster.rect(coordinate(18), coordinate(7), coordinate(34), coordinate(16), folder_top);
-        raster.gradient_rect(coordinate(4), coordinate(15), coordinate(43),
-                             coordinate(42), folder_front, folder_deep);
-        raster.outline(coordinate(4), coordinate(15), coordinate(43),
-                       coordinate(42), Color::rgba(158, 91, 22));
-        raster.rect(coordinate(7), coordinate(18), coordinate(40),
-                    coordinate(20), Color::rgba(255, 242, 190, 218));
+        raster.rect(metrics.coordinate(5), metrics.coordinate(12), metrics.coordinate(42), metrics.coordinate(43), shadow);
+        raster.gradient_rect(metrics.coordinate(4), metrics.coordinate(9), metrics.coordinate(40),
+                             metrics.coordinate(19), folder_top, folder_bottom);
+        raster.rect(metrics.coordinate(4), metrics.coordinate(9), metrics.coordinate(19), metrics.coordinate(17), folder_top);
+        raster.rect(metrics.coordinate(18), metrics.coordinate(7), metrics.coordinate(34), metrics.coordinate(16), folder_top);
+        raster.gradient_rect(metrics.coordinate(4), metrics.coordinate(15), metrics.coordinate(43),
+                             metrics.coordinate(42), folder_front, folder_deep);
+        raster.outline(metrics.coordinate(4), metrics.coordinate(15), metrics.coordinate(43),
+                       metrics.coordinate(42), Color::rgba(158, 91, 22));
+        raster.rect(metrics.coordinate(7), metrics.coordinate(18), metrics.coordinate(40),
+                    metrics.coordinate(20), Color::rgba(255, 242, 190, 218));
         if (icon == Icon::app) {
-            raster.circle(coordinate(35), coordinate(34), coordinate(7),
+            raster.circle(metrics.coordinate(35), metrics.coordinate(34), metrics.coordinate(7),
                           Color::rgba(91, 50, 120));
-            raster.circle(coordinate(34), coordinate(32), coordinate(5),
+            raster.circle(metrics.coordinate(34), metrics.coordinate(32), metrics.coordinate(5),
                           Color::rgba(176, 126, 203));
-            raster.line(coordinate(31), coordinate(34), coordinate(39),
-                        coordinate(34), Color::rgba(255, 255, 255), stroke());
-            raster.line(coordinate(35), coordinate(30), coordinate(35),
-                        coordinate(38), Color::rgba(255, 255, 255), stroke());
+            raster.line(metrics.coordinate(31), metrics.coordinate(34), metrics.coordinate(39),
+                        metrics.coordinate(34), Color::rgba(255, 255, 255), metrics.stroke());
+            raster.line(metrics.coordinate(35), metrics.coordinate(30), metrics.coordinate(35),
+                        metrics.coordinate(38), Color::rgba(255, 255, 255), metrics.stroke());
         }
         return raster;
     }
@@ -309,64 +326,64 @@ struct Raster final {
                         {4.0 * scale, 24.0 * scale},
                         {44.0 * scale, 24.0 * scale},
                         Color::rgba(233, 237, 240));
-        raster.gradient_rect(coordinate(12), coordinate(20), coordinate(36),
-                             coordinate(43), folder_front, folder_deep);
-        raster.outline(coordinate(12), coordinate(20), coordinate(36),
-                       coordinate(43), Color::rgba(83, 106, 120));
-        raster.rect(coordinate(21), coordinate(31), coordinate(28),
-                    coordinate(43), Color::rgba(116, 80, 55));
+        raster.gradient_rect(metrics.coordinate(12), metrics.coordinate(20), metrics.coordinate(36),
+                             metrics.coordinate(43), folder_front, folder_deep);
+        raster.outline(metrics.coordinate(12), metrics.coordinate(20), metrics.coordinate(36),
+                       metrics.coordinate(43), Color::rgba(83, 106, 120));
+        raster.rect(metrics.coordinate(21), metrics.coordinate(31), metrics.coordinate(28),
+                    metrics.coordinate(43), Color::rgba(116, 80, 55));
         return raster;
     }
 
     if (icon == Icon::drive) {
-        raster.gradient_rect(coordinate(7), coordinate(10), coordinate(41),
-                             coordinate(31), Color::rgba(239, 245, 248),
+        raster.gradient_rect(metrics.coordinate(7), metrics.coordinate(10), metrics.coordinate(41),
+                             metrics.coordinate(31), Color::rgba(239, 245, 248),
                              Color::rgba(113, 130, 141));
-        raster.outline(coordinate(7), coordinate(10), coordinate(41),
-                       coordinate(31), Color::rgba(81, 100, 111));
-        raster.gradient_rect(coordinate(5), coordinate(30), coordinate(43),
-                             coordinate(41), Color::rgba(164, 179, 188),
+        raster.outline(metrics.coordinate(7), metrics.coordinate(10), metrics.coordinate(41),
+                       metrics.coordinate(31), Color::rgba(81, 100, 111));
+        raster.gradient_rect(metrics.coordinate(5), metrics.coordinate(30), metrics.coordinate(43),
+                             metrics.coordinate(41), Color::rgba(164, 179, 188),
                              Color::rgba(105, 121, 130));
-        raster.outline(coordinate(5), coordinate(30), coordinate(43),
-                       coordinate(41), Color::rgba(81, 100, 111));
-        raster.circle(coordinate(36), coordinate(35), coordinate(2),
+        raster.outline(metrics.coordinate(5), metrics.coordinate(30), metrics.coordinate(43),
+                       metrics.coordinate(41), Color::rgba(81, 100, 111));
+        raster.circle(metrics.coordinate(36), metrics.coordinate(35), metrics.coordinate(2),
                       Color::rgba(113, 207, 115));
-        raster.rect(coordinate(10), coordinate(34), coordinate(28),
-                    coordinate(36), Color::rgba(220, 230, 235));
+        raster.rect(metrics.coordinate(10), metrics.coordinate(34), metrics.coordinate(28),
+                    metrics.coordinate(36), Color::rgba(220, 230, 235));
         return raster;
     }
 
     if (icon == Icon::archive) {
-        raster.gradient_rect(coordinate(7), coordinate(14), coordinate(41),
-                             coordinate(43), Color::rgba(214, 174, 118),
+        raster.gradient_rect(metrics.coordinate(7), metrics.coordinate(14), metrics.coordinate(41),
+                             metrics.coordinate(43), Color::rgba(214, 174, 118),
                              Color::rgba(155, 103, 47));
-        raster.outline(coordinate(7), coordinate(14), coordinate(41),
-                       coordinate(43), Color::rgba(110, 74, 34));
-        raster.gradient_rect(coordinate(9), coordinate(7), coordinate(39),
-                             coordinate(19), Color::rgba(232, 196, 146),
+        raster.outline(metrics.coordinate(7), metrics.coordinate(14), metrics.coordinate(41),
+                       metrics.coordinate(43), Color::rgba(110, 74, 34));
+        raster.gradient_rect(metrics.coordinate(9), metrics.coordinate(7), metrics.coordinate(39),
+                             metrics.coordinate(19), Color::rgba(232, 196, 146),
                              Color::rgba(174, 121, 64));
-        raster.outline(coordinate(9), coordinate(7), coordinate(39),
-                       coordinate(19), Color::rgba(110, 74, 34));
-        raster.rect(coordinate(22), coordinate(7), coordinate(29),
-                    coordinate(33), Color::rgba(103, 125, 138));
-        raster.rect(coordinate(21), coordinate(30), coordinate(30),
-                    coordinate(38), Color::rgba(232, 238, 241));
-        raster.outline(coordinate(21), coordinate(30), coordinate(30),
-                       coordinate(38), Color::rgba(64, 80, 90));
+        raster.outline(metrics.coordinate(9), metrics.coordinate(7), metrics.coordinate(39),
+                       metrics.coordinate(19), Color::rgba(110, 74, 34));
+        raster.rect(metrics.coordinate(22), metrics.coordinate(7), metrics.coordinate(29),
+                    metrics.coordinate(33), Color::rgba(103, 125, 138));
+        raster.rect(metrics.coordinate(21), metrics.coordinate(30), metrics.coordinate(30),
+                    metrics.coordinate(38), Color::rgba(232, 238, 241));
+        raster.outline(metrics.coordinate(21), metrics.coordinate(30), metrics.coordinate(30),
+                       metrics.coordinate(38), Color::rgba(64, 80, 90));
         return raster;
     }
 
     if (icon == Icon::audio) {
-        for (int x = coordinate(18); x < coordinate(23); ++x) {
-            raster.gradient_rect(x, coordinate(8), x + 1, coordinate(37),
+        for (int x = metrics.coordinate(18); x < metrics.coordinate(23); ++x) {
+            raster.gradient_rect(x, metrics.coordinate(8), x + 1, metrics.coordinate(37),
                                  violet_top, violet_bottom);
         }
-        raster.line(coordinate(21), coordinate(12), coordinate(39),
-                    coordinate(7), Color::rgba(109, 65, 137), stroke(2));
-        raster.line(coordinate(38), coordinate(7), coordinate(38),
-                    coordinate(31), Color::rgba(109, 65, 137), stroke(2));
-        raster.circle(coordinate(13), coordinate(37), coordinate(7), violet_bottom);
-        raster.circle(coordinate(31), coordinate(32), coordinate(7),
+        raster.line(metrics.coordinate(21), metrics.coordinate(12), metrics.coordinate(39),
+                    metrics.coordinate(7), Color::rgba(109, 65, 137), metrics.stroke(2));
+        raster.line(metrics.coordinate(38), metrics.coordinate(7), metrics.coordinate(38),
+                    metrics.coordinate(31), Color::rgba(109, 65, 137), metrics.stroke(2));
+        raster.circle(metrics.coordinate(13), metrics.coordinate(37), metrics.coordinate(7), violet_bottom);
+        raster.circle(metrics.coordinate(31), metrics.coordinate(32), metrics.coordinate(7),
                       Color::rgba(132, 76, 164));
         return raster;
     }
@@ -374,8 +391,8 @@ struct Raster final {
     if (icon == Icon::transfer) {
         Raster folder = make_icon(Icon::folder, extent);
         raster.pixels = std::move(folder.pixels);
-        raster.line(coordinate(7), coordinate(34), coordinate(34),
-                    coordinate(34), dark_blue, stroke(2));
+        raster.line(metrics.coordinate(7), metrics.coordinate(34), metrics.coordinate(34),
+                    metrics.coordinate(34), dark_blue, metrics.stroke(2));
         raster.triangle({42.0 * scale, 34.0 * scale},
                         {31.0 * scale, 27.0 * scale},
                         {31.0 * scale, 41.0 * scale}, dark_blue);
@@ -383,47 +400,47 @@ struct Raster final {
     }
 
     if (icon == Icon::remove) {
-        raster.gradient_rect(coordinate(11), coordinate(13), coordinate(37),
-                             coordinate(43), Color::rgba(238, 244, 247),
+        raster.gradient_rect(metrics.coordinate(11), metrics.coordinate(13), metrics.coordinate(37),
+                             metrics.coordinate(43), Color::rgba(238, 244, 247),
                              Color::rgba(158, 174, 184));
-        raster.outline(coordinate(11), coordinate(13), coordinate(37),
-                       coordinate(43), Color::rgba(89, 107, 117));
-        raster.gradient_rect(coordinate(8), coordinate(8), coordinate(40),
-                             coordinate(14), Color::rgba(255, 255, 255),
+        raster.outline(metrics.coordinate(11), metrics.coordinate(13), metrics.coordinate(37),
+                       metrics.coordinate(43), Color::rgba(89, 107, 117));
+        raster.gradient_rect(metrics.coordinate(8), metrics.coordinate(8), metrics.coordinate(40),
+                             metrics.coordinate(14), Color::rgba(255, 255, 255),
                              Color::rgba(185, 199, 208));
-        raster.outline(coordinate(8), coordinate(8), coordinate(40),
-                       coordinate(14), Color::rgba(89, 107, 117));
-        raster.rect(coordinate(17), coordinate(4), coordinate(31),
-                    coordinate(9), Color::rgba(201, 214, 221));
-        raster.line(coordinate(19), coordinate(20), coordinate(19),
-                    coordinate(36), Color::rgba(122, 79, 96), stroke());
-        raster.line(coordinate(29), coordinate(20), coordinate(29),
-                    coordinate(36), Color::rgba(122, 79, 96), stroke());
+        raster.outline(metrics.coordinate(8), metrics.coordinate(8), metrics.coordinate(40),
+                       metrics.coordinate(14), Color::rgba(89, 107, 117));
+        raster.rect(metrics.coordinate(17), metrics.coordinate(4), metrics.coordinate(31),
+                    metrics.coordinate(9), Color::rgba(201, 214, 221));
+        raster.line(metrics.coordinate(19), metrics.coordinate(20), metrics.coordinate(19),
+                    metrics.coordinate(36), Color::rgba(122, 79, 96), metrics.stroke());
+        raster.line(metrics.coordinate(29), metrics.coordinate(20), metrics.coordinate(29),
+                    metrics.coordinate(36), Color::rgba(122, 79, 96), metrics.stroke());
         return raster;
     }
 
     if (icon == Icon::view || icon == Icon::sort) {
-        raster.gradient_rect(coordinate(5), coordinate(5), coordinate(43),
-                             coordinate(43), paper_top, paper_bottom);
-        raster.outline(coordinate(5), coordinate(5), coordinate(43),
-                       coordinate(43), Color::rgba(78, 104, 120));
+        raster.gradient_rect(metrics.coordinate(5), metrics.coordinate(5), metrics.coordinate(43),
+                             metrics.coordinate(43), paper_top, paper_bottom);
+        raster.outline(metrics.coordinate(5), metrics.coordinate(5), metrics.coordinate(43),
+                       metrics.coordinate(43), Color::rgba(78, 104, 120));
         if (icon == Icon::view) {
             for (int row = 0; row < 3; ++row) {
                 for (int column = 0; column < 3; ++column) {
-                    raster.rect(coordinate(9 + column * 11),
-                                coordinate(9 + row * 11),
-                                coordinate(17 + column * 11),
-                                coordinate(17 + row * 11),
+                    raster.rect(metrics.coordinate(9 + column * 11),
+                                metrics.coordinate(9 + row * 11),
+                                metrics.coordinate(17 + column * 11),
+                                metrics.coordinate(17 + row * 11),
                                 Color::rgba(106, 154, 190));
                 }
             }
         } else {
             for (int row = 0; row < 4; ++row) {
-                raster.rect(coordinate(9), coordinate(10 + row * 8),
-                            coordinate(15), coordinate(16 + row * 8),
+                raster.rect(metrics.coordinate(9), metrics.coordinate(10 + row * 8),
+                            metrics.coordinate(15), metrics.coordinate(16 + row * 8),
                             Color::rgba(106, 154, 190));
-                raster.rect(coordinate(19), coordinate(12 + row * 8),
-                            coordinate(38), coordinate(14 + row * 8),
+                raster.rect(metrics.coordinate(19), metrics.coordinate(12 + row * 8),
+                            metrics.coordinate(38), metrics.coordinate(14 + row * 8),
                             Color::rgba(71, 103, 124));
             }
         }
@@ -431,50 +448,50 @@ struct Raster final {
     }
 
     if (icon == Icon::properties) {
-        raster.circle(coordinate(24), coordinate(24), coordinate(18), dark_blue);
-        raster.circle(coordinate(23), coordinate(21), coordinate(14),
+        raster.circle(metrics.coordinate(24), metrics.coordinate(24), metrics.coordinate(18), dark_blue);
+        raster.circle(metrics.coordinate(23), metrics.coordinate(21), metrics.coordinate(14),
                       Color::rgba(92, 164, 211));
-        raster.circle(coordinate(24), coordinate(15), coordinate(2), paper_top);
-        raster.rect(coordinate(22), coordinate(21), coordinate(26),
-                    coordinate(35), paper_top);
+        raster.circle(metrics.coordinate(24), metrics.coordinate(15), metrics.coordinate(2), paper_top);
+        raster.rect(metrics.coordinate(22), metrics.coordinate(21), metrics.coordinate(26),
+                    metrics.coordinate(35), paper_top);
         return raster;
     }
 
-    raster.rect(coordinate(10), coordinate(5), coordinate(39), coordinate(44), shadow);
-    raster.gradient_rect(coordinate(9), coordinate(3), coordinate(39),
-                         coordinate(44), paper_top, paper_bottom);
-    raster.outline(coordinate(9), coordinate(3), coordinate(39),
-                   coordinate(44), Color::rgba(99, 121, 136));
+    raster.rect(metrics.coordinate(10), metrics.coordinate(5), metrics.coordinate(39), metrics.coordinate(44), shadow);
+    raster.gradient_rect(metrics.coordinate(9), metrics.coordinate(3), metrics.coordinate(39),
+                         metrics.coordinate(44), paper_top, paper_bottom);
+    raster.outline(metrics.coordinate(9), metrics.coordinate(3), metrics.coordinate(39),
+                   metrics.coordinate(44), Color::rgba(99, 121, 136));
     raster.triangle({30.0 * scale, 3.0 * scale},
                     {39.0 * scale, 12.0 * scale},
                     {30.0 * scale, 12.0 * scale},
                     Color::rgba(199, 217, 228));
     if (icon == Icon::image) {
-        raster.gradient_rect(coordinate(13), coordinate(15), coordinate(35),
-                             coordinate(37), Color::rgba(217, 239, 247),
+        raster.gradient_rect(metrics.coordinate(13), metrics.coordinate(15), metrics.coordinate(35),
+                             metrics.coordinate(37), Color::rgba(217, 239, 247),
                              Color::rgba(143, 190, 210));
         raster.triangle({13.0 * scale, 37.0 * scale},
                         {22.0 * scale, 24.0 * scale},
                         {30.0 * scale, 37.0 * scale},
                         Color::rgba(108, 156, 80));
-        raster.circle(coordinate(29), coordinate(20), coordinate(4),
+        raster.circle(metrics.coordinate(29), metrics.coordinate(20), metrics.coordinate(4),
                       Color::rgba(241, 173, 59));
     } else if (icon == Icon::code) {
-        raster.line(coordinate(21), coordinate(17), coordinate(14),
-                    coordinate(25), Color::rgba(49, 116, 91), stroke(2));
-        raster.line(coordinate(14), coordinate(25), coordinate(21),
-                    coordinate(33), Color::rgba(49, 116, 91), stroke(2));
-        raster.line(coordinate(27), coordinate(17), coordinate(34),
-                    coordinate(25), Color::rgba(144, 97, 172), stroke(2));
-        raster.line(coordinate(34), coordinate(25), coordinate(27),
-                    coordinate(33), Color::rgba(144, 97, 172), stroke(2));
+        raster.line(metrics.coordinate(21), metrics.coordinate(17), metrics.coordinate(14),
+                    metrics.coordinate(25), Color::rgba(49, 116, 91), metrics.stroke(2));
+        raster.line(metrics.coordinate(14), metrics.coordinate(25), metrics.coordinate(21),
+                    metrics.coordinate(33), Color::rgba(49, 116, 91), metrics.stroke(2));
+        raster.line(metrics.coordinate(27), metrics.coordinate(17), metrics.coordinate(34),
+                    metrics.coordinate(25), Color::rgba(144, 97, 172), metrics.stroke(2));
+        raster.line(metrics.coordinate(34), metrics.coordinate(25), metrics.coordinate(27),
+                    metrics.coordinate(33), Color::rgba(144, 97, 172), metrics.stroke(2));
     } else {
-        raster.rect(coordinate(14), coordinate(20), coordinate(34),
-                    coordinate(22), Color::rgba(93, 125, 146));
-        raster.rect(coordinate(14), coordinate(26), coordinate(32),
-                    coordinate(28), Color::rgba(93, 125, 146));
-        raster.rect(coordinate(14), coordinate(32), coordinate(34),
-                    coordinate(34), Color::rgba(93, 125, 146));
+        raster.rect(metrics.coordinate(14), metrics.coordinate(20), metrics.coordinate(34),
+                    metrics.coordinate(22), Color::rgba(93, 125, 146));
+        raster.rect(metrics.coordinate(14), metrics.coordinate(26), metrics.coordinate(32),
+                    metrics.coordinate(28), Color::rgba(93, 125, 146));
+        raster.rect(metrics.coordinate(14), metrics.coordinate(32), metrics.coordinate(34),
+                    metrics.coordinate(34), Color::rgba(93, 125, 146));
     }
     return raster;
 }
@@ -483,28 +500,33 @@ struct Raster final {
 
 [[nodiscard]] inline std::shared_ptr<gui_forms::ImageList> make_image_list(
     gui_forms::Window& window, const double logical_extent) {
-    auto images = std::make_shared<gui_forms::ImageList>(
+    if (!std::isfinite(logical_extent) || logical_extent < 1.0 || logical_extent > 2048.0) {
+        throw std::invalid_argument("House logical icon extent must be 1 through 2048 pixels");
+    }
+    std::shared_ptr<gui_forms::ImageList> images = std::make_shared<gui_forms::ImageList>(
         window, gui_forms::Size{logical_extent, logical_extent});
     const std::uint32_t first_extent = static_cast<std::uint32_t>(
         std::lround(logical_extent));
     const std::uint32_t dense_extent = first_extent * 2U;
-    for (const auto& [icon, name] : icon_keys) {
-        auto first = detail::make_icon(icon, first_extent);
-        const auto first_loaded = window.load_bgra32_premultiplied(
+    for (const IconKey& entry : icon_keys) {
+        const Icon icon = entry.icon;
+        const std::string_view name = entry.name;
+        detail::Raster first = detail::make_icon(icon, first_extent);
+        const gui_forms::ImageLoadResult first_loaded = window.load_bgra32_premultiplied(
             first_extent, first_extent, first_extent * 4U,
             std::span<const std::byte>(first.pixels));
         if (!first_loaded) {
             throw std::runtime_error("GUI.Forms rejected a generated House icon");
         }
-        images->add_image(std::string(name), first_loaded.image, 1.0);
-        auto dense = detail::make_icon(icon, dense_extent);
-        const auto dense_loaded = window.load_bgra32_premultiplied(
+        (*images).add_image(std::string(name), first_loaded.image, 1.0);
+        detail::Raster dense = detail::make_icon(icon, dense_extent);
+        const gui_forms::ImageLoadResult dense_loaded = window.load_bgra32_premultiplied(
             dense_extent, dense_extent, dense_extent * 4U,
             std::span<const std::byte>(dense.pixels));
         if (!dense_loaded) {
             throw std::runtime_error("GUI.Forms rejected a generated dense House icon");
         }
-        images->add_image(std::string(name), dense_loaded.image, 2.0);
+        (*images).add_image(std::string(name), dense_loaded.image, 2.0);
     }
     return images;
 }

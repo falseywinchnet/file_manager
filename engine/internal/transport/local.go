@@ -19,20 +19,21 @@ import (
 	"sync"
 	"time"
 
+	"filemanager/engine/api"
 	"filemanager/engine/internal/service"
 )
 
 const (
-	LocalProtocol = "engine.local.v1"
-	frameMagic    = "ENG1"
-	frameHeader   = 8
+	LocalProtocol string = "engine.local.v1"
+	frameMagic    string = "ENG1"
+	frameHeader   int    = 8
 
-	maxQueryConnections = 32
-	maxAdminConnections = 4
-	handshakeTimeout    = 5 * time.Second
-	idleFrameTimeout    = 30 * time.Second
-	requestTimeout      = 30 * time.Second
-	writeTimeout        = 5 * time.Second
+	maxQueryConnections int           = 32
+	maxAdminConnections int           = 4
+	handshakeTimeout    time.Duration = 5 * time.Second
+	idleFrameTimeout    time.Duration = 30 * time.Second
+	requestTimeout      time.Duration = 30 * time.Second
+	writeTimeout        time.Duration = 5 * time.Second
 )
 
 type EndpointFiles struct {
@@ -75,85 +76,109 @@ type helloResponse struct {
 }
 
 func Files(runtimeDir string) EndpointFiles {
-	return EndpointFiles{
+	var files EndpointFiles = EndpointFiles{
 		RuntimeDir: runtimeDir,
 		QuerySock:  filepath.Join(runtimeDir, "query.sock"), AdminSock: filepath.Join(runtimeDir, "admin.sock"),
 		QueryToken: filepath.Join(runtimeDir, "query.token"), AdminToken: filepath.Join(runtimeDir, "admin.token"),
 		Discovery: filepath.Join(runtimeDir, "discovery.json"),
 	}
+	return files
 }
 
 // ServeLocal creates distinct same-user query/admin endpoints. Credentials are
 // random per process instance and are never accepted on the other endpoint.
 func ServeLocal(ctx context.Context, runtimeDir string, engine *service.Service) error {
-	return ServeLocalWithOptions(ctx, runtimeDir, engine, LocalOptions{})
+	var failure error = ServeLocalWithOptions(ctx, runtimeDir, engine, LocalOptions{})
+	return failure
 }
 
 func ServeLocalWithOptions(ctx context.Context, runtimeDir string, engine *service.Service, options LocalOptions) error {
 	if runtime.GOOS == "windows" {
-		return serveWindows(ctx, runtimeDir, engine, options)
+		var failure error = serveWindows(ctx, runtimeDir, engine, options)
+		return failure
 	}
 	if engine == nil {
-		return errors.New("engine service is required")
+		var failure error = errors.New("engine service is required")
+		return failure
 	}
-	files := Files(runtimeDir)
-	if err := verifyRuntimeDirectory(runtimeDir); err != nil {
-		return err
+	var files EndpointFiles = Files(runtimeDir)
+	{
+		var err error = nil
+		err = verifyRuntimeDirectory(runtimeDir)
+		if err != nil {
+			return err
+		}
 	}
-	query, err := listenPrivate(files.QuerySock)
+	var query net.Listener = nil
+	var err error = nil
+	query, err = listenPrivate(files.QuerySock)
 	if err != nil {
 		return err
 	}
 	defer query.Close()
 	defer os.Remove(files.QuerySock)
-	admin, err := listenPrivate(files.AdminSock)
+	var admin net.Listener = nil
+	admin, err = listenPrivate(files.AdminSock)
 	if err != nil {
 		return err
 	}
 	defer admin.Close()
 	defer os.Remove(files.AdminSock)
 	defer cleanupRuntime(files)
-	queryToken, err := rotateToken(files.QueryToken)
+	var queryToken string = ""
+	queryToken, err = rotateToken(files.QueryToken)
 	if err != nil {
 		return err
 	}
-	adminToken, err := rotateToken(files.AdminToken)
+	var adminToken string = ""
+	adminToken, err = rotateToken(files.AdminToken)
 	if err != nil {
 		return err
 	}
-	discovery := Discovery{
-		Protocol: LocalProtocol, InstanceID: engine.Version().InstanceID, UID: os.Getuid(), StartedAt: time.Now().UTC(),
+	var version api.VersionInfo = engine.Version()
+	var started time.Time = time.Now()
+	started = started.UTC()
+	var discovery Discovery = Discovery{
+		Protocol: LocalProtocol, InstanceID: version.InstanceID, UID: os.Getuid(), StartedAt: started,
 		QuerySocket: files.QuerySock, QueryTokenFile: files.QueryToken,
 		AdminSocket: files.AdminSock, AdminTokenFile: files.AdminToken,
 	}
-	if err := writePrivateJSON(files.Discovery, discovery); err != nil {
-		return err
+	{
+		var err error = nil
+		err = writePrivateJSON(files.Discovery, discovery)
+		if err != nil {
+			return err
+		}
 	}
-	serverCtx, cancel := context.WithCancel(ctx)
+	var serverCtx context.Context = nil
+	var cancel context.CancelFunc = nil
+	serverCtx, cancel = context.WithCancel(ctx)
 	defer cancel()
-	var once sync.Once
-	shutdown := func() { once.Do(cancel) }
-	errorsOut := make(chan error, 2)
-	connections := newConnectionSet()
-	var acceptors sync.WaitGroup
-	var handlers sync.WaitGroup
+	var shutdown context.CancelFunc = cancel
+	var errorsOut chan error = make(chan error, 2)
+	var connections *connectionSet = newConnectionSet()
+	var acceptors sync.WaitGroup = sync.WaitGroup{}
+	var handlers sync.WaitGroup = sync.WaitGroup{}
 	acceptors.Add(2)
-	go func() {
-		defer acceptors.Done()
-		serveEndpoint(serverCtx, query, engine, AuthorityQuery, queryToken, maxQueryConnections, connections, &handlers, shutdown, errorsOut, options)
-	}()
-	go func() {
-		defer acceptors.Done()
-		serveEndpoint(serverCtx, admin, engine, AuthorityAdmin, adminToken, maxAdminConnections, connections, &handlers, shutdown, errorsOut, options)
-	}()
-	var serveErr error
+	var queryTask endpointTask = endpointTask{
+		context: serverCtx, listener: query, engine: engine, authority: AuthorityQuery,
+		token: queryToken, maximumConnections: maxQueryConnections, connections: connections,
+		handlers: &handlers, acceptors: &acceptors, shutdown: shutdown, errorsOut: errorsOut, options: options,
+	}
+	var adminTask endpointTask = endpointTask{
+		context: serverCtx, listener: admin, engine: engine, authority: AuthorityAdmin,
+		token: adminToken, maximumConnections: maxAdminConnections, connections: connections,
+		handlers: &handlers, acceptors: &acceptors, shutdown: shutdown, errorsOut: errorsOut, options: options,
+	}
+	go queryTask.Run()
+	go adminTask.Run()
+	var serveErr error = nil
 	select {
 	case <-serverCtx.Done():
 		if ctx.Err() != nil {
 			serveErr = ctx.Err()
 		}
-	case err := <-errorsOut:
-		serveErr = err
+	case serveErr = <-errorsOut:
 	}
 	cancel()
 	_ = query.Close()
@@ -164,46 +189,69 @@ func ServeLocalWithOptions(ctx context.Context, runtimeDir string, engine *servi
 	return serveErr
 }
 
-func serveEndpoint(
-	ctx context.Context,
-	listener net.Listener,
-	engine *service.Service,
-	authority Authority,
-	token string,
-	maximumConnections int,
-	connections *connectionSet,
-	handlers *sync.WaitGroup,
-	shutdown func(),
-	errorsOut chan<- error,
-	options LocalOptions,
-) {
-	slots := make(chan struct{}, maximumConnections)
+// endpointTask borrows the listener/service and shared connection registry.
+// The server joins acceptors, closes registered connections, then joins handlers
+// before releasing any borrowed state. Each endpoint owns its bounded slot pool.
+type endpointTask struct {
+	context            context.Context
+	listener           net.Listener
+	engine             *service.Service
+	authority          Authority
+	token              string
+	maximumConnections int
+	connections        *connectionSet
+	handlers           *sync.WaitGroup
+	acceptors          *sync.WaitGroup
+	shutdown           context.CancelFunc
+	errorsOut          chan<- error
+	options            LocalOptions
+}
+
+func (task *endpointTask) Run() {
+	defer task.acceptors.Done()
+	var slots chan struct{} = make(chan struct{}, task.maximumConnections)
 	for {
-		connection, err := listener.Accept()
+		var connection net.Conn = nil
+		var err error = nil
+		connection, err = task.listener.Accept()
 		if err != nil {
-			if ctx.Err() != nil || errors.Is(err, net.ErrClosed) {
+			if task.context.Err() != nil || errors.Is(err, net.ErrClosed) {
 				return
 			}
 			select {
-			case errorsOut <- err:
+			case task.errorsOut <- err:
 			default:
 			}
 			return
 		}
 		select {
 		case slots <- struct{}{}:
-			connections.Add(connection)
-			handlers.Add(1)
-			go func() {
-				defer handlers.Done()
-				defer func() { <-slots }()
-				defer connections.Remove(connection)
-				handleLocal(ctx, connection, engine, authority, token, shutdown, options)
-			}()
+			task.connections.Add(connection)
+			task.handlers.Add(1)
+			var session connectionTask = connectionTask{endpoint: task, connection: connection, slots: slots}
+			go session.Run()
 		default:
 			_ = connection.Close()
 		}
 	}
+}
+
+// connectionTask owns one accepted connection and its slot until Run exits.
+// endpoint remains alive until the server's handler join completes.
+type connectionTask struct {
+	endpoint   *endpointTask
+	connection net.Conn
+	slots      chan struct{}
+}
+
+func (task *connectionTask) ReleaseSlot() { <-task.slots }
+
+func (task *connectionTask) Run() {
+	defer task.endpoint.handlers.Done()
+	defer task.ReleaseSlot()
+	defer task.endpoint.connections.Remove(task.connection)
+	handleLocal(task.endpoint.context, task.connection, task.endpoint.engine,
+		task.endpoint.authority, task.endpoint.token, task.endpoint.shutdown, task.endpoint.options)
 }
 
 type connectionSet struct {
@@ -212,7 +260,8 @@ type connectionSet struct {
 }
 
 func newConnectionSet() *connectionSet {
-	return &connectionSet{connections: make(map[net.Conn]struct{})}
+	var registry *connectionSet = &connectionSet{connections: make(map[net.Conn]struct{})}
+	return registry
 }
 
 func (s *connectionSet) Add(connection net.Conn) {
@@ -229,63 +278,118 @@ func (s *connectionSet) Remove(connection net.Conn) {
 
 func (s *connectionSet) CloseAll() {
 	s.mu.Lock()
-	connections := make([]net.Conn, 0, len(s.connections))
-	for connection := range s.connections {
-		connections = append(connections, connection)
+	var connections []net.Conn = make([]net.Conn, 0, len(s.connections))
+	{
+		var connection net.Conn = nil
+		for connection = range s.connections {
+			connections = append(connections, connection)
+		}
 	}
 	s.mu.Unlock()
-	for _, connection := range connections {
-		_ = connection.Close()
+	{
+		var connection net.Conn = nil
+		for _, connection = range connections {
+			_ = connection.Close()
+		}
 	}
 }
 
 func handleLocal(ctx context.Context, connection net.Conn, engine *service.Service, authority Authority, token string, shutdown func(), options LocalOptions) {
 	defer connection.Close()
-	if err := connection.SetDeadline(time.Now().Add(handshakeTimeout)); err != nil {
-		return
+	{
+		var err error = nil
+		var now time.Time = time.Now()
+		var deadline time.Time = now.Add(handshakeTimeout)
+		err = connection.SetDeadline(deadline)
+		if err != nil {
+			return
+		}
 	}
-	uid, err := peerUID(connection)
+	var uid int = 0
+	var err error = nil
+	uid, err = peerUID(connection)
 	if err != nil || uid != os.Getuid() {
 		return
 	}
-	var incoming hello
-	if err := readFrame(connection, &incoming); err != nil {
-		return
+	var frames frameReader = frameReader{}
+	var incoming hello = hello{}
+	{
+		var err error = nil
+		err = frames.Read(connection, &incoming)
+		if err != nil {
+			return
+		}
 	}
-	accepted := incoming.Protocol == LocalProtocol && incoming.Authority == authority && constantToken(incoming.Token, token)
-	response := helloResponse{Accepted: accepted, Protocol: LocalProtocol}
+	var accepted bool = incoming.Protocol == LocalProtocol && incoming.Authority == authority && constantToken(incoming.Token, token)
+	var response helloResponse = helloResponse{Accepted: accepted, Protocol: LocalProtocol}
 	if !accepted {
 		response.Error = "session authentication failed"
 	}
-	if err := writeFrame(connection, response); err != nil || !accepted {
-		return
+	{
+		var err error = nil
+		err = writeFrame(connection, response)
+		if err != nil || !accepted {
+			return
+		}
 	}
-	if err := connection.SetDeadline(time.Time{}); err != nil {
-		return
+	{
+		var err error = nil
+		err = connection.SetDeadline(time.Time{})
+		if err != nil {
+			return
+		}
 	}
 	for {
-		if err := connection.SetReadDeadline(time.Now().Add(idleFrameTimeout)); err != nil {
-			return
-		}
-		var request Request
-		if err := readFrame(connection, &request); err != nil {
-			return
-		}
-		requestCtx, cancel := context.WithTimeout(ctx, requestTimeout)
-		outgoing, stop := dispatchAuthorized(requestCtx, engine, request, authority)
-		cancel()
-		if outgoing.Error == nil && options.AfterSuccessfulDispatch != nil {
-			if err := options.AfterSuccessfulDispatch(request, outgoing); err != nil {
-				outgoing.Result = nil
-				outgoing.Error = publicFault(err)
-				stop = false
+		{
+			var err error = nil
+			var now time.Time = time.Now()
+			var deadline time.Time = now.Add(idleFrameTimeout)
+			err = connection.SetReadDeadline(deadline)
+			if err != nil {
+				return
 			}
 		}
-		if err := connection.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
-			return
+		var request Request = Request{}
+		{
+			var err error = nil
+			err = frames.Read(connection, &request)
+			if err != nil {
+				return
+			}
 		}
-		if err := writeFrame(connection, outgoing); err != nil {
-			return
+		var requestCtx context.Context = nil
+		var cancel context.CancelFunc = nil
+		requestCtx, cancel = context.WithTimeout(ctx, requestTimeout)
+		var outgoing Response = Response{}
+		var stop bool = false
+		outgoing, stop = dispatchAuthorized(requestCtx, engine, request, authority)
+		cancel()
+		if outgoing.Error == nil && options.AfterSuccessfulDispatch != nil {
+			{
+				var err error = nil
+				err = options.AfterSuccessfulDispatch(request, outgoing)
+				if err != nil {
+					outgoing.Result = nil
+					outgoing.Error = publicFault(err)
+					stop = false
+				}
+			}
+		}
+		{
+			var err error = nil
+			var now time.Time = time.Now()
+			var deadline time.Time = now.Add(writeTimeout)
+			err = connection.SetWriteDeadline(deadline)
+			if err != nil {
+				return
+			}
+		}
+		{
+			var err error = nil
+			err = writeFrame(connection, outgoing)
+			if err != nil {
+				return
+			}
 		}
 		if stop {
 			shutdown()
@@ -296,210 +400,348 @@ func handleLocal(ctx context.Context, connection net.Conn, engine *service.Servi
 
 func CallLocal(ctx context.Context, runtimeDir string, authority Authority, request Request) (Response, error) {
 	if runtime.GOOS == "windows" {
-		return callWindows(ctx, runtimeDir, authority, request)
+		var emptyResponse Response = Response{}
+		var failure error = nil
+		emptyResponse, failure = callWindows(ctx, runtimeDir, authority, request)
+		return emptyResponse, failure
 	}
-	files := Files(runtimeDir)
-	socket, tokenPath := files.QuerySock, files.QueryToken
+	var files EndpointFiles = Files(runtimeDir)
+	var socket string = ""
+	var tokenPath string = ""
+	socket, tokenPath = files.QuerySock, files.QueryToken
 	if authority == AuthorityAdmin {
 		socket, tokenPath = files.AdminSock, files.AdminToken
 	} else if authority != AuthorityQuery {
-		return Response{}, errors.New("authority must be query or admin")
+		var emptyResponse Response = Response{}
+		var failure error = errors.New("authority must be query or admin")
+		return emptyResponse, failure
 	}
-	token, err := readToken(tokenPath)
+	var token string = ""
+	var err error = nil
+	token, err = readToken(tokenPath)
 	if err != nil {
-		return Response{}, fmt.Errorf("read endpoint token: %w", err)
+		var emptyResponse Response = Response{}
+		var failure error = fmt.Errorf("read endpoint token: %w", err)
+		return emptyResponse, failure
 	}
-	dialer := net.Dialer{}
-	connection, err := dialer.DialContext(ctx, "unix", socket)
+	var dialer net.Dialer = net.Dialer{}
+	var connection net.Conn = nil
+	connection, err = dialer.DialContext(ctx, "unix", socket)
 	if err != nil {
-		return Response{}, err
+		var emptyResponse Response = Response{}
+		return emptyResponse, err
 	}
 	defer connection.Close()
-	if deadline, ok := ctx.Deadline(); ok {
-		_ = connection.SetDeadline(deadline)
+	{
+		var deadline time.Time = time.Time{}
+		var ok bool = false
+		deadline, ok = ctx.Deadline()
+		if ok {
+			_ = connection.SetDeadline(deadline)
+		}
 	}
-	if err := writeFrame(connection, hello{Protocol: LocalProtocol, Authority: authority, Token: token}); err != nil {
-		return Response{}, err
+	{
+		var err error = nil
+		err = writeFrame(connection, hello{Protocol: LocalProtocol, Authority: authority, Token: token})
+		if err != nil {
+			var emptyResponse Response = Response{}
+			return emptyResponse, err
+		}
 	}
-	var accepted helloResponse
-	if err := readFrame(connection, &accepted); err != nil {
-		return Response{}, err
+	var accepted helloResponse = helloResponse{}
+	{
+		var err error = nil
+		err = readFrame(connection, &accepted)
+		if err != nil {
+			var emptyResponse Response = Response{}
+			return emptyResponse, err
+		}
 	}
 	if !accepted.Accepted {
-		return Response{}, errors.New(accepted.Error)
+		var emptyResponse Response = Response{}
+		var failure error = errors.New(accepted.Error)
+		return emptyResponse, failure
 	}
-	if err := writeFrame(connection, request); err != nil {
-		return Response{}, err
+	{
+		var err error = nil
+		err = writeFrame(connection, request)
+		if err != nil {
+			var emptyResponse Response = Response{}
+			return emptyResponse, err
+		}
 	}
-	var response Response
-	if err := readFrame(connection, &response); err != nil {
-		return Response{}, err
+	var response Response = Response{}
+	{
+		var err error = nil
+		err = readFrame(connection, &response)
+		if err != nil {
+			var emptyResponse Response = Response{}
+			return emptyResponse, err
+		}
 	}
 	return response, nil
 }
 
+// frameReader owns connection-local scratch. payload length is the current
+// frame's byte count; capacity is reused up to MaxJSONLFrameBytes. Decode must
+// finish before Read is called again. No scratch is shared between connections.
+type frameReader struct {
+	header  [frameHeader]byte
+	payload []byte
+}
+
 func readFrame(reader io.Reader, target any) error {
-	header := make([]byte, frameHeader)
-	if _, err := io.ReadFull(reader, header); err != nil {
+	var frames frameReader = frameReader{}
+	var err error = frames.Read(reader, target)
+	return err
+}
+
+func (frames *frameReader) Read(reader io.Reader, target any) error {
+	var err error = nil
+	_, err = io.ReadFull(reader, frames.header[:])
+	if err != nil {
 		return err
 	}
-	if string(header[:4]) != frameMagic {
-		return errors.New("invalid Engine frame magic")
+	if string(frames.header[:4]) != frameMagic {
+		var failure error = errors.New("invalid Engine frame magic")
+		return failure
 	}
-	size := binary.BigEndian.Uint32(header[4:])
+	var size uint32 = binary.BigEndian.Uint32(frames.header[4:])
 	if size == 0 || size > MaxJSONLFrameBytes {
-		return errors.New("invalid Engine frame size")
+		var failure error = errors.New("invalid Engine frame size")
+		return failure
 	}
-	payload := make([]byte, size)
-	if _, err := io.ReadFull(reader, payload); err != nil {
+	var count int = int(size)
+	if cap(frames.payload) < count {
+		frames.payload = make([]byte, count)
+	} else {
+		frames.payload = frames.payload[:count]
+	}
+	_, err = io.ReadFull(reader, frames.payload)
+	if err != nil {
 		return err
 	}
-	decoder := json.NewDecoder(bytes.NewReader(payload))
-	if err := decoder.Decode(target); err != nil {
+	var input *bytes.Reader = bytes.NewReader(frames.payload)
+	var decoder *json.Decoder = json.NewDecoder(input)
+	err = decoder.Decode(target)
+	if err != nil {
 		return err
 	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		return errors.New("Engine frame contains trailing JSON")
+	var trailing any = nil
+	err = decoder.Decode(&trailing)
+	if err != io.EOF {
+		var failure error = errors.New("Engine frame contains trailing JSON")
+		return failure
 	}
 	return nil
 }
 
 func writeFrame(writer io.Writer, value any) error {
-	payload, err := json.Marshal(value)
+	var payload []byte = nil
+	var err error = nil
+	payload, err = json.Marshal(value)
 	if err != nil {
 		return err
 	}
-	if len(payload) == 0 || len(payload) > MaxJSONLFrameBytes {
-		return errors.New("Engine frame exceeds the bounded payload")
+	var count int = len(payload)
+	if count == 0 || count > MaxJSONLFrameBytes {
+		var failure error = errors.New("Engine frame exceeds the bounded payload")
+		return failure
 	}
-	frame := make([]byte, frameHeader+len(payload))
-	copy(frame, frameMagic)
-	binary.BigEndian.PutUint32(frame[4:frameHeader], uint32(len(payload)))
-	copy(frame[frameHeader:], payload)
-	for len(frame) != 0 {
-		written, writeErr := writer.Write(frame)
-		if written > 0 {
-			frame = frame[written:]
+	var header [frameHeader]byte = [frameHeader]byte{}
+	copy(header[:], frameMagic)
+	var wireCount uint32 = uint32(count)
+	binary.BigEndian.PutUint32(header[4:], wireCount)
+	err = writeFrameBytes(writer, header[:])
+	if err != nil {
+		return err
+	}
+	err = writeFrameBytes(writer, payload)
+	return err
+}
+
+// writeFrameBytes consumes borrowed bytes synchronously and retains no storage.
+func writeFrameBytes(writer io.Writer, payload []byte) error {
+	for len(payload) != 0 {
+		var written int = 0
+		var err error = nil
+		written, err = writer.Write(payload)
+		if err != nil {
+			return err
 		}
-		if writeErr != nil {
-			return writeErr
-		}
-		if written == 0 {
+		if written <= 0 || written > len(payload) {
 			return io.ErrShortWrite
 		}
+		payload = payload[written:]
 	}
 	return nil
 }
 
 func rotateToken(path string) (string, error) {
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
-		return "", err
+	var raw []byte = make([]byte, 32)
+	{
+		var err error = nil
+		_, err = rand.Read(raw)
+		if err != nil {
+			return "", err
+		}
 	}
-	token := hex.EncodeToString(raw)
-	if err := writePrivate(path, []byte(token)); err != nil {
-		return "", err
+	var token string = hex.EncodeToString(raw)
+	{
+		var err error = nil
+		err = writePrivate(path, []byte(token))
+		if err != nil {
+			return "", err
+		}
 	}
 	return token, nil
 }
 
 func readToken(path string) (string, error) {
-	info, err := os.Lstat(path)
+	var info os.FileInfo = nil
+	var err error = nil
+	info, err = os.Lstat(path)
 	if err != nil {
 		return "", err
 	}
-	if !info.Mode().IsRegular() || info.Mode().Perm() != 0o600 || info.Size() != sha256.Size*2 {
-		return "", errors.New("endpoint token must be a regular 0600 256-bit hexadecimal credential")
+	var mode os.FileMode = info.Mode()
+	if !mode.IsRegular() || mode.Perm() != 0o600 || info.Size() != sha256.Size*2 {
+		var failure error = errors.New("endpoint token must be a regular 0600 256-bit hexadecimal credential")
+		return "", failure
 	}
-	payload, err := os.ReadFile(path)
+	var payload []byte = nil
+	payload, err = os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
-	decoded := make([]byte, sha256.Size)
-	if _, err := hex.Decode(decoded, payload); err != nil {
-		return "", errors.New("endpoint token is not a 256-bit hexadecimal credential")
+	var decoded []byte = make([]byte, sha256.Size)
+	{
+		var err error = nil
+		_, err = hex.Decode(decoded, payload)
+		if err != nil {
+			var failure error = errors.New("endpoint token is not a 256-bit hexadecimal credential")
+			return "", failure
+		}
 	}
-	return string(payload), nil
+	var result string = string(payload)
+	return result, nil
 }
 
 func constantToken(left, right string) bool {
-	return len(left) == len(right) && subtle.ConstantTimeCompare([]byte(left), []byte(right)) == 1
+	var matches bool = len(left) == len(right) && subtle.ConstantTimeCompare([]byte(left), []byte(right)) == 1
+	return matches
 }
 
 func verifyRuntimeDirectory(path string) error {
-	info, err := os.Stat(path)
+	var info os.FileInfo = nil
+	var err error = nil
+	info, err = os.Stat(path)
 	if err != nil {
 		return err
 	}
-	if !info.IsDir() || info.Mode().Perm()&0o077 != 0 {
-		return errors.New("runtime directory must be private")
+	var mode os.FileMode = info.Mode()
+	if !info.IsDir() || mode.Perm()&0o077 != 0 {
+		var failure error = errors.New("runtime directory must be private")
+		return failure
 	}
 	return nil
 }
 
 func listenPrivate(path string) (net.Listener, error) {
-	if info, err := os.Lstat(path); err == nil {
-		if info.Mode()&os.ModeSocket == 0 {
-			return nil, errors.New("refusing to replace a non-socket endpoint")
-		}
-		probe, probeErr := net.DialTimeout("unix", path, 100*time.Millisecond)
-		if probeErr == nil {
-			probe.Close()
-			return nil, errors.New("Engine endpoint is already accepting connections")
-		}
-		if err := os.Remove(path); err != nil {
+	{
+		var info os.FileInfo = nil
+		var err error = nil
+		info, err = os.Lstat(path)
+		if err == nil {
+			if info.Mode()&os.ModeSocket == 0 {
+				var failure error = errors.New("refusing to replace a non-socket endpoint")
+				return nil, failure
+			}
+			var probe net.Conn = nil
+			var probeErr error = nil
+			probe, probeErr = net.DialTimeout("unix", path, 100*time.Millisecond)
+			if probeErr == nil {
+				probe.Close()
+				var failure error = errors.New("Engine endpoint is already accepting connections")
+				return nil, failure
+			}
+			{
+				var err error = nil
+				err = os.Remove(path)
+				if err != nil {
+					return nil, err
+				}
+			}
+		} else if !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, err
 	}
-	listener, err := net.Listen("unix", path)
+	var listener net.Listener = nil
+	var err error = nil
+	listener, err = net.Listen("unix", path)
 	if err != nil {
 		return nil, err
 	}
-	if err := os.Chmod(path, 0o600); err != nil {
-		listener.Close()
-		return nil, err
+	{
+		var err error = nil
+		err = os.Chmod(path, 0o600)
+		if err != nil {
+			listener.Close()
+			return nil, err
+		}
 	}
 	return listener, nil
 }
 
 func writePrivateJSON(path string, value any) error {
-	payload, err := json.MarshalIndent(value, "", "  ")
+	var payload []byte = nil
+	var err error = nil
+	payload, err = json.MarshalIndent(value, "", "  ")
 	if err != nil {
 		return err
 	}
 	payload = append(payload, '\n')
-	return writePrivate(path, payload)
+	var failure error = writePrivate(path, payload)
+	return failure
 }
 
 func writePrivate(path string, payload []byte) error {
-	file, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+"-*.new")
+	var file *os.File = nil
+	var err error = nil
+	file, err = os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+"-*.new")
 	if err != nil {
 		return err
 	}
-	temporary := file.Name()
+	var temporary string = file.Name()
 	defer os.Remove(temporary)
-	if err := file.Chmod(0o600); err != nil {
-		_ = file.Close()
-		return err
+	{
+		var err error = nil
+		err = file.Chmod(0o600)
+		if err != nil {
+			_ = file.Close()
+			return err
+		}
 	}
-	if _, err = file.Write(payload); err == nil {
+	_, err = file.Write(payload)
+	if err == nil {
 		err = file.Sync()
 	}
-	closeErr := file.Close()
+	var closeErr error = file.Close()
 	if err == nil {
 		err = closeErr
 	}
 	if err != nil {
 		return err
 	}
-	return os.Rename(temporary, path)
+	var failure error = os.Rename(temporary, path)
+	return failure
 }
 
 func cleanupRuntime(files EndpointFiles) {
-	for _, path := range []string{files.QuerySock, files.AdminSock, files.QueryToken, files.AdminToken, files.Discovery} {
-		_ = os.Remove(path)
+	{
+		var path string = ""
+		for _, path = range []string{files.QuerySock, files.AdminSock, files.QueryToken, files.AdminToken, files.Discovery} {
+			_ = os.Remove(path)
+		}
 	}
 }

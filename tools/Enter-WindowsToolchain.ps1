@@ -5,34 +5,54 @@ param(
     [string]$RustBin = (Join-Path $env:USERPROFILE '.cargo\bin')
 )
 
-# Dot-source this file to prepare this PowerShell session. No machine/user PATH
-# is rewritten, and the sibling application's compiler installation is read only.
+# Dot-source to prepare only this session. The sibling toolchain stays read-only.
 $ErrorActionPreference = 'Stop'
-$fileManagerRoot = Split-Path $PSScriptRoot -Parent
+[string]$fileManagerRoot = Split-Path $PSScriptRoot -Parent
+[string]$fileManagerParent = Split-Path $fileManagerRoot -Parent
 if ([string]::IsNullOrWhiteSpace($MingwBin)) {
-    $MingwBin = Join-Path (Split-Path $fileManagerRoot -Parent) 'plan-paint\build-deps\msys64\mingw64\bin'
+    $MingwBin = Join-Path $fileManagerParent 'plan-paint\build-deps\msys64\mingw64\bin'
 }
 if ([string]::IsNullOrWhiteSpace($GoBin)) {
     $GoBin = [Environment]::GetEnvironmentVariable('FILE_MANAGER_GO_BIN', 'User')
 }
 
-$fileManagerToolBins = @()
+[System.Collections.Generic.List[string]]$fileManagerToolBins = [System.Collections.Generic.List[string]]::new()
+[string]$fileManagerToolBin = ''
 foreach ($fileManagerToolBin in @($MingwBin, $GoBin, $RustBin)) {
     if (-not [string]::IsNullOrWhiteSpace($fileManagerToolBin) -and
         (Test-Path -LiteralPath $fileManagerToolBin -PathType Container)) {
-        $fileManagerToolBins += (Resolve-Path -LiteralPath $fileManagerToolBin).Path
+        [System.Management.Automation.PathInfo]$fileManagerResolved = Resolve-Path -LiteralPath $fileManagerToolBin
+        $fileManagerToolBins.Add($fileManagerResolved.Path)
     }
 }
-$fileManagerOriginalBins = @($env:PATH -split ';' | Where-Object { $_ })
-$env:PATH = (($fileManagerToolBins + $fileManagerOriginalBins) | Select-Object -Unique) -join ';'
+[string[]]$fileManagerOriginalBins = $env:PATH -split ';'
+[string]$fileManagerOriginalBin = ''
+foreach ($fileManagerOriginalBin in $fileManagerOriginalBins) {
+    if (-not [string]::IsNullOrEmpty($fileManagerOriginalBin)) {
+        $fileManagerToolBins.Add($fileManagerOriginalBin)
+    }
+}
+# Keep the first occurrence, so explicitly selected tools precede inherited ones.
+[System.Collections.Generic.HashSet[string]]$fileManagerSeenBins = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+[System.Collections.Generic.List[string]]$fileManagerUniqueBins = [System.Collections.Generic.List[string]]::new()
+foreach ($fileManagerToolBin in $fileManagerToolBins) {
+    if ($fileManagerSeenBins.Add($fileManagerToolBin)) {
+        $fileManagerUniqueBins.Add($fileManagerToolBin)
+    }
+}
+$env:PATH = [string]::Join(';', $fileManagerUniqueBins)
 $env:FILE_MANAGER_MINGW_BIN = $MingwBin
-if (-not [string]::IsNullOrWhiteSpace($GoBin)) { $env:FILE_MANAGER_GO_BIN = $GoBin }
+if (-not [string]::IsNullOrWhiteSpace($GoBin)) {
+    $env:FILE_MANAGER_GO_BIN = $GoBin
+}
 
+[string]$fileManagerToolName = ''
 foreach ($fileManagerToolName in @('cmake', 'ninja', 'g++', 'python', 'go', 'cargo', 'rustc')) {
-    $fileManagerTool = Get-Command $fileManagerToolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($null -eq $fileManagerTool) {
+    [System.Management.Automation.ApplicationInfo[]]$fileManagerTools = @(Get-Command $fileManagerToolName -CommandType Application -ErrorAction SilentlyContinue)
+    if ($fileManagerTools.Count -eq 0) {
         Write-Warning "$fileManagerToolName is not available in this session."
     } else {
+        [System.Management.Automation.ApplicationInfo]$fileManagerTool = $fileManagerTools[0]
         Write-Host ('{0}: {1}' -f $fileManagerToolName, $fileManagerTool.Source)
     }
 }

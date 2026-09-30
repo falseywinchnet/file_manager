@@ -10,8 +10,18 @@ concurrency:
   group: native-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  house-style:
+    name: House-style spelling regression checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify scanner fixtures and corrected C++ consumer scope
+        run: |
+          python3 -B -m unittest discover -s tools -p test_house_style.py
+          python3 -B tools/check_house_style.py frontend/include frontend/src frontend/tests frontend/examples orchestrator/conformance/clients/cpp
   native:
     name: ${{ matrix.platform }}
+    needs: house-style
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       fail-fast: false
@@ -58,22 +68,14 @@ jobs:
           install: >-
             mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja mingw-w64-x86_64-python git
+      - name: Check reference search behavior and listener ownership
+        shell: bash
+        run: node gui_forms/tests/api_reference_search_tests.js
       - name: Identify dependency compiler
         id: dependency-compiler
         if: runner.os != 'Windows'
         shell: bash
-        run: |
-          python3 - <<'PY'
-          import hashlib, os, subprocess
-          commands = [['clang', '--version']]
-          if os.uname().sysname == 'Darwin':
-              commands += [['xcrun', '--show-sdk-version']]
-          text = os.environ.get('ImageVersion', '')
-          for command in commands:
-              text += subprocess.check_output(command, text=True)
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
-              stream.write('identity=' + hashlib.sha256(text.encode()).hexdigest()[:20] + '\n')
-          PY
+        run: python3 tools/native_compiler_identity.py
       - name: Restore pinned source and Skia build cache
         id: native-dependencies
         if: runner.os != 'Windows'
@@ -84,17 +86,26 @@ jobs:
             gui_forms/third_party/harfbuzz
             gui_forms/third_party/freetype
             .build/native-${{ matrix.platform }}/skia
-          key: native-deps-v1-${{ matrix.platform }}-${{ steps.dependency-compiler.outputs.identity }}-${{ hashFiles('gui_forms/third_party/fetch_skia_cpu.sh', 'gui_forms/third_party/fetch_text_stack.sh', 'gui_forms/third_party/build_skia_cpu*.sh', 'gui_forms/third_party/skia*.patch', 'gui_forms/third_party/skia_cpu_args.gn', 'tools/build_native.py') }}
+          key: native-deps-v1-${{ matrix.platform }}-${{ steps.dependency-compiler.outputs.identity }}-${{ hashFiles('gui_forms/third_party/fetch_skia_cpu.sh', 'gui_forms/third_party/fetch_text_stack.sh', 'gui_forms/third_party/build_skia_cpu*.sh', 'gui_forms/third_party/skia*.patch', 'gui_forms/third_party/skia_cpu_args.gn', 'tools/build_native.py', 'tools/native_build_support.py') }}
       - name: Build Windows
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: python tools/build_native.py --jobs 2
+        run: |
+          python -B tools/native_build_tests.py
+          python -B gui_forms/tests/verify_install_tests.py
+          python tools/build_native.py --jobs 2
       - name: Build macOS
         if: runner.os == 'macOS'
-        run: python3 tools/build_native.py --jobs 2
+        run: |
+          python3 -B tools/native_build_tests.py
+          python3 -B gui_forms/tests/verify_install_tests.py
+          python3 tools/build_native.py --jobs 2
       - name: Build Linux with test display
         if: runner.os == 'Linux'
-        run: xvfb-run -a python3 tools/build_native.py --jobs 2
+        run: |
+          python3 -B tools/native_build_tests.py
+          python3 -B gui_forms/tests/verify_install_tests.py
+          xvfb-run -a python3 tools/build_native.py --jobs 2
       - name: Save pinned dependency cache after build attempts
         if: always() && runner.os != 'Windows' && steps.native-dependencies.outputs.cache-primary-key != '' && steps.native-dependencies.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4

@@ -25,7 +25,7 @@ namespace file_manager {
 #endif
 
 struct NativeSymlink final {
-    std::filesystem::path target;
+    std::filesystem::path target{};
     bool directory{}; // Windows link attribute, independent of target existence.
 };
 [[nodiscard]] NativeSymlink read_native_symlink(
@@ -49,7 +49,7 @@ private:
 #else
     int handle_{-1};
 #endif
-    std::error_code error_;
+    std::error_code error_{};
 };
 
 } // namespace file_manager

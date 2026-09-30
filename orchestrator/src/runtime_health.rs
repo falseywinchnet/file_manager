@@ -93,17 +93,19 @@ impl RuntimeHealth {
     }
 
     #[must_use]
+    #[allow(clippy::let_and_return)] // House calculate-then-return rule.
     pub fn snapshot(&self) -> RuntimeHealthSnapshot {
-        RuntimeHealthSnapshot {
+        let pending_session_limit: usize = if cfg!(windows) && self.kind == "local_daemon" {
+            0
+        } else {
+            LOCAL_PENDING_SESSIONS
+        };
+        let snapshot: RuntimeHealthSnapshot = RuntimeHealthSnapshot {
             kind: self.kind,
             authoritative: false,
             consistency: "relaxed_observability",
             worker_limit: LOCAL_SESSION_WORKERS,
-            pending_session_limit: if cfg!(windows) && self.kind == "local_daemon" {
-                0
-            } else {
-                LOCAL_PENDING_SESSIONS
-            },
+            pending_session_limit,
             accepted_sessions: self.accepted_sessions.load(Ordering::Relaxed),
             rejected_sessions: self.rejected_sessions.load(Ordering::Relaxed),
             active_sessions: self.active_sessions.load(Ordering::Relaxed),
@@ -111,7 +113,8 @@ impl RuntimeHealth {
             authentication_failures: self.authentication_failures.load(Ordering::Relaxed),
             completed_requests: self.completed_requests.load(Ordering::Relaxed),
             malformed_sessions: self.malformed_sessions.load(Ordering::Relaxed),
-        }
+        };
+        snapshot
     }
 }
 

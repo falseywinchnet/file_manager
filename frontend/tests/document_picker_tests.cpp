@@ -5,145 +5,182 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <string_view>
+#include <stdexcept>
 #include <unistd.h>
 
 namespace {
 
+void write_fixture(const std::filesystem::path& path, const std::string_view contents,
+                   const std::ios::openmode mode = std::ios::out) {
+    std::ofstream stream(path, mode);
+    stream << contents;
+    if (!stream)
+        throw std::runtime_error("fixture write failed");
+}
+
 class TestRoot final {
-public:
+  public:
     TestRoot() {
-        path_ = std::filesystem::temp_directory_path() /
-            ("file-manager-picker-" + std::to_string(::getpid()));
-        std::filesystem::create_directories(path_ / "Folder");
-        std::ofstream(path_ / "alpha.txt") << "alpha";
-        std::ofstream(path_ / "beta.txt") << "beta";
-        std::ofstream(path_ / "image.png") << "png";
-        std::ofstream(path_ / ".hidden.txt") << "hidden";
-        (void)create_fixture_link("alpha.txt", path_ / "linked.txt");
+        const std::filesystem::path parent =
+            std::filesystem::canonical(std::filesystem::temp_directory_path());
+        const std::string name = "file-manager-picker-" + std::to_string(::getpid());
+        path_ = parent / name;
+        const bool acquired = std::filesystem::create_directory(path_);
+        if (!acquired) throw std::runtime_error("picker fixture directory already exists");
+        try {
+            std::filesystem::create_directories(path_ / "Folder");
+            write_fixture(path_ / "alpha.txt", "alpha");
+            write_fixture(path_ / "beta.txt", "beta");
+            write_fixture(path_ / "image.png", "png");
+            write_fixture(path_ / ".hidden.txt", "hidden");
+            write_fixture(path_ / ".config", "hidden extensionless");
+            write_fixture(path_ / "README", "extensionless");
+            write_fixture(path_ / "UPPER.TXT", "case");
+            write_fixture(path_ / "multi.part.txt", "suffix");
+            (void)create_fixture_link("alpha.txt", path_ / "linked.txt");
+        } catch (...) {
+            cleanup();
+            throw;
+        }
     }
+    TestRoot(const TestRoot&) = delete;
+    TestRoot& operator=(const TestRoot&) = delete;
     ~TestRoot() {
-        std::error_code ignored;
-        std::filesystem::remove_all(path_, ignored);
+        cleanup();
     }
     [[nodiscard]] const std::filesystem::path& path() const noexcept {
         return path_;
     }
-private:
-    std::filesystem::path path_;
+
+  private:
+    void cleanup() noexcept {
+        // This owner exclusively created this direct child of canonical temp.
+        std::error_code ignored{};
+        std::filesystem::remove_all(path_, ignored);
+    }
+    std::filesystem::path path_{};
 };
 
 void require(const bool condition, const std::string_view message) {
     if (!condition) {
-        std::cerr << "document picker test failed: " << message << '\n';
-        std::exit(1);
+        const std::string diagnostic(message);
+        throw std::runtime_error(diagnostic);
     }
 }
 
-file_manager::DocumentPickerRequest request(
-    const TestRoot& root, const file_manager::DocumentPickerProfile profile) {
-    file_manager::DocumentPickerRequest value;
+file_manager::DocumentPickerRequest request(const TestRoot& root,
+                                            const file_manager::DocumentPickerProfile profile) {
+    file_manager::DocumentPickerRequest value{};
     value.profile = profile;
     value.protected_root = root.path();
     value.initial_location = root.path();
     value.orchestrator_session_valid = true; // Explicit fixture session.
     value.owner_application_id = "picker-test-consumer";
-    value.filters = {{"text", "Text", {"txt"}},
-                     {"images", "Images", {"png"}}};
+    value.filters = {{"text", "Text", {"txt"}}, {"images", "Images", {"png"}}};
     value.active_filter_id = "text";
     return value;
 }
 
-const file_manager::DirectoryEntry* find(
-    const file_manager::FileSelectionController& picker,
-    const std::string_view name) {
-    for (const auto& entry : picker.browser().entries) {
-        if (entry.name == name) return &entry;
+const file_manager::DirectoryEntry* find(const file_manager::FileSelectionController& picker,
+                                         const std::string_view name) {
+    for (const file_manager::DirectoryEntry& entry : picker.browser().entries) {
+        if (entry.name == name)
+            return &entry;
     }
     return nullptr;
 }
 
 } // namespace
 
-int main() {
-    TestRoot root;
+int run_tests() {
+    TestRoot root{};
 
-    auto open_request = request(root, file_manager::DocumentPickerProfile::open_file);
+    file_manager::DocumentPickerRequest open_request =
+        request(root, file_manager::DocumentPickerProfile::open_file);
     file_manager::FileSelectionController open(open_request);
-    require(open.browser().available() && find(open, "alpha.txt") &&
-                !find(open, "image.png") && !find(open, ".hidden.txt"),
+    require(open.browser().available() && find(open, "alpha.txt") && !find(open, "image.png") &&
+                !find(open, ".hidden.txt"),
             "open profile must browse without Engine and apply type/hidden policy");
-    require(open.set_selection({find(open, "alpha.txt")->stable_id}) &&
-                open.accept().accepted() &&
-                open.accept().selections.front().path.filename() == "alpha.txt",
+    const bool open_selected = open.set_selection({(*find(open, "alpha.txt")).stable_id});
+    const file_manager::DocumentPickerResult open_result = open.accept();
+    require(open_selected && open_result.accepted() &&
+                open_result.selections.front().path.filename() == "alpha.txt",
             "one ordinary visible file must revalidate and accept");
-    const auto retained_location = open.browser().location;
-    const auto retained_selection = open.selected_ids();
-    require(!open.navigate(root.path().parent_path()) &&
-                open.browser().available() &&
+    const std::filesystem::path retained_location = open.browser().location;
+    const std::vector<std::string> retained_selection = open.selected_ids();
+    const bool outside_navigation = open.navigate(root.path().parent_path());
+    require(!outside_navigation && open.browser().available() &&
                 open.browser().location == retained_location &&
-                open.selected_ids() == retained_selection &&
-                !open.last_error().empty(),
+                open.selected_ids() == retained_selection && !open.last_error().empty(),
             "refused navigation must retain the last usable directory and selection");
 
-    require(open.set_show_hidden(true) && find(open, ".hidden.txt"),
+    const bool hidden_enabled = open.set_show_hidden(true);
+    require(hidden_enabled && find(open, ".hidden.txt"),
             "app-scoped hidden policy must refresh the same browser model");
-    require(open.set_active_filter("images") && find(open, "image.png") &&
-                !find(open, "alpha.txt") && !find(open, ".hidden.txt"),
+    const bool images_selected = open.set_active_filter("images");
+    require(images_selected && find(open, "image.png") && !find(open, "alpha.txt") &&
+                !find(open, ".hidden.txt"),
             "type filter changes must not leak filtered hidden files");
 
-    auto multi_request = request(
-        root, file_manager::DocumentPickerProfile::open_files);
+    file_manager::DocumentPickerRequest multi_request =
+        request(root, file_manager::DocumentPickerProfile::open_files);
     multi_request.maximum_selection = 2;
     file_manager::FileSelectionController multi(multi_request);
-    require(multi.set_selection({find(multi, "alpha.txt")->stable_id,
-                                 find(multi, "beta.txt")->stable_id}) &&
-                multi.accept().selections.size() == 2U,
+    const bool multiple_selected = multi.set_selection(
+        {(*find(multi, "alpha.txt")).stable_id, (*find(multi, "beta.txt")).stable_id});
+    const file_manager::DocumentPickerResult multiple_result = multi.accept();
+    require(multiple_selected && multiple_result.selections.size() == 2U,
             "bounded multi-open must accept exactly the admitted observations");
-    require(!multi.set_selection({find(multi, "alpha.txt")->stable_id,
-                                  find(multi, "beta.txt")->stable_id,
-                                  find(multi, "Folder")->stable_id}),
-            "multi-open must enforce its cardinality before acceptance");
+    const bool excess_selection = multi.set_selection({(*find(multi, "alpha.txt")).stable_id,
+                                                       (*find(multi, "beta.txt")).stable_id,
+                                                       (*find(multi, "Folder")).stable_id});
+    require(!excess_selection, "multi-open must enforce its cardinality before acceptance");
 
-    auto folder_request = request(
-        root, file_manager::DocumentPickerProfile::select_folder);
+    file_manager::DocumentPickerRequest folder_request =
+        request(root, file_manager::DocumentPickerProfile::select_folder);
     folder_request.filters.clear();
     folder_request.active_filter_id.clear();
     file_manager::FileSelectionController folder(folder_request);
+    const file_manager::DocumentPickerResult current_folder_result = folder.accept();
     require(!find(folder, "alpha.txt") && find(folder, "Folder") &&
-                folder.accept().accepted() &&
-                folder.accept().selections.front().path ==
+                current_folder_result.accepted() &&
+                current_folder_result.selections.front().path ==
                     std::filesystem::canonical(root.path()),
             "folder profile must hide files and allow the current folder");
-    require(folder.set_selection({find(folder, "Folder")->stable_id}) &&
-                folder.accept().accepted() &&
-                folder.accept().selections.front().path.filename() == "Folder",
+    const bool child_selected = folder.set_selection({(*find(folder, "Folder")).stable_id});
+    const file_manager::DocumentPickerResult child_result = folder.accept();
+    require(child_selected && child_result.accepted() &&
+                child_result.selections.front().path.filename() == "Folder",
             "folder profile must accept one selected child folder");
 
-    auto save_request = request(root, file_manager::DocumentPickerProfile::save_as);
+    file_manager::DocumentPickerRequest save_request =
+        request(root, file_manager::DocumentPickerProfile::save_as);
     save_request.suggested_name = "draft";
     save_request.default_extension = "txt";
     file_manager::FileSelectionController save(save_request);
-    auto result = save.accept();
-    require(result.accepted() &&
-                result.selections.front().path.filename() == "draft.txt" &&
+    file_manager::DocumentPickerResult result = save.accept();
+    require(result.accepted() && result.selections.front().path.filename() == "draft.txt" &&
                 !result.selections.front().existing,
             "save-as must correct the extension and return a non-writing destination observation");
-    require(save.set_filename("alpha.txt"),
-            "save profile must accept a bounded basename edit");
+    const bool existing_name_set = save.set_filename("alpha.txt");
+    require(existing_name_set, "save profile must accept a bounded basename edit");
     result = save.accept();
     require(result.terminal ==
-                file_manager::DocumentPickerTerminal::overwrite_confirmation_required &&
+                    file_manager::DocumentPickerTerminal::overwrite_confirmation_required &&
                 result.selections.front().existing,
             "existing save destination must require explicit overwrite confirmation");
-    require(save.accept(true).accepted(),
+    const file_manager::DocumentPickerResult overwrite_result = save.accept(true);
+    require(overwrite_result.accepted(),
             "confirmed overwrite must return the observed existing destination");
-    require(save.set_filename("../escape") &&
-                save.accept().code == "invalid-filename",
+    const bool escape_name_set = save.set_filename("../escape");
+    const file_manager::DocumentPickerResult invalid_name_result = save.accept();
+    require(escape_name_set && invalid_name_result.code == "invalid-filename",
             "save acceptance must reject path-bearing filenames");
 
-    auto export_request = request(
-        root, file_manager::DocumentPickerProfile::export_file);
+    file_manager::DocumentPickerRequest export_request =
+        request(root, file_manager::DocumentPickerProfile::export_file);
     export_request.default_extension = ".txt";
     export_request.suggested_name = "report.txt";
     export_request.allow_native_fallback = true;
@@ -151,50 +188,104 @@ int main() {
     export_picker.set_orchestrator_session_valid(false);
     result = export_picker.accept();
     require(result.terminal == file_manager::DocumentPickerTerminal::unavailable &&
-                result.code == "session-unavailable" &&
-                result.native_fallback_permitted,
+                result.code == "session-unavailable" && result.native_fallback_permitted,
             "lost Orchestrator policy must block acceptance and retain fallback policy");
-    require(export_picker.cancel().terminal ==
-                file_manager::DocumentPickerTerminal::cancelled,
+    const file_manager::DocumentPickerResult cancelled_result = export_picker.cancel();
+    require(cancelled_result.terminal == file_manager::DocumentPickerTerminal::cancelled,
             "cancel must return no observations");
 
-    auto stale_request = request(root, file_manager::DocumentPickerProfile::open_file);
+    file_manager::DocumentPickerRequest stale_request =
+        request(root, file_manager::DocumentPickerProfile::open_file);
     file_manager::FileSelectionController stale(stale_request);
-    const auto stale_id = find(stale, "beta.txt")->stable_id;
-    require(stale.set_selection({stale_id}), "stale fixture must select beta");
+    const std::string stale_id = (*find(stale, "beta.txt")).stable_id;
+    const bool stale_selected = stale.set_selection({stale_id});
+    require(stale_selected, "stale fixture must select beta");
     std::filesystem::remove(root.path() / "beta.txt");
-    std::ofstream(root.path() / "beta.txt") << "replacement";
-    require(stale.accept().code == "selection-changed",
+    write_fixture(root.path() / "beta.txt", "replacement");
+    const file_manager::DocumentPickerResult stale_result = stale.accept();
+    require(stale_result.code == "selection-changed",
             "replacement between selection and acceptance must fail closed");
 
-    auto offline_request = request(root, file_manager::DocumentPickerProfile::open_file);
+    file_manager::DocumentPickerRequest offline_request =
+        request(root, file_manager::DocumentPickerProfile::open_file);
     offline_request.orchestrator_session_valid = false;
     file_manager::FileSelectionController unavailable(offline_request);
-    require(unavailable.accept().code == "session-unavailable", "default must not invent authority");
+    const file_manager::DocumentPickerResult unavailable_result = unavailable.accept();
+    require(unavailable_result.code == "session-unavailable", "default must not invent authority");
     offline_request.authority = file_manager::DocumentPickerAuthority::trusted_local_host;
     offline_request.home_location = root.path();
     file_manager::FileSelectionController local(offline_request);
-    require(local.set_selection({find(local, "Folder")->stable_id}) && !local.accept().accepted(),
+    const bool navigation_selected = local.set_selection({(*find(local, "Folder")).stable_id});
+    const file_manager::DocumentPickerResult folder_as_file_result = local.accept();
+    require(navigation_selected && !folder_as_file_result.accepted(),
             "folders are selectable for navigation, never accepted as open files");
-    require(local.navigate("Folder") && local.navigate(".."), "relative navigation is based on current location");
-    require(local.set_name_filter("a*.TXT") && find(local, "alpha.txt") && !find(local, "beta.txt") && find(local, "Folder"),
+    const bool entered_child = local.navigate("Folder");
+    const bool returned_parent = local.navigate("..");
+    require(entered_child && returned_parent, "relative navigation is based on current location");
+    const bool glob_applied = local.set_name_filter("a*.TXT");
+    require(glob_applied && find(local, "alpha.txt") && !find(local, "beta.txt") &&
+                find(local, "Folder"),
             "filename glob combines with type and leaves folders navigable");
-    require(local.set_selection({find(local, "alpha.txt")->stable_id}) && local.accept().accepted(),
+    const bool local_selected = local.set_selection({(*find(local, "alpha.txt")).stable_id});
+    const file_manager::DocumentPickerResult local_result = local.accept();
+    require(local_selected && local_result.accepted(),
             "explicit trusted host grant accepts without Engine or synthetic daemon");
     local.set_authority_valid(false);
-    require(local.accept().code == "session-unavailable", "host revocation blocks acceptance");
-    auto hidden_request = offline_request;
+    const file_manager::DocumentPickerResult revoked_result = local.accept();
+    require(revoked_result.code == "session-unavailable", "host revocation blocks acceptance");
+    file_manager::DocumentPickerRequest hidden_request = offline_request;
     hidden_request.allow_hidden_toggle = false;
     file_manager::FileSelectionController hidden_locked(hidden_request);
-    require(!hidden_locked.set_show_hidden(true), "host can prohibit session hidden toggle");
-    require(save.set_filename("alpha.txt") && save.accept().terminal == file_manager::DocumentPickerTerminal::overwrite_confirmation_required,
+    const bool hidden_override = hidden_locked.set_show_hidden(true);
+    require(!hidden_override, "host can prohibit session hidden toggle");
+    const bool confirmation_name_set = save.set_filename("alpha.txt");
+    const file_manager::DocumentPickerResult confirmation_result = save.accept();
+    require(confirmation_name_set &&
+                confirmation_result.terminal ==
+                    file_manager::DocumentPickerTerminal::overwrite_confirmation_required,
             "capture overwrite observation");
-    std::ofstream(root.path() / "alpha.txt", std::ios::app) << "changed";
-    require(save.accept(true).code == "destination-changed", "overwrite confirmation binds to displayed revision");
-    require(save.set_active_filter("images") && save.set_filename("new") && save.accept().selections.front().path.filename() == "new.png",
+    write_fixture(root.path() / "alpha.txt", "changed", std::ios::app);
+    const file_manager::DocumentPickerResult changed_destination_result = save.accept(true);
+    require(changed_destination_result.code == "destination-changed",
+            "overwrite confirmation binds to displayed revision");
+    const bool image_filter_set = save.set_active_filter("images");
+    const bool new_name_set = save.set_filename("new");
+    const file_manager::DocumentPickerResult image_save_result = save.accept();
+    require(image_filter_set && new_name_set &&
+                image_save_result.selections.front().path.filename() == "new.png",
             "save extension follows selected type");
-    require(save.set_filename(".hidden") && save.accept().code == "hidden-destination",
+    const bool hidden_name_set = save.set_filename(".hidden");
+    const file_manager::DocumentPickerResult hidden_destination_result = save.accept();
+    require(hidden_name_set && hidden_destination_result.code == "hidden-destination",
             "hidden save path must obey same visibility policy");
+    // Guard the allocation-free suffix matcher against the filesystem extension
+    // rules it replaced, and exercise both wildcard restart and single-byte '?' .
+    file_manager::DocumentPickerRequest suffix_request = open_request;
+    suffix_request.show_hidden = true;
+    suffix_request.filters = {{"none", "No extension", {""}}, {"text", "Text", {"txt"}}};
+    suffix_request.active_filter_id = "none";
+    file_manager::FileSelectionController suffix(suffix_request);
+    require(find(suffix, "README") != nullptr && find(suffix, ".config") != nullptr &&
+                find(suffix, "UPPER.TXT") == nullptr,
+            "leading-dot and extensionless basenames preserve extension matching");
+    const bool text_filter = suffix.set_active_filter("text");
+    require(text_filter && find(suffix, "UPPER.TXT") != nullptr &&
+                find(suffix, "multi.part.txt") != nullptr,
+            "case folding and final-dot suffix semantics remain unchanged");
+    const bool wildcard_filter = suffix.set_name_filter("*part.???");
+    require(wildcard_filter && find(suffix, "multi.part.txt") != nullptr &&
+                find(suffix, "UPPER.TXT") == nullptr,
+            "star backtracking and question-mark matching compose with type filtering");
     std::cout << "document picker tests passed\n";
     return 0;
+}
+
+int main() {
+    try {
+        const int status = run_tests();
+        return status;
+    } catch (const std::exception& error) {
+        std::cerr << "document picker test failed: " << error.what() << '\n';
+        return 1;
+    }
 }

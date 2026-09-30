@@ -558,16 +558,17 @@ impl<C: EngineJsonlCaller> EngineSearchProvider for EngineJsonlSearchAdapter<C> 
         // predicate. Plan Unsupported before issuing an inexact substitute;
         // the broker's existing allowlist may then use bounded live search.
         // Already-issued source-bound catalogue cursors retain their predicate.
-        let continuing_catalogue = request
-            .cursor
-            .as_ref()
-            .is_some_and(|cursor| cursor.source == EngineSearchCursorSource::Catalogue);
+        let continuing_catalogue: bool = match &request.cursor {
+            Some(cursor) => cursor.source == EngineSearchCursorSource::Catalogue,
+            None => false,
+        };
         if !request.text.is_empty() && !continuing_catalogue {
-            return catalogue_failure(
+            let unsupported: EngineQueryResultFixture = catalogue_failure(
                 TerminalStatus::Unsupported,
                 "ENGINE_CATALOGUE_TEXT_UNSUPPORTED",
                 "catalogue name/path substring predicate is unavailable; exact callers use filters.name",
             );
+            return unsupported;
         }
 
         match self
@@ -831,10 +832,9 @@ mod tests {
             self.method = method.to_owned();
             self.params = Some(params.clone());
             if method == "engine.query_live" {
-                return Ok(
-                    json!({"source":"live_filesystem", "scan_id":"fixture-scan", "complete":true,
-                    "results":[], "work":{"visited_entries":1,"stat_calls":0,"elapsed_ms":0}}),
-                );
+                let result: serde_json::Value = json!({"source":"live_filesystem", "scan_id":"fixture-scan", "complete":true,
+                    "results":[], "work":{"visited_entries":1,"stat_calls":0,"elapsed_ms":0}});
+                return Ok(result);
             }
             Ok(json!({
                 "generation": 7,
@@ -1020,26 +1020,28 @@ mod tests {
     }
 
     fn exact_request() -> EngineSearchRequest {
-        let mut request = search_request();
-        request
-            .filters
-            .insert("name".to_owned(), std::mem::take(&mut request.text));
+        let mut request: EngineSearchRequest = search_request();
+        let name: String = std::mem::take(&mut request.text);
+        request.filters.insert("name".to_owned(), name);
         request
     }
 
     #[test]
     fn ordinary_text_and_combined_filters_never_become_exact_name_queries() {
         use crate::engine_port::{EngineSearchBroker, EngineSearchOutcome, EngineSearchPolicy};
-        let mut adapter = EngineJsonlSearchAdapter::new(RecordingCaller::default());
+        let mut adapter: EngineJsonlSearchAdapter<RecordingCaller> =
+            EngineJsonlSearchAdapter::new(RecordingCaller::default());
         assert_eq!(
             adapter.query_catalogue(&search_request()).terminal,
             TerminalStatus::Unsupported
         );
         assert!(adapter.peer_mut().method.is_empty());
-        let mut request = search_request();
+        let mut request: EngineSearchRequest = search_request();
         request.filters.insert("kind".to_owned(), "file".to_owned());
-        let mut broker = EngineSearchBroker::new(adapter);
-        let outcome = broker.search(&request, EngineSearchPolicy::PreferCatalogue);
+        let mut broker: EngineSearchBroker<EngineJsonlSearchAdapter<RecordingCaller>> =
+            EngineSearchBroker::new(adapter);
+        let outcome: EngineSearchOutcome =
+            broker.search(&request, EngineSearchPolicy::PreferCatalogue);
         assert!(matches!(outcome, EngineSearchOutcome::Catalogue(_)));
         assert_eq!(outcome.terminal(), TerminalStatus::Unsupported);
         assert!(broker.into_provider().into_peer().method.is_empty());
@@ -1048,16 +1050,21 @@ mod tests {
     #[test]
     fn ordinary_text_uses_live_only_after_unsupported_predicate_planning() {
         use crate::engine_port::{EngineSearchBroker, EngineSearchOutcome, EngineSearchPolicy};
-        let mut broker =
-            EngineSearchBroker::new(EngineJsonlSearchAdapter::new(RecordingCaller::default()));
-        let outcome = broker.search(&search_request(), EngineSearchPolicy::CatalogueOnly);
+        let caller: RecordingCaller = RecordingCaller::default();
+        let adapter: EngineJsonlSearchAdapter<RecordingCaller> =
+            EngineJsonlSearchAdapter::new(caller);
+        let mut broker: EngineSearchBroker<EngineJsonlSearchAdapter<RecordingCaller>> =
+            EngineSearchBroker::new(adapter);
+        let outcome: EngineSearchOutcome =
+            broker.search(&search_request(), EngineSearchPolicy::CatalogueOnly);
         assert_eq!(outcome.terminal(), TerminalStatus::Unsupported);
         assert!(broker.provider_mut().peer_mut().method.is_empty());
-        let outcome = broker.search(&search_request(), EngineSearchPolicy::PreferCatalogue);
+        let outcome: EngineSearchOutcome =
+            broker.search(&search_request(), EngineSearchPolicy::PreferCatalogue);
         assert!(matches!(outcome, EngineSearchOutcome::Live(_)));
         assert_eq!(outcome.terminal(), TerminalStatus::Success);
         assert_eq!(broker.provider_mut().peer_mut().method, "engine.query_live");
-        let mut invalid = search_request();
+        let mut invalid: EngineSearchRequest = search_request();
         invalid.budget.max_results = 0;
         assert_eq!(
             broker
@@ -1070,17 +1077,19 @@ mod tests {
     #[test]
     fn existing_catalogue_cursor_retains_original_exact_predicate() {
         use crate::engine_contract::{EngineSearchCursor, EngineSearchCursorSource};
-        let mut request = search_request();
+        let mut request: EngineSearchRequest = search_request();
         request.cursor = Some(EngineSearchCursor {
             source: EngineSearchCursorSource::Catalogue,
             value: "old-cursor".to_owned(),
         });
-        let mut adapter = EngineJsonlSearchAdapter::new(RecordingCaller::default());
+        let mut adapter: EngineJsonlSearchAdapter<RecordingCaller> =
+            EngineJsonlSearchAdapter::new(RecordingCaller::default());
         assert_eq!(
             adapter.query_catalogue(&request).terminal,
             TerminalStatus::Success
         );
-        let params = adapter.into_peer().params.expect("catalogue continuation");
+        let caller: RecordingCaller = adapter.into_peer();
+        let params: serde_json::Value = caller.params.expect("catalogue continuation");
         assert_eq!(params["filters"]["name"], "ledger.txt");
         assert_eq!(params["cursor"], "old-cursor");
     }
@@ -1088,16 +1097,17 @@ mod tests {
     #[test]
     fn explicit_exact_no_match_remains_catalogue_and_does_not_fall_back() {
         use crate::engine_port::{EngineSearchBroker, EngineSearchOutcome, EngineSearchPolicy};
-        let adapter = EngineJsonlSearchAdapter::new(RecordingCaller::default());
-        let mut broker = EngineSearchBroker::new(adapter);
-        let outcome = broker.search(&exact_request(), EngineSearchPolicy::PreferCatalogue);
+        let adapter: EngineJsonlSearchAdapter<RecordingCaller> =
+            EngineJsonlSearchAdapter::new(RecordingCaller::default());
+        let mut broker: EngineSearchBroker<EngineJsonlSearchAdapter<RecordingCaller>> =
+            EngineSearchBroker::new(adapter);
+        let outcome: EngineSearchOutcome =
+            broker.search(&exact_request(), EngineSearchPolicy::PreferCatalogue);
         assert!(matches!(outcome, EngineSearchOutcome::Catalogue(_)));
         assert_eq!(outcome.terminal(), TerminalStatus::Success);
-        let params = broker
-            .into_provider()
-            .into_peer()
-            .params
-            .expect("exact call");
+        let adapter: EngineJsonlSearchAdapter<RecordingCaller> = broker.into_provider();
+        let caller: RecordingCaller = adapter.into_peer();
+        let params: serde_json::Value = caller.params.expect("exact call");
         assert_eq!(params["filters"]["name"], "ledger.txt");
     }
 

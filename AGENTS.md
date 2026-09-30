@@ -14,6 +14,21 @@ Before planning or implementation, read:
 5. `planning/DECISION_PROTOCOL.md`
 6. `decisions/README.md`
 7. the relevant component `AGENTS.md` and contract registry entries
+8. `planning/PROGRAMMING_HOUSE_STYLE.md`, the owner's complete coding standard
+
+## House-style acceptance
+
+The owner's 2026-09-30 correction requires the supplied house style in all
+first-party implementation, tests, and authored tooling. Every delegated
+assignment must name this document and include source review against it.
+Passing functional tests does not establish style compliance. Review explicit
+types, named executable behavior and retained callback state, ownership and
+borrow lifetimes, operation order, initialization, conversions, failure states,
+and repeated-loop storage/work. Apply the C++ spelling table to C++; apply
+language-neutral requirements to other languages without confusing their syntax
+with C++. Generated-code restrictions apply only to the named generated profile.
+Do not rewrite vendored dependencies or claim legacy code compliant without
+reviewing it. Record the exact reviewed scope and remaining violations.
 
 ## Scope boundaries
 

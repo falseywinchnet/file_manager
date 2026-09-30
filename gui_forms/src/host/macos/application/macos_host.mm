@@ -345,7 +345,8 @@ static bool register_bundle_typeface(SkiaRaster& raster,
     if (url == nil) {
         return optional;
     }
-    return raster.register_typeface_file(role, weight, italic, url.fileSystemRepresentation);
+    const bool registered = raster.register_typeface_file(role, weight, italic, url.fileSystemRepresentation);
+    return registered;
 }
 
 static bool register_bundle_fallback_typeface(SkiaRaster& raster,
@@ -357,7 +358,8 @@ static bool register_bundle_fallback_typeface(SkiaRaster& raster,
                                         withExtension:extension
                                          subdirectory:@"fonts"];
     if (url == nil) return true;
-    return raster.register_fallback_typeface_file(weight, italic, url.fileSystemRepresentation);
+    const bool registered = raster.register_fallback_typeface_file(weight, italic, url.fileSystemRepresentation);
+    return registered;
 }
 
 namespace {

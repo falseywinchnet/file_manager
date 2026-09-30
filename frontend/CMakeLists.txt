@@ -390,6 +390,15 @@ if(FILE_MANAGER_BUILD_TESTS)
     add_test(NAME file_manager_house_art_tests
              COMMAND file_manager_house_art_tests)
 
+    add_executable(file_manager_object_order_tests tests/object_order_tests.cpp)
+    target_include_directories(file_manager_object_order_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(file_manager_object_order_tests PRIVATE FileManager::FrontendModel GUIForms::Application)
+    target_compile_features(file_manager_object_order_tests PRIVATE cxx_std_20)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(file_manager_object_order_tests PRIVATE -Wall -Wextra -Werror -Wpedantic)
+    endif()
+    add_test(NAME file_manager_object_order_tests COMMAND file_manager_object_order_tests)
+
     add_executable(file_manager_application_interaction_tests
         tests/application_interaction_tests.cpp)
     target_link_libraries(file_manager_application_interaction_tests PRIVATE

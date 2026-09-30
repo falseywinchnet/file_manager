@@ -19,17 +19,17 @@
 
 namespace gui_forms {
 struct MenuStripItemSpec final {
-    std::string stable_id;
-    std::string text;
-    std::vector<MenuItemSpec> items;
+    std::string stable_id{};
+    std::string text{};
+    std::vector<MenuItemSpec> items{};
     bool enabled{true};
     bool visible{true};
 };
 
 struct MenuStripInvocation final {
-    std::string menu_strip_id;
-    std::string top_level_id;
-    MenuItemInvocation item;
+    std::string menu_strip_id{};
+    std::string top_level_id{};
+    MenuItemInvocation item{};
 };
 
 // Retained top-level application menu. The bar stays in ordinary layout; its
@@ -98,20 +98,20 @@ private:
     void on_popup_open_changed(bool open_state);
     void set_hot(std::optional<std::size_t> index);
 
-    std::vector<MenuStripItemSpec> items_;
-    std::unique_ptr<ContextMenu> popup_;
-    std::optional<std::size_t> active_index_;
-    std::optional<std::size_t> hot_index_;
-    std::string selected_item_id_;
+    std::vector<MenuStripItemSpec> items_{};
+    std::unique_ptr<ContextMenu> popup_{};
+    std::optional<std::size_t> active_index_{};
+    std::optional<std::size_t> hot_index_{};
+    std::string selected_item_id_{};
     bool focused_{};
     bool switching_{};
     bool use_mnemonic_{true};
     double item_padding_{11.0};
     FontSpec font_{FontRole::control, 10.5, 400, false, 0.12};
-    SubscriptionToken popup_invoked_;
-    SubscriptionToken popup_changed_;
-    Event<const MenuStripInvocation&> item_invoked_;
-    Event<std::optional<std::size_t>> open_changed_;
+    SubscriptionToken popup_invoked_{};
+    SubscriptionToken popup_changed_{};
+    Event<const MenuStripInvocation&> item_invoked_{};
+    Event<std::optional<std::size_t>> open_changed_{};
 };
 
 } // namespace gui_forms

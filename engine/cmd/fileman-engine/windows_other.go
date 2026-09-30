@@ -8,5 +8,6 @@ import (
 )
 
 func windowsCommand(string, []string, io.Writer) error {
-	return errors.New("Windows deployment is unavailable on this platform")
+	var failure error = errors.New("Windows deployment is unavailable on this platform")
+	return failure
 }

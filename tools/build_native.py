@@ -1,153 +1,160 @@
 #!/usr/bin/env python3
 """Build a development distribution using native tools; never install services."""
+from __future__ import annotations
+
+from dataclasses import dataclass
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
 import platform
 import shutil
-import subprocess
 import sys
-
-ROOT = Path(__file__).resolve().parents[1]
-
-
-def record_source_state(build, stage):
-    """Keep the exact Git view used for source cleanliness auditable."""
-    def git(*args):
-        return subprocess.check_output(['git', '-C', str(ROOT), *args],
-                                       text=True, encoding='utf-8', errors='replace').rstrip('\n')
-    status = git('status', '--porcelain=v1', '--untracked-files=normal')
-    config = subprocess.run(
-        ['git', '-C', str(ROOT), 'config', '--show-origin', '--get-regexp',
-         r'^core\.(autocrlf|eol|filemode|ignorecase)$'],
-        text=True, encoding='utf-8', errors='replace', capture_output=True)
-    if config.returncode not in (0, 1):
-        raise RuntimeError('Cannot inspect Git checkout policy: ' + config.stderr)
-    state = {
-        'git_executable': shutil.which('git'), 'git_version': git('--version'),
-        'source_revision': git('rev-parse', 'HEAD'), 'source_dirty': bool(status),
-        'status_porcelain': status.splitlines(),
-        'tracked_diff_stat': git('diff', 'HEAD', '--stat'),
-        'git_config': config.stdout.splitlines()
-    }
-    destination = build / ('source-state-' + stage + '.json')
-    destination.write_text(json.dumps(state, indent=2) + '\n', encoding='utf-8')
-    print(f'Source state ({stage}): {len(state["status_porcelain"])} changed paths; {destination}', flush=True)
-    for line in state['status_porcelain'][:40]:
-        print('  ' + line, flush=True)
-    return state
+from native_build_support import ROOT, BuildValidation, git_output, record_source_state
+from native_build_support import run, sdk_fingerprint
 
 
-def sdk_fingerprint(sdk):
-    """Bind public headers, import/static libraries and runtime bytes to one SDK."""
-    digest = hashlib.sha256()
-    for directory in ['include', 'lib', 'bin', 'share']:
-        for path in sorted((sdk / directory).rglob('*')):
-            if path.is_file():
-                digest.update(path.relative_to(sdk).as_posix().encode('utf-8') + b'\0')
-                with path.open('rb') as stream:
-                    for chunk in iter(lambda: stream.read(1024 * 1024), b''):
-                        digest.update(chunk)
-                digest.update(b'\0')
-    return digest.hexdigest()
+@dataclass(frozen=True)
+class HostConfiguration:
+    host: str
+    architecture: str
 
 
-def run(*args, cwd=ROOT):
-    print('+', ' '.join(map(str, args)), flush=True)
-    subprocess.run(list(map(str, args)), cwd=cwd, check=True)
+def host_configuration() -> HostConfiguration:
+    systems: dict[str, str] = {'Windows': 'windows', 'Darwin': 'macos', 'Linux': 'linux'}
+    architectures: dict[str, str] = {'AMD64': 'x64', 'x86_64': 'x64', 'arm64': 'arm64', 'aarch64': 'arm64'}
+    system: str = platform.system()
+    machine: str = platform.machine()
+    host: str = systems[system]
+    architecture: str = architectures[machine]
+    result: HostConfiguration = HostConfiguration(host=host, architecture=architecture)
+    return result
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+def build_toolkit(host: str, build: Path, sdk: Path, jobs: int) -> None:
+    """Build, test, then install only into the explicitly supplied build SDK."""
+    toolkit: Path = build / 'gui-forms'
+    options: list[str] = []
+    hosts: dict[str, str] = {'WINDOWS': 'windows', 'MACOS': 'macos', 'LINUX': 'linux'}
+    name: str
+    for name in hosts:
+        enabled: str = 'OFF'
+        if hosts[name] == host:
+            enabled = 'ON'
+        options.append(f'-DGUI_FORMS_ENABLE_{name}_HOST={enabled}')
+    if host == 'windows':
+        options.extend(['-DGUI_FORMS_ENABLE_SKIA=OFF', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=OFF'])
+    else:
+        if host == 'linux':
+            os.environ['GUI_FORMS_SYSTEM_BUILD_TOOLS'] = '1'
+        run('sh', ROOT / 'gui_forms/third_party/fetch_skia_cpu.sh')
+        run('sh', ROOT / 'gui_forms/third_party/fetch_text_stack.sh')
+        skia_out: Path = build / 'skia'
+        if host == 'linux':
+            run('sh', ROOT / 'gui_forms/third_party/build_skia_cpu_linux.sh', skia_out)
+        else:
+            skia_out.mkdir(exist_ok=True)
+            shutil.copy2(ROOT / 'gui_forms/third_party/skia_cpu_args.gn', skia_out / 'args.gn')
+            skia_root: Path = ROOT / 'gui_forms/third_party/skia'
+            run(skia_root / 'bin/gn', 'gen', skia_out, '--root=' + str(skia_root))
+            run(skia_root / 'third_party/ninja/ninja', '-C', skia_out, '-j', jobs, 'skia')
+        options.extend(['-DGUI_FORMS_ENABLE_SKIA=ON', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON',
+                        '-DGUI_FORMS_SKIA_PREBUILT=ON', f'-DGUI_FORMS_SKIA_OUT={skia_out}'])
+    run('cmake', '-S', ROOT / 'gui_forms', '-B', toolkit, '-G', 'Ninja',
+        '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_INSTALL_LIBDIR=lib',
+        '-DCMAKE_POSITION_INDEPENDENT_CODE=ON', '-DGUI_FORMS_BUILD_GALLERY=OFF',
+        '-DGUI_FORMS_BUILD_TESTS=ON', f'-DCMAKE_INSTALL_PREFIX={sdk}', *options)
+    run('cmake', '--build', toolkit, '--parallel', jobs)
+    os.environ['GUI_FORMS_FONT_DIR'] = str(ROOT / 'gui_forms/assets/fonts')
+    run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', '120')
+    run('cmake', '--install', toolkit)
+
+
+def build_components(host: str, build: Path, jobs: int) -> None:
+    suffix: str = ''
+    if host == 'windows':
+        suffix = '.exe'
+    services: Path = build / 'components'
+    services.mkdir(exist_ok=True)
+    engine_executable: Path = services / ('fileman-engine' + suffix)
+    run('go', 'build', '-trimpath', '-o', engine_executable,
+        './cmd/fileman-engine', cwd=ROOT / 'engine')
+    run('cargo', 'build', '--locked', '--release', '--bin', 'orchestrator',
+        '--target-dir', build / 'rust', '--jobs', jobs, cwd=ROOT / 'orchestrator')
+    orchestrator_executable: Path = build / 'rust/release' / ('orchestrator' + suffix)
+    shutil.copy2(orchestrator_executable, services)
+
+
+def main() -> None:
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--jobs', type=int, default=2)
     parser.add_argument('--gui-forms-sdk', type=Path, help='Reuse an already tested native SDK')
     parser.add_argument('--skip-components', action='store_true', help='Explicit frontend-only development package')
-    args = parser.parse_args()
-    if args.jobs < 1:
+    arguments: argparse.Namespace = parser.parse_args()
+    jobs: int = arguments.jobs
+    supplied_sdk: Path | None = arguments.gui_forms_sdk
+    skip_components: bool = arguments.skip_components
+    if jobs < 1:
         parser.error('--jobs must be positive')
-    host = {'Windows': 'windows', 'Darwin': 'macos', 'Linux': 'linux'}[platform.system()]
-    arch = {'AMD64': 'x64', 'x86_64': 'x64', 'arm64': 'arm64', 'aarch64': 'arm64'}[platform.machine()]
-    build = ROOT / '.build' / f'native-{host}-{arch}'
+    configuration: HostConfiguration = host_configuration()
+    host: str = configuration.host
+    architecture: str = configuration.architecture
+    build: Path = ROOT / '.build' / f'native-{host}-{architecture}'
     build.mkdir(parents=True, exist_ok=True)
     record_source_state(build, 'before-build')
-    sdk = args.gui_forms_sdk.resolve() if args.gui_forms_sdk else build / 'gui-forms-sdk'
-    os.environ['BUILD_JOBS'] = str(args.jobs)
-    toolkit = build / 'gui-forms'
-    if not args.gui_forms_sdk:
-        options = [f'-DGUI_FORMS_ENABLE_{name}_HOST={"ON" if host == value else "OFF"}'
-                   for name, value in [('WINDOWS', 'windows'), ('MACOS', 'macos'), ('LINUX', 'linux')]]
-        if host == 'windows':
-            options += ['-DGUI_FORMS_ENABLE_SKIA=OFF', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=OFF']
-        else:
-            if host == 'linux':
-                os.environ['GUI_FORMS_SYSTEM_BUILD_TOOLS'] = '1'
-            run('sh', ROOT / 'gui_forms/third_party/fetch_skia_cpu.sh')
-            run('sh', ROOT / 'gui_forms/third_party/fetch_text_stack.sh')
-            skia_out = build / 'skia'
-            if host == 'linux':
-                run('sh', ROOT / 'gui_forms/third_party/build_skia_cpu_linux.sh', skia_out)
-            else:
-                import shutil
-                skia_out.mkdir(exist_ok=True)
-                shutil.copy2(ROOT / 'gui_forms/third_party/skia_cpu_args.gn', skia_out / 'args.gn')
-                run(ROOT / 'gui_forms/third_party/skia/bin/gn', 'gen', skia_out,
-                    '--root=' + str(ROOT / 'gui_forms/third_party/skia'))
-                run(ROOT / 'gui_forms/third_party/skia/third_party/ninja/ninja', '-C', skia_out,
-                    '-j', args.jobs, 'skia')
-            options += ['-DGUI_FORMS_ENABLE_SKIA=ON', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON',
-                        '-DGUI_FORMS_SKIA_PREBUILT=ON', f'-DGUI_FORMS_SKIA_OUT={skia_out}']
-        run('cmake', '-S', ROOT / 'gui_forms', '-B', toolkit, '-G', 'Ninja',
-            '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_INSTALL_LIBDIR=lib',
-            '-DCMAKE_POSITION_INDEPENDENT_CODE=ON', '-DGUI_FORMS_BUILD_GALLERY=OFF',
-            '-DGUI_FORMS_BUILD_TESTS=ON', f'-DCMAKE_INSTALL_PREFIX={sdk}', *options)
-        run('cmake', '--build', toolkit, '--parallel', args.jobs)
-        os.environ['GUI_FORMS_FONT_DIR'] = str(ROOT / 'gui_forms/assets/fonts')
-        run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', '120')
-        run('cmake', '--install', toolkit)
-    manifest = build / 'gui-forms-consumption.json'
-    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
-    manifest.write_text(json.dumps({
-        'identity': {'id': f'gui-forms-development-{host}-{arch}-{revision[:12]}',
+    sdk: Path = build / 'gui-forms-sdk'
+    sdk_validation: str = 'native build and CTest passed'
+    toolkit_validation: str = 'passed'
+    if supplied_sdk is not None:
+        sdk = supplied_sdk.resolve()
+        sdk_validation = 'externally supplied'
+        toolkit_validation = 'externally supplied SDK'
+    os.environ['BUILD_JOBS'] = str(jobs)
+    if supplied_sdk is None:
+        build_toolkit(host, build, sdk, jobs)
+    manifest: Path = build / 'gui-forms-consumption.json'
+    revision: str = git_output('rev-parse', 'HEAD')
+    manifest_record: dict[str, object] = {
+        'identity': {'id': f'gui-forms-development-{host}-{architecture}-{revision[:12]}',
                      'state': 'development', 'source_revision': revision},
-        'validation': {'sdk': 'externally supplied' if args.gui_forms_sdk else 'native build and CTest passed'},
-        'limits': ['No platform promotion or installed service claim; see package receipt']
-    }, indent=2) + '\n', encoding='utf-8')
-    frontend = build / 'frontend'
-    sdk_identity = sdk_fingerprint(sdk)
+        'validation': {'sdk': sdk_validation},
+        'limits': ['No platform promotion or installed service claim; see package receipt']}
+    manifest_text: str = json.dumps(manifest_record, indent=2) + '\n'
+    manifest.write_text(manifest_text, encoding='utf-8')
+    frontend: Path = build / 'frontend'
+    sdk_identity: str = sdk_fingerprint(sdk)
     run('cmake', '-S', ROOT / 'frontend', '-B', frontend, '-G', 'Ninja',
         '-DCMAKE_BUILD_TYPE=Release', f'-DGUIForms_DIR={sdk}/lib/cmake/GUIForms',
         f'-DFILE_MANAGER_GUI_FORMS_MANIFEST={manifest}',
         f'-DCMAKE_INSTALL_PREFIX={build}/frontend-sdk')
-    sdk_stamp = frontend / 'sdk-fingerprint.txt'
-    if not sdk_stamp.is_file() or sdk_stamp.read_text(encoding='utf-8').strip() != sdk_identity:
-        # Installed headers can preserve source mtimes across an SDK replacement.
-        # Ninja timestamp checks alone cannot protect public C++ class layout ABI.
+    sdk_stamp: Path = frontend / 'sdk-fingerprint.txt'
+    previous_identity: str = ''
+    if sdk_stamp.is_file():
+        previous_text: str = sdk_stamp.read_text(encoding='utf-8')
+        previous_identity = previous_text.strip()
+    if previous_identity != sdk_identity:
+        # Installed header mtimes alone cannot protect a changed public C++ layout.
         run('cmake', '--build', frontend, '--target', 'clean')
-    run('cmake', '--build', frontend, '--parallel', args.jobs)
+    run('cmake', '--build', frontend, '--parallel', jobs)
     run('ctest', '--test-dir', frontend, '--output-on-failure', '--timeout', '120')
-    if sdk_fingerprint(sdk) != sdk_identity:
+    tested_identity: str = sdk_fingerprint(sdk)
+    if tested_identity != sdk_identity:
         raise RuntimeError('GUI.Forms SDK changed during frontend build/tests; rebuild against a stable SDK')
     sdk_stamp.write_text(sdk_identity + '\n', encoding='utf-8')
     run('cmake', '--install', frontend)
-    if not args.skip_components:
-        suffix = '.exe' if host == 'windows' else ''
-        services = build / 'components'
-        services.mkdir(exist_ok=True)
-        run('go', 'build', '-trimpath', '-o', services / ('fileman-engine' + suffix),
-            './cmd/fileman-engine', cwd=ROOT / 'engine')
-        run('cargo', 'build', '--locked', '--release', '--bin', 'orchestrator',
-            '--target-dir', build / 'rust', '--jobs', args.jobs, cwd=ROOT / 'orchestrator')
-        import shutil
-        shutil.copy2(build / 'rust/release' / ('orchestrator' + suffix), services)
-    (build / 'build-validation.json').write_text(json.dumps({
+    if not skip_components:
+        build_components(host, build, jobs)
+    validation: BuildValidation = {
         'source_revision': revision, 'frontend_ctest': 'passed',
-        'gui_forms_sdk_sha256': sdk_identity,
-        'gui_forms_ctest': 'externally supplied SDK' if args.gui_forms_sdk else 'passed'
-    }, indent=2) + '\n', encoding='utf-8')
+        'gui_forms_sdk_sha256': sdk_identity, 'gui_forms_ctest': toolkit_validation}
+    validation_path: Path = build / 'build-validation.json'
+    validation_text: str = json.dumps(validation, indent=2) + '\n'
+    validation_path.write_text(validation_text, encoding='utf-8')
+    package_options: list[str] = []
+    if skip_components:
+        package_options.append('--skip-components')
     run(sys.executable, ROOT / 'tools/package_native.py', '--build', build,
-        '--gui-forms-sdk', sdk, *(['--skip-components'] if args.skip_components else []))
+        '--gui-forms-sdk', sdk, *package_options)
 
 
 if __name__ == '__main__':

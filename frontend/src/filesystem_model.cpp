@@ -1,6 +1,7 @@
 #include "file_manager/platform_paths.hpp"
 #include "file_manager/filesystem_model.hpp"
 #include "native_file.hpp"
+#include "directory_name_order.hpp"
 
 #include <algorithm>
 #include <array>
@@ -9,6 +10,7 @@
 #include <ctime>
 #include <iomanip>
 #include <sstream>
+#include <span>
 #include <stdexcept>
 #include <sys/stat.h>
 
@@ -16,33 +18,37 @@ namespace file_manager {
 namespace {
 
 std::string ascii_lower(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-    });
+    for (char& character : value) {
+        const unsigned char byte = static_cast<unsigned char>(character);
+        const int lowered = std::tolower(byte);
+        character = static_cast<char>(lowered);
+    }
     return value;
 }
 
 std::string stable_id_for(const std::filesystem::path& path,
                           const ObjectIdentity& identity) {
     if (identity.available()) {
-        std::ostringstream stream;
+        std::ostringstream stream{};
         stream << "fm.object." << std::hex << std::setw(16) << std::setfill('0')
                << identity.device << '.' << std::setw(16) << identity.inode;
         if (identity.inode_high != 0) stream << '.' << std::setw(16) << identity.inode_high;
-        return stream.str();
+        const std::string result = stream.str();
+        return result;
     }
     constexpr std::uint64_t offset = 14695981039346656037ULL;
     constexpr std::uint64_t prime = 1099511628211ULL;
     std::uint64_t hash = offset;
-    const auto bytes = path_generic_utf8(path);
+    const std::string bytes = path_generic_utf8(path);
     for (const unsigned char value : bytes) {
         hash ^= value;
         hash *= prime;
     }
-    std::ostringstream stream;
+    std::ostringstream stream{};
     stream << "fm.object." << std::hex << std::setw(16) << std::setfill('0')
            << hash;
-    return stream.str();
+    const std::string result = stream.str();
+    return result;
 }
 
 #if !defined(_WIN32)
@@ -61,13 +67,13 @@ std::filesystem::file_type file_type_from_mode(const mode_t mode) {
 
 bool has_symlink_component(const std::filesystem::path& root,
                            const std::filesystem::path& candidate) {
-    auto cursor = root;
-    const auto relative = candidate.lexically_relative(root);
-    for (const auto& component : relative) {
+    std::filesystem::path cursor = root;
+    const std::filesystem::path relative = candidate.lexically_relative(root);
+    for (const std::filesystem::path& component : relative) {
         if (component == ".") continue;
         cursor /= component;
-        std::error_code error;
-        const auto status = std::filesystem::symlink_status(cursor, error);
+        std::error_code error{};
+        const std::filesystem::file_status status = std::filesystem::symlink_status(cursor, error);
         if (error) return false;
         if (std::filesystem::is_symlink(status)) return true;
 #if defined(_WIN32)
@@ -79,48 +85,52 @@ bool has_symlink_component(const std::filesystem::path& root,
     return false;
 }
 
+bool contains_extension(const std::span<const std::string_view> values,
+                        const std::string_view extension) {
+    const bool found = std::find(values.begin(), values.end(), extension) != values.end();
+    return found;
+}
+
 EntryKind kind_for(const std::filesystem::directory_entry& entry,
                    const std::filesystem::file_status status) {
     if (std::filesystem::is_symlink(status)) return EntryKind::symlink;
     if (std::filesystem::is_directory(status)) return EntryKind::folder;
-    const auto extension = ascii_lower(path_utf8(entry.path().extension()));
-    static constexpr std::array image_extensions{
+    const std::string extension = ascii_lower(path_utf8(entry.path().extension()));
+    static constexpr std::array<std::string_view, 7> image_extensions{
         ".png", ".jpg", ".jpeg", ".gif", ".webp", ".tiff", ".heic"};
-    static constexpr std::array archive_extensions{
+    static constexpr std::array<std::string_view, 6> archive_extensions{
         ".zip", ".tar", ".gz", ".bz2", ".xz", ".7z"};
-    static constexpr std::array audio_extensions{
+    static constexpr std::array<std::string_view, 6> audio_extensions{
         ".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg"};
-    static constexpr std::array code_extensions{
+    static constexpr std::array<std::string_view, 15> code_extensions{
         ".c", ".cc", ".cpp", ".h", ".hpp", ".go", ".rs", ".py",
         ".js", ".ts", ".html", ".css", ".json", ".toml", ".yaml"};
-    const auto contains = [&extension](const auto& values) {
-        return std::find(values.begin(), values.end(), extension) != values.end();
-    };
-    if (contains(image_extensions)) return EntryKind::image;
-    if (contains(archive_extensions)) return EntryKind::archive;
-    if (contains(audio_extensions)) return EntryKind::audio;
-    if (contains(code_extensions)) return EntryKind::code;
-    return std::filesystem::is_regular_file(status) ? EntryKind::document
-                                                     : EntryKind::other;
+    if (contains_extension(image_extensions, extension)) return EntryKind::image;
+    if (contains_extension(archive_extensions, extension)) return EntryKind::archive;
+    if (contains_extension(audio_extensions, extension)) return EntryKind::audio;
+    if (contains_extension(code_extensions, extension)) return EntryKind::code;
+    if (std::filesystem::is_regular_file(status)) return EntryKind::document;
+    return EntryKind::other;
 }
 
 std::string modified_text(const std::filesystem::directory_entry& entry) {
-    std::error_code error;
+    std::error_code error{};
     const std::filesystem::file_time_type time = entry.last_write_time(error);
     if (error) return "Unavailable";
-    return format_modified_time(time);
+    const std::string result = format_modified_time(time);
+    return result;
 }
 
 } // namespace
 
 std::filesystem::path canonical_existing_directory(
     const std::filesystem::path& path) {
-    std::error_code error;
-    const auto canonical = std::filesystem::canonical(path, error);
+    std::error_code error{};
+    const std::filesystem::path canonical = std::filesystem::canonical(path, error);
     if (error) {
         throw std::runtime_error("cannot resolve directory: " + error.message());
     }
-    const auto status = std::filesystem::status(canonical, error);
+    const std::filesystem::file_status status = std::filesystem::status(canonical, error);
     if (error || !std::filesystem::is_directory(status)) {
         throw std::runtime_error("path is not an available directory");
     }
@@ -129,8 +139,8 @@ std::filesystem::path canonical_existing_directory(
 
 bool path_is_within(const std::filesystem::path& root,
                     const std::filesystem::path& candidate) {
-    auto root_it = root.begin();
-    auto candidate_it = candidate.begin();
+    std::filesystem::path::const_iterator root_it = root.begin();
+    std::filesystem::path::const_iterator candidate_it = candidate.begin();
     for (; root_it != root.end(); ++root_it, ++candidate_it) {
         if (candidate_it == candidate.end() || *root_it != *candidate_it) {
             return false;
@@ -142,24 +152,25 @@ bool path_is_within(const std::filesystem::path& root,
 std::optional<std::filesystem::path> rebase_path_from_equivalent_root(
     const std::filesystem::path& canonical_root,
     const std::filesystem::path& candidate) {
-    const auto lexical = candidate.lexically_normal();
+    const std::filesystem::path lexical = candidate.lexically_normal();
     if (!canonical_root.is_absolute() || !lexical.is_absolute()) return {};
     if (path_is_within(canonical_root, lexical)) return lexical;
 
-    std::vector<std::filesystem::path> suffix;
-    auto cursor = lexical;
+    std::vector<std::filesystem::path> suffix{};
+    std::filesystem::path cursor = lexical;
     for (;;) {
-        std::error_code error;
+        std::error_code error{};
         if (std::filesystem::equivalent(canonical_root, cursor, error) &&
             !error) {
-            auto rebased = canonical_root;
-            for (auto component = suffix.rbegin(); component != suffix.rend();
+            std::filesystem::path rebased = canonical_root;
+            for (std::vector<std::filesystem::path>::reverse_iterator component = suffix.rbegin(); component != suffix.rend();
                  ++component) {
                 rebased /= *component;
             }
-            return rebased.lexically_normal();
+            rebased = rebased.lexically_normal();
+            return rebased;
         }
-        const auto parent = cursor.parent_path();
+        const std::filesystem::path parent = cursor.parent_path();
         if (parent.empty() || parent == cursor) break;
         suffix.push_back(cursor.filename());
         cursor = parent;
@@ -169,9 +180,10 @@ std::optional<std::filesystem::path> rebase_path_from_equivalent_root(
 
 bool path_route_has_symlink(const std::filesystem::path& canonical_root,
                             const std::filesystem::path& candidate) {
-    const auto lexical = candidate.lexically_normal();
-    return path_is_within(canonical_root, lexical) &&
+    const std::filesystem::path lexical = candidate.lexically_normal();
+    const bool found = path_is_within(canonical_root, lexical) &&
         has_symlink_component(canonical_root, lexical);
+    return found;
 }
 
 std::optional<NavigationTarget> resolve_navigation_target(
@@ -181,8 +193,8 @@ std::optional<NavigationTarget> resolve_navigation_target(
     const std::filesystem::path& requested) {
     if (requested.empty() || admitted_roots.empty()) return {};
 
-    auto expanded = requested;
-    const auto text = path_utf8(requested);
+    std::filesystem::path expanded = requested;
+    const std::string text = path_utf8(requested);
     if (text == "~") {
         expanded = home_root;
     } else if (text.starts_with("~/")) {
@@ -192,17 +204,17 @@ std::optional<NavigationTarget> resolve_navigation_target(
     }
     expanded = expanded.lexically_normal();
 
-    std::optional<NavigationTarget> best;
+    std::optional<NavigationTarget> best{};
     std::size_t best_depth{};
-    for (const auto& supplied_root : admitted_roots) {
-        const auto root = supplied_root.lexically_normal();
-        auto candidate = expanded;
+    for (const std::filesystem::path& supplied_root : admitted_roots) {
+        const std::filesystem::path root = supplied_root.lexically_normal();
+        std::filesystem::path candidate = expanded;
         if (!path_is_within(root, candidate)) {
-            const auto rebased = rebase_path_from_equivalent_root(root, candidate);
+            const std::optional<std::filesystem::path> rebased = rebase_path_from_equivalent_root(root, candidate);
             if (!rebased) continue;
             candidate = *rebased;
         }
-        const auto depth = static_cast<std::size_t>(
+        const std::size_t depth = static_cast<std::size_t>(
             std::distance(root.begin(), root.end()));
         if (!best || depth > best_depth) {
             best = NavigationTarget{root, std::move(candidate)};
@@ -225,7 +237,7 @@ ObjectIdentity observe_identity(const std::filesystem::path& path) {
 #else
     struct stat observed {};
     if (::lstat(path.c_str(), &observed) != 0) return {};
-    const auto modified_nanoseconds =
+    const std::uint64_t modified_nanoseconds =
 #if defined(__APPLE__)
         static_cast<std::uint64_t>(observed.st_mtimespec.tv_sec) * 1'000'000'000ULL +
         static_cast<std::uint64_t>(observed.st_mtimespec.tv_nsec);
@@ -233,11 +245,12 @@ ObjectIdentity observe_identity(const std::filesystem::path& path) {
         static_cast<std::uint64_t>(observed.st_mtim.tv_sec) * 1'000'000'000ULL +
         static_cast<std::uint64_t>(observed.st_mtim.tv_nsec);
 #endif
-    return {static_cast<std::uint64_t>(observed.st_dev),
+    const ObjectIdentity result{static_cast<std::uint64_t>(observed.st_dev),
             static_cast<std::uint64_t>(observed.st_ino),
             static_cast<std::uint64_t>(observed.st_size),
             modified_nanoseconds,
             file_type_from_mode(observed.st_mode)};
+    return result;
 #endif
 }
 
@@ -246,14 +259,16 @@ bool object_is_hidden(const std::filesystem::path& path,
     if (!name.empty() && name.front() == '.') return true;
 #if defined(_WIN32)
     const DWORD attributes = GetFileAttributesW(path.c_str());
-    return attributes != INVALID_FILE_ATTRIBUTES &&
+    const bool hidden = attributes != INVALID_FILE_ATTRIBUTES &&
         (attributes & FILE_ATTRIBUTE_HIDDEN) != 0;
+    return hidden;
 #elif defined(__APPLE__)
     struct stat observed {};
-    return ::lstat(path.c_str(), &observed) == 0 &&
-        (observed.st_flags & UF_HIDDEN) != 0;
+    const int status = ::lstat(path.c_str(), &observed);
+    const bool hidden = status == 0 && (observed.st_flags & UF_HIDDEN) != 0;
+    return hidden;
 #else
-    (void)path;
+    static_cast<void>(path);
     return false;
 #endif
 }
@@ -264,13 +279,13 @@ DirectorySnapshot read_directory(const std::filesystem::path& root,
                                  const std::uint64_t generation,
                                  const CancellationCheck& cancelled,
                                  const bool show_hidden) {
-    DirectorySnapshot result;
+    DirectorySnapshot result{};
     result.root = root;
     result.location = requested;
     result.generation = generation;
     try {
         result.root = canonical_existing_directory(root);
-        const auto lexical_request = (requested.is_absolute()
+        const std::filesystem::path lexical_request = (requested.is_absolute()
             ? requested
             : result.root / requested).lexically_normal();
         if (!path_is_within(result.root, lexical_request)) {
@@ -291,8 +306,8 @@ DirectorySnapshot read_directory(const std::filesystem::path& root,
             return result;
         }
 
-        const auto needle = ascii_lower(std::string(filter));
-        std::error_code error;
+        const std::string needle = ascii_lower(std::string(filter));
+        std::error_code error{};
         std::filesystem::directory_iterator iterator(
             result.location,
             std::filesystem::directory_options::skip_permission_denied,
@@ -302,7 +317,7 @@ DirectorySnapshot read_directory(const std::filesystem::path& root,
             return result;
         }
         constexpr std::size_t maximum_entries = 50'000;
-        for (const auto& entry : iterator) {
+        for (const std::filesystem::directory_entry& entry : iterator) {
             if (cancelled && cancelled()) {
                 result.entries.clear();
                 result.cancelled = true;
@@ -312,17 +327,17 @@ DirectorySnapshot read_directory(const std::filesystem::path& root,
                 result.error = "location exceeds the 50,000-item frontend bound";
                 break;
             }
-            const auto name = path_utf8(entry.path().filename());
+            const std::string name = path_utf8(entry.path().filename());
             if (!show_hidden && object_is_hidden(entry.path(), name)) continue;
             if (!needle.empty() && ascii_lower(name).find(needle) == std::string::npos) {
                 continue;
             }
-            const auto status = entry.symlink_status(error);
+            const std::filesystem::file_status status = entry.symlink_status(error);
             if (error) {
                 error.clear();
                 continue;
             }
-            DirectoryEntry item;
+            DirectoryEntry item{};
             item.path = entry.path();
             item.identity = observe_identity(item.path);
             item.stable_id = stable_id_for(item.path, item.identity);
@@ -335,7 +350,7 @@ DirectorySnapshot read_directory(const std::filesystem::path& root,
             if (item.directory) {
                 item.secondary_text = "Folder";
             } else if (std::filesystem::is_regular_file(status)) {
-                const auto size = entry.file_size(error);
+                const std::uintmax_t size = entry.file_size(error);
                 item.secondary_text = error ? "File" : format_bytes(size);
                 error.clear();
             } else if (item.kind == EntryKind::symlink) {
@@ -346,14 +361,7 @@ DirectorySnapshot read_directory(const std::filesystem::path& root,
             item.modified_text = modified_text(entry);
             result.entries.push_back(std::move(item));
         }
-        std::sort(result.entries.begin(), result.entries.end(),
-                  [](const DirectoryEntry& left, const DirectoryEntry& right) {
-            if (left.directory != right.directory) return left.directory;
-            const auto left_name = ascii_lower(left.name);
-            const auto right_name = ascii_lower(right.name);
-            if (left_name != right_name) return left_name < right_name;
-            return left.name < right.name;
-        });
+        std::sort(result.entries.begin(), result.entries.end(), detail::DirectoryNameOrder{});
     } catch (const std::exception& error) {
         result.error = error.what();
     }
@@ -377,14 +385,14 @@ std::string format_modified_time(const std::filesystem::file_time_type time) {
 }
 
 std::string format_bytes(const std::uintmax_t bytes) {
-    static constexpr std::array units{"B", "KB", "MB", "GB", "TB"};
+    static constexpr std::array<std::string_view, 5> units{"B", "KB", "MB", "GB", "TB"};
     double value = static_cast<double>(bytes);
     std::size_t unit = 0;
     while (value >= 1024.0 && unit + 1 < units.size()) {
         value /= 1024.0;
         ++unit;
     }
-    std::ostringstream stream;
+    std::ostringstream stream{};
     if (unit == 0) {
         stream << bytes;
     } else if (value < 10.0) {
@@ -393,7 +401,8 @@ std::string format_bytes(const std::uintmax_t bytes) {
         stream << std::fixed << std::setprecision(0) << value;
     }
     stream << ' ' << units[unit];
-    return stream.str();
+    const std::string result = stream.str();
+    return result;
 }
 
 } // namespace file_manager

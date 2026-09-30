@@ -36,18 +36,17 @@ fn human_status_is_concise() {
 #[cfg(not(any(unix, windows)))]
 #[test]
 fn local_transport_is_explicitly_unavailable_without_publishing_an_endpoint() {
-    let runtime = std::env::temp_dir().join(format!(
-        "fileman-unavailable-endpoint-{}",
-        std::process::id()
-    ));
+    let process_id: u32 = std::process::id();
+    let name: String = format!("fileman-unavailable-endpoint-{process_id}");
+    let temporary: std::path::PathBuf = std::env::temp_dir();
+    let runtime: std::path::PathBuf = temporary.join(name);
     assert!(!runtime.exists());
     for arguments in [vec!["serve-local"], vec!["call-local", "status"]] {
-        let output = Command::new(env!("CARGO_BIN_EXE_orchestrator"))
-            .args(arguments)
-            .arg("--runtime-dir")
-            .arg(&runtime)
-            .output()
-            .expect("run unavailable transport");
+        let mut command: Command = Command::new(env!("CARGO_BIN_EXE_orchestrator"));
+        command.args(arguments);
+        command.arg("--runtime-dir");
+        command.arg(&runtime);
+        let output: std::process::Output = command.output().expect("run unavailable transport");
         assert!(!output.status.success());
         assert!(String::from_utf8_lossy(&output.stderr).contains("not implemented"));
         assert!(output.stdout.is_empty());

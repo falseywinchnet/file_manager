@@ -16,6 +16,30 @@
 namespace file_manager {
 
 #if defined(_WIN32)
+namespace {
+
+// The caller validates the fixed 20-byte header before borrowing these fields.
+WORD reparse_word(const std::span<const std::byte> data, const std::size_t offset) {
+    WORD value{};
+    std::memcpy(&value, data.data() + offset, sizeof(value));
+    return value;
+}
+
+DWORD reparse_dword(const std::span<const std::byte> data, const std::size_t offset) {
+    DWORD value{};
+    std::memcpy(&value, data.data() + offset, sizeof(value));
+    return value;
+}
+
+bool valid_reparse_range(const std::size_t path_bytes, const std::size_t offset,
+                         const std::size_t length) {
+    const bool valid = offset % 2 == 0 && length % 2 == 0 &&
+        offset <= path_bytes && length <= path_bytes - offset;
+    return valid;
+}
+
+} // namespace
+
 std::filesystem::path parse_windows_symlink_target(
     const std::span<const std::byte> data, std::error_code& error) {
     error = std::make_error_code(std::errc::invalid_argument);
@@ -23,38 +47,29 @@ std::filesystem::path parse_windows_symlink_target(
     // link header. Offsets and lengths are bytes relative to PathBuffer.
     // https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_reparse_data_buffer
     if (data.size() < 20 || data.size() > MAXIMUM_REPARSE_DATA_BUFFER_SIZE) return {};
-    const auto word = [&data](const std::size_t offset) {
-        WORD value{};
-        std::memcpy(&value, data.data() + offset, sizeof(value));
-        return value;
-    };
-    const auto dword = [&data](const std::size_t offset) {
-        DWORD value{};
-        std::memcpy(&value, data.data() + offset, sizeof(value));
-        return value;
-    };
-    if (dword(0) != IO_REPARSE_TAG_SYMLINK) {
+    if (reparse_dword(data, 0) != IO_REPARSE_TAG_SYMLINK) {
         error = std::make_error_code(std::errc::operation_not_supported);
         return {};
     }
-    const std::size_t payload = word(4);
+    const std::size_t payload = reparse_word(data, 4);
     if (payload < 12 || payload > data.size() - 8) return {};
     const std::size_t path_bytes = payload - 12;
-    const auto valid_range = [path_bytes](const std::size_t offset,
-                                         const std::size_t length) {
-        return offset % 2 == 0 && length % 2 == 0 &&
-            offset <= path_bytes && length <= path_bytes - offset;
-    };
-    if (!valid_range(word(8), word(10)) ||
-        !valid_range(word(12), word(14)) || word(10) == 0) return {};
-    const DWORD flags = dword(16);
+    const std::size_t target_offset = reparse_word(data, 8);
+    const std::size_t target_bytes = reparse_word(data, 10);
+    const std::size_t print_offset = reparse_word(data, 12);
+    const std::size_t print_bytes = reparse_word(data, 14);
+    if (!valid_reparse_range(path_bytes, target_offset, target_bytes) ||
+        !valid_reparse_range(path_bytes, print_offset, print_bytes) ||
+        target_bytes == 0) return {};
+    const DWORD flags = reparse_dword(data, 16);
     if ((flags & ~DWORD{1}) != 0) return {};
     static_assert(sizeof(wchar_t) == 2);
-    std::wstring target(word(10) / 2, L'\0');
-    std::memcpy(target.data(), data.data() + 20 + word(8), word(10));
+    std::wstring target(target_bytes / 2, L'\0');
+    std::memcpy(target.data(), data.data() + 20 + target_offset, target_bytes);
     if (target.find(L'\0') != std::wstring::npos) return {};
     if ((flags & 1) != 0) {
-        if (std::filesystem::path(target).has_root_path()) return {};
+        const std::filesystem::path relative_target(target);
+        if (relative_target.has_root_path()) return {};
     } else {
         // Preserve namespace semantics, including long paths and UNC names,
         // while translating the NT prefix to its Win32 extended equivalent.
@@ -73,7 +88,8 @@ std::filesystem::path parse_windows_symlink_target(
         target.replace(0, 4, L"\\\\?\\");
     }
     error.clear();
-    return std::filesystem::path(std::move(target));
+    const std::filesystem::path result(std::move(target));
+    return result;
 }
 
 ObjectIdentity identity_from_handle(const HANDLE handle) {
@@ -82,7 +98,7 @@ ObjectIdentity identity_from_handle(const HANDLE handle) {
     if (!GetFileInformationByHandle(handle, &basic) ||
         !GetFileInformationByHandleEx(handle, FileIdInfo, &identifier,
                                      sizeof(identifier))) return {};
-    ObjectIdentity result;
+    ObjectIdentity result{};
     result.device = identifier.VolumeSerialNumber;
     std::memcpy(&result.inode, identifier.FileId.Identifier, sizeof(result.inode));
     std::memcpy(&result.inode_high, identifier.FileId.Identifier + 8,
@@ -134,10 +150,15 @@ NativeSymlink read_native_symlink(const std::filesystem::path& path,
         error = std::make_error_code(std::errc::invalid_argument);
         return {};
     }
-    return {parse_windows_symlink_target(std::span(buffer).first(returned), error),
-            (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0};
+    const std::span<const std::byte> reparse_data(buffer.data(), returned);
+    NativeSymlink result{};
+    result.target = parse_windows_symlink_target(reparse_data, error);
+    result.directory = (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    return result;
 #else
-    return {std::filesystem::read_symlink(path, error), false};
+    NativeSymlink result{};
+    result.target = std::filesystem::read_symlink(path, error);
+    return result;
 #endif
 }
 
@@ -166,19 +187,21 @@ NativeReadFile::~NativeReadFile() {
 
 bool NativeReadFile::available() const noexcept {
 #if defined(_WIN32)
-    return handle_ != INVALID_HANDLE_VALUE;
+    const bool result = handle_ != INVALID_HANDLE_VALUE;
 #else
-    return handle_ >= 0;
+    const bool result = handle_ >= 0;
 #endif
+    return result;
 }
 
 ObjectIdentity NativeReadFile::identity() const {
 #if defined(_WIN32)
-    return identity_from_handle(handle_);
+    const ObjectIdentity result = identity_from_handle(handle_);
+    return result;
 #else
     struct stat observed{};
     if (::fstat(handle_, &observed) != 0) return {};
-    ObjectIdentity result;
+    ObjectIdentity result{};
     result.device = static_cast<std::uint64_t>(observed.st_dev);
     result.inode = static_cast<std::uint64_t>(observed.st_ino);
     result.size = static_cast<std::uint64_t>(observed.st_size);
@@ -207,7 +230,8 @@ std::ptrdiff_t NativeReadFile::read(std::byte* const destination, const std::siz
         error_ = std::error_code(GetLastError(), std::system_category());
         return -1;
     }
-    return static_cast<std::ptrdiff_t>(bytes);
+    const std::ptrdiff_t result = static_cast<std::ptrdiff_t>(bytes);
+    return result;
 #else
     ssize_t bytes{};
     do { bytes = ::read(handle_, destination, count); } while (bytes < 0 && errno == EINTR);
@@ -216,6 +240,9 @@ std::ptrdiff_t NativeReadFile::read(std::byte* const destination, const std::siz
 #endif
 }
 
-std::string NativeReadFile::error_message() const { return error_.message(); }
+std::string NativeReadFile::error_message() const {
+    const std::string result = error_.message();
+    return result;
+}
 
 } // namespace file_manager

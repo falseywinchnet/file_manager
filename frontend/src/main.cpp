@@ -31,18 +31,21 @@ namespace {
 // Main owns these models until the native loop returns. Callbacks borrow this
 // record; they neither prolong its lifetime nor form model ownership cycles.
 struct Runtime final {
-    std::shared_ptr<file_manager::Application> application;
-    std::shared_ptr<file_manager::DocumentPickerView> picker;
-    std::shared_ptr<file_manager::AboutView> about;
-    std::function<void()> show_picker;
-    std::function<void()> hide_picker;
-    std::function<void()> show_about;
-    std::function<void()> hide_about;
-    std::function<void()> wake;
-    gui_forms::ApplicationWindowHandle primary_handle;
-    gui_forms::ApplicationWindowHandle picker_handle;
+    Runtime() = default;
+    Runtime(const Runtime&) = delete;
+    Runtime& operator=(const Runtime&) = delete;
+    std::shared_ptr<file_manager::Application> application{};
+    std::shared_ptr<file_manager::DocumentPickerView> picker{};
+    std::shared_ptr<file_manager::AboutView> about{};
+    std::function<void()> show_picker{};
+    std::function<void()> hide_picker{};
+    std::function<void()> show_about{};
+    std::function<void()> hide_about{};
+    std::function<void()> wake{};
+    gui_forms::ApplicationWindowHandle primary_handle{};
+    gui_forms::ApplicationWindowHandle picker_handle{};
     gui_forms::Window* primary_window{};
-    gui_forms::Control::Ptr picker_return_focus;
+    gui_forms::Control::Ptr picker_return_focus{};
     bool picker_open{};
     bool primary_was_enabled{};
 
@@ -83,7 +86,7 @@ struct Runtime final {
         (*picker).set_authority_valid(false);
         (*application).stop();
     }
-    void close_primary() { (void)primary_handle.request_close(); }
+    void close_primary() { static_cast<void>(primary_handle.request_close()); }
     void accept_wake(std::function<void()> value) { wake = std::move(value); }
     void primary_ready(gui_forms::Window&, gui_forms::ApplicationWindowHandle handle) {
         primary_handle = handle;
@@ -126,22 +129,40 @@ std::filesystem::path default_root() {
 #else
     const char* const configured = std::getenv("FILE_MANAGER_ROOT");
 #endif
-    if (configured != nullptr && *configured != 0) return configured;
-    return file_manager::user_home_directory();
+    if (configured != nullptr && *configured != 0) {
+        const std::filesystem::path result(configured);
+        return result;
+    }
+    const std::filesystem::path result = file_manager::user_home_directory();
+    return result;
 }
 
-std::vector<std::string> command_arguments(const int argc, char** const argv) {
-    std::vector<std::string> result;
 #if defined(_WIN32)
-    (void)argc;
-    (void)argv;
+// Owns the single LocalAlloc block, including all count argument strings.
+struct WindowsArgumentOwner final {
+    explicit WindowsArgumentOwner(LPWSTR* const arguments) : values(arguments) {}
+    ~WindowsArgumentOwner() { LocalFree(values); }
+    WindowsArgumentOwner(const WindowsArgumentOwner&) = delete;
+    WindowsArgumentOwner& operator=(const WindowsArgumentOwner&) = delete;
+    LPWSTR* values{};
+};
+#endif
+
+std::vector<std::string> command_arguments(const int argc, char** const argv) {
+    std::vector<std::string> result{};
+#if defined(_WIN32)
+    static_cast<void>(argc);
+    static_cast<void>(argv);
     int count{};
     LPWSTR* const values = CommandLineToArgvW(GetCommandLineW(), &count);
     if (values == nullptr) throw std::runtime_error("cannot read Windows command line");
+    const WindowsArgumentOwner owner(values);
+    result.reserve(static_cast<std::size_t>(count));
     for (int index = 1; index < count; ++index) {
-        result.push_back(file_manager::path_utf8(std::filesystem::path(values[index])));
+        const std::filesystem::path argument_path(owner.values[index]);
+        std::string argument = file_manager::path_utf8(argument_path);
+        result.push_back(std::move(argument));
     }
-    LocalFree(values);
 #else
     for (int index = 1; index < argc; ++index) result.emplace_back(argv[index]);
 #endif
@@ -153,8 +174,8 @@ std::vector<std::string> command_arguments(const int argc, char** const argv) {
 int main(const int argc, char** argv) {
     try {
         std::filesystem::path root = default_root();
-        std::optional<std::filesystem::path> quarantine;
-        std::string engine_root_id;
+        std::optional<std::filesystem::path> quarantine{};
+        std::string engine_root_id{};
         bool allow_mutations = false;
         const std::vector<std::string> arguments = command_arguments(argc, argv);
         for (std::size_t index = 0; index < arguments.size(); ++index) {
@@ -182,10 +203,10 @@ int main(const int argc, char** argv) {
             return 2;
         }
 
-        Runtime runtime;
+        Runtime runtime{};
         runtime.application = std::make_shared<file_manager::Application>(
             root, quarantine, allow_mutations, std::move(engine_root_id));
-        file_manager::DocumentPickerRequest picker_request;
+        file_manager::DocumentPickerRequest picker_request{};
         picker_request.profile = file_manager::DocumentPickerProfile::open_file;
         picker_request.protected_root = root;
         picker_request.initial_location = root;
@@ -208,7 +229,7 @@ int main(const int argc, char** argv) {
 #else
         using NativeWindow = gui_forms::ApplicationWindow;
 #endif
-        NativeWindow primary;
+        NativeWindow primary{};
         primary.stable_id = "file-manager.window";
         primary.model = (*runtime.application).make_window();
         runtime.primary_window = primary.model.get();
@@ -228,7 +249,7 @@ int main(const int argc, char** argv) {
         primary.options.wake_ready = std::bind_front(&Runtime::accept_wake, &runtime);
         primary.options.ready = std::bind_front(&Runtime::primary_ready, &runtime);
 #endif
-        NativeWindow picker_window;
+        NativeWindow picker_window{};
         picker_window.stable_id = "file-manager.open-picker";
         picker_window.owner_id = primary.stable_id;
         picker_window.model = std::make_unique<gui_forms::Window>(
@@ -250,7 +271,7 @@ int main(const int argc, char** argv) {
         picker_window.options.closing = std::bind_front(&Runtime::picker_closing, &runtime);
         picker_window.options.ready = std::bind_front(&Runtime::picker_ready, &runtime);
 #endif
-        NativeWindow about_window;
+        NativeWindow about_window{};
         about_window.stable_id = "file-manager.about-window";
         about_window.owner_id = primary.stable_id;
         about_window.model = std::make_unique<gui_forms::Window>(
@@ -269,7 +290,8 @@ int main(const int argc, char** argv) {
 #else
         about_window.options.ready = std::bind_front(&Runtime::about_ready, &runtime);
 #endif
-        std::vector<NativeWindow> windows;
+        std::vector<NativeWindow> windows{};
+        windows.reserve(3);
         windows.push_back(std::move(primary));
         windows.push_back(std::move(picker_window));
         windows.push_back(std::move(about_window));

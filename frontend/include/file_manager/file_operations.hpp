@@ -30,20 +30,21 @@ enum class OperationTerminal : std::uint8_t {
 };
 
 struct OperationResult final {
-    std::string operation_id;
+    std::string operation_id{};
     OperationKind kind{OperationKind::create_folder};
     OperationTerminal terminal{OperationTerminal::failed};
-    std::string code;
-    std::string message;
-    std::filesystem::path protected_root;
-    std::filesystem::path original_path;
-    std::filesystem::path resulting_path;
-    ObjectIdentity identity;
+    std::string code{};
+    std::string message{};
+    std::filesystem::path protected_root{};
+    std::filesystem::path original_path{};
+    std::filesystem::path resulting_path{};
+    ObjectIdentity identity{};
     bool undo_available{};
     bool recoverable_object_retained{};
 
     [[nodiscard]] bool succeeded() const noexcept {
-        return terminal == OperationTerminal::success;
+        const bool success = terminal == OperationTerminal::success;
+        return success;
     }
 };
 
@@ -80,7 +81,8 @@ public:
         return mutations_enabled_;
     }
     [[nodiscard]] bool undo_available() const noexcept {
-        return undo_.has_value();
+        const bool available = undo_.has_value();
+        return available;
     }
 
     [[nodiscard]] OperationResult create_folder(
@@ -112,9 +114,9 @@ private:
 
     struct UndoRecord final {
         UndoKind kind{UndoKind::rename_back};
-        std::filesystem::path current_path;
-        std::filesystem::path original_path;
-        ObjectIdentity identity;
+        std::filesystem::path current_path{};
+        std::filesystem::path original_path{};
+        ObjectIdentity identity{};
     };
 
     [[nodiscard]] std::string next_operation_id();
@@ -137,12 +139,12 @@ private:
     [[nodiscard]] std::filesystem::path available_quarantine_path(
         const std::filesystem::path& source);
 
-    std::filesystem::path protected_root_;
-    std::filesystem::path quarantine_root_;
+    std::filesystem::path protected_root_{};
+    std::filesystem::path quarantine_root_{};
     bool mutations_enabled_{};
-    OperationFaultCheck injected_fault_;
+    OperationFaultCheck injected_fault_{};
     std::uint64_t next_id_{1};
-    std::optional<UndoRecord> undo_;
+    std::optional<UndoRecord> undo_{};
 };
 
 } // namespace file_manager

@@ -1,0 +1,18 @@
+Start testing: Sep 30 02:03 Pacific Daylight Time
+----------------------------------------------------------
+11/11 Testing: file_manager_application_interaction_tests
+11/11 Test: file_manager_application_interaction_tests
+Command: "C:/Users/Shadow/file_manager/frontend/.build/shadow-windows-latency/file_manager_application_interaction_tests.exe"
+Directory: C:/Users/Shadow/file_manager/frontend/.build/shadow-windows-latency
+"file_manager_application_interaction_tests" start time: Sep 30 02:03 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.19 sec
+----------------------------------------------------------
+Test Failed.
+"file_manager_application_interaction_tests" end time: Sep 30 02:03 Pacific Daylight Time
+"file_manager_application_interaction_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Sep 30 02:03 Pacific Daylight Time

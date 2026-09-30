@@ -15,9 +15,9 @@ namespace gui_forms {
 enum class BreadcrumbAppearance : std::uint8_t { plain, raised };
 
 struct BreadcrumbSegment final {
-    std::string stable_id;
-    std::string text;
-    std::string description;
+    std::string stable_id{};
+    std::string text{};
+    std::string description{};
     bool enabled{true};
 };
 
@@ -106,11 +106,11 @@ private:
     };
 
     struct EditorCommitCallback final {
-        std::weak_ptr<BreadcrumbTrail> target;
+        std::weak_ptr<BreadcrumbTrail> target{};
         void operator()(const std::string& text) const;
     };
     struct EditorCancelCallback final {
-        std::weak_ptr<BreadcrumbTrail> target;
+        std::weak_ptr<BreadcrumbTrail> target{};
         void operator()() const;
     };
 
@@ -126,29 +126,29 @@ private:
     void normalize_active();
     void paint_raised(Painter& painter);
 
-    std::vector<BreadcrumbSegment> segments_;
-    std::vector<VisibleItem> visible_items_;
-    std::vector<std::string> hidden_segment_ids_;
-    std::string editor_stable_id_;
-    std::string overflow_stable_id_;
-    std::string edit_stable_id_;
-    std::string active_id_;
-    std::shared_ptr<TextBox> editor_;
-    SubscriptionToken editor_commit_;
-    SubscriptionToken editor_cancel_;
-    std::optional<std::size_t> hovered_visible_;
-    std::optional<std::size_t> pressed_visible_;
+    std::vector<BreadcrumbSegment> segments_{};
+    std::vector<VisibleItem> visible_items_{};
+    std::vector<std::string> hidden_segment_ids_{};
+    std::string editor_stable_id_{};
+    std::string overflow_stable_id_{};
+    std::string edit_stable_id_{};
+    std::string active_id_{};
+    std::shared_ptr<TextBox> editor_{};
+    SubscriptionToken editor_commit_{};
+    SubscriptionToken editor_cancel_{};
+    std::optional<std::size_t> hovered_visible_{};
+    std::optional<std::size_t> pressed_visible_{};
     FontSpec font_{FontRole::control, 10.5, 400, false};
     BreadcrumbAppearance appearance_{BreadcrumbAppearance::plain};
     bool editing_{};
     bool tab_completion_available_{};
     bool focused_{};
-    Event<const std::string&> segment_activated_;
-    Event<> overflow_activated_;
-    Event<const std::string&> edit_committed_;
-    Event<const std::string&> edit_started_;
-    Event<> edit_cancelled_;
-    Event<> edit_completion_requested_;
+    Event<const std::string&> segment_activated_{};
+    Event<> overflow_activated_{};
+    Event<const std::string&> edit_committed_{};
+    Event<const std::string&> edit_started_{};
+    Event<> edit_cancelled_{};
+    Event<> edit_completion_requested_{};
 
     static constexpr double edge_overlap_ = 9.0;
     static constexpr double edit_width_ = 30.0;

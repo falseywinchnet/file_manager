@@ -429,7 +429,8 @@ impl SettingsService {
         // opens, and directory fsync. Refuse before touching the filesystem
         // until another platform can preserve those guarantees.
         if !cfg!(unix) {
-            return Err("persistent settings are unavailable on this platform: private no-follow durable storage is not implemented".to_owned());
+            let message: String = "persistent settings are unavailable on this platform: private no-follow durable storage is not implemented".to_owned();
+            return Err(message);
         }
         let directory = directory.into();
         prepare_private_directory(&directory)?;
@@ -1115,19 +1116,17 @@ mod tests {
     #[cfg(not(unix))]
     #[test]
     fn unavailable_persistent_store_does_not_touch_the_filesystem() {
-        let parent = temporary_directory("unsupported");
-        let store = parent.join("store");
-        let error = SettingsService::open(&store).expect_err("unsupported durable adapter");
+        let parent: PathBuf = temporary_directory("unsupported");
+        let store: PathBuf = parent.join("store");
+        let error: String = SettingsService::open(&store).expect_err("unsupported durable adapter");
         assert!(error.contains("unavailable"));
         assert!(!store.exists());
         fs::create_dir(&store).expect("create existing store");
-        let primary = store.join("settings-v1.json");
+        let primary: PathBuf = store.join("settings-v1.json");
         fs::write(&primary, b"existing evidence").expect("write existing document");
         SettingsService::open(&store).expect_err("existing store also unavailable");
-        assert_eq!(
-            fs::read(primary).expect("preserved document"),
-            b"existing evidence"
-        );
+        let preserved: Vec<u8> = fs::read(primary).expect("preserved document");
+        assert_eq!(preserved, b"existing evidence");
         fs::remove_dir_all(parent).expect("remove test tree");
     }
 

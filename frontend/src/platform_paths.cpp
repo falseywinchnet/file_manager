@@ -20,7 +20,8 @@ bool valid_platform_basename(const std::string_view name) {
 #if defined(_WIN32)
     if (name.find_first_of("\\:<>\"|?*") != std::string_view::npos ||
         name.back() == '.' || name.back() == ' ') return false;
-    std::string stem;
+    std::string stem{};
+    stem.reserve(name.size());
     for (const unsigned char value : name) {
         if (value < 32U) return false;
         if (value == '.') break;
@@ -44,13 +45,17 @@ std::filesystem::path user_home_directory() {
     }
 #else
     const char* const value = std::getenv("HOME");
-    if (value != nullptr && *value != '\0') return value;
+    if (value != nullptr && *value != '\0') {
+        const std::filesystem::path result(value);
+        return result;
+    }
 #endif
-    return std::filesystem::current_path();
+    const std::filesystem::path result = std::filesystem::current_path();
+    return result;
 }
 
 std::vector<std::filesystem::path> local_volume_roots() {
-    std::vector<std::filesystem::path> roots;
+    std::vector<std::filesystem::path> roots{};
 #if defined(_WIN32)
     const DWORD mask = GetLogicalDrives();
     for (unsigned index = 0; index < 26; ++index) {
@@ -62,7 +67,7 @@ std::vector<std::filesystem::path> local_volume_roots() {
         if (type == DRIVE_FIXED || type == DRIVE_RAMDISK) roots.emplace_back(root);
     }
 #elif defined(__APPLE__)
-    std::error_code error;
+    std::error_code error{};
     if (std::filesystem::is_directory("/Volumes", error)) roots.emplace_back("/Volumes");
 #else
     // Linux mounts form one real filesystem hierarchy. Expose its root without
@@ -74,7 +79,7 @@ std::vector<std::filesystem::path> local_volume_roots() {
 
 std::string path_utf8(const std::filesystem::path& path) {
     const std::u8string value = path.u8string();
-    std::string result;
+    std::string result{};
     result.reserve(value.size());
     for (const char8_t byte : value) result.push_back(static_cast<char>(byte));
     return result;
@@ -82,7 +87,7 @@ std::string path_utf8(const std::filesystem::path& path) {
 
 std::string path_generic_utf8(const std::filesystem::path& path) {
     const std::u8string value = path.generic_u8string();
-    std::string result;
+    std::string result{};
     result.reserve(value.size());
     for (const char8_t byte : value) result.push_back(static_cast<char>(byte));
     return result;
