@@ -1,9 +1,12 @@
 #include "native_file.hpp"
 
 #include <cstring>
+#include <array>
 #include <limits>
 
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#include <winioctl.h>
+#else
 #include <cerrno>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -13,6 +16,66 @@
 namespace file_manager {
 
 #if defined(_WIN32)
+std::filesystem::path parse_windows_symlink_target(
+    const std::span<const std::byte> data, std::error_code& error) {
+    error = std::make_error_code(std::errc::invalid_argument);
+    // REPARSE_DATA_BUFFER: 8-byte common header, then the 12-byte symbolic
+    // link header. Offsets and lengths are bytes relative to PathBuffer.
+    // https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_reparse_data_buffer
+    if (data.size() < 20 || data.size() > MAXIMUM_REPARSE_DATA_BUFFER_SIZE) return {};
+    const auto word = [&data](const std::size_t offset) {
+        WORD value{};
+        std::memcpy(&value, data.data() + offset, sizeof(value));
+        return value;
+    };
+    const auto dword = [&data](const std::size_t offset) {
+        DWORD value{};
+        std::memcpy(&value, data.data() + offset, sizeof(value));
+        return value;
+    };
+    if (dword(0) != IO_REPARSE_TAG_SYMLINK) {
+        error = std::make_error_code(std::errc::operation_not_supported);
+        return {};
+    }
+    const std::size_t payload = word(4);
+    if (payload < 12 || payload > data.size() - 8) return {};
+    const std::size_t path_bytes = payload - 12;
+    const auto valid_range = [path_bytes](const std::size_t offset,
+                                         const std::size_t length) {
+        return offset % 2 == 0 && length % 2 == 0 &&
+            offset <= path_bytes && length <= path_bytes - offset;
+    };
+    if (!valid_range(word(8), word(10)) ||
+        !valid_range(word(12), word(14)) || word(10) == 0) return {};
+    const DWORD flags = dword(16);
+    if ((flags & ~DWORD{1}) != 0) return {};
+    static_assert(sizeof(wchar_t) == 2);
+    std::wstring target(word(10) / 2, L'\0');
+    std::memcpy(target.data(), data.data() + 20 + word(8), word(10));
+    if (target.find(L'\0') != std::wstring::npos) return {};
+    if ((flags & 1) != 0) {
+        if (std::filesystem::path(target).has_root_path()) return {};
+    } else {
+        // Preserve namespace semantics, including long paths and UNC names,
+        // while translating the NT prefix to its Win32 extended equivalent.
+        // MinGW path::is_absolute does not recognize the extended prefix.
+        if (!target.starts_with(L"\\??\\")) return {};
+        const std::wstring_view name(target.data() + 4, target.size() - 4);
+        const bool drive = name.size() >= 3 &&
+            ((name[0] >= L'A' && name[0] <= L'Z') ||
+             (name[0] >= L'a' && name[0] <= L'z')) &&
+            name[1] == L':' && name[2] == L'\\';
+        const bool unc = name.starts_with(L"UNC\\") && name.size() > 4;
+        if (!drive && !unc) {
+            error = std::make_error_code(std::errc::operation_not_supported);
+            return {};
+        }
+        target.replace(0, 4, L"\\\\?\\");
+    }
+    error.clear();
+    return std::filesystem::path(std::move(target));
+}
+
 ObjectIdentity identity_from_handle(const HANDLE handle) {
     BY_HANDLE_FILE_INFORMATION basic{};
     FILE_ID_INFO identifier{};
@@ -42,6 +105,41 @@ ObjectIdentity identity_from_handle(const HANDLE handle) {
     return result;
 }
 #endif
+
+NativeSymlink read_native_symlink(const std::filesystem::path& path,
+                                 std::error_code& error) {
+    error.clear();
+#if defined(_WIN32)
+    const HANDLE handle = CreateFileW(path.c_str(), 0,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+        OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS,
+        nullptr);
+    if (handle == INVALID_HANDLE_VALUE) {
+        error = std::error_code(static_cast<int>(GetLastError()), std::system_category());
+        return {};
+    }
+    BY_HANDLE_FILE_INFORMATION info{};
+    std::array<std::byte, MAXIMUM_REPARSE_DATA_BUFFER_SIZE> buffer{};
+    DWORD returned{};
+    const bool read = GetFileInformationByHandle(handle, &info) &&
+        DeviceIoControl(handle, FSCTL_GET_REPARSE_POINT, nullptr, 0,
+            buffer.data(), static_cast<DWORD>(buffer.size()), &returned, nullptr);
+    const DWORD read_error = read ? ERROR_SUCCESS : GetLastError();
+    CloseHandle(handle);
+    if (!read) {
+        error = std::error_code(static_cast<int>(read_error), std::system_category());
+        return {};
+    }
+    if (returned > buffer.size()) {
+        error = std::make_error_code(std::errc::invalid_argument);
+        return {};
+    }
+    return {parse_windows_symlink_target(std::span(buffer).first(returned), error),
+            (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0};
+#else
+    return {std::filesystem::read_symlink(path, error), false};
+#endif
+}
 
 NativeReadFile::NativeReadFile(const std::filesystem::path& path) {
 #if defined(_WIN32)

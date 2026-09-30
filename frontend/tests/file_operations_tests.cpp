@@ -1,5 +1,6 @@
 #include "fixture_links.hpp"
 #include "file_manager/file_operations.hpp"
+#include "../src/native_file.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -48,6 +49,13 @@ bool require(const bool condition, const char* message) {
 
 void write_file(const std::filesystem::path& path, const std::string& value) {
     std::ofstream(path) << value;
+}
+
+std::filesystem::path link_target(const std::filesystem::path& path) {
+    std::error_code error;
+    const auto link = file_manager::read_native_symlink(path, error);
+    if (error) throw std::system_error(error, "read fixture link target");
+    return link.target;
 }
 
 bool has_copy_stage(const std::filesystem::path& parent) {
@@ -137,6 +145,19 @@ int main() {
                  copy_collision.code == "destination_exists",
                  "copy collision must not overwrite the published object")) return 1;
 
+    const auto link_collision_parent = area.source() / "link-collision";
+    std::filesystem::create_directory(link_collision_parent);
+    const auto link_collision = link_collision_parent / alpha.filename();
+    if (create_fixture_link(area.outside(), link_collision)) {
+        const auto before_link = file_manager::observe_identity(link_collision);
+        const auto collision_result = operations.copy_object(
+            alpha, alpha_identity, link_collision_parent);
+        if (!require(collision_result.code == "destination_exists" &&
+                     file_manager::observe_identity(link_collision) == before_link &&
+                     !std::filesystem::exists(area.outside()),
+                     "copy must preserve an occupied dangling-link destination")) return 1;
+    }
+
     const auto copy_tree = area.source() / "copy-tree";
     std::filesystem::create_directories(copy_tree / "nested");
     write_file(copy_tree / "nested" / "value.txt", "tree value");
@@ -157,15 +178,15 @@ int main() {
                      std::filesystem::file_type::symlink),
                  "directory copy must preserve nested files and symlink leaves")) return 1;
     if (copy_link_available && !require(
-            std::filesystem::read_symlink(copy_destination / "copy-tree" / "outside-link") ==
-                std::filesystem::read_symlink(copy_tree / "outside-link") &&
+            link_target(copy_destination / "copy-tree" / "outside-link") ==
+                link_target(copy_tree / "outside-link") &&
             !std::filesystem::exists(area.outside()),
             "copy must preserve a dangling file link target without creating it")) return 1;
     if (directory_link_available) {
         const auto copied_link = copy_destination / "copy-tree" / "directory-link";
         if (!require(file_manager::observe_identity(copied_link).type ==
                          std::filesystem::file_type::symlink &&
-                     std::filesystem::read_symlink(copied_link) == "missing-directory",
+                     link_target(copied_link) == "missing-directory",
                      "copy must preserve a dangling relative directory link")) return 1;
 #if defined(_WIN32)
         const DWORD attributes = GetFileAttributesW(copied_link.c_str());

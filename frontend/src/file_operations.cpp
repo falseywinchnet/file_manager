@@ -1,5 +1,6 @@
 #include "file_manager/platform_paths.hpp"
 #include "file_manager/file_operations.hpp"
+#include "native_file.hpp"
 
 #include <cstdlib>
 #include <iomanip>
@@ -125,26 +126,20 @@ CopyOutcome copy_node_no_follow(const std::filesystem::path& source,
             }
             return {true, false, "copied", "file copied to stage"};
         case std::filesystem::file_type::symlink: {
-            const auto target = std::filesystem::read_symlink(source, error);
+            const auto link = read_native_symlink(source, error);
             if (error) return {false, false, "symlink_read_failed", error.message()};
 #if defined(_WIN32)
             // The link itself retains its directory kind even when its target
             // is missing. Do not follow the target to infer that kind.
-            const DWORD attributes = GetFileAttributesW(source.c_str());
-            if (attributes == INVALID_FILE_ATTRIBUTES) {
-                error = std::error_code(static_cast<int>(GetLastError()),
-                                        std::system_category());
-                return {false, false, "symlink_attributes_failed", error.message()};
-            }
-            DWORD flags = (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0
+            DWORD flags = link.directory
                 ? SYMBOLIC_LINK_FLAG_DIRECTORY : 0;
             flags |= SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
-            if (!CreateSymbolicLinkW(destination.c_str(), target.c_str(), flags)) {
+            if (!CreateSymbolicLinkW(destination.c_str(), link.target.c_str(), flags)) {
                 error = std::error_code(static_cast<int>(GetLastError()),
                                         std::system_category());
             }
 #else
-            std::filesystem::create_symlink(target, destination, error);
+            std::filesystem::create_symlink(link.target, destination, error);
 #endif
             if (error) return {false, false, "symlink_copy_failed", error.message()};
             return {true, false, "copied", "symlink leaf copied to stage"};
@@ -281,9 +276,16 @@ std::optional<std::string> FileOperationService::validate_basename(
 
 bool FileOperationService::destination_exists_no_follow(
     const std::filesystem::path& path) {
+#if defined(_WIN32)
+    if (GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES) return true;
+    const DWORD error = GetLastError();
+    // An unobservable destination is occupied for overwrite prevention.
+    return error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND;
+#else
     std::error_code error;
     const auto status = std::filesystem::symlink_status(path, error);
     return !error && status.type() != std::filesystem::file_type::not_found;
+#endif
 }
 
 std::filesystem::path FileOperationService::available_quarantine_path(
