@@ -55,6 +55,7 @@ add_library(gui_forms_core STATIC
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
     src/core/surface_material/types/surface_material_types.cpp
     src/core/text/text_store/text_store.cpp
+    src/core/document_view/document_view_state.cpp
     src/core/text_shaping/validation/text_shaping_validation.cpp
     src/core/text/unicode/unicode_grapheme.cpp
     src/core/typography/resolution/typography_resolution.cpp
@@ -1620,6 +1621,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_text_store_tests tests/text_store_tests.cpp)
     target_link_libraries(gui_forms_text_store_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_text_store_tests COMMAND gui_forms_text_store_tests)
+
+    add_executable(gui_forms_document_view_tests tests/document_view_tests.cpp)
+    target_link_libraries(gui_forms_document_view_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_document_view_tests COMMAND gui_forms_document_view_tests)
 
     add_executable(gui_forms_grapheme_conformance_tests
         tests/grapheme_conformance_tests.cpp

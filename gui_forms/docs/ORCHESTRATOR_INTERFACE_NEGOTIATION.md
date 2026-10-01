@@ -1,5 +1,17 @@
 # Orchestrator ↔ GUI.Forms interface negotiation
 
+## SwiftEdit staged document-view proposal — 2026-10-01
+
+The concrete additive provider proposal is
+[Document-view provider proposal](DOCUMENT_VIEW_PROVIDER_PROPOSAL_2026-10-01.md).
+**OBSERVED:** D1 semantics are reconciled for bounded development implementation
+in the canonical
+[Orchestrator D1 contract](../../orchestrator/spec/contracts/GUI_DOCUMENT_VIEW_DEVELOPMENT.md).
+D1 covers identity/revision, page publication, exact source/display mapping and
+viewport requests; selection/editing is deferred. Later retained control/cluster layout and independent print
+stages remain separately gated. Existing TextBox limits and frozen SDKs are
+unchanged; the proposal itself advertises no implemented capability.
+
 Status: **round 001 GUI.Forms reply published; Orchestrator reconciliation open**.
 
 Participants: Orchestrator integration authority, GUI.Forms provider, and File
