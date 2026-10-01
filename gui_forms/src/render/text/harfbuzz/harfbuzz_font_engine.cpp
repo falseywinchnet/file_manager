@@ -7,6 +7,7 @@
 #include <SheenBidi/SheenBidi.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -131,6 +132,13 @@ class HarfBuzzFontEngine::Impl final {
 public:
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
     TextLayoutDiagnostics diagnostics{};
+    TextLayoutFailure failure{TextLayoutFailure::none};
+    std::uint64_t failure_run{};
+    [[nodiscard]] bool take_failure(TextLayoutFailure point) noexcept {
+        if (failure != point || failure_run != diagnostics.append_calls) { return false; }
+        failure = TextLayoutFailure::none;
+        return true;
+    }
 #endif
     struct Face final {
         FontFaceId id{};
@@ -266,52 +274,121 @@ public:
         return id;
     }
 
-    void append_run(ShapedText& result, Face& face, std::string_view utf8,
+    struct CallFont final {
+        Face* face{};
+        HarfBuzzFontOwner owner{nullptr, hb_font_destroy};
+    };
+    // Native owners and face borrows live for one synchronous shape call.
+    // Registration cannot run concurrently; the face vector stays unchanged.
+    struct ShapeCall final {
+        std::array<CallFont, maximum_faces> fonts{};
+        std::size_t font_count{};
+        HarfBuzzBufferOwner buffer{nullptr, hb_buffer_destroy};
+    };
+
+    void append_run(ShapeCall& call, ShapedText& result, Face& face, std::string_view utf8,
                     Utf8Range range, FontSpec font, double run_origin,
                     bool add_trailing_spacing, bool rtl) {
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
         ++diagnostics.append_calls;
         TextLayoutPhaseTimer append_timer(diagnostics, TextLayoutPhase::append_total);
-        TextLayoutPhaseTimer size_timer(diagnostics, TextLayoutPhase::ft_size);
 #endif
-        const FT_F26Dot6 size = static_cast<FT_F26Dot6>(
-            std::llround(std::clamp(font.size, 1.0, 4096.0) * 64.0));
-        const FT_Error size_set = FT_Set_Char_Size(face.face, 0, size, 72U, 72U);
+        hb_font_t* hb_font = nullptr;
+        const std::size_t font_count = call.font_count;
+        for (std::size_t index = 0; index < font_count; ++index) {
+            const CallFont& entry = call.fonts[index];
+            if (entry.face == &face) {
+                hb_font = entry.owner.get();
+                break;
+            }
+        }
+        if (hb_font == nullptr) {
+            if (font_count >= maximum_faces) { throw std::runtime_error("Shape face bound exceeded"); }
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
-        size_timer.stop();
+            TextLayoutPhaseTimer size_timer(diagnostics, TextLayoutPhase::ft_size);
 #endif
-        if (size_set != 0) return;
+            const double bounded_size = std::clamp(font.size, 1.0, 4096.0);
+            const long long fixed_size = std::llround(bounded_size * 64.0);
+            const FT_F26Dot6 size = static_cast<FT_F26Dot6>(fixed_size);
+            const FT_Error size_set = FT_Set_Char_Size(face.face, 0, size, 72U, 72U);
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
-        TextLayoutPhaseTimer font_timer(diagnostics, TextLayoutPhase::hb_font);
+            size_timer.stop();
 #endif
-        HarfBuzzFontOwner font_owner{hb_ft_font_create_referenced(face.face), hb_font_destroy};
+            if (size_set != 0) { throw std::runtime_error("FreeType size setup failed"); }
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
-        font_timer.stop();
+            TextLayoutPhaseTimer font_timer(diagnostics, TextLayoutPhase::hb_font);
 #endif
-        hb_font_t* hb_font = font_owner.get();
-        if (hb_font == nullptr) return;
+            hb_font_t* acquired_font = nullptr;
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+            if (take_failure(TextLayoutFailure::empty_font)) {
+                acquired_font = hb_font_get_empty();
+            } else if (take_failure(TextLayoutFailure::unbound_font)) {
+                acquired_font = hb_font_create(hb_face_get_empty());
+            } else
+#endif
+            {
+                acquired_font = hb_ft_font_create_referenced(face.face);
+            }
+            HarfBuzzFontOwner font_owner{acquired_font, hb_font_destroy};
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+            font_timer.stop();
+#endif
+            hb_font = font_owner.get();
+            if (hb_font == nullptr || hb_font == hb_font_get_empty() ||
+                hb_ft_font_get_ft_face(hb_font) != face.face) { throw std::bad_alloc(); }
+            hb_ft_font_set_load_flags(hb_font, FT_LOAD_DEFAULT | FT_LOAD_NO_BITMAP);
+            CallFont& entry = call.fonts[font_count];
+            entry.face = &face;
+            entry.owner = std::move(font_owner);
+            ++call.font_count;
+        }
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
         TextLayoutPhaseTimer buffer_timer(diagnostics, TextLayoutPhase::buffer_setup);
 #endif
-        hb_ft_font_set_load_flags(hb_font, FT_LOAD_DEFAULT | FT_LOAD_NO_BITMAP);
-        HarfBuzzBufferOwner buffer_owner{hb_buffer_create(), hb_buffer_destroy};
-        hb_buffer_t* buffer = buffer_owner.get();
-        if (buffer == nullptr) {
-            return;
+        if (!call.buffer) {
+            hb_buffer_t* acquired = nullptr;
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+            if (take_failure(TextLayoutFailure::empty_buffer)) {
+                acquired = hb_buffer_get_empty();
+            } else
+#endif
+            {
+                acquired = hb_buffer_create();
+            }
+            call.buffer.reset(acquired);
         }
+        hb_buffer_t* buffer = call.buffer.get();
+        if (buffer == nullptr || !hb_buffer_allocation_successful(buffer)) { throw std::bad_alloc(); }
+        // Full reset restores flags, script/language, context and Unicode
+        // functions to newly-created defaults before establishing this run.
+        hb_buffer_reset(buffer);
         hb_buffer_set_cluster_level(buffer,
             HB_BUFFER_CLUSTER_LEVEL_MONOTONE_GRAPHEMES);
         hb_buffer_add_utf8(buffer, utf8.data(), static_cast<int>(utf8.size()),
                            static_cast<unsigned>(range.start.value()),
                            static_cast<int>(range.end.value() -
                                             range.start.value()));
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+        if (take_failure(TextLayoutFailure::after_add)) { throw std::bad_alloc(); }
+#endif
+        if (!hb_buffer_allocation_successful(buffer)) { throw std::bad_alloc(); }
         hb_buffer_set_direction(buffer, rtl ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
         hb_buffer_guess_segment_properties(buffer);
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
         buffer_timer.stop();
         TextLayoutPhaseTimer shape_timer(diagnostics, TextLayoutPhase::hb_shape);
 #endif
-        hb_shape(hb_font, buffer, nullptr, 0U);
+        const char* const* shapers = nullptr;
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+        constexpr const char* unavailable_shapers[]{"diagnostic-unavailable-shaper", nullptr};
+        if (take_failure(TextLayoutFailure::no_shaper)) { shapers = unavailable_shapers; }
+#endif
+        const hb_bool_t shaped = hb_shape_full(hb_font, buffer, nullptr, 0U, shapers);
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+        if (take_failure(TextLayoutFailure::after_shape)) { throw std::bad_alloc(); }
+#endif
+        if (!hb_buffer_allocation_successful(buffer)) { throw std::bad_alloc(); }
+        if (!shaped) { throw std::runtime_error("HarfBuzz shaping failed"); }
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
         shape_timer.stop();
         TextLayoutPhaseTimer output_timer(diagnostics, TextLayoutPhase::glyph_output);
@@ -324,6 +401,9 @@ public:
         ShapedFontRun run{};
         run.face = face.id;
         run.source_range = range;
+#if defined(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE)
+        run.diagnostic_rtl = rtl;
+#endif
         run.glyphs.reserve(count);
         double pen_x = run_origin;
         double pen_y{};
@@ -513,10 +593,11 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
     counters.visual_runs = static_cast<std::uint64_t>(visual.size());
 #endif
     double origin{};
+    Impl::ShapeCall call{};
     for (std::size_t index = 0U; index < visual.size(); ++index) {
         const VisualSegment& segment = visual[index];
         const double before = result.width;
-        (*impl_).append_run(result, *segment.face, utf8, segment.range, font, origin,
+        (*impl_).append_run(call, result, *segment.face, utf8, segment.range, font, origin,
                           index + 1U != visual.size(), segment.rtl);
         origin += std::max(0.0, result.width - before);
     }
@@ -532,6 +613,13 @@ std::size_t HarfBuzzFontEngine::face_count() const noexcept {
 TextLayoutDiagnostics HarfBuzzFontEngine::diagnostics() const noexcept {
     const TextLayoutDiagnostics result = (*impl_).diagnostics;
     return result;
+}
+void HarfBuzzFontEngine::set_diagnostic_failure(TextLayoutFailure failure, std::uint64_t run) {
+    if (failure != TextLayoutFailure::none && run == 0) {
+        throw std::invalid_argument("Diagnostic failure run must be nonzero");
+    }
+    (*impl_).failure = failure;
+    (*impl_).failure_run = run;
 }
 #endif
 

@@ -22,6 +22,7 @@ option(GUI_FORMS_BUILD_BENCHMARKS "Build measurement harnesses" OFF)
 option(GUI_FORMS_BUILD_DOCUMENT_VIEW_BENCHMARK "Build the renderer-neutral D1 measurement harness" OFF)
 option(GUI_FORMS_BUILD_TEXT_LAYOUT_PROBE "Build the private text shaping diagnostic" OFF)
 option(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS "Instrument private text shaping phases" OFF)
+option(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE "Record private run directions for geometry comparison" OFF)
 option(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD
        "Build the deterministic native File Manager first-party consumer" OFF)
 
@@ -171,6 +172,9 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     target_compile_features(gui_forms_text_engine PUBLIC cxx_std_20)
     if(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
         target_compile_definitions(gui_forms_text_engine PUBLIC GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS=1)
+    endif()
+    if(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE)
+        target_compile_definitions(gui_forms_text_engine PUBLIC GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE=1)
     endif()
     set_target_properties(gui_forms_text_engine PROPERTIES
         POSITION_INDEPENDENT_CODE ON)

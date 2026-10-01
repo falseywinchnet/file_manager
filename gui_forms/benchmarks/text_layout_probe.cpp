@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <locale>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -113,6 +114,72 @@ double elapsed_ms(Clock::time_point start, Clock::time_point end) {
     return milliseconds;
 }
 
+#if defined(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE)
+// This is a separate, untimed process mode. Explicit fields avoid padding and
+// native object representations. Hex floats preserve finite values and -0.
+void write_font_manifest(const std::filesystem::path& root) {
+    constexpr std::array<const char*, 4> names{
+        "Carlito-Regular.ttf", "NotoSansArabic-Regular.ttf",
+        "NotoSansHebrew-Regular.ttf", "NotoEmoji-Regular.ttf"};
+    constexpr char digits[] = "0123456789abcdef";
+    const std::size_t face_count = names.size();
+    for (std::size_t index = 0; index < face_count; ++index) {
+        const std::filesystem::path path = root / names[index];
+        const std::vector<std::byte> encoded = read_font(path);
+        const std::size_t byte_count = encoded.size();
+        const std::size_t local_id = index + 1;
+        std::cout << "face," << local_id << ',' << names[index]
+                  << ",face_index=0,weight=400,italic=0,primary=" << (index == 0)
+                  << ",bytes=" << byte_count << '\n';
+        for (std::size_t byte_index = 0; byte_index < byte_count; ++byte_index) {
+            const unsigned byte = std::to_integer<unsigned>(encoded[byte_index]);
+            std::cout.put(digits[byte / 16U]);
+            std::cout.put(digits[byte % 16U]);
+        }
+        std::cout << '\n';
+    }
+}
+
+void write_geometry(const std::filesystem::path& fonts, std::string_view name,
+                    const std::string& input) {
+    require(input.size() <= 16 * 1024, "geometry source work bound");
+    constexpr std::array<FontSpec, 3> configurations{
+        FontSpec{FontRole::content, 16.0, 400, false, 0.0},
+        FontSpec{FontRole::content, 9.5, 400, false, 0.25},
+        FontSpec{FontRole::content, 32.0, 700, true, -0.5}};
+    HarfBuzzFontEngine engine{};
+    static_cast<void>(register_fonts(engine, fonts));
+    const TextStore source(input);
+    const std::size_t configuration_count = configurations.size();
+    for (std::size_t configuration = 0; configuration < configuration_count; ++configuration) {
+        const FontSpec font = configurations[configuration];
+        const ShapedText shaped = engine.shape(input, font);
+        if (!input.empty()) { static_cast<void>(inspect(shaped, source)); }
+        const std::size_t run_count = shaped.runs.size();
+        std::cout << "shape," << name << ',' << input.size() << ',' << configuration
+                  << ',' << static_cast<unsigned>(font.role) << ',' << font.size
+                  << ',' << font.weight << ',' << font.italic << ',' << font.letter_spacing
+                  << ',' << shaped.width << ',' << shaped.height << ',' << shaped.ascent
+                  << ',' << shaped.descent << ',' << shaped.missing_clusters
+                  << ',' << shaped.missing_primary_face << ',' << run_count << '\n';
+        for (std::size_t run_index = 0; run_index < run_count; ++run_index) {
+            const ShapedFontRun& run = shaped.runs[run_index];
+            const std::size_t glyph_count = run.glyphs.size();
+            std::cout << "run," << run_index << ',' << run.face.value
+                      << ',' << run.source_range.start.value() << ',' << run.source_range.end.value()
+                      << ',' << run.diagnostic_rtl << ',' << glyph_count << '\n';
+            for (std::size_t glyph_index = 0; glyph_index < glyph_count; ++glyph_index) {
+                const ShapedGlyph& glyph = run.glyphs[glyph_index];
+                std::cout << "glyph," << glyph.glyph.value << ',' << glyph.cluster.value()
+                          << ',' << glyph.x << ',' << glyph.y
+                          << ',' << glyph.advance_x << ',' << glyph.advance_y << '\n';
+            }
+        }
+    }
+    std::cout.flush();
+}
+#endif
+
 void measure(const std::filesystem::path& fonts, std::string_view name, const std::string& input) {
     constexpr std::size_t samples = 31;
     require(input.size() <= 16 * 1024, "probe source work bound");
@@ -195,9 +262,8 @@ void measure(const std::filesystem::path& fonts, std::string_view name, const st
 
 int main(int argc, char** argv) {
     try {
-        require(argc == 2, "usage: text_layout_probe FONT_DIRECTORY");
+        require(argc == 2 || argc == 3, "usage: text_layout_probe FONT_DIRECTORY [--geometry]");
         const std::filesystem::path fonts(argv[1]);
-        std::cout << "case,input_bytes,first_ms,samples,p50_ms,p95_ms,p99_ms,worst_ms,runs,glyphs,returned_capacity,font_bytes,missing_clusters\n";
         const std::string tiny = repeat_complete("office abc ", 64);
         const std::string medium = repeat_complete("office abc ", 4096);
         const std::string long_line = repeat_complete("office abc ", 16384);
@@ -207,6 +273,27 @@ int main(int argc, char** argv) {
         std::string combining = "a";
         const std::string marks = repeat_complete("\xcc\x81", 16382);
         combining.append(marks);
+#if defined(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE)
+        if (argc == 3) {
+            require(std::string_view(argv[2]) == "--geometry", "unknown probe mode");
+            std::cout.imbue(std::locale::classic());
+            std::cout << std::hexfloat;
+            write_font_manifest(fonts);
+            write_geometry(fonts, "ascii_small", tiny);
+            write_geometry(fonts, "ascii_4k", medium);
+            write_geometry(fonts, "ascii_16k", long_line);
+            write_geometry(fonts, "labels_16k", labels);
+            write_geometry(fonts, "bidi_16k", bidi);
+            write_geometry(fonts, "emoji_16k", emoji);
+            write_geometry(fonts, "one_grapheme_16k", combining);
+            write_geometry(fonts, "empty", "");
+            write_geometry(fonts, "mixed_controls", "fi\tABC שלום\nالعربية a\xcc\x81 123");
+            require(static_cast<bool>(std::cout), "geometry output failed");
+            return EXIT_SUCCESS;
+        }
+#endif
+        require(argc == 2, "geometry trace was not enabled in this build");
+        std::cout << "case,input_bytes,first_ms,samples,p50_ms,p95_ms,p99_ms,worst_ms,runs,glyphs,returned_capacity,font_bytes,missing_clusters\n";
         measure(fonts, "ascii_small", tiny);
         measure(fonts, "ascii_4k", medium);
         measure(fonts, "ascii_16k", long_line);

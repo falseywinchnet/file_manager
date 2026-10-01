@@ -8,8 +8,10 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <new>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -383,8 +385,86 @@ void test_public_resolution_record_names_actual_bundled_runs() {
 
 } // namespace
 
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+namespace {
+void require_same_shape(const ShapedText& left, const ShapedText& right) {
+    require(left.width == right.width && left.height == right.height &&
+            left.ascent == right.ascent && left.descent == right.descent &&
+            left.missing_clusters == right.missing_clusters &&
+            left.missing_primary_face == right.missing_primary_face &&
+            left.runs.size() == right.runs.size(), "shape summary unchanged");
+    const std::size_t run_count = left.runs.size();
+    for (std::size_t index = 0; index < run_count; ++index) {
+        const ShapedFontRun& first = left.runs[index];
+        const ShapedFontRun& second = right.runs[index];
+        require(first.face == second.face &&
+                first.source_range.start == second.source_range.start &&
+                first.source_range.end == second.source_range.end &&
+                first.glyphs == second.glyphs, "shape run unchanged");
+#if defined(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE)
+        require(first.diagnostic_rtl == second.diagnostic_rtl, "shape direction unchanged");
+#endif
+    }
+}
+
+void test_call_failure_preserves_caller_and_recovers() {
+    HarfBuzzFontEngine engine{};
+    const std::vector<std::byte> primary = read_file(GUI_FORMS_TEST_CARLITO_REGULAR);
+    const std::vector<std::byte> fallback = read_file(GUI_FORMS_TEST_NOTO_HEBREW_REGULAR);
+    const std::optional<FontFaceId> primary_id =
+        engine.register_typeface(FontRole::content, 400, false, primary);
+    require(primary_id.has_value(), "failure primary registers");
+    const std::optional<FontFaceId> fallback_id =
+        engine.register_fallback_typeface(400, false, fallback);
+    require(fallback_id.has_value(), "failure fallback registers");
+    constexpr FontSpec font{FontRole::content, 16.0, 400, false};
+    const std::string input = "abc שלום def";
+    const ShapedText expected = engine.shape(input, font);
+    require(expected.runs.size() >= 3, "fixture exercises partial result before failure");
+    ShapedText published = engine.shape(input, font);
+    struct FailureCase final {
+        TextLayoutFailure point{};
+        std::uint64_t run{};
+        bool allocation_failure{};
+    };
+    constexpr std::array<FailureCase, 6> failures{
+        FailureCase{TextLayoutFailure::empty_font, 1, true},
+        FailureCase{TextLayoutFailure::unbound_font, 1, true},
+        FailureCase{TextLayoutFailure::empty_buffer, 1, true},
+        FailureCase{TextLayoutFailure::after_add, 2, true},
+        FailureCase{TextLayoutFailure::after_shape, 2, true},
+        FailureCase{TextLayoutFailure::no_shaper, 2, false}};
+    const std::size_t failure_count = failures.size();
+    for (std::size_t index = 0; index < failure_count; ++index) {
+        const FailureCase failure = failures[index];
+        // Acquisition failures use run one; later-stage failures unwind after
+        // at least one complete run has entered the call-owned partial result.
+        engine.set_diagnostic_failure(failure.point, failure.run);
+        bool rejected = false;
+        try {
+            ShapedText replacement = engine.shape(input, font);
+            published = std::move(replacement);
+        } catch (const std::bad_alloc&) {
+            rejected = failure.allocation_failure;
+        } catch (const std::runtime_error&) {
+            rejected = !failure.allocation_failure;
+        }
+        require(rejected, "native acquisition/failure must not return partial success");
+        const TextLayoutDiagnostics diagnostics = engine.diagnostics();
+        require(diagnostics.append_calls == failure.run, "failure occurred at requested run");
+        require_same_shape(published, expected);
+        const ShapedText recovered = engine.shape(input, font);
+        require_same_shape(recovered, expected);
+    }
+}
+} // namespace
+#endif
+
 int main() {
     try {
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+        test_call_failure_preserves_caller_and_recovers();
+#endif
         test_shared_font_lifetime();
         test_owned_font_view_lifetime();
         test_mixed_direction_text();

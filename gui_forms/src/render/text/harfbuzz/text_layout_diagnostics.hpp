@@ -7,6 +7,10 @@
 
 namespace gui_forms::render::text {
 
+enum class TextLayoutFailure {
+    none, empty_font, unbound_font, empty_buffer, after_add, after_shape, no_shaper,
+};
+
 // Private diagnostic-only vocabulary. One snapshot belongs to one engine and
 // is accessed only on that engine's executor. No global last-result state.
 enum class TextLayoutPhase : std::size_t {

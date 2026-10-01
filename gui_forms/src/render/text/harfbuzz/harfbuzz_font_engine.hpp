@@ -38,6 +38,9 @@ struct ShapedGlyph final {
 struct ShapedFontRun final {
     FontFaceId face{};
     Utf8Range source_range{};
+#if defined(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE)
+    bool diagnostic_rtl{};
+#endif
     std::vector<ShapedGlyph> glyphs{};
 };
 
@@ -81,12 +84,17 @@ public:
         std::optional<FontRole> role, std::uint16_t weight, bool italic,
         std::span<const std::byte> encoded, std::shared_ptr<const void> owner,
         std::uint32_t face_index = 0U);
+    // Native setup/allocation failures throw; a call-owned partial result never
+    // becomes a successful return. Callers retain old state until return succeeds.
     [[nodiscard]] ShapedText shape(std::string_view utf8, FontSpec font);
     [[nodiscard]] ResolvedTextLayout resolve(std::string_view utf8,
                                              FontSpec font);
     [[nodiscard]] std::size_t face_count() const noexcept;
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
     [[nodiscard]] TextLayoutDiagnostics diagnostics() const noexcept;
+    // Executor-confined, consumed at the named point/run. An unreached point
+    // remains armed until replaced; none explicitly disarms it.
+    void set_diagnostic_failure(TextLayoutFailure failure, std::uint64_t run);
 #endif
 
 private:

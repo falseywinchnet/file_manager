@@ -64,6 +64,9 @@ removing diagnostic blocks reproduces every nonblank pre-change production
 engine source line. This is narrow source equivalence, not binary identity.
 The spelling scan covered the new diagnostic header and probe: two files, zero
 findings. Parent independently reviewed the engine diff, header, probe and CMake.
+After the parent's named-conversion correction, the diagnostic targets rebuilt,
+the two-file spelling scan remained clean, CTest passed 1/1 in 0.10 seconds,
+and `git diff --check` passed (apart from Git's informational CRLF warning).
 
 Semantic source review against the complete
 `planning/PROGRAMMING_HOUSE_STYLE.md` covers the new diagnostic header, the
