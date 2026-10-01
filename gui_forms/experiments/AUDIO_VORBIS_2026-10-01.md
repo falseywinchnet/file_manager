@@ -1,4 +1,4 @@
-# Audio decoder development receipt — 2026-10-01
+# Audio decoder development receipt - 2026-10-01
 
 This is development validation for the optional GUI.Forms Audio component on Windows x64 with GCC 16.2. The complete Application SDK, native listening, macOS and Linux remain unvalidated. Audio implementation commit: `00dca7c6d057cd9a0919ea33ae7c6abef53631cb`.
 
@@ -14,13 +14,13 @@ Cancellation: stop_token checked between <=64 KiB reads, pages, decode requests 
 
 Tests: source CTest includes WAV/PCM compatibility, engine controls/quotas/revocation, exact Vorbis5760 frames, finite nonzero tone, four-worker determinism, cancellation before work and after first decode chunk, 64-byte test arena exhaustion, aggregate quota refusal, reservation release and old-owner preservation/retry, checksum corruption, four truncation cases, mono/rate refusal, no EOS, oversized granule, valid-CRC malformed packet, chained stream and oversized encoded file. Test-only seams not defined in installed build.
 
-Installed consumer: the Games checkout’s `.build/audio-sdk-build` (Audio enabled, tests OFF; not full native Application SDK), installed .build/audio-sdk. .build/audio-consumer-build CTest 4/4 passes: installed_audio_api, prepared_audio_assets (243 WAV), compressed_audio_assets (243 Ogg, all17 loop frame counts exact, playback seam error0), game_audio_policy (disabled music no engine/read, async missing-file retry, pause/resume, effect EOF/restart, master/local mute and hidden/pending shutdown). All6 game audio adapter translation units compile against imported GUIForms::Audio. Candidate runtime Ogg set 54,735,409 bytes vs PCM1,169,418,011; source audio76,417,500. Vorbis quality6 is lossy; loop seam test proves playback adds no padding/discontinuity, not perceptual equivalence to original source.
+Installed consumer: the Games checkout's `.build/audio-sdk-build` (Audio enabled, tests OFF; not full native Application SDK), installed .build/audio-sdk. .build/audio-consumer-build CTest 4/4 passes: installed_audio_api, prepared_audio_assets (243 WAV), compressed_audio_assets (243 Ogg, all17 loop frame counts exact, playback seam error0), game_audio_policy (disabled music no engine/read, async missing-file retry, pause/resume, effect EOF/restart, master/local mute and hidden/pending shutdown). All6 game audio adapter translation units compile against imported GUIForms::Audio. Candidate runtime Ogg set 54,735,409 bytes vs PCM1,169,418,011; source audio76,417,500. Vorbis quality6 is lossy; loop seam test proves playback adds no padding/discontinuity, not perceptual equivalence to original source.
 
 Exact-scope semantic review: named explicit types/callbacks, visible ownership/release order, no auto/lambdas/arrows/structured bindings, stateful operations separate from test assertions, static format selected before PCM kernels, no allocation or format selection inside sample loop, checked sample/frame arithmetic and no partial publication. `tools/check_house_style.py` on the three C++ files: zero spelling findings. git diff --check clean (line-ending notices only).
 
 gui_forms/include/gui_forms/audio/audio.hpp SHA256 f36963b65302eb6f33298d2088bbd01a004265fb85310d752da6b8ab6e051dd2
-gui_forms/src/audio/audio.cpp SHA256 a6771e87a44a34d5f4253a2a314474ad3adcfab5b963f88f9279729d2b474728
-gui_forms/tests/audio/audio_service_tests.cpp SHA256 2ccdf47bd99a76b5a21c2c48d44e250cf31beafab4f162644348f92c2da51962
+gui_forms/src/audio/audio.cpp SHA256 23091b14e7c6b889f375964cb2f5839e598ccf96c71897d90f20e23fccbd6cd2
+gui_forms/tests/audio/audio_service_tests.cpp SHA256 658dc474539655c09f7aab9ee150b712486328a81479791bdc98f03cf319a7de
 gui_forms/cmake/Audio.cmake SHA256 91e10996489ce637ddddfbc786c51e6eb2dc7cc0560ed1566d800022f6a342b9
 
 ## Reproducible test scope and captured results
@@ -72,3 +72,19 @@ behavior. Aggregate clip payload accounting excludes encoded inputs, per-load
 arenas, ordinary stream/control allocations, foreign and caller stacks, backend
 state and allocator overhead. Applications must bound concurrent loads; Games
 uses one loader thread. Release/native validation remains outstanding.
+
+## Coordinator verification after review corrections
+
+The coordinator independently reviewed the complete authored integration diff
+for implementation commit `00dca7c` and the following two corrections: spell
+`std::barrier<>` explicitly in the concurrency test; calculate the checked
+sample count once before the sample-copy loop. Receipt encoding was also
+corrected and the source hashes above reflect that final source.
+
+The coordinator rebuilt and reran the source suite (1/1, 0.34 seconds), rebuilt
+the tests-disabled Audio library, reinstalled into a separate development SDK
+prefix, rebuilt its independent consumers and reran all four tests (4/4,
+10.91 seconds). The coordinator found no blocking issue in the authored
+integration scope. This is separate verification of those tests and that source
+review; it is not an independent full vendor audit, physical audio listening,
+complete application SDK or additional platform validation.

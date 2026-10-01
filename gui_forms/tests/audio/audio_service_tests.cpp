@@ -345,7 +345,7 @@ void vorbis_loader() {
         energy += static_cast<double>(sample) * sample;
     }
     require(energy > 1, "tone was decoded, not replaced with silence");
-    std::barrier start(4);
+    std::barrier<> start(4);
     std::array<ConcurrentDecode, 4> jobs{};
     std::array<std::thread, 4> workers{};
     for (std::size_t i = 0; i < jobs.size(); ++i) {

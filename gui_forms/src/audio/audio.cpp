@@ -378,7 +378,8 @@ AudioClipResult AudioClip::load_ogg(const std::filesystem::path& path, std::stop
                 return {{}, AudioStatus::invalid_format};
             }
             const std::size_t destination = static_cast<std::size_t>(decoded_frames * 2);
-            for (std::size_t i = 0; i < static_cast<std::size_t>(frames) * 2; ++i) {
+            const std::size_t sample_count = static_cast<std::size_t>(frames) * 2;
+            for (std::size_t i = 0; i < sample_count; ++i) {
                 if (!std::isfinite(block[i])) { return {{}, AudioStatus::invalid_value}; }
                 owned.samples_[destination + i] = std::clamp(block[i], -1.0f, 1.0f);
             }
