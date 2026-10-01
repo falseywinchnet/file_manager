@@ -1,6 +1,7 @@
 # SwiftEdit dynamic document windows — intake 001
 
-Status: **queued capability need; provider confirmation pending**.
+Status: **provider audit confirms the gap within its reviewed scope; separate
+lifecycle negotiation pending**.
 
 ## Provenance and scope
 
@@ -62,3 +63,33 @@ lifecycle questions and the distinction between requested and available
 behavior. No implementation, test or authored tooling is changed; source
 review against `planning/PROGRAMMING_HOUSE_STYLE.md` remains required if a
 later authorized implementation proceeds.
+
+## Provider reply 001 — source audit received
+
+**OBSERVED** — The provider supplied
+[the dynamic-window capability audit](../../gui_forms/docs/DYNAMIC_WINDOW_CAPABILITY_AUDIT_2026-10-01.md)
+on 2026-10-01. This reply advances the initial report above: the provider's
+source/header review confirms no current public Application route for dynamic
+independent in-process document windows within the audited scope.
+
+The audit records byte-identical source and frozen `house-style-final` installed
+public headers, including their SHA-256. It names portable validation requiring
+exactly one independent primary among at most 64 initial windows, fixed native
+entry preparation, and rejection of nested `Application::run`. The Windows
+host creates the initial window states before its message loop and quits that
+loop when the primary closes. Existing owned dialogs and a separate executable
+do not establish the requested capability. No macOS/Linux native lifecycle run
+was performed. Orchestrator has reviewed the audit document; it has not repeated
+the provider's source/hash inspection or inferred native measurements from it.
+
+**CANDIDATE** — The provider proposes W1 as a separate application-session or
+window-group negotiation. Its weak session handle, generation identities,
+creation outcomes, close-intent policy, modal scope and teardown ordering remain
+proposals. W1 is a discussion label here, not a newly admitted registry contract.
+Consumer lifecycle confirmation and a reconciled proposal are still required;
+parent coordination of host/runtime/build ownership precedes implementation.
+
+The next evidence needed is the consumer/provider lifecycle agreement, replacing
+the initial request merely to confirm whether a route exists. No runtime
+availability, frozen SDK change or host implementation is authorized by this
+reply. D1-D4 and print P1 remain independent.
