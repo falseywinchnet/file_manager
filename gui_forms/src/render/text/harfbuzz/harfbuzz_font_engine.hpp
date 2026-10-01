@@ -4,6 +4,10 @@
 #include "gui_forms/typography.hpp"
 #include "gui_forms/types.hpp"
 
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+#include "text_layout_diagnostics.hpp"
+#endif
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -81,6 +85,9 @@ public:
     [[nodiscard]] ResolvedTextLayout resolve(std::string_view utf8,
                                              FontSpec font);
     [[nodiscard]] std::size_t face_count() const noexcept;
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+    [[nodiscard]] TextLayoutDiagnostics diagnostics() const noexcept;
+#endif
 
 private:
     class Impl;

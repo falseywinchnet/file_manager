@@ -129,6 +129,9 @@ void decode_scalars(std::string_view utf8, Utf8Range range,
 
 class HarfBuzzFontEngine::Impl final {
 public:
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+    TextLayoutDiagnostics diagnostics{};
+#endif
     struct Face final {
         FontFaceId id{};
         std::optional<FontRole> role;
@@ -266,13 +269,30 @@ public:
     void append_run(ShapedText& result, Face& face, std::string_view utf8,
                     Utf8Range range, FontSpec font, double run_origin,
                     bool add_trailing_spacing, bool rtl) {
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+        ++diagnostics.append_calls;
+        TextLayoutPhaseTimer append_timer(diagnostics, TextLayoutPhase::append_total);
+        TextLayoutPhaseTimer size_timer(diagnostics, TextLayoutPhase::ft_size);
+#endif
         const FT_F26Dot6 size = static_cast<FT_F26Dot6>(
             std::llround(std::clamp(font.size, 1.0, 4096.0) * 64.0));
         const FT_Error size_set = FT_Set_Char_Size(face.face, 0, size, 72U, 72U);
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+        size_timer.stop();
+#endif
         if (size_set != 0) return;
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+        TextLayoutPhaseTimer font_timer(diagnostics, TextLayoutPhase::hb_font);
+#endif
         HarfBuzzFontOwner font_owner{hb_ft_font_create_referenced(face.face), hb_font_destroy};
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+        font_timer.stop();
+#endif
         hb_font_t* hb_font = font_owner.get();
         if (hb_font == nullptr) return;
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+        TextLayoutPhaseTimer buffer_timer(diagnostics, TextLayoutPhase::buffer_setup);
+#endif
         hb_ft_font_set_load_flags(hb_font, FT_LOAD_DEFAULT | FT_LOAD_NO_BITMAP);
         HarfBuzzBufferOwner buffer_owner{hb_buffer_create(), hb_buffer_destroy};
         hb_buffer_t* buffer = buffer_owner.get();
@@ -287,7 +307,15 @@ public:
                                             range.start.value()));
         hb_buffer_set_direction(buffer, rtl ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
         hb_buffer_guess_segment_properties(buffer);
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+        buffer_timer.stop();
+        TextLayoutPhaseTimer shape_timer(diagnostics, TextLayoutPhase::hb_shape);
+#endif
         hb_shape(hb_font, buffer, nullptr, 0U);
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+        shape_timer.stop();
+        TextLayoutPhaseTimer output_timer(diagnostics, TextLayoutPhase::glyph_output);
+#endif
 
         unsigned count{};
         const hb_glyph_info_t* infos = hb_buffer_get_glyph_infos(buffer, &count);
@@ -387,6 +415,10 @@ std::optional<FontFaceId> HarfBuzzFontEngine::register_fallback_typeface(
 }
 
 ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+    TextLayoutDiagnostics& counters = (*impl_).diagnostics;
+    counters = TextLayoutDiagnostics{};
+#endif
     ShapedText result{};
     if (utf8.empty()) {
         result.height = font.size;
@@ -401,6 +433,9 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
         return result;
     }
 
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+    TextLayoutPhaseTimer store_timer(counters, TextLayoutPhase::store_graphemes);
+#endif
     TextStore store(utf8);
     struct Segment final { Impl::Face* face{}; Utf8Range range{}; };
     const std::size_t graphemes = store.grapheme_count().value();
@@ -410,6 +445,11 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
         const std::size_t bytes = range.end.value() - range.start.value();
         maximum_cluster_bytes = std::max(maximum_cluster_bytes, bytes);
     }
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+    store_timer.stop();
+    counters.graphemes = static_cast<std::uint64_t>(graphemes);
+    TextLayoutPhaseTimer fallback_timer(counters, TextLayoutPhase::fallback);
+#endif
     std::vector<char32_t> scalars{};
     scalars.reserve(maximum_cluster_bytes);
     std::vector<Segment> segments{};
@@ -437,15 +477,28 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
         }
     }
 
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+    fallback_timer.stop();
+    counters.segments = static_cast<std::uint64_t>(segments.size());
+    TextLayoutPhaseTimer bidi_timer(counters, TextLayoutPhase::bidi);
+#endif
     // Unicode bidi ordering is independent of font fallback. Reorder whole
     // directional runs, then shape font fragments with the resolved direction;
     // never reverse UTF-8 bytes or reorder stored application text.
     const std::vector<DirectionRun> directions = visual_direction_runs(utf8);
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+    bidi_timer.stop();
+    counters.directions = static_cast<std::uint64_t>(directions.size());
+    TextLayoutPhaseTimer intersection_timer(counters, TextLayoutPhase::intersections);
+#endif
     struct VisualSegment final { Impl::Face* face{}; Utf8Range range{}; bool rtl{}; };
     std::vector<VisualSegment> visual{};
     std::vector<VisualSegment> parts{};
     parts.reserve(segments.size());
     for (const DirectionRun& direction : directions) {
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+        counters.intersection_pairs += counters.segments;
+#endif
         parts.clear();
         for (const Segment& segment : segments) {
             const std::size_t start = std::max(segment.range.start.value(), direction.range.start.value());
@@ -455,6 +508,10 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
         if (direction.rtl) { std::reverse(parts.begin(), parts.end()); }
         visual.insert(visual.end(), parts.begin(), parts.end());
     }
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+    intersection_timer.stop();
+    counters.visual_runs = static_cast<std::uint64_t>(visual.size());
+#endif
     double origin{};
     for (std::size_t index = 0U; index < visual.size(); ++index) {
         const VisualSegment& segment = visual[index];
@@ -470,6 +527,13 @@ std::size_t HarfBuzzFontEngine::face_count() const noexcept {
     const std::size_t count = (*impl_).faces.size();
     return count;
 }
+
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+TextLayoutDiagnostics HarfBuzzFontEngine::diagnostics() const noexcept {
+    const TextLayoutDiagnostics result = (*impl_).diagnostics;
+    return result;
+}
+#endif
 
 ResolvedTextLayout HarfBuzzFontEngine::resolve(std::string_view utf8,
                                                FontSpec font) {

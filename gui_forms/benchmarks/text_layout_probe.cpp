@@ -137,11 +137,22 @@ void measure(const std::filesystem::path& fonts, std::string_view name, const st
         run_count = first.runs.size();
     }
     std::size_t maximum_returned_capacity = first_facts.capacity_bytes;
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+    TextLayoutDiagnostics phase_totals{};
+    TextLayoutDiagnostics last_diagnostics{};
+    const std::size_t phase_count = phase_totals.nanoseconds.size();
+#endif
     for (std::size_t index = 0; index < samples; ++index) {
         const Clock::time_point start = Clock::now();
         const ShapedText result = engine.shape(input, font);
         const Clock::time_point end = Clock::now();
         timings[index] = elapsed_ms(start, end);
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+        last_diagnostics = engine.diagnostics();
+        for (std::size_t phase = 0; phase < phase_count; ++phase) {
+            phase_totals.nanoseconds[phase] += last_diagnostics.nanoseconds[phase];
+        }
+#endif
         const ShapeFacts facts = inspect(result, oracle);
         require(facts.signature == first_facts.signature && facts.glyphs == first_facts.glyphs &&
                 result.width == first_width && result.missing_clusters == missing,
@@ -159,6 +170,25 @@ void measure(const std::filesystem::path& fonts, std::string_view name, const st
               << maximum_returned_capacity << ',' << font_bytes << ',' << missing << '\n';
     // Preserve completed cases if the external deadline terminates a later one.
     std::cout.flush();
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+    const double sample_divisor = static_cast<double>(samples);
+    const std::array<const char*, 10> phase_names{
+        "store_graphemes", "fallback", "bidi", "intersections", "append_total",
+        "ft_size", "hb_font", "buffer_setup", "hb_shape", "glyph_output"};
+    static_assert(phase_names.size() == static_cast<std::size_t>(TextLayoutPhase::count));
+    for (std::size_t phase = 0; phase < phase_count; ++phase) {
+        const double nanoseconds = static_cast<double>(phase_totals.nanoseconds[phase]);
+        const double mean_ms = nanoseconds / sample_divisor / 1'000'000.0;
+        std::cout << "phase," << name << ',' << phase_names[phase] << ',' << mean_ms << '\n';
+    }
+    std::cout << "counts," << name << ",graphemes=" << last_diagnostics.graphemes
+              << ",segments=" << last_diagnostics.segments
+              << ",directions=" << last_diagnostics.directions
+              << ",intersection_pairs=" << last_diagnostics.intersection_pairs
+              << ",visual_runs=" << last_diagnostics.visual_runs
+              << ",append_calls=" << last_diagnostics.append_calls << '\n';
+    std::cout.flush();
+#endif
 }
 
 } // namespace
