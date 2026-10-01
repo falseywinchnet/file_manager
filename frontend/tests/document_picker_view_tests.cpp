@@ -403,6 +403,15 @@ int run_tests() {
         const std::shared_ptr<gui_forms::Button> linked_open =
             std::dynamic_pointer_cast<gui_forms::Button>(linked_window.find("file-manager.picker.accept"));
         const bool link_clicked = (*linked_open).perform_click();
+        if (!link_selected || !link_clicked || linked.controller().browser().location != root / "Folder") {
+            const std::filesystem::path canonical_alias = std::filesystem::canonical(root / "folder-link");
+            const std::filesystem::path canonical_target = std::filesystem::canonical(root / "Folder");
+            std::cerr << "link view navigation: selected=" << link_selected << " clicked=" << link_clicked
+                      << " actual=" << linked.controller().browser().location << " expected=" << root / "Folder"
+                      << " canonical_alias=" << canonical_alias << " canonical_target=" << canonical_target
+                      << " root=" << linked.controller().browser().root
+                      << " error=" << linked.controller().last_error() << '\n';
+        }
         require(link_selected && link_clicked && linked.controller().browser().location == root / "Folder",
                 "picker Open enters selected folder link through canonical navigation");
     }

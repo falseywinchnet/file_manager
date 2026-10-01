@@ -112,6 +112,14 @@ void trusted_directory_links(const TestRoot& root) {
     const file_manager::DocumentPickerResult alias_result = local.accept();
     require(selected && !alias_result.accepted(), "link alias can be selected for navigation but not accepted as a file");
     const bool entered = local.navigate(alias);
+    if (!entered || local.browser().location != target) {
+        const std::filesystem::path canonical_alias = std::filesystem::canonical(alias);
+        const std::filesystem::path canonical_target = std::filesystem::canonical(target);
+        std::cerr << "link navigation: entered=" << entered
+                  << " actual=" << local.browser().location << " expected=" << target
+                  << " canonical_alias=" << canonical_alias << " canonical_target=" << canonical_target
+                  << " root=" << local.browser().root << " error=" << local.last_error() << '\n';
+    }
     require(entered && local.browser().location == target, "trusted directory link enters canonical target");
     const bool returned = local.navigate(root.path());
     require(returned, "return from canonical target");
