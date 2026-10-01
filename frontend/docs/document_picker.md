@@ -98,10 +98,19 @@ resolve a symbolic-link route to an existing canonical directory within an
 already admitted root. Folder-link rows remain visible through file filters and
 can be entered using Open. The browser then displays the canonical location;
 selection and save observations refer to that location, not the alias. Broken
-links, targets outside admitted roots, revoked grants and file-link leaves do
+links, targets outside admitted roots and revoked grants do
 not gain this behavior. Orchestrator-session navigation retains its no-link
 policy. This directory-navigation exception does not permit following a save
 target link or weaken overwrite identity checks.
+For the same current trusted-local grant, Open File, Open Files and Import Files
+may select a visible file alias. Acceptance rechecks the alias revision, resolves
+an existing regular target within the admitted roots and returns the canonical
+target path and freshly observed target identity. Filters and hidden-file policy
+apply to the displayed alias; a target's different basename does not silently
+change that selection. Broken, cyclic, outside-root or changed aliases refuse.
+One failed item refuses the whole selection. Save/Export and the daemon-session
+projection continue to refuse file-link leaves. No result reserves a file or
+allows a consumer to fall back to the unresolved alias during its own I/O.
 The host revalidates immediately before reading/replacing and owns parsing,
 encoding, atomic-write behavior and its final collision policy. No file contents
 are read or written by the picker.

@@ -1,5 +1,6 @@
 #include "file_manager/platform_paths.hpp"
 #include "file_manager/document_picker_view.hpp"
+#include "document_picker_policy.hpp"
 
 #include <algorithm>
 #include <utility>
@@ -639,6 +640,9 @@ void DocumentPickerView::reload() {
         (*up_).set_enabled(controller_.browser().location != controller_.request().protected_root);
         std::vector<gui_forms::ObjectViewItem> items{};
         items.reserve(controller_.browser().entries.size());
+        const bool trusted_links = controller_.session_valid() &&
+            request.authority == DocumentPickerAuthority::trusted_local_host;
+        const bool reads_files = picker_reads_files(request.profile);
         for (const DirectoryEntry& entry : controller_.browser().entries) {
             gui_forms::ObjectViewItem item{
                 .stable_id = entry.stable_id,
@@ -647,8 +651,7 @@ void DocumentPickerView::reload() {
                 .description = entry.directory ? "Folder" : "File",
                 .glyph = glyph(entry),
                 .enabled = entry.kind != EntryKind::symlink ||
-                    (entry.directory && controller_.session_valid() &&
-                     controller_.request().authority == DocumentPickerAuthority::trusted_local_host),
+                    (trusted_links && (entry.directory || reads_files)),
                 .image_key = {},
             };
             items.push_back(std::move(item));

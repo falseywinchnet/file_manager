@@ -1,6 +1,7 @@
 #include "file_manager/platform_paths.hpp"
 #include "file_manager/document_picker.hpp"
 #include "native_file.hpp"
+#include "document_picker_policy.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -373,9 +374,10 @@ bool FileSelectionController::set_selection(std::vector<std::string> stable_ids)
         const DirectoryEntry* entry = find_entry(id);
         if (entry == nullptr)
             return false;
-        const bool navigable_link = orchestrator_session_valid_ &&
-            request_.authority == DocumentPickerAuthority::trusted_local_host && (*entry).directory;
-        if ((*entry).kind == EntryKind::symlink && !navigable_link)
+        const bool admitted_link = orchestrator_session_valid_ &&
+            request_.authority == DocumentPickerAuthority::trusted_local_host &&
+            ((*entry).directory || picker_reads_files(request_.profile));
+        if ((*entry).kind == EntryKind::symlink && !admitted_link)
             return false;
         for (std::size_t prior = 0; prior < index; ++prior) {
             if (stable_ids[prior] == id)
@@ -597,10 +599,44 @@ DocumentPickerResult FileSelectionController::accept(const bool overwrite_confir
             return result;
         }
         const ObjectIdentity current = observe_identity((*entry).path);
-        if (!current.available() || !(*entry).identity.same_revision(current) ||
-            path_route_has_symlink(request_.protected_root, (*entry).path)) {
+        if (!current.available() || !(*entry).identity.same_revision(current)) {
             const DocumentPickerResult result =
                 selection_error("selection-changed", "selected object changed before acceptance");
+            return result;
+        }
+        const bool trusted_file_alias = (*entry).kind == EntryKind::symlink && !(*entry).directory &&
+            request_.authority == DocumentPickerAuthority::trusted_local_host &&
+            picker_reads_files(request_.profile);
+        if (trusted_file_alias) {
+            const std::optional<std::filesystem::path> resolved = resolve_native_file((*entry).path);
+            if (!resolved) {
+                const DocumentPickerResult result = selection_error(
+                    "link-unavailable", "File link has no available regular-file target");
+                return result;
+            }
+            const std::optional<NavigationTarget> target = resolve_navigation_target(
+                request_.admitted_roots, browser_.location, request_.home_location, *resolved);
+            if (!target || path_route_has_symlink((*target).root, (*target).path)) {
+                const DocumentPickerResult result = selection_error(
+                    "link-target-refused", "File link target is outside admitted roots or unresolved");
+                return result;
+            }
+            const ObjectIdentity target_identity = observe_identity((*target).path);
+            const ObjectIdentity alias_identity = observe_identity((*entry).path);
+            if (!target_identity.available() || target_identity.type != std::filesystem::file_type::regular ||
+                !(*entry).identity.same_revision(alias_identity)) {
+                const DocumentPickerResult result = selection_error(
+                    "link-changed", "File link or target changed before acceptance");
+                return result;
+            }
+            DocumentSelectionObservation observation{
+                .path = (*target).path, .identity = target_identity, .existing = true};
+            observations.push_back(std::move(observation));
+            continue;
+        }
+        if (path_route_has_symlink(request_.protected_root, (*entry).path)) {
+            const DocumentPickerResult result =
+                selection_error("selection-changed", "selected object traverses an unresolved link");
             return result;
         }
         const bool want_folder = request_.profile == DocumentPickerProfile::select_folder;

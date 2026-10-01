@@ -14,9 +14,10 @@
 #endif
 
 namespace file_manager {
+namespace {
 
-std::optional<std::filesystem::path> resolve_native_directory(
-    const std::filesystem::path& path) {
+std::optional<std::filesystem::path> resolve_native_target(
+    const std::filesystem::path& path, const std::filesystem::file_type expected) {
 #if defined(_WIN32)
     // Allocate before acquiring the handle. No throwing work occurs until it is
     // closed. Verify identity when converting the returned extended namespace
@@ -27,11 +28,9 @@ std::optional<std::filesystem::path> resolve_native_directory(
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
         OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
     if (handle == INVALID_HANDLE_VALUE) return {};
-    BY_HANDLE_FILE_INFORMATION information{};
-    const BOOL observed = GetFileInformationByHandle(handle, &information);
     const ObjectIdentity identity = identity_from_handle(handle);
     DWORD length = 0;
-    if (observed && (information.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+    if (identity.available() && identity.type == expected) {
         length = GetFinalPathNameByHandleW(handle, target.data(), capacity,
                                          FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
     }
@@ -54,10 +53,25 @@ std::optional<std::filesystem::path> resolve_native_directory(
     std::error_code error{};
     const std::filesystem::path resolved = std::filesystem::canonical(path, error);
     if (error) return {};
-    const bool directory = std::filesystem::is_directory(resolved, error);
-    if (error || !directory) return {};
+    const std::filesystem::file_status status = std::filesystem::status(resolved, error);
+    if (error || status.type() != expected) return {};
     return resolved;
 #endif
+}
+} // namespace
+
+std::optional<std::filesystem::path> resolve_native_directory(
+    const std::filesystem::path& path) {
+    const std::optional<std::filesystem::path> result =
+        resolve_native_target(path, std::filesystem::file_type::directory);
+    return result;
+}
+
+std::optional<std::filesystem::path> resolve_native_file(
+    const std::filesystem::path& path) {
+    const std::optional<std::filesystem::path> result =
+        resolve_native_target(path, std::filesystem::file_type::regular);
+    return result;
 }
 
 #if defined(_WIN32)

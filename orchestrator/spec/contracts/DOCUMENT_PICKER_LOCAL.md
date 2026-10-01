@@ -64,8 +64,9 @@ no-link read path before publishing its snapshot. Canonicalization alone is not
 a race-free I/O authority or reservation. Acceptance still revalidates directory
 and selected object identity/revision; the host revalidates before its own I/O.
 
-Final file-link acceptance is outside this amendment: Open/Import retain refusal
-of a symlink leaf. Select Folder may accept the freshly revalidated canonical
+Final file-link acceptance was outside this directory-only amendment; the
+separately assigned Open/Import amendment below addresses that next scope.
+Select Folder may accept the freshly revalidated canonical
 directory after navigation, not return the alias as an accepted link. Save/Export
 from that directory still accept only a valid basename under the canonical
 parent, retain no-link route/leaf checks, and bind overwrite confirmation to the
@@ -86,3 +87,50 @@ is made here.
 **OBSERVED assignment:** the coordinator owns the controller/view fix and focused
 tests. Source review and test/native receipts remain pending; this is acceptance
 of a development scope, not a new architecture decision or SDK availability.
+
+## Trusted-local Open/Import file-alias amendment — accepted development scope
+
+**OBSERVED coordinator direction:** the owner's symlink complaint includes files,
+not only directories. The coordinator has assigned itself the bounded next fix
+under that existing user intent. This section prepares its canonical semantics
+accepted by the coordinator; it adds no owner permission or research gate and claims
+no implemented or installed behavior.
+
+Only a currently granted `trusted_local_host` presentation in Open File, Open
+Files or Import Files may select a visible file alias for this path. Selection
+retains the alias's browser-snapshot identity/revision; it is not yet acceptance
+of either the alias or its target. At acceptance, revalidate the current browser
+directory and the alias against that snapshot, freshly resolve the target and
+require a regular file under an explicitly admitted root. Return the canonical
+target path with its fresh exact identity/revision, never the alias path paired
+with target identity. Existing profile cardinality, filters, visibility and
+single-completion rules remain in force; resolution does not admit another root.
+Filename/type filters and hidden visibility apply to the displayed alias; the
+resolved target may have a different basename. These are presentation filters,
+not content validation or filesystem authority.
+
+Outside-root, broken/cyclic, changed-since-snapshot, unavailable and nonregular
+targets refuse, as does revoked/unavailable authority. Failed acceptance returns
+no partial accepted selection and keeps the presentation open. Fresh resolution
+and identity observation are not an I/O reservation: the consumer performs its
+existing no-follow I/O and immediate identity/revision revalidation on the
+returned canonical target. A race or replacement must not fall back to opening
+the alias route or silently choose another object.
+
+Save/Export retain no-follow leaf and route guards and exact overwrite binding;
+this Open/Import exception does not authorize file-link writes. The Orchestrator
+session projection remains no-follow. Existing directory-alias navigation and
+canonical Select Folder behavior remain unchanged, as do ADR-017 protected
+mutation and ADR-020 protected-root actions. No general filesystem-model policy
+change, root inference, public API addition or consumer privilege is implied.
+
+**OBSERVED assignment:** the coordinator owns the private target-resolution
+adapter extending the directory helper, frontend native-file/controller/view
+changes, focused tests and consumer documentation. This chat owns this canonical
+record only. Required focused evidence includes admitted same/cross-root regular
+targets, alias replacement/retargeting since snapshot, broken/cyclic/outside-root
+and nonregular targets, authority loss, mixed multi-selection failure, canonical
+result identity, unchanged Save/Export and session refusals, and preservation of
+directory navigation. Exact authored source review against
+`planning/PROGRAMMING_HOUSE_STYLE.md` and test/native receipts remain separate
+acceptance evidence. No SDK or platform availability is promoted by this scope.

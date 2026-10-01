@@ -380,6 +380,38 @@ int run_tests() {
     verify_exception_reset(save_request, true);
     verify_disconnected_controls(save_request);
     verify_teardown_during_completion(save_request);
+    const bool file_link_available = create_fixture_link(root / "open.txt", root / "file-link.txt");
+    if (file_link_available) {
+        file_manager::DocumentPickerRequest file_request{};
+        file_request.protected_root = root;
+        file_request.owner_application_id = "file-link-view-test";
+        file_request.authority = file_manager::DocumentPickerAuthority::trusted_local_host;
+        ResultRecorder file_recorder{};
+        file_manager::DocumentPickerView file_view(file_request);
+        gui_forms::Window file_window(file_view.root_control(), {760, 560});
+        file_window.perform_layout();
+        file_view.attach_dialog(file_window);
+        const gui_forms::Delegate<const file_manager::DocumentPickerResult&> file_callback =
+            gui_forms::Delegate<const file_manager::DocumentPickerResult&>::bind<
+                ResultRecorder, &ResultRecorder::receive>(file_recorder);
+        gui_forms::SubscriptionToken file_connection = file_view.completed().subscribe(file_callback);
+        const std::shared_ptr<gui_forms::ObjectView> file_objects =
+            std::dynamic_pointer_cast<gui_forms::ObjectView>(file_window.find("file-manager.picker.objects"));
+        std::string file_id{};
+        for (const file_manager::DirectoryEntry& entry : file_view.controller().browser().entries) {
+            if (entry.name == "file-link.txt") file_id = entry.stable_id;
+        }
+        require(!file_id.empty(), "file alias row is visible");
+        (*file_objects).set_selected_ids({file_id});
+        const std::shared_ptr<gui_forms::Button> file_open =
+            std::dynamic_pointer_cast<gui_forms::Button>(file_window.find("file-manager.picker.accept"));
+        const bool file_clicked = (*file_open).perform_click();
+        const file_manager::ObjectIdentity target_identity = file_manager::observe_identity(root / "open.txt");
+        require(file_clicked && file_recorder.completed && file_recorder.result.accepted() &&
+                    file_recorder.result.selections.front().path == root / "open.txt" &&
+                    file_recorder.result.selections.front().identity.same_revision(target_identity),
+                "Open button accepts file alias as canonical target with matching identity");
+    }
     const bool link_available = create_fixture_link(root / "Folder", root / "folder-link", true);
     if (link_available) {
         file_manager::DocumentPickerRequest link_request{};

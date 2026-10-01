@@ -176,12 +176,105 @@ void trusted_directory_links(const TestRoot& root) {
             "directory-link cleanup preserves both target directories");
 }
 
+bool select_named(file_manager::FileSelectionController& picker, const std::string_view name) {
+    const file_manager::DirectoryEntry* row = find(picker, name);
+    require(row != nullptr, "file-alias fixture row is visible");
+    const bool selected = picker.set_selection({(*row).stable_id});
+    return selected;
+}
+
+void trusted_file_links(const TestRoot& root) {
+    const std::filesystem::path folder = root.path() / "Folder";
+    const std::filesystem::path other = root.path() / "Other";
+    std::filesystem::create_directory(other);
+    write_fixture(folder / "target.txt", "local target");
+    write_fixture(other / "target.bin", "cross-root target");
+    const bool available = create_fixture_link(folder / "target.txt", folder / "local.txt");
+    if (!available) return;
+    require(create_fixture_link(other / "target.bin", folder / "cross.txt"), "cross-root link fixture");
+    require(create_fixture_link(root.path() / "alpha.txt", folder / "outside.txt"), "outside link fixture");
+    require(create_fixture_link(folder / "missing", folder / "broken.txt"), "broken link fixture");
+    require(create_fixture_link("cycle.txt", folder / "cycle.txt"), "cyclic link fixture");
+    require(create_fixture_link(folder / "target.txt", folder / "changed.txt"), "changed link fixture");
+    const std::array<file_manager::DocumentPickerProfile, 3> read_profiles{
+        file_manager::DocumentPickerProfile::open_file,
+        file_manager::DocumentPickerProfile::open_files,
+        file_manager::DocumentPickerProfile::import_files};
+    file_manager::DocumentPickerRequest policy = request(root, read_profiles.front());
+    policy.protected_root = folder;
+    policy.initial_location = folder;
+    policy.admitted_roots = {folder, other};
+    policy.authority = file_manager::DocumentPickerAuthority::trusted_local_host;
+    for (const file_manager::DocumentPickerProfile profile : read_profiles) {
+        policy.profile = profile;
+        file_manager::FileSelectionController picker(policy);
+        const bool local_selected = select_named(picker, "local.txt");
+        const file_manager::DocumentPickerResult local = picker.accept();
+        const file_manager::ObjectIdentity local_identity =
+            file_manager::observe_identity(folder / "target.txt");
+        require(local_selected && local.accepted() && local.selections.size() == 1 &&
+                    local.selections.front().path == folder / "target.txt" &&
+                    local.selections.front().identity.same_revision(local_identity),
+                "all read profiles return canonical target and fresh exact identity");
+        const bool cross_selected = select_named(picker, "cross.txt");
+        const file_manager::DocumentPickerResult cross = picker.accept();
+        require(cross_selected && cross.accepted() && cross.selections.front().path == other / "target.bin",
+                "explicit additional root permits target; visible alias supplies filename filter");
+        const std::array<std::string_view, 3> refused_names{"outside.txt", "broken.txt", "cycle.txt"};
+        for (const std::string_view name : refused_names) {
+            const bool selected = select_named(picker, name);
+            const file_manager::DocumentPickerResult refused = picker.accept();
+            require(selected && !refused.accepted() && refused.selections.empty(),
+                    "outside, broken and cyclic aliases refuse without partial selection");
+        }
+        const bool selected_before_revoke = select_named(picker, "local.txt");
+        picker.set_authority_valid(false);
+        const file_manager::DocumentPickerResult revoked = picker.accept();
+        require(selected_before_revoke && !revoked.accepted(), "revoked authority cannot accept file alias");
+    }
+    policy.profile = file_manager::DocumentPickerProfile::open_files;
+    policy.maximum_selection = 2;
+    file_manager::FileSelectionController mixed(policy);
+    const file_manager::DirectoryEntry* good = find(mixed, "local.txt");
+    const file_manager::DirectoryEntry* bad = find(mixed, "outside.txt");
+    require(good != nullptr && bad != nullptr, "mixed selection rows exist");
+    const bool mixed_selected = mixed.set_selection({(*good).stable_id, (*bad).stable_id});
+    const file_manager::DocumentPickerResult mixed_result = mixed.accept();
+    require(mixed_selected && !mixed_result.accepted() && mixed_result.selections.empty(),
+            "one refused alias prevents partial multi-selection acceptance");
+
+    policy.profile = file_manager::DocumentPickerProfile::open_file;
+    file_manager::FileSelectionController changed(policy);
+    const bool changed_selected = select_named(changed, "changed.txt");
+    std::filesystem::rename(folder / "changed.txt", folder / "retired.txt");
+    require(create_fixture_link(other / "target.bin", folder / "changed.txt"), "replacement alias fixture");
+    const file_manager::DocumentPickerResult changed_result = changed.accept();
+    require(changed_selected && !changed_result.accepted(), "alias replacement since snapshot refuses");
+
+    policy.authority = file_manager::DocumentPickerAuthority::orchestrator_session;
+    file_manager::FileSelectionController session(policy);
+    const bool session_selected = select_named(session, "local.txt");
+    require(!session_selected, "daemon-session selection retains no-follow policy");
+    policy.authority = file_manager::DocumentPickerAuthority::trusted_local_host;
+    const std::array<file_manager::DocumentPickerProfile, 2> write_profiles{
+        file_manager::DocumentPickerProfile::save_as, file_manager::DocumentPickerProfile::export_file};
+    for (const file_manager::DocumentPickerProfile profile : write_profiles) {
+        policy.profile = profile;
+        file_manager::FileSelectionController save(policy);
+        const bool selected = select_named(save, "local.txt");
+        const bool named = save.set_filename("local.txt");
+        const file_manager::DocumentPickerResult result = save.accept(true);
+        require(!selected && named && !result.accepted(), "Save and Export retain no-follow file leaves");
+    }
+}
+
 } // namespace
 
 int run_tests() {
     {
         TestRoot link_root{};
         trusted_directory_links(link_root);
+        trusted_file_links(link_root);
     }
     TestRoot root{};
 

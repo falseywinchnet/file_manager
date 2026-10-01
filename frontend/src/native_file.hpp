@@ -20,6 +20,9 @@ namespace file_manager {
 // This is not a retained I/O authority; callers recheck admitted roots and identity.
 [[nodiscard]] std::optional<std::filesystem::path> resolve_native_directory(
     const std::filesystem::path& path);
+// Resolves an existing regular file for a fresh selection observation only.
+[[nodiscard]] std::optional<std::filesystem::path> resolve_native_file(
+    const std::filesystem::path& path);
 
 #if defined(_WIN32)
 // Observes the opened object, including all 128 file-ID bits. Reparse points
