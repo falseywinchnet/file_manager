@@ -341,3 +341,27 @@ certification. Games owns the follow-up code/evidence commit; root integrates
 the negotiation batch. Cursor reply 003 now reconciles precise status, unique
 window metrics and terminal lease behavior for its assigned development scope;
 native/installed cursor evidence remains pending.
+
+### Subsequent source evidence and scheduling boundary
+
+Cursor source development is integrated at `50ea223`, with receipt follow-up
+`87ce23e`; see [cursor receipt 004](GAMES_WINDOW_CURSOR_2026-10-01.md).
+Focused tests and authored source review do not establish visible native or
+matched-SDK availability. Other cursor backends remain unsupported.
+
+Games' subsequent audio-scheduling request is research/proposal only. No
+implementation scope is assigned until sample-frame time units, loop boundaries,
+late-command policy, cancellation, rate changes and bounded command/storage
+ownership are reconciled. Existing playback/decoder authorization does not
+silently admit scheduled-start or sample-accurate timeline APIs.
+
+The concrete next-bar request now has a dedicated
+[proposal-only intake](GAMES_AUDIO_BAR_TRANSITION_2026-10-01.md), owned by
+Orchestrator. Games supplies exact API/profile details; no scheduling source
+or SDK mutation is assigned by reserving that record.
+
+Subsequent coordinator admission opens only the dedicated private Stage 1
+scheduler/model/tests/receipt scope recorded there. Clarification 004 resolves
+its bar-grid, timeline, fade, cancellation and retirement model laws. Public
+Audio APIs, miniaudio-node integration and concurrent callback guarantees remain
+unadmitted Stage 2 work; model success cannot establish those properties.

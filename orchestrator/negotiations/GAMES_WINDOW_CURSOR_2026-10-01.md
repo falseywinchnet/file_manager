@@ -217,3 +217,33 @@ assigned development slice. Focused implementation and owned-window validation
 remain required before adapter/SDK availability. No global desktop warp was
 performed or authorized; native validation stays within owned windows and
 current permissions. Other backends remain explicitly unsupported.
+
+## Source-development receipt 004
+
+**OBSERVED** — Coordinator integrated cursor source at `50ea223`, followed by
+receipt whitespace correction `87ce23e`. The durable
+[cursor validation receipt](../../gui_forms/experiments/CURSOR_INTERACTION_2026-10-01.md)
+lists exact reviewed hashes and the complete 13-file authored scope plus root
+CMake registration. Orchestrator read the receipt; it did not rerun the tests
+or repeat the implementation review.
+
+**MEASURED coordinator evidence:** four focused build targets were current and
+three focused tests passed in 0.21 seconds. Source review found and corrected a
+first-time restoration failure during shutdown that previously skipped retry.
+The common closing path makes at most one retry before native teardown while
+preserving the original failure; its fake regression verifies two attempts in
+that case. Modal-entry revocation is also covered. Tests retain distinctions
+among wrong-thread refusal, terminal lease state, unsupported/denied/native
+failures, forged or stale metrics and conversion bounds.
+
+The Windows fixture uses a hidden owned HWND for refusal, coordinate and
+resource-lifecycle checks. It never requests foreground focus, hides the user's
+pointer or moves it. Thus visible native hide/restore/warp, modal/focus/capture
+interactions, multiple visible windows and DPI transitions remain unverified.
+The complete matched Application SDK has not been rebuilt/adopted for this
+slice; macOS/Linux hooks remain unsupported. These source tests do not promote
+visible native, installed SDK or cross-platform availability.
+
+The coordinator's house-style review covers only the named authored delta and
+reports no remaining blocking finding there; legacy code is not certified.
+This receipt advances implementation evidence, not the native acceptance gate.

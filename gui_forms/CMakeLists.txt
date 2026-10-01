@@ -1544,6 +1544,12 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_cursor_interaction_tests tests/cursor_interaction_tests.cpp)
     target_link_libraries(gui_forms_cursor_interaction_tests PRIVATE gui_forms_core)
     add_test(NAME cursor_interaction COMMAND gui_forms_cursor_interaction_tests)
+    add_executable(gui_forms_audio_loop_scheduler_tests
+        tests/audio/audio_loop_scheduler_tests.cpp
+        src/audio/loop_transport/scheduler.cpp)
+    target_include_directories(gui_forms_audio_loop_scheduler_tests PRIVATE src/audio/loop_transport)
+    target_compile_features(gui_forms_audio_loop_scheduler_tests PRIVATE cxx_std_20)
+    add_test(NAME gui_forms_audio_loop_scheduler_tests COMMAND gui_forms_audio_loop_scheduler_tests)
     if(WIN32)
         add_executable(gui_forms_windows_cursor_tests tests/windows_cursor_tests.cpp)
         target_link_libraries(gui_forms_windows_cursor_tests PRIVATE gui_forms_core user32 gdi32)
