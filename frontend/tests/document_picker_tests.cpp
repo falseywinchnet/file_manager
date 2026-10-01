@@ -244,6 +244,7 @@ void trusted_file_links(const TestRoot& root) {
             "one refused alias prevents partial multi-selection acceptance");
 
     policy.profile = file_manager::DocumentPickerProfile::open_file;
+    policy.maximum_selection = 1;
     file_manager::FileSelectionController changed(policy);
     const bool changed_selected = select_named(changed, "changed.txt");
     std::filesystem::rename(folder / "changed.txt", folder / "retired.txt");

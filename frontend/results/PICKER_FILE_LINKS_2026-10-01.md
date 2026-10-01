@@ -43,3 +43,12 @@ initialized observations, reserved result storage, failure without partial
 publication, alias borrows and replacement order were checked. Seven-file
 spelling check reports zero findings. This is review of the changed scope; it
 does not certify all legacy code in these files.
+
+**REJECTED first native fixture run:** `36886549919` at `2d04310` failed on
+the constructor guard `single-selection picker profile requires a bound of one`.
+The new mixed-selection fixture set the maximum to two, then switched its reused
+request back to Open File without restoring one. The native link cases reached
+that guard; local error-1314 skips had hidden it. The fixture now explicitly
+restores the single-selection bound before constructing the next controller.
+This fixes test setup; it does not bypass the product cardinality guard. Native
+re-execution remains required before publishing alias availability.
