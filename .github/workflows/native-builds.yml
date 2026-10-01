@@ -112,6 +112,12 @@ jobs:
           xvfb-run -a python3 tools/build_native.py --jobs 2
           python3 -B tools/export_native_sdks_tests.py
           python3 -B tools/export_native_sdks.py
+      - name: Measure Mac paint phases with a controlled surrogate
+        if: runner.os == 'macOS'
+        # Scheduling can reject comparability on a shared runner. Preserve the
+        # rejected measurement without invalidating the already-tested SDK.
+        continue-on-error: true
+        run: python3 -B tools/run_macos_paint_cost.py
       - name: Save pinned dependency cache after build attempts
         if: always() && runner.os != 'Windows' && steps.native-dependencies.outputs.cache-primary-key != '' && steps.native-dependencies.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -149,4 +155,5 @@ jobs:
             .build/native-${{ matrix.platform }}/**/CMakeConfigureLog.yaml
             .build/native-${{ matrix.platform }}/package-check.json
             .build/native-${{ matrix.platform }}/source-state-*.json
+            .build/native-${{ matrix.platform }}/paint-cost/*
           if-no-files-found: ignore

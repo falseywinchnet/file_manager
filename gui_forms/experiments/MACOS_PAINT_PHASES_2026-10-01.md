@@ -1,7 +1,8 @@
 # Mac synchronous paint phase instrumentation
 
-Status: candidate instrumentation and native fixture extension; native compile
-and execution pending. No rendering-strategy change or CPU improvement claim.
+Status: independently reviewed instrumentation committed as `945f9a7`;
+native run `36878654190` succeeded on all three platforms, including the Mac
+fixture. No rendering-strategy change or CPU improvement claim.
 
 ## Evidence and measurement boundary
 
@@ -105,7 +106,21 @@ violation remains in the authored scope.
 The exact portable aggregate was extracted and compiled on Shadow with C++20,
 `-Wall -Wextra -Wconversion -Wsign-conversion -Werror`. Accumulation of 17 ns and
 3 ns, maximum, JSON field names, and overflow saturation checks passed. The
-temporary executable is under `gui_forms/.build/`. This is not an Objective-C++
+temporary source and executable are
+`C:/Users/Shadow/file_manager/gui_forms/.build/mac-phase-aggregate-check.cpp` and
+`C:/Users/Shadow/file_manager/gui_forms/.build/mac-phase-aggregate-check.exe`.
+The source copies the current `struct MacPaintPhase final` through its closing
+brace, stopping before the following anonymous-namespace closing comment; only
+standard includes and the described main-function checks are added. The exact
+file-based verification command, run from `C:/Users/Shadow/file_manager`, was:
+
+```powershell
+. ./tools/Enter-WindowsToolchain.ps1
+g++ -std=c++20 -Wall -Wextra -Wconversion -Wsign-conversion -Werror gui_forms/.build/mac-phase-aggregate-check.cpp -o gui_forms/.build/mac-phase-aggregate-check.exe
+& ./gui_forms/.build/mac-phase-aggregate-check.exe
+```
+
+Both compilation and execution returned zero. This is not an Objective-C++
 compile or native rendering test. `git diff --check` passed. Existing native
 fixture target requires no CMake change. Coordinator owns review, commit, push,
 and native CI; A2 remains frozen and untouched.
@@ -116,3 +131,13 @@ native resource lifetimes, completed-phase failure semantics, and fixture stage
 ordering. No defect was found in the authored scope. Native Objective-C++ compile
 and fixture execution remain pending CI; portable aggregate checks do not replace
 them. This commit admits measurement only, not a rendering optimization.
+The coordinator also independently compiled and ran the saved portable aggregate
+check with the strict command above; both completed successfully.
+
+SwiftEdit's evidence collector reported all six Mac fixture snapshots parsed.
+Visible stage 1 to 2 added one draw: retained 53,083 ns, CG setup 5,291 ns,
+CG draw 60,458 ns, release 2,708 ns, raster preparation 7,833 ns and finish
+166 ns. Hidden stage 3 to 4 left all phase counts and times unchanged; no
+saturation or native callback faults were reported. These are attributed native
+fixture observations, not a measurement of SwiftEdit process CPU or a complete
+cost attribution. The longer provider-owned surrogate remains separate.

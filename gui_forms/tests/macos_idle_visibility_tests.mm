@@ -8,6 +8,8 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
+#include <ctime>
 #include <exception>
 #include <functional>
 #include <memory>
@@ -20,6 +22,7 @@
 // Private diagnostics already used by native exposure fixtures; no public ABI.
 @interface NSView (IdleVisibilityProbe)
 - (std::string)hostJSON;
+- (void)collectDamage;
 @end
 
 namespace {
@@ -232,7 +235,14 @@ private:
 
 } // namespace
 
-int main() {
+#include "macos_paint_cost_experiment.inc"
+
+int main(const int argc, char** const argv) {
+    if (argc == 2 && std::strcmp(argv[1], "--paint-cost-experiment") == 0) {
+        const int result = run_paint_cost_experiment();
+        return result;
+    }
+    if (argc != 1) return 2;
     Probe probe{};
     gui_forms::host::MacApplicationWindow primary{};
     primary.stable_id = "idle.primary";
