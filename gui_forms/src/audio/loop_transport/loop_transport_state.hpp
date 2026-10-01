@@ -74,6 +74,7 @@ struct AudioLoopTransportState final {
     void close() noexcept;
 };
 #ifdef GUI_FORMS_AUDIO_TESTING
+void audio_loop_test_engine_failure(AudioEngineState& engine, AudioStatus failure);
 // Simulates the engine's private render thread; caller keeps engine alive until
 // joined and never overlaps any public offline render or native device use.
 AudioLoopStatus audio_loop_test_native_render(AudioLoopTransport& transport, std::span<float> samples);

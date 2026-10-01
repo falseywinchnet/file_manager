@@ -458,9 +458,18 @@ struct AudioEngineState final {
 };
 #ifdef GUI_FORMS_AUDIO_LOOP_TRANSPORT
 AudioLoopStatus loop_engine_status(const AudioEngineState& engine) noexcept {
-    const AudioLoopStatus result = engine.status.load() == AudioStatus::ok ? AudioLoopStatus::ok : AudioLoopStatus::closed;
-    return result;
+    const AudioStatus observed = engine.status.load();
+    if (observed == AudioStatus::ok) { return AudioLoopStatus::ok; }
+    if (observed == AudioStatus::closed) { return AudioLoopStatus::closed; }
+    // This profile has no device-specific result: interruption/unavailability
+    // and mixer failure both mean the backend cannot advance transport time.
+    return AudioLoopStatus::backend_error;
 }
+#ifdef GUI_FORMS_AUDIO_TESTING
+void audio_loop_test_engine_failure(AudioEngineState& engine, AudioStatus failure) {
+    engine.callback_failure(failure);
+}
+#endif
 void release_loop_slot(AudioEngineState& engine, AudioLoopTransportState& transport, std::size_t slot) noexcept {
     if (engine.transports[slot] == &transport) { engine.transports[slot] = nullptr; }
 }

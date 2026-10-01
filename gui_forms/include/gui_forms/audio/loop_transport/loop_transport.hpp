@@ -34,6 +34,9 @@ struct AudioLoopReceipt final {
 // samples j=0..N-1 while the new track has full gain. N=0/1 cuts immediately.
 // Mixing overlap can clip. A change during a fade replaces only the pending
 // request, preserves its original admission+lead cutoff and waits for fade end.
+// Poll observes engine failure for unfinished receipts without rewriting their
+// phase or timing. Device loss/interruption and mixer errors report backend_error;
+// closed remains distinct. Already-terminal receipts preserve their outcome.
 // Applied is terminal at the first incoming sample; cancellation then is too
 // late. Expired receipt history gives expired_target, not an inferred result.
 // Destruction and move assignment require the creating control thread. No

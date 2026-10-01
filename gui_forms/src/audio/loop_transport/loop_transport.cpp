@@ -183,7 +183,8 @@ AudioLoopReceipt AudioLoopTransportState::poll(std::uint64_t id) {
             const std::uint64_t after = cell.sequence.load(std::memory_order_seq_cst);
             if (before == after && result.id == id) {
                 if (result.phase == AudioLoopPhase::queued || result.phase == AudioLoopPhase::admitted) {
-                    const AudioLoopStatus failed = failure.load(std::memory_order_acquire);
+                    AudioLoopStatus failed = failure.load(std::memory_order_acquire);
+                    if (failed == AudioLoopStatus::ok) { failed = loop_engine_status(*engine); }
                     if (failed != AudioLoopStatus::ok) { result.status = failed; result.reason = failed; }
                 }
                 return result;
@@ -366,6 +367,9 @@ AudioLoopStatus AudioLoopTransport::close() {
 }
 #ifdef GUI_FORMS_AUDIO_TESTING
 struct AudioLoopTransportTestAccess final {
+    static void fail(AudioLoopTransport& transport, AudioStatus failure) {
+        audio_loop_test_engine_failure(*(*transport.state_).engine, failure);
+    }
     static AudioLoopStatus render(AudioLoopTransport& transport, std::span<float> samples) {
         if (!transport.state_ || samples.size() % 2 != 0) { return AudioLoopStatus::invalid_value; }
         ma_engine* engine_node = (*transport.state_).native_engine;
@@ -374,6 +378,9 @@ struct AudioLoopTransportTestAccess final {
         return result;
     }
 };
+void audio_loop_test_fail(AudioLoopTransport& transport, AudioStatus failure) {
+    AudioLoopTransportTestAccess::fail(transport, failure);
+}
 AudioLoopStatus audio_loop_test_native_render(AudioLoopTransport& transport, std::span<float> samples) {
     const AudioLoopStatus result = AudioLoopTransportTestAccess::render(transport, samples);
     return result;

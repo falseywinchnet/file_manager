@@ -9,6 +9,7 @@
 #include <vector>
 
 namespace gui_forms {
+void audio_loop_test_fail(AudioLoopTransport& transport, AudioStatus failure);
 AudioLoopStatus audio_loop_test_native_render(AudioLoopTransport& transport, std::span<float> samples);
 }
 namespace {
@@ -86,7 +87,8 @@ void exact_mix(std::size_t chunk, std::uint64_t fade = 4) {
     require(pending_receipt.phase == AudioLoopPhase::admitted, "paused change remains pending");
     const AudioLoopCommand stopped = transport.stop();
     render(engine, one);
-    require(stopped.status == AudioLoopStatus::ok && transport.poll(pending.id).phase == AudioLoopPhase::cancelled,
+    const AudioLoopReceipt cancelled_pending = transport.poll(pending.id);
+    require(stopped.status == AudioLoopStatus::ok && cancelled_pending.phase == AudioLoopPhase::cancelled,
             "stop cancels while paused");
     engine.shutdown();
     const AudioLoopCommand closed = transport.resume();
@@ -127,11 +129,14 @@ void quota_and_history() {
         require(item.status == AudioLoopStatus::ok, "history can recycle terminal cells");
         render(engine, sample);
     }
-    require(transport.poll(start.id).status == AudioLoopStatus::expired &&
-            transport.poll(pending.id).phase == AudioLoopPhase::admitted, "bounded history preserves pending request");
+    const AudioLoopReceipt old_start = transport.poll(start.id);
+    const AudioLoopReceipt retained_pending = transport.poll(pending.id);
+    require(old_start.status == AudioLoopStatus::expired &&
+            retained_pending.phase == AudioLoopPhase::admitted, "bounded history preserves pending request");
     const AudioLoopCommand expired = transport.cancel(start.id);
     render(engine, sample);
-    require(transport.poll(expired.id).phase == AudioLoopPhase::expired_target, "expired cancellation history explicit");
+    const AudioLoopReceipt expired_target = transport.poll(expired.id);
+    require(expired_target.phase == AudioLoopPhase::expired_target, "expired cancellation history explicit");
     const AudioLoopStatus closed = transport.close();
     const AudioLoopStatus retry = engine.loop_transport(extra);
     require(closed == AudioLoopStatus::ok && retry == AudioLoopStatus::ok, "closed transport returns shared quota");
@@ -140,6 +145,40 @@ void quota_and_history() {
     const AudioStatus after_repeat = engine.voice(clip, true, still_full);
     require(again == AudioLoopStatus::ok && after_repeat == AudioStatus::quota_exceeded,
             "repeated close cannot revoke a reused slot");
+}
+void engine_failure(AudioStatus failure) {
+    AudioEngine engine{};
+    const AudioStatus opened = engine.open(true);
+    require(opened == AudioStatus::ok, "failure fixture engine");
+    AudioLoopTransport transport{};
+    const AudioLoopStatus created = engine.loop_transport(transport);
+    require(created == AudioLoopStatus::ok, "failure fixture transport");
+    const std::shared_ptr<const AudioClip> clip = make_clip(32, .1f);
+    const AudioLoopCommand start = transport.change(clip, {8, 0, 0});
+    std::array<float, 2> sample{};
+    render(engine, sample);
+    const AudioLoopCommand pending = transport.change(clip, {8, 480000, 0});
+    render(engine, sample);
+    const AudioLoopCommand queued = transport.set_gain(.5);
+    audio_loop_test_fail(transport, failure);
+    const AudioLoopReceipt pending_failure = transport.poll(pending.id);
+    const AudioLoopReceipt queued_failure = transport.poll(queued.id);
+    const AudioLoopReceipt completed = transport.poll(start.id);
+    require(pending_failure.status == AudioLoopStatus::backend_error &&
+            pending_failure.reason == AudioLoopStatus::backend_error &&
+            pending_failure.phase == AudioLoopPhase::admitted, "engine failure visible for admitted work");
+    require(queued_failure.status == AudioLoopStatus::backend_error &&
+            queued_failure.reason == AudioLoopStatus::backend_error &&
+            queued_failure.phase == AudioLoopPhase::queued, "engine failure visible for queued work");
+    require(completed.status == AudioLoopStatus::ok && completed.phase == AudioLoopPhase::applied,
+            "engine failure does not rewrite completed work");
+    const AudioLoopCommand refused = transport.resume();
+    require(refused.status == AudioLoopStatus::backend_error, "enqueue preserves engine failure");
+    engine.shutdown();
+    const AudioLoopReceipt closed = transport.poll(pending.id);
+    const AudioLoopCommand revoked = transport.resume();
+    require(closed.phase == AudioLoopPhase::closed && revoked.status == AudioLoopStatus::closed,
+            "shutdown remains distinct from engine failure");
 }
 struct ClipOwner final {
     std::shared_ptr<const AudioClip> clip{};
@@ -249,6 +288,8 @@ int main() {
         exact_mix(1); exact_mix(7); exact_mix(30);
         exact_mix(7, 0); exact_mix(7, 1); exact_mix(7, 2);
         quota_and_history();
+        engine_failure(AudioStatus::backend_error);
+        engine_failure(AudioStatus::device_unavailable);
         concurrent_retirement();
         std::cout << "Actual PCM loop transitions, command receipts, shared quota and concurrent retirement pass.\n";
         return 0;
