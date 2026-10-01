@@ -118,6 +118,8 @@ void disclosure_render() {
     }
 }
 void clipboard_files() {
+    const std::shared_ptr<Panel> root = make_control<Panel>(StableId("clipboard-root"));
+    Window model(root, {1, 1});
     const HWND owner = CreateWindowExW(0, L"STATIC", L"Clipboard file fixture", 0,
                                         0, 0, 1, 1, HWND_MESSAGE, nullptr, nullptr, nullptr);
     require(owner != nullptr);
@@ -137,7 +139,7 @@ void clipboard_files() {
     require(SetClipboardData(CF_HDROP, allocation) != nullptr);
     CloseClipboard();
     host::WindowsHostServices services;
-    services.bind_owner(owner);
+    services.bind_owner(owner, model);
     const HostClipboardFilesResult files = services.read_clipboard_files();
     require(files.status.accepted());
     require(files.paths_utf8.size() == 1);
