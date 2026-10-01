@@ -559,3 +559,82 @@ using independently owned faces and prepared positions without reshaping.
 Compatibility refusal, public contract reconciliation, native host behavior,
 complete resource accounting and matched SDK/consumer adoption remain open.
 No installed, runtime or native-UI availability is promoted by these receipts.
+
+## Paint receipt 005 — private ownership and position transfer
+
+**MEASURED** — The provider's
+[private paint receipt](../../gui_forms/experiments/TEXT_PAINT_PROBE_2026-10-01.md)
+and [final output](../../gui_forms/experiments/TEXT_PAINT_PROBE_2026-10-01.txt)
+record byte-equal 102,400-byte grayscale surfaces, with 1,369 nonzero pixels and
+seven runs, from worker-prepared geometry and an independently synchronous
+shaper. Both shapers were destroyed before independently owned paint-side FT
+faces were created from retained immutable font bytes. Both paths use the same
+private raster implementation. Orchestrator checked these records without
+rerunning the fixture; this is ownership/position-transfer evidence, not an
+independent raster oracle or Skia/GDI/native-window parity.
+
+The fixed fixture uses static/default variation, scale 1, 72 DPI and matching
+26.6 sizing, `FT_LOAD_DEFAULT | FT_LOAD_NO_BITMAP`, default hinting and normal
+outline-to-256-level-grayscale rendering with positive pitch. It consumes
+prepared positions without reshaping. Font bytes, local face/index/style,
+effective identity and authority epoch are checked; complete staged pixels
+replace the previous surface only after success. These settings and the private
+status numbers are not a selected public raster profile or protocol.
+
+Fourteen executed refusal cases preserve old pixels and identity, covering
+missing coverage/lease, revoked authority with live bytes, provider/font/config
+mismatches, face/font/glyph incompatibility and invalid geometry. The real
+mixed-text input containing `a` followed by U+0301 has one missing cluster and
+is retained as a refusal fixture, with its
+[initial failed expectation](../../gui_forms/experiments/TEXT_PAINT_PROBE_initial_refusal_2026-10-01.txt).
+The fully covered positive case did not erase that reported limitation. The
+subsequent [canonical-pair correction](../../gui_forms/experiments/COMBINING_ACUTE_2026-10-01.md),
+integrated at `8528f27`, established a nominal-cmap false negative before
+HarfBuzz composition and corrected the bounded two-scalar case. The historical
+failure remains evidence; the updated paint fixture accepts that original input
+and retains isolated U+0301 as a genuine unsupported case. All saved geometry
+fields except three declared missing-coverage counters remained identical.
+
+Negative-pitch/color/bitmap refusal and native/allocation-failure cleanup were
+source-reviewed, not exercised by the final fixtures. No paint latency or leak
+measurement is supplied. FT bitmap allocation precedes the bitmap-size guards;
+those guards provide indexing safety, not pre-allocation quota proof. Controlled
+staging pixels do not bound opaque FT caches, temporaries or peak memory.
+
+Concrete remaining public semantics include font variation/load/hinting/raster
+profile identity, lease lifetime versus revocation authority, face/glyph
+compatibility and refusal outcomes, and separately declared native resource
+guarantees. Production integration, public API reconciliation, native host/UI
+evidence and matched SDK adoption remain open. No production renderer choice or
+runtime availability follows from this private proof or its exact-scope source
+review against `planning/PROGRAMMING_HOUSE_STYLE.md`.
+
+## Concrete D3a public-consumer proposal — candidate 001
+
+The next semantic proposal is
+[GUI_PREPARED_TEXT_DEVELOPMENT.md](../spec/contracts/GUI_PREPARED_TEXT_DEVELOPMENT.md).
+It replaces further general experiment planning with named admission, ownership,
+revocation, asynchronous completion, record/replay and failure laws for one
+bounded complete paragraph. It is a candidate for matched-source development,
+not a frozen API or runtime availability entry.
+
+Provider source feasibility identifies Window service attachment with explicit
+revocation, host-owned service lifetime, Painter unsupported default, and typed
+retained display commands/replay. A unique public handle needs private shared
+immutable storage because recorded commands outlive the wrapper; their retained
+bytes and revocation checks are part of the contract. Recorded acceptance and
+successful pixel/frame commit are separate outcomes.
+
+SwiftEdit explicitly accepts visual-only read-only intermediate validation:
+source selection is preserved and source-based copy remains separate. Pointer
+selection, caret geometry, wrapping/tab layout and editing are not claimed by
+this first slice. The current Windows DIB painter cannot consume HB-prepared
+glyphs; the consumer requires unsupported until a production adapter is proved.
+The private FT fixture neither selects that renderer nor substitutes for it.
+
+Exact controlled byte capacities, bounded display-chunk retention, production
+transactional paint route and readiness/close dispatch integration need provider
+reconciliation before source freeze. The candidate names these implementation
+scopes. The later route-A development selection in that candidate records
+coordinated A1 host transaction work and A2 prepared-text integration under
+existing implementation authorization; it does not imply installed availability.
