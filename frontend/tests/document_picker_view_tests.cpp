@@ -1,4 +1,5 @@
 #include "file_manager/document_picker_view.hpp"
+#include "fixture_links.hpp"
 
 #include <cstdlib>
 #include <filesystem>
@@ -379,6 +380,32 @@ int run_tests() {
     verify_exception_reset(save_request, true);
     verify_disconnected_controls(save_request);
     verify_teardown_during_completion(save_request);
+    const bool link_available = create_fixture_link(root / "Folder", root / "folder-link", true);
+    if (link_available) {
+        file_manager::DocumentPickerRequest link_request{};
+        link_request.protected_root = root;
+        link_request.owner_application_id = "link-view-test";
+        link_request.authority = file_manager::DocumentPickerAuthority::trusted_local_host;
+        link_request.filters = {{"text", "Text files", {"txt"}}};
+        file_manager::DocumentPickerView linked(link_request);
+        gui_forms::Window linked_window(linked.root_control(), {760, 560});
+        linked_window.perform_layout();
+        linked.attach_dialog(linked_window);
+        const std::shared_ptr<gui_forms::ObjectView> linked_objects =
+            std::dynamic_pointer_cast<gui_forms::ObjectView>(linked_window.find("file-manager.picker.objects"));
+        std::string link_id{};
+        for (const file_manager::DirectoryEntry& entry : linked.controller().browser().entries) {
+            if (entry.name == "folder-link") link_id = entry.stable_id;
+        }
+        require(!link_id.empty(), "folder link stays visible through file filter");
+        (*linked_objects).set_selected_ids({link_id});
+        const bool link_selected = linked.controller().selected_ids().size() == 1;
+        const std::shared_ptr<gui_forms::Button> linked_open =
+            std::dynamic_pointer_cast<gui_forms::Button>(linked_window.find("file-manager.picker.accept"));
+        const bool link_clicked = (*linked_open).perform_click();
+        require(link_selected && link_clicked && linked.controller().browser().location == root / "Folder",
+                "picker Open enters selected folder link through canonical navigation");
+    }
     std::cout << "document picker view tests passed\n";
     return 0;
 }

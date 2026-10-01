@@ -41,6 +41,20 @@ const DocumentTypeFilter* find_filter(const std::vector<DocumentTypeFilter>& fil
     return nullptr;
 }
 
+// Resolves navigation only. The caller still uses the contained no-link reader
+// and returns observations of the canonical target, never of the alias.
+std::optional<NavigationTarget> trusted_directory_target(
+    const DocumentPickerRequest& request, const std::filesystem::path& location) {
+    std::error_code error{};
+    const std::filesystem::path canonical = std::filesystem::canonical(location, error);
+    if (error) return {};
+    const bool directory = std::filesystem::is_directory(canonical, error);
+    if (error || !directory) return {};
+    const std::optional<NavigationTarget> target = resolve_navigation_target(
+        request.admitted_roots, canonical, request.home_location, canonical);
+    return target;
+}
+
 // Byte-oriented glob; case conversion preserves the existing C-locale behavior.
 // No allocation, retained input, or writes to either borrowed string.
 bool name_matches(const std::string_view text, const std::string_view pattern) {
@@ -282,19 +296,43 @@ bool FileSelectionController::navigate(const std::filesystem::path& location) {
 
 bool FileSelectionController::refresh() {
     ++generation_;
-    DirectorySnapshot snapshot = read_directory(request_.protected_root, request_.initial_location,
+    std::filesystem::path root = request_.protected_root;
+    std::filesystem::path location = request_.initial_location;
+    const bool trusted_navigation = orchestrator_session_valid_ &&
+        request_.authority == DocumentPickerAuthority::trusted_local_host;
+    if (trusted_navigation) {
+        const std::optional<NavigationTarget> target = trusted_directory_target(request_, location);
+        if (!target) {
+            last_error_ = "Folder is unavailable or outside the admitted roots";
+            return false;
+        }
+        root = (*target).root;
+        location = (*target).path;
+    }
+    DirectorySnapshot snapshot = read_directory(root, location,
                                                 {}, generation_, {}, show_hidden_);
     if (!snapshot.available()) {
         last_error_ = snapshot.cancelled ? "directory refresh was cancelled" : snapshot.error;
         return false;
     }
     last_error_.clear();
+    request_.protected_root = snapshot.root;
     request_.initial_location = snapshot.location;
     // Compact live entries in place. Preserve order and move only surviving rows.
     // Filter selection is invariant for this refresh and resolved before traversal.
     const DocumentTypeFilter* filter = find_filter(request_.filters, active_filter_id_);
     std::size_t visible_count = 0;
     for (std::size_t index = 0; index < snapshot.entries.size(); ++index) {
+        DirectoryEntry& entry = snapshot.entries[index];
+        if (trusted_navigation && entry.kind == EntryKind::symlink) {
+            const std::optional<NavigationTarget> target = trusted_directory_target(request_, entry.path);
+            if (target) {
+                // Keep the alias identity/path. It may be entered, but direct
+                // acceptance still refuses a link leaf and requires navigation.
+                entry.directory = true;
+                entry.secondary_text = "Folder link";
+            }
+        }
         if (!entry_matches(snapshot.entries[index], request_.profile, name_filter_, filter))
             continue;
         if (visible_count != index)
@@ -335,7 +373,11 @@ bool FileSelectionController::set_selection(std::vector<std::string> stable_ids)
     for (std::size_t index = 0; index < stable_ids.size(); ++index) {
         const std::string& id = stable_ids[index];
         const DirectoryEntry* entry = find_entry(id);
-        if (entry == nullptr || (*entry).kind == EntryKind::symlink)
+        if (entry == nullptr)
+            return false;
+        const bool navigable_link = orchestrator_session_valid_ &&
+            request_.authority == DocumentPickerAuthority::trusted_local_host && (*entry).directory;
+        if ((*entry).kind == EntryKind::symlink && !navigable_link)
             return false;
         for (std::size_t prior = 0; prior < index; ++prior) {
             if (stable_ids[prior] == id)

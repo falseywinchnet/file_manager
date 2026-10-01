@@ -92,9 +92,65 @@ const file_manager::DirectoryEntry* find(const file_manager::FileSelectionContro
     return nullptr;
 }
 
+void trusted_directory_links(const TestRoot& root) {
+    const std::filesystem::path target = root.path() / "Folder";
+    const std::filesystem::path alias = root.path() / "folder-link";
+    const bool available = create_fixture_link(target, alias, true);
+    if (!available) return;
+    const bool outside_available = create_fixture_link(root.path().parent_path(), root.path() / "outside-link", true);
+    const bool broken_available = create_fixture_link(root.path() / "missing", root.path() / "broken-link", true);
+    require(outside_available && broken_available, "link navigation fixtures created");
+    file_manager::DocumentPickerRequest policy = request(root, file_manager::DocumentPickerProfile::open_file);
+    file_manager::FileSelectionController contained(policy);
+    const bool contained_entered = contained.navigate(alias);
+    require(!contained_entered, "session picker retains no-link navigation policy");
+    policy.authority = file_manager::DocumentPickerAuthority::trusted_local_host;
+    file_manager::FileSelectionController local(policy);
+    const file_manager::DirectoryEntry* row = find(local, "folder-link");
+    require(row != nullptr && (*row).directory, "directory link survives filename/type filtering for navigation");
+    const bool selected = local.set_selection({(*row).stable_id});
+    const file_manager::DocumentPickerResult alias_result = local.accept();
+    require(selected && !alias_result.accepted(), "link alias can be selected for navigation but not accepted as a file");
+    const bool entered = local.navigate(alias);
+    require(entered && local.browser().location == target, "trusted directory link enters canonical target");
+    const bool returned = local.navigate(root.path());
+    require(returned, "return from canonical target");
+    const bool outside = local.navigate(root.path() / "outside-link");
+    const bool broken = local.navigate(root.path() / "broken-link");
+    const bool file_link = local.navigate(root.path() / "linked.txt");
+    require(!outside && !broken && !file_link && local.browser().location == root.path(),
+            "outside, broken and file links preserve current navigation");
+    local.set_authority_valid(false);
+    const bool revoked = local.navigate(alias);
+    require(!revoked, "revoked grant cannot follow a directory link");
+
+    policy.profile = file_manager::DocumentPickerProfile::select_folder;
+    policy.initial_location = alias;
+    file_manager::FileSelectionController folder(policy);
+    const file_manager::DocumentPickerResult folder_result = folder.accept();
+    require(folder_result.accepted() && folder_result.selections.front().path == target &&
+                folder_result.selections.front().identity.type == std::filesystem::file_type::directory,
+            "initial link route returns freshly observed canonical directory identity");
+    policy.profile = file_manager::DocumentPickerProfile::save_as;
+    policy.suggested_name = "new.txt";
+    file_manager::FileSelectionController save(policy);
+    const file_manager::DocumentPickerResult destination = save.accept();
+    require(destination.accepted() && destination.selections.front().path == target / "new.txt",
+            "save in navigated link target returns canonical non-link destination");
+    const bool leaf_available = create_fixture_link(root.path() / "alpha.txt", target / "leaf.txt");
+    require(leaf_available, "save link leaf fixture");
+    const bool named = save.set_filename("leaf.txt");
+    const file_manager::DocumentPickerResult leaf = save.accept();
+    require(named && !leaf.accepted(), "directory navigation does not permit following save link leaf");
+}
+
 } // namespace
 
 int run_tests() {
+    {
+        TestRoot link_root{};
+        trusted_directory_links(link_root);
+    }
     TestRoot root{};
 
     file_manager::DocumentPickerRequest open_request =

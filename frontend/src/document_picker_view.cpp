@@ -646,7 +646,9 @@ void DocumentPickerView::reload() {
                 .secondary_text = entry.secondary_text,
                 .description = entry.directory ? "Folder" : "File",
                 .glyph = glyph(entry),
-                .enabled = entry.kind != EntryKind::symlink,
+                .enabled = entry.kind != EntryKind::symlink ||
+                    (entry.directory && controller_.session_valid() &&
+                     controller_.request().authority == DocumentPickerAuthority::trusted_local_host),
                 .image_key = {},
             };
             items.push_back(std::move(item));

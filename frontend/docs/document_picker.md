@@ -93,6 +93,15 @@ Acceptance rechecks the current directory identity and selected object revision,
 refuses link routes/out-of-root paths, enforces profile cardinality and validates
 the final save basename after extension application. A selected file copied into
 the Save As filename field remains an observation, not a write reservation.
+For an explicit, current `trusted_local_host` grant, directory navigation may
+resolve a symbolic-link route to an existing canonical directory within an
+already admitted root. Folder-link rows remain visible through file filters and
+can be entered using Open. The browser then displays the canonical location;
+selection and save observations refer to that location, not the alias. Broken
+links, targets outside admitted roots, revoked grants and file-link leaves do
+not gain this behavior. Orchestrator-session navigation retains its no-link
+policy. This directory-navigation exception does not permit following a save
+target link or weaken overwrite identity checks.
 The host revalidates immediately before reading/replacing and owns parsing,
 encoding, atomic-write behavior and its final collision policy. No file contents
 are read or written by the picker.
