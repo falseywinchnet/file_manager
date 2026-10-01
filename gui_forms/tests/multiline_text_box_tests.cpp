@@ -4,8 +4,12 @@
 #include "support/typography_painter.hpp"
 #include "support/named_callbacks.hpp"
 
+#include <array>
 #include <chrono>
+#include <cmath>
+#include <cstddef>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 
 namespace {
@@ -400,6 +404,162 @@ void bounded_workload() {
     const double line_elapsed = line_duration.count();
     std::cout << "4096-byte line cold layout: " << line_elapsed << " ms\n";
 }
+
+class CaretPainter final : public Painter {
+public:
+    void save() override {}
+    void restore() override {}
+    void translate(Point) override {}
+    void clip_rect(Rect) override {}
+    void fill_rect(Rect, Color) override {}
+    void stroke_rect(Rect, Color, double) override {}
+    void draw_line(const Point first, const Point last, Color, double) override {
+        ++lines;
+        start = first;
+        end = last;
+    }
+    void draw_text_utf8(Point, std::string_view, FontSpec, Color) override {}
+    void draw_image(ImageId, Rect, double) override {}
+    std::size_t lines{0};
+    Point start{};
+    Point end{};
+};
+
+void paint_retained(Fixture& fixture, CaretPainter& painter) {
+    fixture.window.perform_layout();
+    const DamageRegion damage = fixture.window.take_damage();
+    const std::optional<PaintReceipt> receipt = fixture.window.paint(painter, damage.bounds());
+    require(receipt.has_value(), "retained caret fixture must paint");
+}
+
+Rect blink_damage(Fixture& fixture) {
+    const std::optional<FrameTime> deadline = fixture.window.next_wake();
+    require(deadline.has_value(), "focused caret must retain a deadline");
+    const FramePollResult poll = fixture.window.poll_frame_schedule(*deadline);
+    require(poll.deadlines_fired == 1U && poll.coalesced_requests == 1U,
+            "actual caret callback must supply damage before scheduler fallback");
+    const DamageRegion damage = fixture.window.take_damage();
+    const Rect bounds = damage.bounds();
+    return bounds;
+}
+
+void localized_caret_blinks() {
+    const std::array<bool, 2> modes{false, true};
+    for (const bool multiline : modes) {
+        Fixture fixture{};
+        fixture.editor.set_multiline(multiline);
+        CaretPainter painter{};
+        paint_retained(fixture, painter);
+        require(painter.lines == 1U, "empty editor initially draws its visible caret");
+        const Point old_start = painter.start;
+        const Point old_end = painter.end;
+        fixture.window.reset_activity_metrics();
+        const Rect hidden_damage = blink_damage(fixture);
+        require(hidden_damage.width > 0.0 && hidden_damage.width <= 3.0 &&
+                    hidden_damage.height <= 63.0,
+                "empty caret damage must remain a narrow padded strip");
+        require(hidden_damage.x <= old_start.x &&
+                    hidden_damage.x + hidden_damage.width > old_start.x &&
+                    hidden_damage.y <= old_start.y &&
+                    hidden_damage.y + hidden_damage.height >= old_end.y,
+                "erase damage must contain the previously recorded caret endpoints");
+        painter.lines = 0U;
+        const std::optional<PaintReceipt> hidden = fixture.window.paint(painter, hidden_damage);
+        require(hidden.has_value() && painter.lines == 0U,
+                "hidden blink must remove the recorded caret line");
+        const Rect visible_damage = blink_damage(fixture);
+        require(visible_damage == hidden_damage,
+                "show and erase must damage the same retained caret pixels");
+        const std::optional<PaintReceipt> visible = fixture.window.paint(painter, visible_damage);
+        require(visible.has_value() && painter.lines == 1U,
+                "visible blink must restore the recorded caret line");
+        const MetricsSnapshot metrics = fixture.window.metrics_snapshot();
+        require(metrics.display_chunks_rebuilt == 2U && metrics.measure_passes == 0U &&
+                    metrics.arrange_passes == 0U && metrics.painted_damage_area < 400.0,
+                "blink keeps chunk rebuilding but bounds raster damage without layout");
+        fixture.window.set_occluded(true, FrameClock::now());
+        require(!fixture.window.next_wake().has_value(), "occluded caret remains suspended");
+    }
+
+    Fixture fixture{};
+    fixture.editor.set_text("alpha\nbeta\ngamma");
+    fixture.caret(7U);
+    CaretPainter painter{};
+    paint_retained(fixture, painter);
+    const Rect damage = blink_damage(fixture);
+    require(damage.width <= 3.0 && damage.height <= 23.0 && damage.y > 4.0,
+            "multiline caret damage follows the selected row");
+
+    const std::array<double, 3> scales{0.5, 1.5, 2.0};
+    for (const double scale : scales) {
+        Fixture scaled{};
+        scaled.editor.set_text("abc");
+        scaled.caret(1U);
+        scaled.window.set_scale(scale);
+        CaretPainter scaled_painter{};
+        paint_retained(scaled, scaled_painter);
+        const Rect scaled_damage = blink_damage(scaled);
+        const double expected_width = 1.0 + 2.0 / scale;
+        require(std::abs(scaled_damage.width - expected_width) < 1.0e-9,
+                "unclipped caret damage includes one device pixel beyond each stroke edge");
+    }
+}
+
+void require_full_blink_fallback(Fixture& fixture, const char* message) {
+    // Drain the prior mutation's region while leaving its dirty state pending.
+    // The blink itself must not trust previously recorded geometry.
+    const DamageRegion pending = fixture.window.take_damage();
+    static_cast<void>(pending);
+    const Rect damage = blink_damage(fixture);
+    require(damage.width >= fixture.editor.client_rectangle().width, message);
+}
+
+void caret_geometry_fallbacks() {
+    Metrics replacement_metrics{};
+    Fixture fixture{};
+    CaretPainter painter{};
+    require_full_blink_fallback(fixture, "unpainted caret requires full fallback");
+    fixture.editor.invalidate(Dirty::paint);
+    paint_retained(fixture, painter);
+    fixture.editor.set_text("alpha\nbeta\ngamma\ndelta\nepsilon");
+    require_full_blink_fallback(fixture, "text replacement invalidates caret geometry");
+    fixture.editor.invalidate(Dirty::paint);
+    paint_retained(fixture, painter);
+    fixture.editor.arrange({0.0, 0.0, 90.0, 60.0});
+    require_full_blink_fallback(fixture, "resize invalidates caret geometry");
+    fixture.editor.invalidate(Dirty::paint);
+    paint_retained(fixture, painter);
+    const PointerEvent wheel{.action = PointerAction::wheel,
+                             .position = {20.0, 20.0}, .wheel_delta = {0.0, 1.0}};
+    fixture.pointer(wheel);
+    require_full_blink_fallback(fixture, "scroll invalidates caret geometry");
+    fixture.editor.invalidate(Dirty::paint);
+    paint_retained(fixture, painter);
+    fixture.window.set_scale(1.5);
+    require_full_blink_fallback(fixture, "device scale invalidates caret geometry");
+    fixture.editor.invalidate(Dirty::paint);
+    paint_retained(fixture, painter);
+    FontSpec font = fixture.editor.font();
+    font.size += 2.0;
+    fixture.editor.set_font(font);
+    require_full_blink_fallback(fixture, "font invalidates caret geometry");
+    fixture.editor.invalidate(Dirty::paint);
+    paint_retained(fixture, painter);
+    fixture.window.set_text_metrics_provider(&replacement_metrics);
+    require_full_blink_fallback(fixture, "metrics provider invalidates caret geometry");
+    fixture.editor.invalidate(Dirty::paint);
+    paint_retained(fixture, painter);
+    fixture.caret(0U);
+    require_full_blink_fallback(fixture, "selection invalidates caret geometry");
+    fixture.editor.invalidate(Dirty::paint);
+    paint_retained(fixture, painter);
+    const bool blurred = fixture.window.request_focus({});
+    require(blurred, "blur must succeed");
+    require(!fixture.window.next_wake().has_value(), "blur revokes caret scheduling");
+    const bool focused = fixture.window.request_focus(fixture.field);
+    require(focused, "refocus must succeed");
+    require_full_blink_fallback(fixture, "refocus cannot reuse previous caret geometry");
+}
 }
 
 int main() {
@@ -411,6 +571,8 @@ int main() {
         clipboard_and_limits();
         dpi_transition_remeasures_same_provider();
         clear_history_establishes_save_boundary();
+        localized_caret_blinks();
+        caret_geometry_fallbacks();
         bounded_workload();
         std::cout << "gui_forms_multiline_text_box_tests: passed\n";
         return 0;

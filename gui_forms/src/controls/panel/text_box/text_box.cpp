@@ -680,7 +680,7 @@ void TextBox::reveal_multiline_caret() {
         std::max(0.0, document_width_ - width + 1.0));
 }
 
-void TextBox::paint_multiline(Painter& painter) {
+Rect TextBox::paint_multiline(Painter& painter) {
     ensure_multiline_layout();
     reveal_multiline_caret();
     const Rect bounds = local_bounds();
@@ -730,13 +730,18 @@ void TextBox::paint_multiline(Painter& painter) {
     }
     if (text().empty() && !placeholder_.empty()) painter.draw_text_utf8(
         {text_left_, 4.0 + line_ascent_}, placeholder_, font, themed ? editor.muted_text : style().disabled_text);
-    if (focused_ && caret_visible_) {
+    Rect caret_bounds{};
+    if (focused_) {
         const std::size_t row = caret_line();
         const double x = text_left_ - horizontal_offset_ + multiline_boundary_x(row, selection_.caret);
         const double y = 4.0 + static_cast<double>(row) * line_height_ - vertical_offset_;
-        painter.draw_line({x, y}, {x, y + line_height_}, foreground, 1.0);
+        caret_bounds = {x, y, 0.0, line_height_};
+        if (caret_visible_) {
+            painter.draw_line({x, y}, {x, y + line_height_}, foreground, 1.0);
+        }
     }
     painter.restore();
+    return caret_bounds;
 }
 
 Utf8Offset TextBox::position_at(double local_x) const noexcept {
@@ -772,6 +777,7 @@ Utf8Offset TextBox::position_at(double local_x) const noexcept {
 }
 
 void TextBox::on_paint(Painter& painter, Rect damage) {
+    caret_damage_.valid = false;
     const Rect bounds = local_bounds();
     const bool themed = !has_background_override() && !has_style_override();
     const ControlVisualRecipe& editor_recipe = effective_theme().resolve(
@@ -783,7 +789,10 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
         Panel::on_paint(painter, damage);
     }
     if (multiline_) {
-        paint_multiline(painter);
+        const Rect caret_bounds = paint_multiline(painter);
+        const Rect text_clip{text_left_, 4.0, std::max(0.0, bounds.width - 10.0),
+                             std::max(0.0, bounds.height - 8.0)};
+        retain_caret_damage(caret_bounds, text_clip);
         return;
     }
     const FontSpec font = effective_font(font_);
@@ -884,6 +893,14 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
         } else {
             painter.stroke_rect(ring, style().accent, 1.0);
         }
+    }
+    if (selection_.empty()) {
+        const double caret_x = origin_x + caret_content_x;
+        const Rect caret_bounds{caret_x, 4.0, 0.0,
+                                std::max(0.0, bounds.height - 8.0)};
+        const Rect text_clip{text_left_, 2.0, viewport,
+                             std::max(0.0, bounds.height - 4.0)};
+        retain_caret_damage(caret_bounds, text_clip);
     }
 }
 
@@ -1119,6 +1136,7 @@ void TextBox::on_text_input(TextInputEvent& event) {
 }
 
 void TextBox::reset_caret_blink() {
+    caret_damage_.valid = false;
     caret_upstream_ = false;
     reveal_pending_ = true;
     preferred_x_ = -1.0;
@@ -1139,6 +1157,7 @@ void TextBox::schedule_caret_blink() {
 }
 
 void TextBox::on_focus_changed(bool focused) {
+    caret_damage_.valid = false;
     focused_ = focused;
     selecting_ = false;
     if (focused_) {
@@ -1155,8 +1174,52 @@ void TextBox::on_frame(FrameTime) {
         return;
     }
     caret_visible_ = !caret_visible_;
-    invalidate(Dirty::paint);
+    if (caret_damage_current()) {
+        invalidate(caret_damage_.rectangle);
+    } else {
+        invalidate(Dirty::paint);
+    }
     schedule_caret_blink();
+}
+
+void TextBox::retain_caret_damage(const Rect line_bounds, const Rect clip) {
+    const Window* owner = window();
+    if (!focused_ || owner == nullptr || !line_bounds.finite() || line_bounds.height <= 0.0) return;
+    const double scale = (*owner).scale();
+    if (!std::isfinite(scale) || scale <= 0.0) return;
+    // Half of the one-DIP stroke plus one device pixel for antialiasing,
+    // including both endpoint caps. The same text clip constrains actual ink.
+    const double padding = 0.5 + 1.0 / scale;
+    const Rect padded{line_bounds.x - padding, line_bounds.y - padding,
+                      line_bounds.width + 2.0 * padding,
+                      line_bounds.height + 2.0 * padding};
+    const Rect clipped = Rect::intersection(padded, clip);
+    const Rect damage = Rect::intersection(clipped, client_rectangle());
+    if (damage.empty()) return;
+    CaretDamage candidate{};
+    candidate.rectangle = damage;
+    candidate.bounds = local_bounds();
+    candidate.font = effective_font(font_);
+    candidate.selection = selection_;
+    candidate.scroll = {horizontal_offset_, vertical_offset_};
+    candidate.provider = (*owner).text_metrics_provider();
+    candidate.revision = store_.revision();
+    candidate.scale = scale;
+    candidate.valid = true;
+    caret_damage_ = candidate;
+}
+
+bool TextBox::caret_damage_current() const {
+    const Window* owner = window();
+    if (!caret_damage_.valid || owner == nullptr || (multiline_ && reveal_pending_) ||
+        has_dirty(dirty(), Dirty::measure | Dirty::arrange | Dirty::paint)) return false;
+    const Point scroll{horizontal_offset_, vertical_offset_};
+    const bool current = caret_damage_.bounds == local_bounds() &&
+        caret_damage_.font == effective_font(font_) &&
+        caret_damage_.selection == selection_ && caret_damage_.scroll == scroll &&
+        caret_damage_.provider == (*owner).text_metrics_provider() &&
+        caret_damage_.revision == store_.revision() && caret_damage_.scale == (*owner).scale();
+    return current;
 }
 
 SemanticDescriptor TextBox::semantic_descriptor() const {
@@ -1186,6 +1249,7 @@ bool TextBox::on_semantic_action(SemanticAction action, std::string_view value) 
 }
 
 void TextBox::on_detached_from_window() noexcept {
+    caret_damage_.valid = false;
     caret_frame_.disconnect();
     focused_ = false;
     selecting_ = false;

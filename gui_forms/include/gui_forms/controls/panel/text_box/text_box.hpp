@@ -164,7 +164,7 @@ private:
         std::vector<VisualRun> runs{};
     };
     void ensure_multiline_layout();
-    void paint_multiline(Painter& painter);
+    [[nodiscard]] Rect paint_multiline(Painter& painter);
     void reveal_multiline_caret();
     [[nodiscard]] std::size_t caret_line() const;
     [[nodiscard]] Utf8Offset multiline_position_at(double x, double y);
@@ -190,6 +190,8 @@ private:
     [[nodiscard]] std::string display_text() const;
     void reset_caret_blink();
     void schedule_caret_blink();
+    void retain_caret_damage(const Rect line_bounds, const Rect clip);
+    [[nodiscard]] bool caret_damage_current() const;
     void push_history(std::deque<Snapshot>& history, Snapshot snapshot);
     void clear_redo() noexcept;
 
@@ -226,6 +228,20 @@ private:
     bool focused_{};
     bool selecting_{};
     bool caret_visible_{true};
+    // Last successfully recorded geometry, including the invisible blink phase.
+    // Dirty state rejects other pending visual changes before this is reused.
+    struct CaretDamage final {
+        Rect rectangle{};
+        Rect bounds{};
+        FontSpec font{};
+        TextSelection selection{};
+        Point scroll{};
+        const TextMetricsProvider* provider{nullptr}; // Identity only; never dereferenced.
+        std::uint64_t revision{0};
+        double scale{0.0};
+        bool valid{false};
+    };
+    CaretDamage caret_damage_{};
     FrameRequestToken caret_frame_{};
     std::deque<Snapshot> undo_{};
     std::deque<Snapshot> redo_{};
