@@ -1,0 +1,215 @@
+#import <AppKit/AppKit.h>
+
+#include "gui_forms/gui_forms.hpp"
+#include "gui_forms/platform/macos_host.hpp"
+
+#include <chrono>
+#include <cstdint>
+#include <cstdio>
+#include <exception>
+#include <functional>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+// Private diagnostics already used by native exposure fixtures; no public ABI.
+@interface NSView (IdleVisibilityProbe)
+- (std::string)hostJSON;
+@end
+
+namespace {
+
+struct Probe final {
+    gui_forms::Window* child_model{nullptr}; // Owned by run_macos_application.
+    std::shared_ptr<gui_forms::TextBox> text{};
+    gui_forms::FrameRequestToken timer{};
+    std::function<void()> show{};
+    std::function<void()> hide{};
+    std::uint64_t timer_calls{0};
+    std::uint64_t closed_count{0};
+    std::uint64_t baseline_wakes{0};
+    std::uint64_t baseline_draws{0};
+    std::uint32_t stage{0};
+    bool attached_hidden{false};
+    bool completed{false};
+    std::string failure{};
+    std::string final_snapshot{};
+};
+
+NSWindow* find_window(NSString* title) {
+    for (NSWindow* candidate in NSApp.windows) {
+        if ([candidate.title isEqualToString:title]) return candidate;
+    }
+    return nil;
+}
+
+std::uint64_t counter(const std::string& snapshot, const std::string& key) {
+    const std::string marker = "\"" + key + "\":";
+    const std::size_t position = snapshot.find(marker);
+    if (position == std::string::npos) throw std::runtime_error("missing host counter");
+    const std::string digits = snapshot.substr(position + marker.size());
+    const std::uint64_t value = static_cast<std::uint64_t>(std::stoull(digits));
+    return value;
+}
+
+void require(Probe& probe, bool condition, const char* message) {
+    if (!condition && probe.failure.empty()) probe.failure = message;
+}
+
+class CountTimer final {
+public:
+    explicit CountTimer(Probe& probe) noexcept : probe_(probe) {}
+    void operator()(gui_forms::FrameTime) const { ++probe_.timer_calls; }
+private:
+    Probe& probe_;
+};
+
+class CountClosed final {
+public:
+    explicit CountClosed(Probe& probe) noexcept : probe_(probe) {}
+    void operator()() const { ++probe_.closed_count; }
+private:
+    Probe& probe_;
+};
+
+void advance(void* context);
+
+void enqueue(Probe& probe, std::int64_t milliseconds) {
+    const std::int64_t nanoseconds = milliseconds * 1000000;
+    const dispatch_time_t deadline = dispatch_time(DISPATCH_TIME_NOW, nanoseconds);
+    // Exactly one outstanding callback; stack owner survives the native run loop.
+    dispatch_after_f(deadline, dispatch_get_main_queue(), &probe, advance);
+}
+
+void exercise(Probe& probe) {
+    NSWindow* child = find_window(@"Idle probe child");
+    NSWindow* primary = find_window(@"Idle probe primary");
+    if (child == nil || primary == nil) throw std::runtime_error("missing owned window");
+    const std::string snapshot = [child.contentView hostJSON];
+    std::printf("idle-stage=%u|host=%s\n", probe.stage, snapshot.c_str());
+    if (probe.stage == 0) {
+        require(probe, probe.attached_hidden, "initial hidden model was not occluded");
+        require(probe, (*probe.child_model).occluded(), "hidden model became visible");
+        require(probe, probe.timer_calls != 0, "hidden explicit UI timer did not run");
+        probe.timer.disconnect();
+        const bool hidden_deadline = (*probe.child_model).next_wake().has_value();
+        require(probe, !hidden_deadline, "initial hidden caret retained a wake deadline");
+        probe.show();
+    } else if (probe.stage == 1) {
+        require(probe, child.isVisible && !(*probe.child_model).occluded(),
+                "show did not synchronize visibility");
+        const bool focused = (*probe.child_model).request_focus(probe.text);
+        require(probe, focused, "visible textbox could not focus");
+        probe.baseline_wakes = counter(snapshot, "scheduled_wake_count");
+        probe.baseline_draws = counter(snapshot, "native_draw_count");
+    } else if (probe.stage == 2) {
+        const std::uint64_t wakes = counter(snapshot, "scheduled_wake_count");
+        const std::uint64_t draws = counter(snapshot, "native_draw_count");
+        require(probe, wakes > probe.baseline_wakes, "focused caret deadline did not wake");
+        require(probe, draws > probe.baseline_draws, "focused caret did not paint");
+        probe.hide();
+    } else if (probe.stage == 3) {
+        require(probe, !child.isVisible && (*probe.child_model).occluded(),
+                "hide did not synchronize visibility");
+        // Let ordering callbacks settle before measuring the hidden interval.
+        probe.baseline_wakes = counter(snapshot, "scheduled_wake_count");
+        probe.baseline_draws = counter(snapshot, "native_draw_count");
+    } else if (probe.stage == 4) {
+        const std::uint64_t wakes = counter(snapshot, "scheduled_wake_count");
+        const std::uint64_t draws = counter(snapshot, "native_draw_count");
+        require(probe, wakes == probe.baseline_wakes, "hidden caret kept waking");
+        require(probe, draws == probe.baseline_draws, "hidden window kept drawing");
+        probe.show();
+    } else {
+        require(probe, child.isVisible && !(*probe.child_model).occluded(),
+                "second show did not restore visibility");
+        probe.completed = true;
+        [primary performClose:nil];
+        return;
+    }
+    ++probe.stage;
+    enqueue(probe, 750);
+}
+
+void advance(void* context) {
+    Probe& probe = *static_cast<Probe*>(context);
+    try {
+        exercise(probe);
+    } catch (const std::exception& error) {
+        probe.failure = error.what();
+        NSWindow* primary = find_window(@"Idle probe primary");
+        [primary performClose:nil];
+    }
+}
+
+class CaptureVisibility final {
+public:
+    explicit CaptureVisibility(Probe& probe) noexcept : probe_(probe) {}
+    void operator()(std::function<void()> show, std::function<void()> hide) const {
+        probe_.show = std::move(show);
+        probe_.hide = std::move(hide);
+        probe_.attached_hidden = (*probe_.child_model).occluded();
+        const bool focused = (*probe_.child_model).request_focus(probe_.text);
+        require(probe_, focused, "hidden textbox could not establish model focus");
+        const std::chrono::milliseconds interval(100);
+        const gui_forms::FrameTime deadline = gui_forms::FrameClock::now() + interval;
+        probe_.timer = (*probe_.child_model).schedule_ui_timer(
+            *probe_.text, interval, deadline, CountTimer(probe_));
+        enqueue(probe_, 750);
+    }
+private:
+    Probe& probe_;
+};
+
+class CaptureFinal final {
+public:
+    explicit CaptureFinal(Probe& probe) noexcept : probe_(probe) {}
+    void operator()(std::string_view, std::string_view host) const {
+        probe_.final_snapshot = host;
+    }
+private:
+    Probe& probe_;
+};
+
+} // namespace
+
+int main() {
+    Probe probe{};
+    gui_forms::host::MacApplicationWindow primary{};
+    primary.stable_id = "idle.primary";
+    std::shared_ptr<gui_forms::Panel> root = std::make_shared<gui_forms::Panel>(
+        gui_forms::StableId("idle.primary.root"));
+    primary.model = std::make_unique<gui_forms::Window>(root, gui_forms::Size{320, 200});
+    primary.options.title = "Idle probe primary";
+    primary.options.initial_size = {320, 200};
+    primary.options.closed = CountClosed(probe);
+
+    gui_forms::host::MacApplicationWindow child{};
+    child.stable_id = "idle.child";
+    child.owner_id = primary.stable_id;
+    probe.text = std::make_shared<gui_forms::TextBox>(gui_forms::StableId("idle.text"));
+    child.model = std::make_unique<gui_forms::Window>(probe.text, gui_forms::Size{320, 200});
+    probe.child_model = child.model.get();
+    child.options.title = "Idle probe child";
+    child.options.initial_size = {320, 200};
+    child.options.initially_visible = false;
+    child.options.visibility_ready = CaptureVisibility(probe);
+    child.options.final_snapshot = CaptureFinal(probe);
+    child.options.closed = CountClosed(probe);
+
+    std::vector<gui_forms::host::MacApplicationWindow> windows{};
+    windows.push_back(std::move(primary));
+    windows.push_back(std::move(child));
+    const int result = gui_forms::host::run_macos_application(std::move(windows));
+    probe.timer.disconnect();
+    if (result != 0 || !probe.completed || probe.closed_count != 2 || !probe.failure.empty() ||
+        probe.final_snapshot.find("\"native_callback_faults\":0") == std::string::npos) {
+        std::fprintf(stderr, "idle visibility probe failed: %s\n", probe.failure.c_str());
+        return 1;
+    }
+    std::printf("Initial hidden, explicit UI timer, caret, hide/show and shutdown passed\n");
+    return 0;
+}

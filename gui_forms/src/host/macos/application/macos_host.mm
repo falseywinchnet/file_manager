@@ -442,6 +442,11 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     std::uint64_t _lastSemanticGeneration;
     std::uint64_t _accessibilityCacheGeneration;
     std::uint64_t _nativeCallbackFaults;
+    BOOL _initialHostOccluded;
+    std::uint64_t _scheduledWakeCount;
+    std::uint64_t _damageCollectionCount;
+    std::uint64_t _nativeDrawCount;
+    std::uint64_t _displayTickCount;
     NSArray* _semanticAccessibilityChildren;
     NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>*
         _semanticAccessibilityElements;
@@ -779,6 +784,11 @@ private:
         _lastSemanticGeneration = 0;
         _accessibilityCacheGeneration = 0;
         _nativeCallbackFaults = 0;
+        _initialHostOccluded = YES;
+        _scheduledWakeCount = 0;
+        _damageCollectionCount = 0;
+        _nativeDrawCount = 0;
+        _displayTickCount = 0;
         _transparentFullSizeContent = transparentFullSizeContent;
         _windowDragRegionIds = std::move(windowDragRegionIds);
         _semanticAccessibilityChildren = nil;
@@ -873,6 +883,13 @@ private:
                                timestampNanoseconds:host_now_nanoseconds()];
     if (!result.accepted()) return NO;
     _hostAttached = YES;
+    // Initial ordering can precede attachment, when occlusion notifications
+    // cannot enter the host session. Establish native state before scheduling.
+    NSWindow* nativeWindow = self.window;
+    const bool nativeVisible = nativeWindow != nil && nativeWindow.isVisible &&
+        (nativeWindow.occlusionState & NSWindowOcclusionStateVisible) != 0;
+    _initialHostOccluded = nativeVisible ? NO : YES;
+    [self notifyOcclusion:_initialHostOccluded];
     [self notifyDisplaysChanged];
     [self collectDamage];
     [self startDisplayLinkIfNeeded];
@@ -1201,6 +1218,7 @@ private:
 }
 
 - (void)collectDamage {
+    ++_damageCollectionCount;
     try {
         if (!_model) {
             return;
@@ -1261,6 +1279,7 @@ private:
 }
 
 - (void)displayLinkTick {
+    ++_displayTickCount;
     if (!_model || self.window == nil || _hostOccluded == YES) return;
     std::vector<LiveSurfacePresentation> updates =
         (*_model).take_live_surface_presentations();
@@ -1320,6 +1339,7 @@ private:
 }
 
 - (void)scheduledWake {
+    ++_scheduledWakeCount;
     // Objective-C exceptions do not participate in C++ exception handling.
     // A raised AppKit exception escaping a libdispatch source terminates the
     // process, so contain it at the native callback boundary and preserve its
@@ -1414,6 +1434,7 @@ private:
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
+    ++_nativeDrawCount;
     try {
         [self drawRetainedRect:dirtyRect];
     } catch (const std::exception& error) {
@@ -1788,6 +1809,12 @@ private:
         std::to_string(_windowDragRegionIds.size()) +
         ",\"window_drag_region_resolved_count\":" +
         std::to_string(resolvedDragRegions) +
+        ",\"initial_host_occluded\":" + (_initialHostOccluded ? "true" : "false") +
+        ",\"host_occluded\":" + (_hostOccluded ? "true" : "false") +
+        ",\"scheduled_wake_count\":" + std::to_string(_scheduledWakeCount) +
+        ",\"damage_collection_count\":" + std::to_string(_damageCollectionCount) +
+        ",\"native_draw_count\":" + std::to_string(_nativeDrawCount) +
+        ",\"display_tick_count\":" + std::to_string(_displayTickCount) +
         ",\"native_callback_faults\":" +
         std::to_string(_nativeCallbackFaults) + "}";
 }

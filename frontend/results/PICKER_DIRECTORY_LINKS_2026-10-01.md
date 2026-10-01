@@ -23,7 +23,10 @@ directory, save-link refusal, broken/outside/file-link refusal, revoked grant,
 unchanged session behavior, and selecting a filtered folder-link row followed
 by the actual Open button. Fixture cleanup owns only newly created temporary
 directories. Symlink tests explicitly skip if the platform cannot create links;
-native platform CI is needed to establish its executed coverage.
+native platform CI is needed to establish its executed coverage. Inspection of
+this run's `LastTest.log` confirms Windows error 1314 skipped the link fixtures;
+the 2/2 result establishes ordinary regression coverage, not execution of the
+new symbolic-link assertions. macOS/Linux CI must execute those assertions.
 
 The first view regression draft incorrectly treated a void selection setter as
 Boolean and called a private accept method. Compilation refused both; corrected
