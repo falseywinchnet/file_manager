@@ -39,7 +39,8 @@ building the four focused targets found them current; the coordinator reran all
 three focused tests successfully in 0.21 seconds on the source hashes below.
 No desktop pointer movement or hiding was performed by those tests.
 
-Author: Astra  
+Author: Astra
+
 Sponsor: Rainstar
 
 ## Exact reviewed source bytes
