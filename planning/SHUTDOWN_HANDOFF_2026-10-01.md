@@ -1,7 +1,15 @@
 # Shutdown checkpoint — 2026-10-01
 
-The owner announced shutdown in five minutes. Feature expansion stopped so
-current work could be preserved and pushed. This checkpoint is not a release.
+## Correction: work is active
+
+The coordinator incorrectly treated an earlier shutdown announcement as a new
+deadline. The owner corrected this in SwiftEdit message
+`01a0f677-03a3-7430-bcc5-710252ced81d`: the shutdown had already come and gone.
+The freeze is revoked. Provider, registry and SwiftEdit owners were notified to
+resume their authorized scopes. Do not use this record to stop ongoing work.
+
+The checkpoint below was saved and pushed during that mistaken interruption.
+It remains useful validation evidence, not a release or a current shutdown order.
 
 ## Saved scope
 
