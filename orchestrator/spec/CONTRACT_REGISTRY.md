@@ -32,7 +32,7 @@ remain unavailable, deferred, negotiating, or stubbed.
 | ORC-ENG-003 | Engine status and currentness snapshot | Orchestrator spec + engine | Go engine | Orchestrator, frontend diagnostics | snapshot semantic v0; separate local event-stream extension | snapshot frozen-v0 and contained M4 installed snapshot implemented; subscription extension negotiating |
 | ORC-ENG-004 | Catalogue-independent bounded live filesystem search | Engine semantics registered by Orchestrator | Go engine | Orchestrator query broker; frontend only through unified Orchestrator search or registered direct fallback | semantic contract + JSON fixtures + development JSONL/Rust/C++ and contained M4 installed conformance | provider development and contained installed adapter observed; 10k APFS scale point measured; million-entry and native NTFS/ext4 gates open |
 | ORC-KOL-001 | Kolmogrov configuration, hash identity, candidate query, evidence | Kolmogrov + engine | Go engine | engine planner, conformance tools | internal library/service seam | negotiation round 001 |
-| ORC-GUI-001 | GUI.Forms consumption manifest, stable C surface, and lifecycle | GUI.Forms registered by Orchestrator | GUI.Forms | C++ frontend | installed C++ package + C ABI + manifest | frozen v0 for `gui-forms-fm0-macos-arm64-2026-08-10`; later FM rows remain negotiating |
+| ORC-GUI-001 | GUI.Forms consumption manifest, stable C surface, and lifecycle | GUI.Forms registered by Orchestrator | GUI.Forms | C++ frontend; trusted development consumers | installed C++ package + C ABI + manifest; separately staged development source profiles | frozen v0 for `gui-forms-fm0-macos-arm64-2026-08-10`; later FM rows remain negotiating; document-view D1 semantic draft reconciled for development implementation, not available |
 | ORC-GUI-002 | Web.Forms authoring schema, nested ambient context, GUI.Forms capability manifest, and generated-construction compatibility | Web.Forms source semantics + GUI.Forms control semantics, registered by Orchestrator | Python Web.Forms compiler + future GUI.Forms manifest | Web.Forms/GUI.Forms conformance; future frontend builds | two-stage dogfood IR, then versioned capability manifest and C++17-compatible generated public C++ | proposed; Python descriptor dogfood open, production schema and ABI not frozen |
 | ORC-FE-001 | Frontend bootstrap session, lifecycle, availability, unified search, and fallback | Orchestrator + frontend | Orchestrator | File Manager, diagnostics, independent conformance client | atomic immutable snapshot plus `orchestrator.search` over production local wire + thin C++ source client | stable 1.0 Core bootstrap projection; additive unified search development operation passes zero-catalogue Rust/C++ route without frontend lane selection |
 | ORC-APP-001 | First-party application identity, profile namespace, and capability snapshot | Orchestrator | Orchestrator application registry | File Manager, future Paint/Text Editor/Games, shared surfaces | local API + immutable snapshot | proposed in application-backbone round 001; no operation admitted |
@@ -131,6 +131,31 @@ then uses the allowed live fallback. Exact `filters.name`, successful catalogue
 no-match, metadata authority and issued cursor source/predicate remain unchanged.
 This is a documented development compatibility change; indexed substring
 acceleration is not implemented or claimed.
+
+### SwiftEdit document/view development reconciliation — 2026-10-01
+
+**OBSERVED provider/consumer agreement:** the renderer-neutral D1 page/request/
+publication/mapping model is reconciled in
+[GUI_DOCUMENT_VIEW_DEVELOPMENT.md](contracts/GUI_DOCUMENT_VIEW_DEVELOPMENT.md),
+with replies and parent review in
+[round 001](../negotiations/SWIFTEDIT_DOCUMENT_VIEW_2026-10-01.md). The verified
+owner direction permits development toward SwiftEdit's feature requirements;
+it does not select document storage/history architecture or establish speed.
+
+D1 uses owned bounded projections, exact source/display units, complete
+document/revision/request identity, two ownership-accounted producer slots plus
+one published page, and explicit stale/cancel/budget/context outcomes. Mapping
+rejects a replaced page even at the same document revision. This is a direct
+in-process development C++ seam; it adds no Orchestrator runtime operation,
+stable C ABI or executable availability advertisement.
+
+D1 implementation evidence and matching installed SDK consumption remain
+unmeasured at reconciliation. D2 retained control, D3 cluster layout and D4
+selection/editing need separate agreement/evidence before large-document GUI
+support is available. Native print P1 is independent and unresolved. The 16 MiB
+admission cutoff is the consumer's documented interpretation of the owner's
+16 MB requirement, not a new GIVEN or a provider storage mandate. Historical
+FM0 artifacts and the planning-only `text_editor/` gate are unchanged.
 
 ## Explicitly forbidden edges
 
