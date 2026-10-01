@@ -460,3 +460,102 @@ for this authorized experiment and are not claimed by it.
 Provider attribution and private prototype evidence are the next review input.
 No public layout seam, installed capability or final native editor availability
 is admitted by this records-only reconciliation.
+
+## Native phase receipt 002 — historical attribution before reuse
+
+**MEASURED** — The provider's
+[phase-attribution receipt](../../gui_forms/experiments/TEXT_LAYOUT_PHASE_ATTRIBUTION_2026-10-01.md)
+and [raw phase data](../../gui_forms/experiments/TEXT_LAYOUT_PHASE_ATTRIBUTION_2026-10-01.csv)
+use the baseline environment, fixed fonts and generated inputs in a separate
+Release diagnostic build. Orchestrator checked the receipt and relevant CSV
+phase rows without rerunning the experiment. Arithmetic phase means cover 31
+warm calls; they are not the main-row medians.
+
+For mixed bidi, append total averaged 368.534 ms, including HB shape 245.441 ms
+and glyph output 96.632 ms; intersections averaged 3.572 ms despite 3,149,313
+intersection pairs. For emoji/fallback, append total averaged 205.633 ms,
+including HB shape 148.270 ms and glyph output 37.811 ms; intersections averaged
+0.424 ms. Append includes its subphases and native owner destruction, so these
+numbers must not be summed as disjoint costs. Glyph output includes fallback
+extent calls and result updates, not just array copying.
+
+This narrowed the tested bottleneck evidence toward per-run work. At this phase,
+reusing native font/buffer objects was a **HYPOTHESIS**, not yet a measured
+speedup or selected implementation; receipt 003 below records its later outcome.
+Instrumentation overhead and background
+load are not isolated; these samples do not replace the uninstrumented baseline.
+At that stage, full outside-timing geometry comparison was still required before
+accepting an optimization; the initial repeatability checks did not supply it.
+
+The diagnostic is OFF by default. Its receipt records focused ON/OFF tests and
+source-equivalence review after removing diagnostic blocks, not binary identity
+or global production house-style compliance. Opaque allocations, independent
+paint caches, cancellation latency, failure atomicity and public layout
+availability gain no new guarantee from phase attribution.
+
+## Combined receipts 003/004 — reviewed reuse and private worker proof
+
+**OBSERVED** — The coordinator integrated reviewed per-call reuse at `aa1f8d4`
+and the private worker lifecycle slice at `dcadfe2`. Orchestrator read the
+[reuse receipt](../../gui_forms/experiments/TEXT_LAYOUT_CALL_REUSE_2026-10-01.md)
+and [worker receipt](../../gui_forms/experiments/TEXT_WORKER_LIFECYCLE_2026-10-01.md),
+including the confirmed worker CSV; it did not rerun the experiments or perform
+the implementation source reviews attributed to the provider/coordinator.
+
+**MEASURED** — Before optimization, the provider captured full serialized
+geometry for 27 cases across nine inputs and three font configurations. The
+baseline and final failure-checked reuse output matched all 12,043,216 bytes;
+the receipt supplies the durable compressed golden and hashes. This covers
+ordered run/glyph fields, positions, advances, metrics, exact fonts and missing
+coverage on the pinned fixture set. It is not native paint parity or universal
+shaper correctness. Per-call reuse is now implemented and reviewed in this
+private path, superseding its merely hypothetical status in receipt 002.
+
+The same-profile comparison's mixed-bidi median fell from 249.801 to 79.2671 ms;
+emoji/fallback fell from 130.591 to 26.4464 ms. Final worst values were 93.4156
+and 65.9451 ms respectively. Negative results remain: ASCII 16 KiB median rose
+from 3.5487 to 3.8719 ms and enormous-grapheme worst rose from 2.4172 to 13.1278 ms.
+The earlier 894.725 ms bidi tail is preserved in its original baseline, not
+substituted for the paired comparison. Background load was not isolated.
+
+Reuse retains up to 64 lazily acquired HB fonts and one fully reset buffer for
+one shape call only; no persistent cache is introduced. All call owners unwind
+before return. Allocation acquisition timing and failure behavior deliberately
+changed. Six diagnostic cases test empty/unbound HB objects, buffer rejection
+and real shaping failure, old-result preservation and same-engine recovery.
+They do not prove real allocator-exhaustion coverage or leak counts. The receipt
+records final full-geometry equality and ON/OFF tests after these corrections.
+Opaque native memory remains unknown and more font caches may coexist per call.
+
+**MEASURED** — The standalone worker proof exercised one occupied queued/running/
+ready slot, cancellation without release, stale and failed completion preserving
+old display, coalesced intent, recovery, and close before start/idle/ready/running
+plus repeated close. A checked private authority epoch fixes cancel followed by
+an identical desired identity reviving an old result. Full identity and epoch
+must both match. Epoch exhaustion was source-reviewed, not directly executed.
+
+Both raw worker runs remain linked from the receipt. The confirmed run serviced
+seven foreground ticks, six observing running work, with maximum gap 18.9779 ms,
+pending elapsed 107.543 ms and synchronous close/drain/join 90.269 ms. This is a
+foreground counter/sleep harness, not a native window/input/paint test. Close can
+block the foreground and native shaping remains noninterruptible. Final typed
+borrow cleanup followed the two measurements; pre/post source hashes and rebuild/
+syntax results are recorded without pretending those runs sampled the final hash.
+
+The post-close result retained 16,384 text-capacity bytes, 4,096 run-capacity
+elements, 10,752 glyph-capacity elements and 1,314,192 shared encoded-font bytes.
+These mixed units are not a total byte budget, peak/RSS measurement or hard quota;
+owner overhead, native temporaries/caches and peak simultaneous output are excluded.
+No painter is implemented by the worker proof. It admits scale 1/no wrap and
+tab metadata only, and does not establish D1 mappings or source-grapheme proof.
+
+The inspected Shadow application profile and `tools/Build-Windows.ps1` disable
+HarfBuzz. These receipts therefore establish private-engine/prospective-view
+progress, not a measured improvement in deployed File Manager or SwiftEdit.
+Their exact-scope house-style reviews do not certify legacy or vendor code.
+
+The next authorized private scope is paint-side font/glyph/configuration parity
+using independently owned faces and prepared positions without reshaping.
+Compatibility refusal, public contract reconciliation, native host behavior,
+complete resource accounting and matched SDK/consumer adoption remain open.
+No installed, runtime or native-UI availability is promoted by these receipts.
