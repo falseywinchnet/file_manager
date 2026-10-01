@@ -69,3 +69,16 @@ files passed the spelling scan. Semantic review covered explicit types, buffer
 bounds, handle cleanup before throwing operations, namespace/identity checks,
 failure preservation, and the unchanged admitted-root policy. No known violation
 remains in these hunks; unrelated legacy source is not certified.
+
+The `9ecea53` native run then passed the Windows picker view link test, while the
+model test reached a subsequent temporary-directory reuse failure. Its previous
+fixture destructor ignored `remove_all` errors. The model fixture now explicitly
+unlinks its three owned directory links (including the broken and outside-target
+links) before recursive cleanup, using `RemoveDirectoryW` on Windows and `remove`
+on POSIX, and asserts that both target directories survive. The PID-based root
+reuse check remains unchanged so a cleanup failure is not hidden by a new name.
+This is a fixture correction candidate pending Windows CI; the residual path
+contents from the earlier runner were not available for inspection. Local 2/2
+ordinary regressions passed in 0.46 seconds with the existing privilege skip.
+The authored helper, calls, and assertions passed house-style source review and
+the one-file spelling scan. No product behavior changes in this follow-up.

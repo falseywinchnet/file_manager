@@ -2,6 +2,7 @@
 #include "file_manager/document_picker.hpp"
 
 #include <cstdlib>
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -92,6 +93,22 @@ const file_manager::DirectoryEntry* find(const file_manager::FileSelectionContro
     return nullptr;
 }
 
+void remove_directory_link_fixture(const std::filesystem::path& path) {
+    // Only the three directory links created by trusted_directory_links enter
+    // here. RemoveDirectoryW unlinks a directory reparse point, not its target.
+#if defined(_WIN32)
+    const BOOL removed = RemoveDirectoryW(path.c_str());
+    if (!removed) {
+        const DWORD error = GetLastError();
+        throw std::system_error(static_cast<int>(error), std::system_category(),
+                                "remove picker directory-link fixture");
+    }
+#else
+    const bool removed = std::filesystem::remove(path);
+    require(removed, "directory-link fixture must be removed");
+#endif
+}
+
 void trusted_directory_links(const TestRoot& root) {
     const std::filesystem::path target = root.path() / "Folder";
     const std::filesystem::path alias = root.path() / "folder-link";
@@ -150,6 +167,13 @@ void trusted_directory_links(const TestRoot& root) {
     const bool named = save.set_filename("leaf.txt");
     const file_manager::DocumentPickerResult leaf = save.accept();
     require(named && !leaf.accepted(), "directory navigation does not permit following save link leaf");
+    const std::array<std::filesystem::path, 3> directory_links{
+        alias, root.path() / "outside-link", root.path() / "broken-link"};
+    for (const std::filesystem::path& link : directory_links) {
+        remove_directory_link_fixture(link);
+    }
+    require(std::filesystem::is_directory(target) && std::filesystem::is_directory(root.path().parent_path()),
+            "directory-link cleanup preserves both target directories");
 }
 
 } // namespace
