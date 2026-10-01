@@ -3,6 +3,9 @@
 #include "../services/windows_clipboard_image.hpp"
 #include "../services/windows_cursor.hpp"
 #include "../input/windows_key_translation.hpp"
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+#include "../raster/dib_frame_store.hpp"
+#endif
 
 #include "gui_forms/live_surface.hpp"
 #include "gui_forms/text.hpp"
@@ -34,6 +37,7 @@
 #include <mutex>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -559,6 +563,9 @@ void enable_best_dpi_awareness() noexcept {
 }
 
 class DibPainter final : public Painter {
+#if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
+    friend struct DibHostFixture;
+#endif
     struct PaintTiming final {
         std::uint64_t calls{};
         std::uint64_t nanoseconds{};
@@ -603,6 +610,31 @@ public:
     DibPainter& operator=(const DibPainter&) = delete;
 
     bool resize(Size logical_size, double scale) {
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+        abort_frame();
+        surface_size_valid_ = false;
+        if (!std::isfinite(scale) || scale <= 0.0 ||
+            !std::isfinite(logical_size.width) || !std::isfinite(logical_size.height) ||
+            logical_size.width < 0.0 || logical_size.height < 0.0) return false;
+        const double columns = std::ceil(logical_size.width * scale);
+        const double rows = std::ceil(logical_size.height * scale);
+        const double limit = static_cast<double>(detail::DibFrameStore::pixel_limit);
+        if (!std::isfinite(columns) || !std::isfinite(rows) ||
+            columns > limit || rows > limit ||
+            (rows > 0.0 && columns > limit / rows)) return false;
+        if (metrics_dc_ == nullptr) {
+            metrics_dc_ = CreateCompatibleDC(nullptr);
+            if (metrics_dc_ == nullptr) return false;
+        }
+        memory_dc_ = metrics_dc_;
+        if (scale_ != scale) text_run_cache_.clear();
+        logical_size_ = logical_size;
+        scale_ = scale;
+        width_ = static_cast<int>(columns);
+        height_ = static_cast<int>(rows);
+        surface_size_valid_ = true;
+        return true;
+#else
         if (scale_ != scale) text_run_cache_.clear();
         const int width = std::max(1, static_cast<int>(std::ceil(logical_size.width * scale)));
         const int height = std::max(1, static_cast<int>(std::ceil(logical_size.height * scale)));
@@ -629,9 +661,18 @@ public:
         height_ = height;
         std::memset(pixels_, 0, static_cast<std::size_t>(width_) * height_ * 4U);
         return true;
+#endif
     }
 
-    void begin_frame() {
+    bool begin_frame() {
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+        if (!surface_size_valid_) return false;
+        const detail::DibFrameStatus begun = frames_.begin(width_, height_);
+        if (begun != detail::DibFrameStatus::success) return false;
+        const detail::DibSurfaceView candidate = frames_.candidate();
+        memory_dc_ = candidate.dc;
+        pixels_ = candidate.pixels.data();
+#endif
         states_.clear();
         states_.push_back(State{
             0.0,
@@ -639,7 +680,32 @@ public:
             {0.0, 0.0, logical_size_.width, logical_size_.height},
             std::nullopt});
         SetBkMode(memory_dc_, TRANSPARENT);
+        return true;
     }
+
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+    void abort_frame() noexcept {
+        frames_.abort();
+        memory_dc_ = metrics_dc_;
+        pixels_ = nullptr;
+    }
+    [[nodiscard]] bool matches_front(const PaintLeaseSnapshot& lease) const noexcept {
+        const detail::DibFrameKey key = frames_.front_key();
+        const detail::DibFrontView front = frames_.front();
+        const bool matches = surface_size_valid_ && frames_.has_front() && key.epoch == lease.surface_epoch &&
+            key.revision == lease.content_revision && key.revision == lease.presented_revision &&
+            key.scale == scale_ && front.width == width_ && front.height == height_;
+        return matches;
+    }
+    [[nodiscard]] bool commit_frame(HDC target, const RECT& damage, PaintReceipt receipt) {
+        const detail::DibFrameKey key{.revision = receipt.rendered_revision,
+            .epoch = receipt.surface_epoch, .scale = scale_};
+        const detail::DibFrameStatus status = frames_.commit(target, damage, key);
+        abort_frame();
+        const bool committed = status == detail::DibFrameStatus::success;
+        return committed;
+    }
+#endif
 
     bool synchronize_images(const ImageRegistry& registry) {
         const ImageRegistrySnapshot snapshot = registry.snapshot();
@@ -711,6 +777,11 @@ public:
     }
 
     [[nodiscard]] bool present(HDC target, const RECT& damage) const {
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+        const detail::DibFrameStatus status = frames_.expose(target, damage);
+        const bool exposed = status == detail::DibFrameStatus::success;
+        return exposed;
+#else
         if (target == nullptr || memory_dc_ == nullptr) return false;
         const int left = std::clamp<int>(damage.left, 0, width_);
         const int top = std::clamp<int>(damage.top, 0, height_);
@@ -719,6 +790,7 @@ public:
         if (right == left || bottom == top) return true;
         return BitBlt(target, left, top, right - left, bottom - top,
                       memory_dc_, left, top, SRCCOPY) != FALSE;
+#endif
     }
 
     [[nodiscard]] bool present_live_surface(
@@ -727,18 +799,47 @@ public:
             presentation.destination.empty() || presentation.clip.empty()) {
             return false;
         }
-        begin_frame();
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+        try {
+            if (!begin_frame()) return false;
+            states_.back().clip = presentation.clip;
+            draw_live_surface(presentation.surface, presentation.destination, 1.0);
+        } catch (...) {
+            abort_frame();
+            return false;
+        }
+#else
+        if (!begin_frame()) return false;
         states_.back().clip = presentation.clip;
-        draw_live_surface(
-            presentation.surface, presentation.destination, 1.0);
+        draw_live_surface(presentation.surface, presentation.destination, 1.0);
+#endif
         const PixelRect pixels = pixel_rect(presentation.clip);
         RECT damage{pixels.left, pixels.top, pixels.right, pixels.bottom};
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+        const detail::DibFrameKey key = frames_.front_key();
+        const detail::DibFrameStatus status = frames_.commit(target, damage, key);
+        abort_frame();
+        const bool committed = status == detail::DibFrameStatus::success;
+        return committed;
+#else
         return present(target, damage);
+#endif
     }
 
     bool save_bmp(std::wstring_view path) const {
-        if (pixels_ == nullptr || width_ <= 0 || height_ <= 0 || path.empty()) return false;
-        const std::uint64_t pixel_bytes = static_cast<std::uint64_t>(width_) * height_ * 4U;
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+        const detail::DibFrontView front = frames_.front();
+        const std::uint32_t* saved_pixels = front.pixels.data();
+        const int saved_width = front.width;
+        const int saved_height = front.height;
+#else
+        const std::uint32_t* saved_pixels = pixels_;
+        const int saved_width = width_;
+        const int saved_height = height_;
+#endif
+        if (saved_pixels == nullptr || saved_width <= 0 || saved_height <= 0 || path.empty()) return false;
+        const std::uint64_t pixel_bytes = static_cast<std::uint64_t>(saved_width) *
+            static_cast<std::uint64_t>(saved_height) * 4U;
         if (pixel_bytes > std::numeric_limits<DWORD>::max()) return false;
         BITMAPFILEHEADER file{};
         BITMAPINFOHEADER bitmap{};
@@ -746,8 +847,8 @@ public:
         file.bfOffBits = sizeof(file) + sizeof(bitmap);
         file.bfSize = file.bfOffBits + static_cast<DWORD>(pixel_bytes);
         bitmap.biSize = sizeof(bitmap);
-        bitmap.biWidth = width_;
-        bitmap.biHeight = -height_;
+        bitmap.biWidth = saved_width;
+        bitmap.biHeight = -saved_height;
         bitmap.biPlanes = 1;
         bitmap.biBitCount = 32;
         bitmap.biCompression = BI_RGB;
@@ -760,7 +861,7 @@ public:
                         written == sizeof(file) &&
                         WriteFile(output, &bitmap, sizeof(bitmap), &written, nullptr) &&
                         written == sizeof(bitmap) &&
-                        WriteFile(output, pixels_, static_cast<DWORD>(pixel_bytes),
+                        WriteFile(output, saved_pixels, static_cast<DWORD>(pixel_bytes),
                                   &written, nullptr) &&
                         written == pixel_bytes;
         CloseHandle(output);
@@ -1232,6 +1333,13 @@ public:
                 area.right, destination_x + destination_width);
             const int copy_bottom = std::min(
                 area.bottom, destination_y + destination_height);
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+            const BOOL flushed = GdiFlush();
+            if (flushed == FALSE) {
+                if (saved != 0) RestoreDC(memory_dc_, saved);
+                throw std::runtime_error("Live surface CPU copy refused after GDI flush failure");
+            }
+#endif
             if (copy_right > copy_left && copy_bottom > copy_top) {
                 const std::size_t copy_bytes =
                     static_cast<std::size_t>(copy_right - copy_left) * 4U;
@@ -1260,12 +1368,22 @@ public:
         info.bmiHeader.biPlanes = 1;
         info.bmiHeader.biBitCount = 32;
         info.bmiHeader.biCompression = BI_RGB;
-        static_cast<void>(StretchDIBits(
+        const int copied_scanlines = StretchDIBits(
             memory_dc_, destination_x, destination_y,
             destination_width, destination_height, 0, 0,
             static_cast<int>(frame.width()), static_cast<int>(frame.height()),
-            frame.pixels().data(), &info, DIB_RGB_COLORS, SRCCOPY));
+            frame.pixels().data(), &info, DIB_RGB_COLORS, SRCCOPY);
         if (saved != 0) RestoreDC(memory_dc_, saved);
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+        // Finish native consumption while the LiveSurfaceFrame still owns its
+        // read lease. A failed batch reports failure but has finished the borrow.
+        const BOOL flushed = GdiFlush();
+        if (copied_scanlines == static_cast<int>(GDI_ERROR) || flushed == FALSE) {
+            throw std::runtime_error("Live surface GDI copy failed");
+        }
+#else
+        static_cast<void>(copied_scanlines);
+#endif
     }
 
     void draw_image_region(ImageId image, Rect source_rect, Rect destination,
@@ -2029,9 +2147,16 @@ private:
         return runs;
     }
     void reset_bitmap() noexcept {
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+        abort_frame();
+        frames_.close();
+        if (metrics_dc_ != nullptr) DeleteDC(metrics_dc_);
+        metrics_dc_ = nullptr;
+#else
         if (memory_dc_ != nullptr && old_bitmap_ != nullptr) SelectObject(memory_dc_, old_bitmap_);
         if (bitmap_ != nullptr) DeleteObject(bitmap_);
         if (memory_dc_ != nullptr) DeleteDC(memory_dc_);
+#endif
         memory_dc_ = nullptr; bitmap_ = nullptr; old_bitmap_ = nullptr; pixels_ = nullptr;
         width_ = 0; height_ = 0;
     }
@@ -2093,6 +2218,11 @@ private:
     }
 
     HDC memory_dc_{};
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+    detail::DibFrameStore frames_{};
+    HDC metrics_dc_{};
+    bool surface_size_valid_{};
+#endif
     HBITMAP bitmap_{};
     HGDIOBJ old_bitmap_{};
     std::uint32_t* pixels_{};
@@ -2114,6 +2244,9 @@ private:
 };
 
 class WindowsHostState final {
+#if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
+    friend struct DibHostFixture;
+#endif
 public:
     WindowsHostState(std::unique_ptr<Window> model, WindowsHostOptions options)
         : model_(std::move(model)), options_(std::move(options)),
@@ -2591,8 +2724,13 @@ private:
     void resize() {
         RECT client{};
         GetClientRect(hwnd_, &client);
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+        const Size logical{std::max(0.0, (client.right - client.left) / scale_),
+                           std::max(0.0, (client.bottom - client.top) / scale_)};
+#else
         const Size logical{std::max(1.0, (client.right - client.left) / scale_),
                            std::max(1.0, (client.bottom - client.top) / scale_)};
+#endif
         raster_.resize(logical, scale_);
         dispatch(HostResizeEvent{logical});
         collect_damage();
@@ -2669,6 +2807,12 @@ private:
     }
 
     void present_live_surface_updates() {
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+        // Placements are model-current. Never consume their generations while
+        // the retained front belongs to an older layout, scale or revision.
+        const PaintLeaseSnapshot lease = (*model_).paint_lease_snapshot();
+        if (!pending_damage_.empty() || !raster_.matches_front(lease)) return;
+#endif
         ++live_presentation_drains_;
         const std::chrono::steady_clock::time_point started =
             std::chrono::steady_clock::now();
@@ -2690,6 +2834,11 @@ private:
                 ++live_updates_presented_;
             } else {
                 ++live_updates_failed_;
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+                pending_damage_.add(update.clip);
+                recovery_expose_pending_ = true;
+                InvalidateRect(hwnd_, nullptr, FALSE);
+#endif
             }
         }
         ReleaseDC(hwnd_, target);
@@ -2702,6 +2851,65 @@ private:
     }
 
     void paint() {
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+        PAINTSTRUCT paint_state{};
+        HDC dc = BeginPaint(hwnd_, &paint_state);
+        const PaintLeaseSnapshot before = (*model_).paint_lease_snapshot();
+        if (recovery_expose_pending_ ||
+            (pending_damage_.empty() && raster_.matches_front(before))) {
+            recovery_expose_pending_ = false;
+            static_cast<void>(raster_.present(dc, paint_state.rcPaint));
+            EndPaint(hwnd_, &paint_state);
+            return;
+        }
+        const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
+        if (pending_damage_.empty()) {
+            pending_damage_.add({paint_state.rcPaint.left / scale_, paint_state.rcPaint.top / scale_,
+                (paint_state.rcPaint.right - paint_state.rcPaint.left) / scale_,
+                (paint_state.rcPaint.bottom - paint_state.rcPaint.top) / scale_});
+        }
+        std::optional<PaintReceipt> receipt{};
+        bool presented = false;
+        try {
+            const bool begun = raster_.begin_frame();
+            if (begun) {
+                const bool images_ready = raster_.synchronize_images((*model_).image_resources());
+                if (images_ready) {
+                    receipt = (*model_).paint(raster_, pending_damage_.bounds());
+                    if (receipt) presented = raster_.commit_frame(dc, paint_state.rcPaint, *receipt);
+                }
+            }
+        } catch (...) {
+            ++native_callback_faults_;
+            std::fprintf(stderr, "gui-forms-host=transaction-paint-fault\n");
+        }
+        if (!presented) {
+            raster_.abort_frame();
+            static_cast<void>(raster_.present(dc, paint_state.rcPaint));
+        }
+        EndPaint(hwnd_, &paint_state);
+        const std::chrono::nanoseconds elapsed =
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - started);
+        if (presented) {
+            const PaintLeaseSnapshot current = (*model_).paint_lease_snapshot();
+            bool acknowledged = current.surface_epoch == (*receipt).surface_epoch &&
+                current.presented_revision == (*receipt).rendered_revision;
+            if (!acknowledged) {
+                acknowledged = (*model_).notify_presented(*receipt,
+                    static_cast<std::uint64_t>(elapsed.count()));
+            }
+            if (acknowledged) pending_damage_.clear();
+        }
+        if (!presented) {
+            // One exposure-only recovery pass; retain damage until a later
+            // application/native request instead of continuously retrying OOM.
+            std::fprintf(stderr, "gui-forms-host=transaction-frame-not-presented\n");
+            recovery_expose_pending_ = true;
+            InvalidateRect(hwnd_, nullptr, FALSE);
+        }
+        collect_damage();
+#else
         PAINTSTRUCT paint_state{};
         HDC dc = BeginPaint(hwnd_, &paint_state);
         const std::chrono::steady_clock::time_point started =
@@ -2726,6 +2934,7 @@ private:
             pending_damage_.clear();
         }
         collect_damage();
+#endif
     }
 
     Point client_point(LPARAM lparam) const noexcept {
@@ -3185,6 +3394,9 @@ private:
     WINDOWPLACEMENT restore_placement_{};
     DibPainter raster_;
     DamageRegion pending_damage_;
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+    bool recovery_expose_pending_{};
+#endif
     double scale_{1.0};
     std::uint64_t next_sequence_{1};
     std::uint64_t native_callback_faults_{};
@@ -3222,7 +3434,15 @@ LRESULT CALLBACK window_procedure(HWND window, UINT message, WPARAM wparam, LPAR
     return DefWindowProcW(window, message, wparam, lparam);
 }
 
+#if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
+#include "windows_dib_lifecycle_fixture.inc"
+#endif
+
 } // namespace
+
+#if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
+void run_windows_dib_lifecycle_fixture() { DibHostFixture::run(); }
+#endif
 
 HostCapabilities windows_capabilities() {
     return {HostCapabilities::current_protocol_version,

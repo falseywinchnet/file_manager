@@ -13,6 +13,8 @@ option(GUI_FORMS_BUILD_TESTS "Build automated proving-slice tests" ${PROJECT_IS_
 option(GUI_FORMS_ENABLE_SKIA "Build the private CPU-only Skia adapter" ON)
 option(GUI_FORMS_ENABLE_MACOS_HOST "Build the native AppKit host" ${APPLE})
 option(GUI_FORMS_ENABLE_WINDOWS_HOST "Build the native Win32 host" ${WIN32})
+option(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB
+       "Enable bounded transactional DIB frames in the Windows development host" OFF)
 option(GUI_FORMS_ENABLE_LINUX_HOST "Build the native X11 host with the private CPU renderer" OFF)
 option(GUI_FORMS_ENABLE_HARFBUZZ_TEXT
        "Build the pinned HarfBuzz/FreeType text engine"
@@ -37,6 +39,10 @@ endif()
 
 if(GUI_FORMS_ENABLE_WINDOWS_HOST AND NOT WIN32)
     message(FATAL_ERROR "GUI_FORMS_ENABLE_WINDOWS_HOST requires a Windows target")
+endif()
+
+if(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB AND NOT GUI_FORMS_ENABLE_WINDOWS_HOST)
+    message(FATAL_ERROR "GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB requires the Windows host")
 endif()
 
 if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT GUI_FORMS_ENABLE_SKIA)
@@ -831,6 +837,12 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     target_compile_definitions(gui_forms_host_windows PRIVATE
         WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
     )
+    if(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+        target_sources(gui_forms_host_windows PRIVATE
+            src/host/windows/raster/dib_frame_store.cpp)
+        target_compile_definitions(gui_forms_host_windows PRIVATE
+            GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1)
+    endif()
     target_link_libraries(gui_forms_host_windows
         PUBLIC gui_forms_core
         PRIVATE user32 gdi32 ole32 oleaut32 oleacc uuid windowscodecs comdlg32 shell32 usp10
@@ -1535,6 +1547,37 @@ if(GUI_FORMS_BUILD_TESTS)
         target_include_directories(gui_forms_windows_key_translation_tests PRIVATE src/host/windows/input)
         target_link_libraries(gui_forms_windows_key_translation_tests PRIVATE gui_forms_core)
         add_test(NAME gui_forms_windows_key_translation_tests COMMAND gui_forms_windows_key_translation_tests)
+        if(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+            add_executable(gui_forms_windows_dib_frame_store_tests
+                tests/windows_dib_frame_store_tests.cpp
+                src/host/windows/raster/dib_frame_store.cpp)
+            target_include_directories(gui_forms_windows_dib_frame_store_tests PRIVATE
+                include src/host/windows/raster)
+            target_compile_definitions(gui_forms_windows_dib_frame_store_tests PRIVATE
+                WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+                GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1)
+            target_link_libraries(gui_forms_windows_dib_frame_store_tests PRIVATE gdi32 user32)
+            add_test(NAME gui_forms_windows_dib_frame_store_tests
+                     COMMAND gui_forms_windows_dib_frame_store_tests)
+            add_executable(gui_forms_windows_dib_lifecycle_tests
+                tests/windows_dib_lifecycle_tests.cpp
+                src/host/windows/application/windows_host.cpp
+                src/host/windows/accessibility/windows_accessibility.cpp
+                src/host/windows/services/windows_clipboard_image.cpp
+                src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
+                src/host/windows/raster/dib_frame_store.cpp)
+            target_include_directories(gui_forms_windows_dib_lifecycle_tests PRIVATE
+                include src/host/windows)
+            target_compile_definitions(gui_forms_windows_dib_lifecycle_tests PRIVATE
+                WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+                GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1 GUI_FORMS_DIB_LIFECYCLE_TEST=1)
+            target_link_libraries(gui_forms_windows_dib_lifecycle_tests PRIVATE
+                gui_forms_core user32 gdi32 ole32 oleaut32 oleacc uuid
+                windowscodecs comdlg32 shell32 usp10)
+            add_test(NAME gui_forms_windows_dib_lifecycle_tests
+                     COMMAND gui_forms_windows_dib_lifecycle_tests)
+            set_tests_properties(gui_forms_windows_dib_lifecycle_tests PROPERTIES TIMEOUT 30)
+        endif()
     endif()
     if(GUI_FORMS_ENABLE_LINUX_HOST)
         find_package(X11 QUIET)
