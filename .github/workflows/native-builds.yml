@@ -94,18 +94,24 @@ jobs:
           python -B tools/native_build_tests.py
           python -B gui_forms/tests/verify_install_tests.py
           python tools/build_native.py --jobs 2
+          python -B tools/export_native_sdks_tests.py
+          python -B tools/export_native_sdks.py
       - name: Build macOS
         if: runner.os == 'macOS'
         run: |
           python3 -B tools/native_build_tests.py
           python3 -B gui_forms/tests/verify_install_tests.py
           python3 tools/build_native.py --jobs 2
+          python3 -B tools/export_native_sdks_tests.py
+          python3 -B tools/export_native_sdks.py
       - name: Build Linux with test display
         if: runner.os == 'Linux'
         run: |
           python3 -B tools/native_build_tests.py
           python3 -B gui_forms/tests/verify_install_tests.py
           xvfb-run -a python3 tools/build_native.py --jobs 2
+          python3 -B tools/export_native_sdks_tests.py
+          python3 -B tools/export_native_sdks.py
       - name: Save pinned dependency cache after build attempts
         if: always() && runner.os != 'Windows' && steps.native-dependencies.outputs.cache-primary-key != '' && steps.native-dependencies.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -124,6 +130,14 @@ jobs:
             .build/native-${{ matrix.platform }}/dist/*.zip
             .build/native-${{ matrix.platform }}/dist/*.tar.gz
             .build/native-${{ matrix.platform }}/dist/*.sha256
+          if-no-files-found: error
+      - name: Upload verified matching native SDKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-forms-picker-sdk-${{ matrix.platform }}
+          path: |
+            .build/native-${{ matrix.platform }}/sdk-dist/*.zip
+            .build/native-${{ matrix.platform }}/sdk-dist/*.sha256
           if-no-files-found: error
       - name: Preserve build/test diagnostics
         if: always()
