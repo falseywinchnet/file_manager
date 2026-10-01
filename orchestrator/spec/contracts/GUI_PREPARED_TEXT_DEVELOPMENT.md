@@ -459,3 +459,71 @@ The owner directed imminent machine shutdown. This record is saved for the
 coordinator's shared checkpoint; source review, corrected hashes and any required
 validation remain pending. No A2 acceptance, runtime availability or next-slice
 assignment follows from this shutdown checkpoint.
+
+### Coordinator acceptance — continued development integration only
+
+**OBSERVED** — The owner withdrew the shutdown hold. The coordinator completed
+the correction review of checkpoint `6992bcb` and accepted the A2 service/raster
+component for continued development integration only. This supersedes the
+pending-review status immediately above. The
+[independent coordinator review](../../../gui_forms/experiments/PREPARED_TEXT_A2_COORDINATOR_REVIEW_2026-10-01.md)
+records the exact source/CMake scope and resolved findings. Orchestrator read
+that receipt; it did not repeat the coordinator's review or test execution.
+
+Session IDs use a nonzero, nonreused atomic sequence shared across service
+instances within one linked provider. Saturation refuses before wrap; failed
+construction may consume an ID. This process-wide claim assumes one linked
+provider: separately loaded duplicate provider images are neither established
+nor admitted. ID uniqueness alone does not publish session state.
+
+The corrected cross-service test rejects foreign authority despite equal epochs,
+preserves previous output and ready ownership, then accepts the matching token.
+Final raster authority validation and mask replacement now hold the authority
+mutex together, giving a defined order against revocation. Reviewed retirement/
+reservation/close paths revealed no reverse nested-lock path in this component.
+Successful publication does not preserve authority against subsequent revocation.
+
+**MEASURED coordinator validation:** all 14 manifest hashes matched, six focused
+targets were current, and the six selected tests passed in 0.63 seconds. No
+additional blocking finding was identified in the corrected authored scope
+under `planning/PROGRAMMING_HOUSE_STYLE.md`. This is not untouched legacy/vendor
+certification, sanitizer coverage or a deterministic raster/cancel scheduling test.
+
+Window attachment/readiness, typed display retention, Painter replay, Windows
+DIB compositing, production backend proof and SDK export remain separate,
+unassigned next integration work pending exact ownership coordination. No host,
+Painter, DIB, installed SDK or runtime availability follows from this component
+acceptance. Noninterruptible shaping, join latency, opaque native allocations
+and the visual-only feature limits remain unchanged.
+
+### Assigned next slice — guarded retained painting and DIB staging
+
+**OBSERVED coordinator assignment:** the provider now owns the neutral core
+storage/geometry extraction; guarded public Painter typed result; typed shared
+storage display command and recording/replay; guarded Windows DibPainter/
+compositor changes; and focused retained-lifetime and failed-frame/receipt tests.
+Root owns all CMake changes. This supersedes the unassigned status above only
+for these named edits; it records assignment, not completed implementation.
+
+The service remains caller-owned for this slice. Window lifecycle/service
+attachment is subsequent, unassigned work and Window remains unchanged. Existing
+cursor and other unrelated host behavior are not widened by this assignment.
+
+Painter outcomes distinguish `recorded`, `staged` and typed refusal. Recorded
+means a command retained its typed immutable payload; staged means backend
+work reached the candidate frame. Neither means pixels were presented. Only
+the frame transaction/receipt can establish the final commit/presentation
+outcome, including failure preservation. Earlier proposed `painted` operation
+wording does not grant per-command presentation success in this retained route.
+
+Windows frame commit runs on the owning UI executor. The standalone raster
+contract remains independently executor-owned and is not silently restricted
+to UI execution by host integration. Storage retention, revocation and failure
+tests must cover actual recording/replay and candidate-frame behavior without
+claiming physical-screen atomicity after native presentation failure.
+
+The prepared-development-ON SDK installation must refuse to avoid exporting
+incomplete headers or a changed Painter vtable ABI. Ordinary OFF SDK behavior
+remains unchanged. This is an assigned development slice, not SDK publication,
+production backend readiness or runtime availability. Subsequent evidence must
+identify exact source review, tests and any remaining native behavior limits.

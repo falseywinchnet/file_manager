@@ -272,3 +272,45 @@ than collapse unlike failures into an unexplained terminal state. Queue admissio
 render admission, application, rejection and release remain different events.
 Exact status projection and ownership/concurrency implementation receive review
 before API freeze. No native listening or cross-platform result is inferred.
+
+## Stage 2 coordinator acceptance — source-build development only
+
+**OBSERVED** — The independent
+[Stage 2 coordinator review](../../gui_forms/experiments/AUDIO_LOOP_TRANSPORT_COORDINATOR_REVIEW_2026-10-01.md)
+accepts the corrected component for continued source-build development consumer
+integration. Orchestrator read this receipt; it did not repeat source review,
+native dependency inspection or test execution. The API remains opt-in development
+and ON installation refuses; no installed capability or frozen API is admitted.
+
+The corrected pending-poll law checks parent engine failure when no transport-
+local failure exists. Mixer failure and device interruption/unavailability report
+typed `backend_error`; ordinary close remains `closed`. Queued/admitted receipt
+phase and timing remain intact, and completed receipts retain their historical
+outcome. The private regression injects the actual engine failure path separately
+for backend error and device unavailability, checks pending and terminal behavior,
+refused new commands and shutdown. It is not a real device-interruption test.
+
+The coordinator reviewed producer-owned clips, release/acquire descriptor
+publication, last callback use before retirement, control-side owner destruction,
+atomic coherent receipts, terminal writer handoff and checked counter exhaustion.
+The pinned miniaudio detach chain was inspected for quiescence before data-source
+and owner release under the stated executor/offline-render preconditions. This
+source-backed conclusion is not sanitizer or native listening evidence.
+
+Four stateful poll calls were moved outside assertions because polling also
+collects retired owners. The previously claimed CTest timeout was absent; root
+added actual registration in `2580014` and verified generated `TIMEOUT 30`.
+Historical tests do not retroactively gain that timeout.
+
+**MEASURED coordinator evidence:** rebuilt development-ON tests passed 2/2 in
+0.86 seconds, including actual PCM, fades/timing, bounded history/quota,
+concurrent publication/collection and engine-failure observation. Independently
+rebuilt OFF Audio tests passed 1/1 in 0.37 seconds, 0.39 seconds total. Exact
+authored header/private implementation/tests/scheduler/bridge/CMake review under
+`planning/PROGRAMMING_HOUSE_STYLE.md` found no remaining blocking violation.
+Unrelated legacy and vendor code are not style-certified.
+
+Continued source-build consumer integration is now open within the reviewed
+development scope. Installation, full Application SDK, physical-device/listening,
+macOS/Linux runtime and release availability remain closed or unverified. Root
+owns the separate correction/receipt commit; this semantic receipt adds no code.

@@ -371,3 +371,10 @@ the exact Stage 2 development scope recorded in the dedicated negotiation.
 This supersedes the prior unadmitted implementation state, not the requirement
 for actual PCM, concurrency, ownership and shutdown evidence. API freeze, device
 playback and SDK publication are not authorized by that development assignment.
+
+The later Stage 2 coordinator review accepts the corrected transport for
+continued source-build development integration only; the dedicated negotiation
+links its review and ON 2/2 / OFF 1/1 independent evidence. Pending polls now
+reflect parent engine backend failure while preserving receipt phase/timing and
+completed outcomes. Development-ON installation still refuses. No installed SDK,
+native listening or macOS/Linux runtime availability follows.
