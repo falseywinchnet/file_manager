@@ -607,6 +607,7 @@ HostDialogResult HostServices::show_dialog(const HostDialogRequest& request) {
     }
 
     ++snapshot_.dialog_requests;
+    revoke_cursor_interaction(CursorError::denied);
     modal_stack_.push_back(request.request_id);
     snapshot_.modal_depth = static_cast<std::uint32_t>(modal_stack_.size());
     snapshot_.maximum_modal_depth =
@@ -708,6 +709,7 @@ void HostServices::shutdown() noexcept {
     if (snapshot_.shutdown || std::this_thread::get_id() != ui_thread_) {
         return;
     }
+    revoke_cursor_interaction(CursorError::closing);
     snapshot_.shutdown = true;
     shutdown_impl();
     active_cursor_images_.reset();

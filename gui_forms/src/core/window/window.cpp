@@ -1,4 +1,5 @@
 #include "gui_forms/window.hpp"
+#include "gui_forms/host/services/host_services.hpp"
 #include "gui_forms/live_surface.hpp"
 #include "gui_forms/detail/bound_member_function.hpp"
 #include "../dispatcher/state/dispatcher_state.hpp"
@@ -1189,6 +1190,7 @@ void Window::change_pointer_capture(const Control::Ptr& control,
         captured_.reset();
         captured_pointer_id_ = 0;
     }
+    if (previous && host_services_ != nullptr) { (*host_services_).revoke_cursor_interaction(); }
     if (revoked && previous) {
         metrics_.record_capture_revocation();
     }

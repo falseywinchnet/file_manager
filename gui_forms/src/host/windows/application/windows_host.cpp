@@ -2289,7 +2289,7 @@ public:
     void bind_window(HWND window) noexcept {
         if (native_phase_ != NativePhase::creating) return;
         hwnd_ = window;
-        services_.bind_owner(window);
+        services_.bind_owner(window, *model_);
         native_phase_ = NativePhase::bound;
     }
 
@@ -2420,6 +2420,7 @@ public:
         case WM_SIZE: resize(); return 0;
         case WM_DPICHANGED: dpi_changed(wparam, lparam); return 0;
         case WM_ACTIVATE:
+            if (LOWORD(wparam) == WA_INACTIVE) { services_.revoke_cursor_interaction(); }
             if (trace_win32_input()) {
                 std::fprintf(stderr, "win32-input=activate|state:%u|active:%d|focus:%d\n",
                              static_cast<unsigned>(LOWORD(wparam)),
@@ -2439,6 +2440,8 @@ public:
             break;
         case WM_SETCURSOR:
             if (LOWORD(lparam) == HTCLIENT) {
+                const bool hidden = services_.maintain_hidden_cursor();
+                if (hidden) { return TRUE; }
                 POINT point{};
                 bool applied = false;
                 if (GetCursorPos(&point) && ScreenToClient(hwnd_, &point)) {
@@ -2451,6 +2454,24 @@ public:
                 // hidden and prevents DefWindowProc from restoring hCursor.
                 if (applied) return TRUE;
             }
+            services_.revoke_cursor_interaction();
+            break;
+        case WM_KILLFOCUS:
+        case WM_CANCELMODE:
+            services_.revoke_cursor_interaction();
+            (*model_).release_pointer();
+            break;
+        case WM_CAPTURECHANGED:
+            if (reinterpret_cast<HWND>(lparam) != hwnd_) {
+                services_.revoke_cursor_interaction();
+                (*model_).release_pointer();
+            }
+            break;
+        case WM_SHOWWINDOW:
+            if (wparam == FALSE) { services_.revoke_cursor_interaction(); }
+            break;
+        case WM_MOUSELEAVE:
+            services_.revoke_cursor_interaction();
             break;
         case WM_PAINT:
             // A render wake remains coalesced until the host actually begins
@@ -2545,6 +2566,7 @@ public:
         case WM_COPYDATA: return automation(reinterpret_cast<const COPYDATASTRUCT*>(lparam));
         case WM_CLOSE: return close();
         case WM_DESTROY:
+            services_.revoke_cursor_interaction(CursorError::closing);
             accessibility_.detach();
             if (!closed_) {
                 const HostLifecyclePhase phase = session_.snapshot().phase;
@@ -3021,6 +3043,8 @@ private:
     }
 
     bool update_cursor(Point position) {
+        const bool hidden = services_.maintain_hidden_cursor();
+        if (hidden) { return true; }
         const Control::Ptr captured = (*model_).captured_control();
         const Control::Ptr target = captured ? captured : (*model_).hit_test(position);
         const CursorKind cursor = target ? (*target).effective_cursor() : CursorKind::arrow;

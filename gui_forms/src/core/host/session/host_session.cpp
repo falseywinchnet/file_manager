@@ -159,6 +159,7 @@ HostSession::HostSession(Window& window,
         if (window.host_services_ != nullptr && window.host_services_ != services_) {
             throw std::logic_error("GUI.Forms Window already has an active host service seam");
         }
+        window.invalidate_cursor_interaction(CursorError::stale_window);
         window.host_services_ = services_;
         capture_observation_ = window.pointer_capture_changed().subscribe(
             Delegate<const PointerCaptureChange&>::bind<
@@ -412,6 +413,7 @@ void HostSession::shutdown() noexcept {
     snapshot_.attached = false;
     snapshot_.occluded = false;
     if (window_ != nullptr) {
+        (*window_).invalidate_cursor_interaction(CursorError::closing);
         (*window_).shutdown_dispatcher();
         (*window_).cancel_frame_requests();
         (*window_).release_pointer();

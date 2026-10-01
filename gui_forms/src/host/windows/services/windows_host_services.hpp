@@ -9,9 +9,73 @@ public:
 
     ~WindowsHostServices() override { shutdown(); }
 
-    void bind_owner(HWND owner) noexcept { owner_ = owner; }
+    void bind_owner(HWND owner, Window& model) noexcept { owner_ = owner; cursor_model_ = &model; }
+    bool maintain_hidden_cursor() noexcept {
+        if (!cursor_hidden() || cursor_model_ == nullptr) { return false; }
+        const CursorStatus authority = cursor_authority_impl(*cursor_model_, true);
+        if (!authority.accepted()) { revoke_cursor_interaction(); return false; }
+        const CursorStatus hidden = hide_cursor_impl();
+        if (!hidden.accepted()) { revoke_cursor_interaction(CursorError::native_failure); return false; }
+        return true;
+    }
 
 protected:
+    CursorCapabilities cursor_capabilities_impl() const noexcept override { return {true, true}; }
+    CursorStatus cursor_authority_impl(const Window& window, bool require_pointer) const noexcept override {
+        if (cursor_model_ != &window) { return {CursorError::stale_window}; }
+        const CursorStatus result = windows_detail::cursor_authority(owner_, require_pointer);
+        return result;
+    }
+    CursorStatus hide_cursor_impl() noexcept override {
+        TRACKMOUSEEVENT tracking{sizeof(TRACKMOUSEEVENT), TME_LEAVE, owner_, 0};
+        const BOOL tracked = TrackMouseEvent(&tracking);
+        if (!tracked) { return {CursorError::native_failure}; }
+        SetCursor(nullptr);
+        const HCURSOR current = GetCursor();
+        const CursorStatus result{current == nullptr ? CursorError::none : CursorError::native_failure};
+        return result;
+    }
+    CursorStatus restore_cursor_impl() noexcept override {
+        try {
+            if (owner_ == nullptr || cursor_model_ == nullptr) { return {CursorError::stale_window}; }
+            // Outside this window's input scope, Windows owns the applicable cursor.
+            // Do not overwrite another application's shape during focus departure.
+            const HWND foreground = GetForegroundWindow();
+            const HWND capture = GetCapture();
+            if (foreground != owner_ && capture != owner_) { return {}; }
+            POINT point{};
+            const BOOL located = GetCursorPos(&point);
+            if (!located) { return {CursorError::native_failure}; }
+            const HWND pointed_window = WindowFromPoint(point);
+            if (pointed_window != owner_ && capture != owner_) { return {}; }
+            const BOOL converted = ScreenToClient(owner_, &point);
+            if (!converted) { return {CursorError::native_failure}; }
+            Window& model = *cursor_model_;
+            const double scale = model.scale();
+            const Control::Ptr captured = model.captured_control();
+            const Control::Ptr target = captured ? captured : model.hit_test({point.x / scale, point.y / scale});
+            const CursorImagesPtr images = target ? (*target).effective_cursor_images() : CursorImagesPtr{};
+            const CursorKind kind = target ? (*target).effective_cursor() : CursorKind::arrow;
+            const HostServiceStatus restored = set_custom_cursor(images, scale, kind);
+            const CursorStatus result{restored.accepted() ? CursorError::none : CursorError::native_failure};
+            return result;
+        } catch (...) {
+            // Window hit testing/custom raster preparation may allocate. Cleanup
+            // cannot throw across native destruction; retain an explicit failure.
+            return {CursorError::native_failure};
+        }
+    }
+    CursorStatus warp_cursor_impl(int client_x, int client_y) noexcept override {
+        if (cursor_model_ == nullptr) { return {CursorError::stale_window}; }
+        POINT target{};
+        const CursorStatus prepared = windows_detail::cursor_screen_target(owner_, client_x, client_y, target);
+        if (!prepared.accepted()) { return prepared; }
+        const CursorStatus authority = cursor_authority_impl(*cursor_model_, false);
+        if (!authority.accepted()) { return authority; }
+        const BOOL placed = SetCursorPos(target.x, target.y);
+        const CursorStatus result{placed ? CursorError::none : CursorError::native_failure};
+        return result;
+    }
     HostMonitorResult query_monitors_impl() override {
         HostMonitorResult result;
         const BOOL enumerated = EnumDisplayMonitors(
@@ -24,6 +88,7 @@ protected:
     }
 
     HostServiceStatus set_cursor_impl(CursorKind cursor) override {
+        if (cursor_hidden()) { return {}; }
         return apply_system_cursor(cursor)
             ? HostServiceStatus{}
             : HostServiceStatus{HostServiceError::backend_failure};
@@ -33,14 +98,14 @@ protected:
                                               const CursorImage& image) override {
         for (const CursorEntry& entry : cursors_) {
             if (entry.images == images && entry.scale == image.scale) {
-                SetCursor(entry.native);
+                if (!cursor_hidden()) { SetCursor(entry.native); }
                 return {};
             }
         }
         if (cursors_.capacity() < 32) cursors_.reserve(32);
         HCURSOR cursor = windows_detail::create_image_cursor(*images, image);
         if (cursor == nullptr) return {HostServiceError::backend_failure};
-        SetCursor(cursor);
+        if (!cursor_hidden()) { SetCursor(cursor); }
         if (cursors_.size() >= 32) {
             DestroyCursor(cursors_.front().native);
             cursors_.erase(cursors_.begin());
@@ -56,6 +121,7 @@ protected:
         }
         cursors_.clear();
         owner_ = nullptr;
+        cursor_model_ = nullptr;
     }
 
     HostServiceStatus set_pointer_capture_impl(bool captured,
@@ -246,5 +312,6 @@ private:
     }
 
     HWND owner_{};
+    Window* cursor_model_{};
     std::array<COLORREF, 16> custom_colors_{};
 };

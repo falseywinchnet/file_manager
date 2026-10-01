@@ -2,6 +2,7 @@
 #include "gui_forms/types/cursor_image/cursor_image.hpp"
 
 #include "gui_forms/host/types/host_types.hpp"
+#include "gui_forms/host/cursor_interaction/cursor_interaction.hpp"
 
 #include <chrono>
 #include <optional>
@@ -22,11 +23,19 @@ public:
     static constexpr std::uint32_t maximum_nested_modal_depth = 8U;
 
     explicit HostServices(HostCapabilities capabilities);
-    virtual ~HostServices() = default;
+    virtual ~HostServices();
     HostServices(const HostServices&) = delete;
     HostServices& operator=(const HostServices&) = delete;
 
     [[nodiscard]] HostMonitorResult query_monitors();
+    [[nodiscard]] CursorCapabilities cursor_capabilities() const noexcept;
+    [[nodiscard]] CursorLeaseResult begin_cursor_hidden(Window& window);
+    [[nodiscard]] CursorStatus warp_cursor(Window& window, CursorMetrics metrics, Point target);
+    // Host lifecycle hooks: revoke before focus/capture loss, detach or close.
+    // Cleanup failures remain visible on outstanding leases and this snapshot.
+    void revoke_cursor_interaction(CursorError cause = CursorError::revoked) noexcept;
+    [[nodiscard]] CursorLeaseSnapshot cursor_interaction_snapshot() const noexcept;
+    [[nodiscard]] bool cursor_hidden() const noexcept;
     [[nodiscard]] HostServiceStatus set_cursor(CursorKind cursor);
     // Native failure/unsupported images immediately install fallback. Success
     // then means a usable pointer; it does not promise custom-image support.
@@ -66,6 +75,11 @@ public:
     }
 
 protected:
+    [[nodiscard]] virtual CursorCapabilities cursor_capabilities_impl() const noexcept;
+    [[nodiscard]] virtual CursorStatus cursor_authority_impl(const Window& window, bool require_pointer) const noexcept;
+    [[nodiscard]] virtual CursorStatus hide_cursor_impl() noexcept;
+    [[nodiscard]] virtual CursorStatus restore_cursor_impl() noexcept;
+    [[nodiscard]] virtual CursorStatus warp_cursor_impl(int client_x, int client_y) noexcept;
     [[nodiscard]] virtual HostMonitorResult query_monitors_impl() = 0;
     [[nodiscard]] virtual HostServiceStatus set_cursor_impl(CursorKind cursor) = 0;
     [[nodiscard]] virtual HostServiceStatus set_custom_cursor_impl(
@@ -85,6 +99,10 @@ protected:
     virtual void shutdown_impl() noexcept {}
 
 private:
+    friend class CursorHiddenLease;
+    [[nodiscard]] CursorStatus release_cursor_lease(CursorLeaseState& state) noexcept;
+    [[nodiscard]] CursorStatus validate_cursor_request(const Window& window) const noexcept;
+    std::shared_ptr<CursorLeaseState> cursor_lease_{};
     [[nodiscard]] HostServiceStatus validate_request(
         HostCapability capability) noexcept;
 

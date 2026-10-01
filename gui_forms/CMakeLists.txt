@@ -91,6 +91,7 @@ add_library(gui_forms_core STATIC
     src/core/host/types/host_services_snapshot/host_services_snapshot.cpp
     src/core/host/types/host_session_snapshot/host_session_snapshot.cpp
     src/core/host/services/host_services.cpp
+    src/core/host/cursor_interaction/cursor_interaction.cpp
     src/core/types/cursor_image/cursor_image.cpp
     src/core/host/session/host_session.cpp
     src/core/feedback/semantic_feedback/semantic_feedback.cpp
@@ -1540,6 +1541,9 @@ endif()
 
 if(GUI_FORMS_BUILD_TESTS)
     enable_testing()
+    add_executable(gui_forms_cursor_interaction_tests tests/cursor_interaction_tests.cpp)
+    target_link_libraries(gui_forms_cursor_interaction_tests PRIVATE gui_forms_core)
+    add_test(NAME cursor_interaction COMMAND gui_forms_cursor_interaction_tests)
     if(WIN32)
         add_executable(gui_forms_windows_cursor_tests tests/windows_cursor_tests.cpp)
         target_link_libraries(gui_forms_windows_cursor_tests PRIVATE gui_forms_core user32 gdi32)

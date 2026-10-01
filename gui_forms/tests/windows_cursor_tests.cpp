@@ -1,6 +1,42 @@
 #include "../src/host/windows/services/windows_cursor.hpp"
 #include <iostream>
 
+static bool owned_window_cursor_validation() {
+    using namespace gui_forms;
+    const HINSTANCE module = GetModuleHandleW(nullptr);
+    const wchar_t* class_name = L"GUI.Forms.CursorValidation.Hidden";
+    WNDCLASSW window_class{};
+    window_class.lpfnWndProc = DefWindowProcW;
+    window_class.hInstance = module;
+    window_class.lpszClassName = class_name;
+    const ATOM registered = RegisterClassW(&window_class);
+    if (registered == 0) { return false; }
+    RECT allowed{};
+    const BOOL clip_known = GetClipCursor(&allowed);
+    if (!clip_known) { UnregisterClassW(class_name, module); return false; }
+    // A hidden owned window: no focus request, native hide or pointer placement.
+    const HWND owner = CreateWindowExW(0, class_name, L"Cursor validation", WS_POPUP,
+        allowed.left, allowed.top, 96, 72, nullptr, nullptr, module, nullptr);
+    if (owner == nullptr) { UnregisterClassW(class_name, module); return false; }
+    POINT target{123, 456};
+    const CursorStatus authority = host::windows_detail::cursor_authority(owner, true);
+    const CursorStatus negative = host::windows_detail::cursor_screen_target(owner, -1, 0, target);
+    const bool unchanged = target.x == 123 && target.y == 456;
+    const CursorStatus edge = host::windows_detail::cursor_screen_target(owner, 96, 0, target);
+    const CursorStatus origin = host::windows_detail::cursor_screen_target(owner, 0, 0, target);
+    POINT expected{};
+    const BOOL converted = ClientToScreen(owner, &expected);
+    const bool correct = origin.accepted() && converted && target.x == expected.x && target.y == expected.y;
+    const BOOL destroyed = DestroyWindow(owner);
+    const CursorStatus stale = host::windows_detail::cursor_authority(owner, false);
+    const BOOL unregistered = UnregisterClassW(class_name, module);
+    const bool passed = authority.error == CursorError::denied && negative.error == CursorError::invalid_coordinate &&
+        edge.error == CursorError::invalid_coordinate && unchanged && correct && destroyed && unregistered &&
+        stale.error == CursorError::stale_window;
+    if (!passed) { std::cerr << "Owned-window cursor authority/coordinate validation failed\n"; }
+    return passed;
+}
+
 static bool cursor_cycle(const gui_forms::CursorImages& images, const gui_forms::CursorImage& raster) {
     HCURSOR cursor = gui_forms::host::windows_detail::create_image_cursor(images, raster);
     if (cursor == nullptr) { std::cerr << "Create cursor failed: " << GetLastError() << '\n'; return false; }
@@ -24,6 +60,8 @@ static bool cursor_cycle(const gui_forms::CursorImages& images, const gui_forms:
 }
 
 int main() {
+    const bool scope_validated = owned_window_cursor_validation();
+    if (!scope_validated) { return 4; }
     const gui_forms::CursorImagesPtr images = gui_forms::CursorImages::create(
         {{32, 32, 1, std::vector<gui_forms::Color>(1024, {200, 100, 50, 128})}}, .25, .75);
     const gui_forms::CursorImage raster = (*images).rasterize(1.25);

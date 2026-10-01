@@ -1,7 +1,61 @@
 #pragma once
 #include "gui_forms/types/cursor_image/cursor_image.hpp"
 #include <windows.h>
+#include "gui_forms/host/cursor_interaction/cursor_interaction.hpp"
+#include <limits>
 namespace gui_forms::host::windows_detail {
+
+// Borrowed HWND must remain live on the calling UI thread for each operation.
+// These helpers inspect authority/geometry only; they do not hide or move input.
+inline CursorStatus cursor_authority(HWND owner, bool require_pointer) noexcept {
+    const BOOL live = owner == nullptr ? FALSE : IsWindow(owner);
+    if (!live) { return {CursorError::stale_window}; }
+    const BOOL visible = IsWindowVisible(owner);
+    const BOOL minimized = IsIconic(owner);
+    const HWND foreground = GetForegroundWindow();
+    const HWND active = GetActiveWindow();
+    const HWND focused = GetFocus();
+    if (!visible || minimized || foreground != owner || active != owner || focused != owner) { return {CursorError::denied}; }
+    RECT bounds{};
+    const BOOL measured = GetClientRect(owner, &bounds);
+    if (!measured) { return {CursorError::native_failure}; }
+    if (bounds.right <= 0 || bounds.bottom <= 0) { return {CursorError::denied}; }
+    if (require_pointer) {
+        POINT screen{};
+        const BOOL located = GetCursorPos(&screen);
+        if (!located) { return {CursorError::native_failure}; }
+        const HWND pointed = WindowFromPoint(screen);
+        if (pointed != owner) { return {CursorError::denied}; }
+        POINT client = screen;
+        const BOOL converted = ScreenToClient(owner, &client);
+        if (!converted) { return {CursorError::native_failure}; }
+        if (client.x < 0 || client.y < 0 || client.x >= bounds.right || client.y >= bounds.bottom) { return {CursorError::denied}; }
+    }
+    return {};
+}
+inline CursorStatus cursor_screen_target(HWND owner, int client_x, int client_y, POINT& target) noexcept {
+    const BOOL live = owner == nullptr ? FALSE : IsWindow(owner);
+    if (!live) { return {CursorError::stale_window}; }
+    RECT bounds{};
+    const BOOL measured = GetClientRect(owner, &bounds);
+    if (!measured) { return {CursorError::native_failure}; }
+    if (client_x < 0 || client_y < 0 || client_x >= bounds.right || client_y >= bounds.bottom) {
+        return {CursorError::invalid_coordinate};
+    }
+    POINT origin{};
+    const BOOL converted = ClientToScreen(owner, &origin);
+    if (!converted) { return {CursorError::native_failure}; }
+    const std::int64_t x = std::int64_t(origin.x) + client_x;
+    const std::int64_t y = std::int64_t(origin.y) + client_y;
+    if (x < std::numeric_limits<int>::min() || x > std::numeric_limits<int>::max() ||
+        y < std::numeric_limits<int>::min() || y > std::numeric_limits<int>::max()) { return {CursorError::invalid_coordinate}; }
+    RECT allowed{};
+    const BOOL queried = GetClipCursor(&allowed);
+    if (!queried) { return {CursorError::native_failure}; }
+    if (x < allowed.left || x >= allowed.right || y < allowed.top || y >= allowed.bottom) { return {CursorError::denied}; }
+    target = {static_cast<LONG>(x), static_cast<LONG>(y)};
+    return {};
+}
 // Native resources are created only from the validated, immutable image set.
 inline HCURSOR create_image_cursor(const CursorImages& images, const CursorImage& image) {
         const std::vector<unsigned char> zeros(static_cast<std::size_t>((image.width + 15) / 16 * 2) * image.height, 0);

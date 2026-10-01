@@ -1,4 +1,5 @@
 #include "gui_forms/window.hpp"
+#include "gui_forms/host/services/host_services.hpp"
 #include "../../dispatcher/state/dispatcher_state.hpp"
 #include "../../scheduler/request/scheduled_frame_request.hpp"
 #include "../accelerator/accelerator_attachment.hpp"
@@ -28,6 +29,7 @@ Window::Window(Control::Ptr root, Size client_size, ImageRegistryLimits image_li
       lifetime_(std::make_shared<detail::WindowLifetime>()),
       ui_thread_(std::this_thread::get_id()),
       dispatcher_state_(std::make_shared<detail::DispatcherState>(ui_thread_)) {
+    initialize_cursor_identity();
     (*lifetime_).window = this;
     if (!root_) {
         throw std::invalid_argument("GUI.Forms window requires a retained root control");
@@ -44,6 +46,7 @@ Window::Window(Control::Ptr root, Size client_size, ImageRegistryLimits image_li
     metrics_.record_dirty_mark(initial_damage.area());
 }
 Window::~Window() {
+    invalidate_cursor_interaction(CursorError::closing);
     paint_wake_handler_ = {};
     paint_wake_pending_ = false;
     abandon_deferred_input();
@@ -75,6 +78,7 @@ void Window::resize(Size client_size) {
     }
     const Rect old_bounds{0.0, 0.0, client_size_.width, client_size_.height};
     client_size_ = client_size;
+    invalidate_cursor_interaction(CursorError::stale_metrics);
     ++surface_epoch_;
     if (surface_epoch_ == 0U) ++surface_epoch_;
     add_damage_all_planes(old_bounds);
@@ -95,6 +99,7 @@ void Window::set_scale(double scale) {
         return;
     }
     scale_ = scale;
+    invalidate_cursor_interaction(CursorError::stale_metrics);
     ++surface_epoch_;
     if (surface_epoch_ == 0U) ++surface_epoch_;
     mark_subtree_dirty(*root_, invalidation::conservative_subtree);
@@ -156,6 +161,7 @@ void Window::set_theme(std::shared_ptr<const Theme> theme) {
 void Window::set_active(bool active) {
     require_ui_thread("activation mutation");
     if (active_ == active) return;
+    if (!active && host_services_ != nullptr) { (*host_services_).revoke_cursor_interaction(); }
     active_ = active;
     mark_subtree_dirty(*root_, Dirty::style | Dirty::paint | Dirty::semantics);
     for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {

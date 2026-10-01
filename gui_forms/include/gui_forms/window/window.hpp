@@ -7,6 +7,7 @@
 #include "gui_forms/dispatcher.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/metrics.hpp"
+#include "gui_forms/host/cursor_interaction/cursor_interaction.hpp"
 #include "gui_forms/resources.hpp"
 #include "gui_forms/scheduler.hpp"
 #include "gui_forms/window/presentation/presentation_types.hpp"
@@ -242,6 +243,12 @@ public:
 
     [[nodiscard]] Control::Ptr root() const noexcept { return root_; }
     [[nodiscard]] Size client_size() const noexcept { return client_size_; }
+    [[nodiscard]] CursorMetrics cursor_metrics() const noexcept;
+    [[nodiscard]] CursorCapabilities cursor_capabilities() const noexcept;
+    [[nodiscard]] CursorLeaseResult begin_cursor_hidden();
+    // Synchronous client-DIP placement. Success is a native request, not a
+    // fabricated motion/click; OS motion may be delivered or coalesced normally.
+    [[nodiscard]] CursorStatus warp_cursor(CursorMetrics metrics, Point target);
     void resize(Size client_size);
     void set_scale(double scale);
     [[nodiscard]] double scale() const noexcept { return scale_; }
@@ -481,6 +488,8 @@ public:
 
 private:
     friend class HostSession;
+    void initialize_cursor_identity() noexcept;
+    void invalidate_cursor_interaction(CursorError cause) noexcept;
     friend class Control;
     friend class UpdateScope;
     friend class Timer;
@@ -672,6 +681,8 @@ private:
 
     Control::Ptr root_;
     Size client_size_{};
+    std::uint64_t cursor_window_id_{};
+    std::uint64_t cursor_metrics_generation_{1};
     double scale_{1.0};
     PresentationSettings presentation_settings_{};
     TextMetricsProvider* text_metrics_provider_{};
