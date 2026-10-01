@@ -11,8 +11,13 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <exception>
+#include <limits>
+#include <string>
+#include <string_view>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -83,6 +88,44 @@ using gui_forms::TextInputEvent;
 using gui_forms::Window;
 using gui_forms::CursorKind;
 using gui_forms::render::SkiaRaster;
+
+// Main-thread diagnostic aggregates only. These measure completed synchronous
+// phases, not process CPU time, deferred AppKit work, or physical bytes copied.
+namespace {
+struct MacPaintPhase final {
+    std::uint64_t calls{0};
+    std::uint64_t nanoseconds{0};
+    std::uint64_t maximum_nanoseconds{0};
+    bool saturated{false};
+
+    void record(const std::chrono::steady_clock::time_point start,
+                const std::chrono::steady_clock::time_point end) noexcept {
+        const std::chrono::nanoseconds elapsed =
+            std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+        const std::uint64_t duration = elapsed.count() > 0
+            ? static_cast<std::uint64_t>(elapsed.count()) : 0U;
+        const std::uint64_t limit = std::numeric_limits<std::uint64_t>::max();
+        if (calls == limit) saturated = true;
+        else ++calls;
+        if (duration > limit - nanoseconds) {
+            nanoseconds = limit;
+            saturated = true;
+        } else {
+            nanoseconds += duration;
+        }
+        maximum_nanoseconds = std::max(maximum_nanoseconds, duration);
+    }
+
+    [[nodiscard]] std::string json_fields(const std::string_view name) const {
+        const std::string prefix = ",\"paint_" + std::string(name);
+        const std::string result = prefix + "_calls\":" + std::to_string(calls) +
+            prefix + "_nanoseconds\":" + std::to_string(nanoseconds) +
+            prefix + "_maximum_nanoseconds\":" + std::to_string(maximum_nanoseconds) +
+            prefix + "_saturated\":" + (saturated ? "true" : "false");
+        return result;
+    }
+};
+} // namespace
 
 static std::uint64_t host_now_nanoseconds() {
     return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -447,6 +490,17 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     std::uint64_t _damageCollectionCount;
     std::uint64_t _nativeDrawCount;
     std::uint64_t _displayTickCount;
+    MacPaintPhase _rasterPreparePhase;
+    MacPaintPhase _retainedPaintPhase;
+    MacPaintPhase _rasterFinishPhase;
+    MacPaintPhase _cgSetupPhase;
+    MacPaintPhase _cgDrawPhase;
+    MacPaintPhase _cgReleasePhase;
+    double _lastNativeDirtyArea;
+    double _lastFrameDamageBoundsArea;
+    double _lastCGDestinationArea;
+    double _lastCGClipBoundsArea;
+    std::size_t _lastCGSourceBytes;
     NSArray* _semanticAccessibilityChildren;
     NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>*
         _semanticAccessibilityElements;
@@ -789,6 +843,17 @@ private:
         _damageCollectionCount = 0;
         _nativeDrawCount = 0;
         _displayTickCount = 0;
+        _rasterPreparePhase = {};
+        _retainedPaintPhase = {};
+        _rasterFinishPhase = {};
+        _cgSetupPhase = {};
+        _cgDrawPhase = {};
+        _cgReleasePhase = {};
+        _lastNativeDirtyArea = 0.0;
+        _lastFrameDamageBoundsArea = 0.0;
+        _lastCGDestinationArea = 0.0;
+        _lastCGClipBoundsArea = 0.0;
+        _lastCGSourceBytes = 0U;
         _transparentFullSizeContent = transparentFullSizeContent;
         _windowDragRegionIds = std::move(windowDragRegionIds);
         _semanticAccessibilityChildren = nil;
@@ -1454,6 +1519,12 @@ private:
         std::chrono::steady_clock::now();
     const double scale = self.window == nil ? 1.0 : self.window.backingScaleFactor;
     const GFSize logicalSize{self.bounds.size.width, self.bounds.size.height};
+    _lastNativeDirtyArea = std::max(0.0, dirtyRect.size.width) *
+        std::max(0.0, dirtyRect.size.height);
+    _lastFrameDamageBoundsArea = 0.0;
+    _lastCGDestinationArea = 0.0;
+    _lastCGClipBoundsArea = 0.0;
+    _lastCGSourceBytes = 0U;
     if (_raster.resize(logicalSize, scale)) {
         _rasterHasContent = NO;
         _pendingDamage.add(GFRect{0.0, 0.0, logicalSize.width, logicalSize.height});
@@ -1467,10 +1538,21 @@ private:
         frameDamage.add(update.clip);
     }
     _raster.begin_frame(frameDamage);
+    _lastFrameDamageBoundsArea = frameDamage.bounds().area();
+    const std::chrono::steady_clock::time_point preparedAt =
+        std::chrono::steady_clock::now();
+    _rasterPreparePhase.record(started, preparedAt);
     std::optional<PaintReceipt> receipt;
     if (!_pendingDamage.empty()) {
+        const std::chrono::steady_clock::time_point paintStarted =
+            std::chrono::steady_clock::now();
         receipt = (*_model).paint(_raster, _pendingDamage.bounds());
+        const std::chrono::steady_clock::time_point paintEnded =
+            std::chrono::steady_clock::now();
+        _retainedPaintPhase.record(paintStarted, paintEnded);
     }
+    const std::chrono::steady_clock::time_point finishStarted =
+        std::chrono::steady_clock::now();
     for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
         _raster.save();
         _raster.clip_rect(update.clip);
@@ -1478,6 +1560,9 @@ private:
         _raster.restore();
     }
     _raster.end_frame();
+    const std::chrono::steady_clock::time_point finishEnded =
+        std::chrono::steady_clock::now();
+    _rasterFinishPhase.record(finishStarted, finishEnded);
 
     if (receipt) _rasterHasContent = YES;
     bool presented = false;
@@ -1486,6 +1571,8 @@ private:
     // intentionally declines painting then; the last complete raster is still
     // valid and must be copied into AppKit's newly supplied backing context.
     if (_rasterHasContent == YES && pixels != nullptr) {
+        const std::chrono::steady_clock::time_point setupStarted =
+            std::chrono::steady_clock::now();
         CGDataProviderRef provider = CGDataProviderCreateWithData(
             nullptr, pixels, _raster.byte_size(), nullptr);
         CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
@@ -1496,8 +1583,18 @@ private:
             _raster.pixel_width(), _raster.pixel_height(), 8, 32,
             _raster.row_bytes(), colorSpace, bitmapInfo, provider,
             nullptr, false, kCGRenderingIntentDefault);
+        const std::chrono::steady_clock::time_point setupEnded =
+            std::chrono::steady_clock::now();
+        _cgSetupPhase.record(setupStarted, setupEnded);
         if (image != nullptr) {
             CGContextRef context = NSGraphicsContext.currentContext.CGContext;
+            const CGRect clipBounds = CGContextGetClipBoundingBox(context);
+            _lastCGClipBoundsArea = std::max(0.0, clipBounds.size.width) *
+                std::max(0.0, clipBounds.size.height);
+            _lastCGDestinationArea = logicalSize.width * logicalSize.height;
+            _lastCGSourceBytes = _raster.byte_size();
+            const std::chrono::steady_clock::time_point drawStarted =
+                std::chrono::steady_clock::now();
             CGContextSaveGState(context);
             CGContextSetBlendMode(context, kCGBlendModeCopy);
             CGContextTranslateCTM(context, 0.0, logicalSize.height);
@@ -1506,11 +1603,19 @@ private:
                                CGRectMake(0.0, 0.0, logicalSize.width, logicalSize.height),
                                image);
             CGContextRestoreGState(context);
+            const std::chrono::steady_clock::time_point drawEnded =
+                std::chrono::steady_clock::now();
+            _cgDrawPhase.record(drawStarted, drawEnded);
             presented = true;
-            CGImageRelease(image);
         }
+        const std::chrono::steady_clock::time_point releaseStarted =
+            std::chrono::steady_clock::now();
+        if (image != nullptr) CGImageRelease(image);
         CGColorSpaceRelease(colorSpace);
         CGDataProviderRelease(provider);
+        const std::chrono::steady_clock::time_point releaseEnded =
+            std::chrono::steady_clock::now();
+        _cgReleasePhase.record(releaseStarted, releaseEnded);
     }
     const std::chrono::duration<long long, std::ratio<1, 1000000000>> elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now() - started);
@@ -1815,6 +1920,17 @@ private:
         ",\"damage_collection_count\":" + std::to_string(_damageCollectionCount) +
         ",\"native_draw_count\":" + std::to_string(_nativeDrawCount) +
         ",\"display_tick_count\":" + std::to_string(_displayTickCount) +
+        _rasterPreparePhase.json_fields("raster_prepare") +
+        _retainedPaintPhase.json_fields("retained") +
+        _rasterFinishPhase.json_fields("raster_finish") +
+        _cgSetupPhase.json_fields("cg_setup") +
+        _cgDrawPhase.json_fields("cg_draw") +
+        _cgReleasePhase.json_fields("cg_release") +
+        ",\"last_native_dirty_area\":" + std::to_string(_lastNativeDirtyArea) +
+        ",\"last_frame_damage_bounds_area\":" + std::to_string(_lastFrameDamageBoundsArea) +
+        ",\"last_cg_destination_area\":" + std::to_string(_lastCGDestinationArea) +
+        ",\"last_cg_clip_bounds_area\":" + std::to_string(_lastCGClipBoundsArea) +
+        ",\"last_cg_source_bytes\":" + std::to_string(_lastCGSourceBytes) +
         ",\"native_callback_faults\":" +
         std::to_string(_nativeCallbackFaults) + "}";
 }

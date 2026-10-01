@@ -3,7 +3,9 @@
 #include "gui_forms/gui_forms.hpp"
 #include "gui_forms/platform/macos_host.hpp"
 
+#include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <exception>
@@ -37,6 +39,7 @@ struct Probe final {
     bool completed{false};
     std::string failure{};
     std::string final_snapshot{};
+    std::string phase_baseline{};
 };
 
 NSWindow* find_window(NSString* title) {
@@ -57,6 +60,44 @@ std::uint64_t counter(const std::string& snapshot, const std::string& key) {
 
 void require(Probe& probe, bool condition, const char* message) {
     if (!condition && probe.failure.empty()) probe.failure = message;
+}
+
+double extent(const std::string& snapshot, const std::string& key) {
+    const std::string marker = "\"" + key + "\":";
+    const std::size_t position = snapshot.find(marker);
+    if (position == std::string::npos) throw std::runtime_error("missing host extent");
+    const std::string digits = snapshot.substr(position + marker.size());
+    const double value = std::stod(digits);
+    return value;
+}
+
+void verify_phases(Probe& probe, const std::string& snapshot, const bool active) {
+    const std::array<std::string_view, 6> names{
+        "raster_prepare", "retained", "raster_finish", "cg_setup", "cg_draw", "cg_release"};
+    for (const std::string_view name : names) {
+        const std::string prefix = "paint_" + std::string(name);
+        const std::uint64_t calls = counter(snapshot, prefix + "_calls");
+        const std::uint64_t before_calls = counter(probe.phase_baseline, prefix + "_calls");
+        const std::uint64_t duration = counter(snapshot, prefix + "_nanoseconds");
+        const std::uint64_t before_duration = counter(probe.phase_baseline, prefix + "_nanoseconds");
+        const std::uint64_t maximum = counter(snapshot, prefix + "_maximum_nanoseconds");
+        require(probe, maximum <= duration, "phase maximum exceeds its total");
+        const std::string unsaturated = "\"" + prefix + "_saturated\":false";
+        require(probe, snapshot.find(unsaturated) != std::string::npos,
+                "native phase counters saturated during bounded fixture");
+        if (active) {
+            require(probe, calls > before_calls && duration >= before_duration,
+                    "visible caret did not record completed native paint phases");
+        } else {
+            require(probe, calls == before_calls && duration == before_duration,
+                    "hidden interval performed native paint phase work");
+        }
+    }
+    const std::uint64_t setups = counter(snapshot, "paint_cg_setup_calls");
+    const std::uint64_t draws = counter(snapshot, "paint_cg_draw_calls");
+    const std::uint64_t releases = counter(snapshot, "paint_cg_release_calls");
+    require(probe, setups == draws && setups == releases,
+            "healthy fixture must pair image setup, draw and release");
 }
 
 class CountTimer final {
@@ -105,11 +146,24 @@ void exercise(Probe& probe) {
         require(probe, focused, "visible textbox could not focus");
         probe.baseline_wakes = counter(snapshot, "scheduled_wake_count");
         probe.baseline_draws = counter(snapshot, "native_draw_count");
+        probe.phase_baseline = snapshot;
     } else if (probe.stage == 2) {
         const std::uint64_t wakes = counter(snapshot, "scheduled_wake_count");
         const std::uint64_t draws = counter(snapshot, "native_draw_count");
         require(probe, wakes > probe.baseline_wakes, "focused caret deadline did not wake");
         require(probe, draws > probe.baseline_draws, "focused caret did not paint");
+        verify_phases(probe, snapshot, true);
+        const double destination = extent(snapshot, "last_cg_destination_area");
+        const NSRect bounds = child.contentView.bounds;
+        const double expected_destination = bounds.size.width * bounds.size.height;
+        require(probe, std::abs(destination - expected_destination) < 1.0e-6,
+                "reported CG destination must match submitted logical window bounds");
+        const double native_dirty = extent(snapshot, "last_native_dirty_area");
+        const double frame_damage = extent(snapshot, "last_frame_damage_bounds_area");
+        const double clip = extent(snapshot, "last_cg_clip_bounds_area");
+        const std::uint64_t source_bytes = counter(snapshot, "last_cg_source_bytes");
+        require(probe, native_dirty > 0.0 && frame_damage > 0.0 && clip > 0.0 && source_bytes > 0U,
+                "visible presentation must report nonempty submitted extents");
         probe.hide();
     } else if (probe.stage == 3) {
         require(probe, !child.isVisible && (*probe.child_model).occluded(),
@@ -117,11 +171,13 @@ void exercise(Probe& probe) {
         // Let ordering callbacks settle before measuring the hidden interval.
         probe.baseline_wakes = counter(snapshot, "scheduled_wake_count");
         probe.baseline_draws = counter(snapshot, "native_draw_count");
+        probe.phase_baseline = snapshot;
     } else if (probe.stage == 4) {
         const std::uint64_t wakes = counter(snapshot, "scheduled_wake_count");
         const std::uint64_t draws = counter(snapshot, "native_draw_count");
         require(probe, wakes == probe.baseline_wakes, "hidden caret kept waking");
         require(probe, draws == probe.baseline_draws, "hidden window kept drawing");
+        verify_phases(probe, snapshot, false);
         probe.show();
     } else {
         require(probe, child.isVisible && !(*probe.child_model).occluded(),
