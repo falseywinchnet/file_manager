@@ -532,3 +532,135 @@ Provider reconciliation must define slot retirement and actual byte accounting
 for fixed metadata and cancellation-held work. These are consumer-acceptable
 upper bounds that the provider may tighten explicitly, not assigned source work
 or changes to A2's independent replacement-slot and mask limits.
+
+### Concrete provider API reconciliation — development implementation assigned
+
+**OBSERVED:** Orchestrator read the complete provider reply
+[`LOGICAL_WRAPPED_MASK_V1_PROPOSAL_2026-10-01.md`](../../gui_forms/docs/LOGICAL_WRAPPED_MASK_V1_PROPOSAL_2026-10-01.md).
+The coordinator finds the bounded profile coherent and reports Games accepted
+the complete proposal, tighter bounds and lifecycles without a fixture mismatch.
+The coordinator now assigns bounded development implementation of this reconciled
+profile. Earlier intake proposals above remain history. The assignment is
+source-only and default OFF; no global architecture decision, installed SDK or
+availability is claimed, and no additional approval or research gate is added.
+
+The four proposed source-only headers are `gui_forms/text_mask.hpp`,
+`gui_forms/text_mask/types/text_mask_types.hpp`,
+`gui_forms/text_mask/lease/text_mask_lease.hpp` and
+`gui_forms/text_mask/service/text_mask_service.hpp`, under the provider's
+`include/` directory. They are a concrete ownership/API sketch, not frozen ABI.
+`TextMaskService` owns its lifetime ledger, registered fonts and one current
+`TextMaskSession`. Session operations are lookup, submit, snapshot, take, discard,
+cancel, clear-cache, begin-close and join/release. `TextMaskLease` is a copyable
+immutable owner exposing borrowed coverage, exact admitted source, line records
+and metrics; a valid zero-ink result differs from an empty handle. Borrowed views
+require a surviving lease. Submitted string views are borrowed only during the
+call; successful admission owns their bytes. Reusing existing opaque font/wake
+types does not authorize cross-ledger font borrowing.
+
+All following bounds apply to the service lifetime ledger, including old-session
+and frame-held owners after eviction or close; reopening cannot reset them:
+
+| Resource | Candidate bound and accounting |
+|---|---|
+| Input and lines | 16,384 UTF-8 bytes/request; 256 lines including empty/trailing lines |
+| Requests | Nine occupied slots total across assigned, queued, completed and retiring; one native worker lane and at most eight queued |
+| Cache | 700 exact-key records; no unbounded auxiliary index |
+| Live masks | 709 distinct objects, including candidates, completed, cached, evicted/frame-held and zero-ink masks |
+| Live exact-source keys | 718 owners: up to 709 mask-associated keys plus nine pending inputs; shared allocation counted once |
+| Retained UTF-8 | 2 MiB allocated capacity across requests, cache, candidates and lease-retained source until last-owner release |
+| Individual mask | 4,096 device pixels/axis and 4 MiB coverage, charging stride times height before allocation |
+| All live coverage | 32 MiB, including candidate and evicted/frame-held allocations |
+| First-party metadata | 8 MiB actual requested allocation bytes/capacity, including records, retained line arrays and shared-owner control blocks |
+| Transient shaping payload | 8 MiB for the single executing job; not retained by completed masks |
+| First-party workspace | 16 MiB for the worker, including bounded registration metadata |
+| Fonts | Eight faces/bank, 4 MiB/face, 8 MiB aggregate, at most two live banks; retired owners remain charged |
+| Native shaping work | At most 2,048 native shaping calls and 4 MiB aggregate submitted UTF-8 context/request; exceeding either returns `shape_work` |
+
+Check sizes, multiplication and alignment and reserve under the ledger lock
+before allocation; release after destruction/deallocation. Reservations convert
+to live usage without double charging. Metadata includes private shared-owner
+allocation requests, not just public handle sizes. Host allocator overhead and
+opaque vendor allocations/caches are outside these requested-byte bounds; this
+is neither an RSS quota nor a hard latency guarantee. The finite native-work
+limit bounds repeated contextual trials without claiming linear runtime.
+
+Admission reserves its slot and input/key/metadata before publishing an ID.
+Failure preserves the caller's output ID and prior masks. Coverage admission
+occurs later, after measuring ink, before candidate allocation against the live
+coverage/object limits. Queue acceptance therefore does not promise a successful
+mask: late budget failure is a typed completion preserving prior output. Eviction
+can release cache ownership, never a still-retained frame allocation. Exact
+cache equality uses normalized options, profile, font bank identity/generation,
+primary face, raster/scale and UTF-8 length/bytes; hashes only propose matches.
+
+IDs use a process-wide nonreused session identity and checked request serial,
+never a reusable slot index. Completed results/errors occupy their original slot
+until take/discard/cancel; no additional completion queue exists. Queued and
+completed cancellation retire synchronously. Running cancellation revokes
+publication and reports `pending_retirement`: slot, input, candidate/native work
+and reservations stay charged until worker acknowledgement and destruction.
+Cancellation and completion publication linearize under the slot mutex; cancelled
+results cannot enter cache or revive a view. Successful take returns an owning
+lease and retires the slot; taking a failed completion preserves prior output
+and consumes the error slot. Pending, stale and wrong-executor calls preserve
+output and slot.
+
+Close stops admission/delivery, clears cache ownership, retires queued/completed
+slots and marks executing work retiring. Join waits for worker retirement and
+wake-target quiescence; the target must live until join returns. Replacement
+sessions wait for the preceding join, while old leases remain charged/readable
+without new-view publication authority. Controls use the opening executor; the
+worker posts only a coalesced payload-free wake. Lookup hits use no request slot;
+submit hits still occupy a completed slot. Retiring work still excludes another
+native job. Nine fixed snapshot entries suffice; no unbounded subscriber list.
+
+The literal-source profile is independent of D1 document identity/proofs.
+Offsets reference the exact admitted string retained by the lease. The adapter
+normalizes isolated CR; the provider admits LF/CRLF and initially refuses isolated
+CR, tabs and other Unicode hard separators. Size is 4–128 logical units, width
+0–8,192 (zero disables wrap; positive rounding to zero refuses). Size/width/gap
+use the agreed 1/64 quantization; gap derives from quantized size with no final
+trailing gap. Grayscale scale is 0.5–4 and mono integer scale 1–4. Validation
+ranges do not promise masks fit the device-axis/coverage limits.
+
+Complete-paragraph bidi levels feed line reordering and contextual final-line
+shaping; no joining/ligatures cross the chosen break. Greedy legal breaks and
+grapheme-plus-shaping-cluster fallback preserve indivisible overflow without
+truncation. Consumed whitespace/hard breaks remain represented by source offsets.
+Empty input is one empty line with primary-face logical height and no ink.
+The logical first-line box top anchors baselines; signed device ink origin and
+native bearings remain separate from logical advance. Raster positions scale
+once; true mono expands native packed mono to 0/255, never thresholds gray.
+Primary face and registration-order fallback are explicit encoded-bank choices.
+
+Games' reported acceptance covers the tighter lifetime, metadata, work and
+retirement bounds. The assigned implementation must receive exact
+source review against `planning/PROGRAMMING_HOUSE_STYLE.md`, plus focused
+cross-scale, Unicode context, mono, budget-boundary, zero-ink/frame-held eviction,
+cancellation and close/reopen evidence. Initial fixtures use approved
+Carlito/Cousine; new Games font intake requires coordinator source/license
+reconciliation. Numeric goldens and actual help-panel inspection remain distinct.
+`PreparedTextService`/A2 and its three-generation/two-mask limits are unchanged;
+this independent service neither borrows nor enlarges those budgets.
+
+**OBSERVED coordinator report of consumer evidence:** ten fixtures contain
+0–129 UTF-8 bytes each, sizes 11.5–16, widths 0–704 and at most four hard lines.
+Proposed per-game banks contain six faces: dialogue regular/bold, Cousine
+regular/bold and Carlito regular/bold. Reported encoded totals are 2,208,324 bytes
+for Four Pegs, 2,117,796 for Atom Probe and 2,018,368 for Switchbox, with a maximum
+individual face of 682,468 bytes. These reported input/font sizes fit the stated
+bounds; actual ink extents, coverage allocation and shaping-work cost remain
+unmeasured. This recording chat has not independently reproduced those counts.
+
+**OBSERVED coordinator assignment:** the GUI.Forms provider owns staged
+implementation of the proposal's four development headers and service/session/
+lease boundary; the lifetime ledger, bounded queue/retirement and exact-key cache;
+logical wrapping/contextual shaping and grayscale/true-mono raster; and focused
+tests and evidence. Reuse private mechanisms where their contracts match while
+preserving A2's independent semantics and budgets. The coordinator owns CMake
+wiring and install-boundary review. Source remains development-only/default OFF;
+this assignment is not header installation, SDK publication or consumer readiness.
+The complete house-style review and scoped test evidence above are implementation
+acceptance work, not another permission gate. This chat owns only this negotiation
+record; the coordinator owns commit integration.
