@@ -207,3 +207,137 @@ assumed covered by the arena without source evidence.
 Coordinator owns dependency/codec admission and shared repository checkpoint.
 Owner-directed imminent shutdown stops further record edits after handoff;
 this checkpoint does not open decoder implementation or widen availability.
+
+## Resume — conditional compact-decoder development authorization
+
+**OBSERVED** — After Games received direct owner resume and compact-decoder
+direction, the coordinator authorized development in its existing four reserved
+audio files: `include/gui_forms/audio/audio.hpp`, `src/audio/audio.cpp`,
+`tests/audio/audio_service_tests.cpp` and `cmake/Audio.cmake`, all relative to
+`gui_forms/`. This supersedes the shutdown no-edit state for that bounded work;
+it does not grant unrelated host edits or runtime availability.
+
+Dependency edits are conditional on independent verification of the pinned
+`extras/stb_vorbis.c` bytes and license. Games reports stb_vorbis v1.22 at the
+existing miniaudio commit `f40cf03f80cdb7e741d43e53b7e706e8c1394bcf`, LF-byte SHA-256
+`4c7cb2ff1f7011e9d67950446b7eb9ca044f2e464d76bfbb0b84dd2e23e65636`,
+and MIT alternative A in Sean Barrett's 2017 license trailer. These remain
+provider reports pending review of the independent verification receipt; the
+previously verified miniaudio header/license does not verify this separate file.
+
+Games also reports 243 lossy Vorbis q6 candidates totaling 54,735,409 bytes,
+compared with 1,169,418,011 bytes of prepared PCM. Those figures are attributed
+reports, not independently reviewed measurements in this record. They motivate
+the compact-release work without establishing decoding correctness, audio
+acceptance, release publication or installed availability.
+
+Implementation must preserve the existing WAV foundation and satisfy bounded
+memory, cancellation and failure tests: admitted encoded/decoded capacities,
+actual frame-count checks, explicit arena coverage and excluded storage,
+finite sample/channel/rate validation, no partial clip publication, cleanup on
+malformed/truncated/cancelled/resource failure, and background-owner shutdown.
+No audio/UI-thread decoding or hidden asynchronous owner is admitted. Report
+exact authored source review against `planning/PROGRAMMING_HOUSE_STYLE.md`
+separately from scanner/test results before integration.
+
+Games retains audio implementation and consumer ownership; Orchestrator edits
+only the relevant negotiation records. Coordinator owns shared integration.
+Cursor remains a proposal with no implementation assignment. A2's public
+prepared-text/mask service remains unavailable. SwiftEdit owns the separate SDK
+workflow/export-packaging slice; that assignment introduces no runtime changes.
+
+### Subsequent cursor development assignment
+
+The coordinator subsequently assigned Games the first Windows cursor slice
+after stable audio handoff; see
+[cursor scope and pending API reply](GAMES_WINDOW_CURSOR_2026-10-01.md).
+This supersedes the preceding unassigned cursor status only. Scope is the new
+lease/policy and cursor-only host/Window integration with focused tests, excluding
+committed A1 raster/text and retaining root CMake ownership. Other backends stay
+unsupported; exact public API/status reconciliation precedes adapter freeze.
+Development assignment does not establish native or installed availability.
+
+## Vorbis development evidence receipt — review 001
+
+**OBSERVED** — Orchestrator read the provider's initial local receipt and then
+the durable [Audio Vorbis receipt](../../gui_forms/experiments/AUDIO_VORBIS_2026-10-01.md).
+It independently matched all four audio source/CMake SHA-256 values against the
+receipt. Implementation commit is `00dca7c6d057cd9a0919ea33ae7c6abef53631cb`;
+the implementation source hash is
+`a6771e87a44a34d5f4253a2a314474ad3adcfab5b963f88f9279729d2b474728`.
+The durable receipt supersedes the Git-ignored `astra` reference and records
+reproduction instructions and captured source 1/1 and installed-consumer 4/4
+results. It was added after the implementation commit under the coordinator's
+separate evidence scope; no evidence commit identity is asserted here.
+This review did not rerun tests, repeat the vendor audit or certify implementation
+house style. The provider's receipt supplies its exact authored review scope.
+
+**MEASURED, provider receipt** — An Audio-enabled, tests-disabled library was
+installed into Games' separate development Audio SDK. Its independent consumer
+CTest passed 4/4: public API, 243 WAV assets, 243 Ogg assets with all 17 exact
+loop frame/seam checks, and Games mixer-policy cases. Six adapter translation
+units compiled against imported `GUIForms::Audio`. Corpus output is 54,735,409
+Vorbis q6 bytes versus 1,169,418,011 prepared PCM bytes. Q6 is lossy; zero playback
+seam error does not establish perceptual equivalence to original source audio.
+
+The receipt records pinned-source hash/license checks, fixed 16 MiB arena,
+<=64 MiB owned encoded input, actual-frame/finite-sample validation and shared
+512 MiB clip reservations before output allocation. Container CRC/sequence/
+continuation/EOS validation does not replace packet validation; malformed and
+truncated inputs refuse without partial publication. Overshoot is explicitly
+saturated to [-1,1]. Source tests cover cancellation, arena/quota exhaustion,
+reservation release, old-owner preservation/retry and concurrent decode checks;
+private failure seams are absent from the installed library.
+
+Important bounds remain explicit: codec scalar/local arrays and the fixed output
+block are stack storage outside the arena. The audited include-boundary sort
+replacement avoids a possible libc-qsort allocation; vendor bytes are unchanged.
+Opening/initial pumping is serialized to handle the selected decoder's global
+CRC initialization. Codec open/decode calls and waiting for that mutex are
+noninterruptible. Cancellation checks occur between bounded reads, pages, decode
+requests and publication; legacy WAV cancellation surrounds the whole WAV call.
+These are not instantaneous cancellation or whole-process memory guarantees.
+
+The Games loader is separately consumer-owned: reported queue 32 plus one active
+job, one worker, per-slot cancellation and drain/join on destruction. That queue
+does not alter the shared audio foundation's absence of streaming commands.
+No physical-device listening, complete Application SDK, macOS/Linux validation
+or release publication is claimed. Cursor implementation still follows stable
+audio handoff; A2/text-mask readiness is unaffected by these decoder results.
+
+The durable receipt also makes explicit that shared clip payload accounting
+excludes encoded inputs, per-load arenas, stream/control allocations, stacks,
+backend state and allocator overhead. Applications must independently bound
+concurrent loads; Games uses one loader thread. This is neither a total-process
+memory limit nor a hard real-time guarantee.
+
+### Independent coordinator follow-up — corrected source
+
+Review 001 above preserves the original `00dca7c` source/hash snapshot. The
+coordinator subsequently requested explicit `std::barrier<>` spelling and a
+named sample count outside the conversion loop, plus receipt encoding cleanup.
+The corrected source hashes are:
+
+- `src/audio/audio.cpp`:
+  `23091b14e7c6b889f375964cb2f5839e598ccf96c71897d90f20e23fccbd6cd2`.
+- `tests/audio/audio_service_tests.cpp`:
+  `658dc474539655c09f7aab9ee150b712486328a81479791bdc98f03cf319a7de`.
+
+Orchestrator independently matched these two current file hashes against the
+updated receipt. This does not rewrite the earlier snapshot or imply its test
+run used the corrected bytes.
+
+**MEASURED coordinator follow-up:** before correction, independent source CTest
+passed 1/1 in 0.45 seconds and installed consumer 4/4 in 12.72 seconds. After
+correction, root rebuilt and passed source 1/1 in 0.34 seconds, rebuilt the
+tests-disabled library, installed the Audio SDK, rebuilt the independent consumer
+and passed 4/4 in 10.91 seconds. These are coordinator reruns, not Orchestrator
+reruns. The durable receipt is being updated with this distinct provenance.
+
+Root reviewed the complete authored implementation/header/CMake/test delta and
+the two corrections and reported no remaining blocking finding in that exact
+scope. This is not vendor, legacy, whole-platform or physical-device listening
+certification. Games owns the follow-up code/evidence commit; root integrates
+the negotiation batch. Cursor reply 003 now reconciles precise status, unique
+window metrics and terminal lease behavior for its assigned development scope;
+native/installed cursor evidence remains pending.
