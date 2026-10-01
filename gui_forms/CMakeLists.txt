@@ -19,6 +19,7 @@ option(GUI_FORMS_ENABLE_HARFBUZZ_TEXT
        ${GUI_FORMS_ENABLE_SKIA})
 option(GUI_FORMS_BUILD_FUZZERS "Build libFuzzer entry points" OFF)
 option(GUI_FORMS_BUILD_BENCHMARKS "Build measurement harnesses" OFF)
+option(GUI_FORMS_BUILD_DOCUMENT_VIEW_BENCHMARK "Build the renderer-neutral D1 measurement harness" OFF)
 option(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD
        "Build the deterministic native File Manager first-party consumer" OFF)
 
@@ -1439,6 +1440,11 @@ if(GUI_FORMS_BUILD_GALLERY)
             endif()
         endif()
     endif()
+endif()
+
+if(GUI_FORMS_BUILD_DOCUMENT_VIEW_BENCHMARK)
+    add_executable(gui_forms_document_view_benchmark benchmarks/document_view_benchmark.cpp)
+    target_link_libraries(gui_forms_document_view_benchmark PRIVATE gui_forms_core)
 endif()
 
 if(GUI_FORMS_BUILD_BENCHMARKS)

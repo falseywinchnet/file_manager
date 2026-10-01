@@ -8,6 +8,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace {
@@ -40,11 +41,11 @@ DocumentPageRequest request(DocumentViewState& state, std::uint64_t begin, std::
     return *result.request;
 }
 
-DocumentPage identity_page(const DocumentPageRequest& token, std::string text) {
+DocumentPage identity_page(const DocumentPageRequest& token, std::string_view text) {
     DocumentPage page{};
     page.request = token;
     page.covered = token.permitted;
-    page.display_utf8 = std::move(text);
+    page.display_utf8.assign(text);
     if (!page.display_utf8.empty()) {
         const std::uint32_t end = static_cast<std::uint32_t>(page.display_utf8.size());
         const DocumentMapSpan span{.source = page.covered, .begin = DisplayByteOffset(0),
@@ -166,6 +167,16 @@ void test_full_token_and_binding() {
             "same-revision page replacement invalidates BOTH old mapping directions");
     require(current.status == DocumentViewStatus::success && (*current.position).value == 4,
             "new page maps same display position differently");
+    for (std::size_t index = 0; index < 3; ++index) {
+        DocumentPageRequest forged_mapping = next;
+        if (index == 0) { forged_mapping.viewport.horizontal_dip = 1; }
+        if (index == 1) { forged_mapping.permitted.begin = SourceByteOffset(2); }
+        if (index == 2) { ++forged_mapping.revision.revision; }
+        const SourceMappingResult source = state.source_position(forged_mapping, DisplayByteOffset(1));
+        const DisplayMappingResult display = state.display_position(forged_mapping, SourceByteOffset(4));
+        require(source.status == DocumentViewStatus::stale && display.status == DocumentViewStatus::stale,
+                "exact mapping rejects altered viewport, permitted interval and revision");
+    }
 
     const DocumentPageRequest pending = request(state, 0, 3);
     const DocumentViewStatus invalid_bind = state.bind({1, 1}, SourceByteOffset(7));
@@ -197,13 +208,14 @@ void test_mapping_units() {
     page.covered = token.permitted;
     // Literal label, multibyte e-acute, one illegal byte and one CRLF token.
     page.display_utf8 = "[BYTE FF] A\xc3\xa9[BYTE FF][CRLF]";
-    page.mapping = {
+    const std::array<DocumentMapSpan, 3> units{{
         {.source = range(0, 13), .begin = DisplayByteOffset(0), .end = DisplayByteOffset(13),
          .kind = DocumentMapKind::identity_utf8},
         {.source = range(13, 14), .begin = DisplayByteOffset(13), .end = DisplayByteOffset(22),
          .kind = DocumentMapKind::atomic_token},
         {.source = range(14, 16), .begin = DisplayByteOffset(22), .end = DisplayByteOffset(28),
-         .kind = DocumentMapKind::atomic_token}};
+         .kind = DocumentMapKind::atomic_token}}};
+    page.mapping.assign(units.begin(), units.end());
     publish(state, page);
     const SourceMappingResult literal = state.source_position(token, DisplayByteOffset(2));
     require(literal.status == DocumentViewStatus::success && (*literal.position).value == 2,
@@ -242,11 +254,14 @@ void test_refusal_preserves_page_and_capacity() {
     status = state.publish(std::move(malformed));
     require(status == DocumentViewStatus::invalid_page, "invalid display UTF8 refused");
     malformed.display_utf8[0] = 'a';
-    malformed.display_utf8.reserve(DocumentViewLimits::display_capacity + 1);
+    const std::size_t excessive_display_capacity = DocumentViewLimits::display_capacity + 1;
+    malformed.display_utf8.reserve(excessive_display_capacity);
     status = state.publish(std::move(malformed));
     require(status == DocumentViewStatus::budget_exceeded, "small live string with excessive capacity refused");
-    malformed = identity_page(token, "abc");
-    malformed.mapping.reserve(DocumentViewLimits::mapping_capacity + 1);
+    DocumentPage replacement = identity_page(token, "abc");
+    malformed = std::move(replacement);
+    const std::size_t excessive_mapping_capacity = DocumentViewLimits::mapping_capacity + 1;
+    malformed.mapping.reserve(excessive_mapping_capacity);
     status = state.publish(std::move(malformed));
     require(status == DocumentViewStatus::budget_exceeded, "mapping capacity separate from length");
     const std::optional<DocumentPage>& retained = state.page();
@@ -276,13 +291,15 @@ void test_large_mapping_reference_and_reuse() {
         DocumentPage page{};
         page.request = token;
         page.covered = token.permitted;
-        page.display_utf8.reserve(9 * 65'536);
+        constexpr std::size_t display_capacity = 9 * 65'536;
+        page.display_utf8.reserve(display_capacity);
         page.mapping.reserve(65'536);
         for (std::uint32_t index = 0; index < 65'536; ++index) {
             page.display_utf8.append("[BYTE FF]");
             const std::uint32_t display_begin = 9 * index;
             const std::uint32_t display_end = display_begin + 9;
-            const std::uint64_t source_end = static_cast<std::uint64_t>(index) + 1;
+            const std::uint64_t source_begin = index;
+            const std::uint64_t source_end = source_begin + 1;
             const DocumentMapSpan span{.source = range(index, source_end),
                 .begin = DisplayByteOffset(display_begin), .end = DisplayByteOffset(display_end),
                 .kind = DocumentMapKind::atomic_token};
@@ -301,6 +318,73 @@ void test_large_mapping_reference_and_reuse() {
     }
 }
 
+void test_invalid_viewports_and_page_partitions() {
+    DocumentViewState state{};
+    bind(state, 20);
+    const DocumentPageRequest token = request(state, 0, 3);
+    const DocumentPageRequest later = request(state, 3, 6);
+    const SourceByteRange permitted = range(0, 3);
+    const double infinity = std::numeric_limits<double>::infinity();
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const std::array<double, 3> invalid_offsets{-1.0, infinity, nan};
+    for (std::size_t index = 0; index < invalid_offsets.size(); ++index) {
+        DocumentViewport invalid = viewport(0);
+        invalid.horizontal_dip = invalid_offsets[index];
+        const DocumentRequestResult result = state.request_page(invalid, permitted);
+        require(result.status == DocumentViewStatus::invalid_range, "invalid DIP precedes capacity");
+    }
+    const SourceByteRange reversed = range(3, 0);
+    const SourceByteRange outside = range(0, 21);
+    const DocumentViewport origin = viewport(0);
+    const DocumentRequestResult reversed_result = state.request_page(origin, reversed);
+    const DocumentRequestResult outside_result = state.request_page(origin, outside);
+    require(reversed_result.status == DocumentViewStatus::invalid_range &&
+            outside_result.status == DocumentViewStatus::invalid_range, "range validation before slot lookup");
+    DocumentPage valid = identity_page(later, "def");
+    publish(state, valid);
+    finish(state, token);
+
+    const DocumentPageRequest next = request(state, 0, 3);
+    const std::array<SourceByteRange, 3> invalid_coverage{
+        range(0, 0), range(0, 4), range(1, 3)};
+    for (std::size_t index = 0; index < invalid_coverage.size(); ++index) {
+        DocumentPage page = identity_page(next, "abc");
+        page.covered = invalid_coverage[index];
+        const DocumentViewStatus status = state.publish(std::move(page));
+        require(status == DocumentViewStatus::invalid_page, "nonEOF empty, excessive, missing anchor coverage");
+    }
+    DocumentPage malformed = identity_page(next, "abc");
+    malformed.mapping[0].end = DisplayByteOffset(2);
+    DocumentViewStatus status = state.publish(std::move(malformed));
+    require(status == DocumentViewStatus::invalid_page, "unequal identity lengths refused");
+    malformed.mapping[0].end = DisplayByteOffset(4);
+    status = state.publish(std::move(malformed));
+    require(status == DocumentViewStatus::invalid_page, "display span beyond payload refused");
+    malformed.mapping[0].end = DisplayByteOffset(3);
+    malformed.mapping[0].kind = static_cast<DocumentMapKind>(255);
+    status = state.publish(std::move(malformed));
+    require(status == DocumentViewStatus::invalid_page, "invalid enum refused");
+    malformed = DocumentPage{};
+
+    DocumentPageRequest forged = next;
+    forged.permitted.end = SourceByteOffset(2);
+    const DocumentViewStatus changed_interval = state.finish(forged);
+    forged = next;
+    ++forged.revision.revision;
+    const DocumentViewStatus changed_revision = state.finish(forged);
+    require(changed_interval == DocumentViewStatus::stale && changed_revision == DocumentViewStatus::stale,
+            "all token fields participate in release authority");
+    finish(state, next);
+
+    const DocumentViewStatus zero_identity = state.bind({0, 1}, SourceByteOffset(20));
+    const DocumentViewStatus zero_revision = state.bind({1, 0}, SourceByteOffset(20));
+    require(zero_identity == DocumentViewStatus::invalid_revision &&
+            zero_revision == DocumentViewStatus::invalid_revision, "zero identities rejected");
+    bind(state, 20, {1, 2});
+    const DocumentViewStatus backward = state.bind({1, 1}, SourceByteOffset(20));
+    require(backward == DocumentViewStatus::stale, "revision cannot decrease");
+}
+
 } // namespace
 
 int main() {
@@ -311,6 +395,7 @@ int main() {
         test_mapping_units();
         test_refusal_preserves_page_and_capacity();
         test_large_mapping_reference_and_reuse();
+        test_invalid_viewports_and_page_partitions();
         std::cout << "document view D1 fixtures passed; map span bytes=" << sizeof(DocumentMapSpan) << '\n';
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

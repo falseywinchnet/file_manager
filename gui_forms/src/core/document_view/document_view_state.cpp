@@ -30,7 +30,7 @@ bool scalar_boundary(std::string_view text, std::size_t offset) noexcept {
     if (offset > text.size()) { return false; }
     if (offset == text.size()) { return true; }
     const unsigned char byte = static_cast<unsigned char>(text[offset]);
-    const unsigned char marker = byte & 0xc0U;
+    const unsigned int marker = byte & 0xc0U;
     const bool boundary = marker != 0x80U;
     return boundary;
 }
@@ -284,7 +284,9 @@ DisplayMappingResult DocumentViewState::display_position(
             return result;
         }
         const std::uint64_t relative = position.value - span.source.begin.value;
-        display += static_cast<std::uint32_t>(relative);
+        // Validated identity extents fit the page-local uint32 display range.
+        const std::uint32_t display_relative = static_cast<std::uint32_t>(relative);
+        display += display_relative;
         const bool boundary = scalar_boundary(current.display_utf8, display);
         if (!boundary) { result.status = DocumentViewStatus::invalid_boundary; return result; }
     }
