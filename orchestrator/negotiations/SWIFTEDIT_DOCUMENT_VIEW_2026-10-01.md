@@ -314,3 +314,149 @@ a quota-capable candidate. This supersedes any quota-or-fixture-only reading
 of the provider's earlier proposal. It grants no hard-bounded native availability
 and selects no generic allocator, sandbox architecture or UI executor. Profile
 reconciliation must state which limits are enforced, measured or still unknown.
+
+## Native diagnostic receipt 001 — negative scheduling evidence
+
+**MEASURED** — The provider's
+[native shaping receipt](../../gui_forms/experiments/TEXT_LAYOUT_NATIVE_PROBE_2026-10-01.md),
+[initial CSV](../../gui_forms/experiments/TEXT_LAYOUT_NATIVE_PROBE_2026-10-01.csv)
+and [reviewed CSV](../../gui_forms/experiments/TEXT_LAYOUT_NATIVE_PROBE_REVIEWED_2026-10-01.csv)
+record two completed runs of the existing private shaping path. Orchestrator
+checked the receipt against both CSV summaries; it did not rerun the probe.
+
+Scope: Windows 11, GCC 16.2 Release, four fixed bundled fonts, HarfBuzz/FreeType
+enabled, Skia/native hosts disabled, with concurrent development not isolated.
+The receipt pins libraries, fonts and source hashes. Each case has a first shape
+after font registration and 31 warm-engine samples; first is not OS-cache cold.
+Timing covers `engine.shape`, including internal temporary destruction, but
+excludes font setup, returned-result destruction, paint and the external oracle.
+
+| Case | First-run warm p50 / worst (ms) | Reviewed-run warm p50 / worst (ms) |
+|---|---:|---:|
+| ASCII, 16,379 bytes | 4.1303 / 7.6094 | 4.1047 / 7.957 |
+| Mixed bidi, 16,384 bytes | 328.826 / 894.725 | 312.668 / 331.370 |
+| Emoji/fallback, 16,380 bytes | 155.825 / 170.971 | 152.886 / 197.012 |
+
+The mixed-bidi and emoji cases produced 3,073 and 2,341 shaped runs respectively;
+these counts are not timing sample counts. Both executions completed within the
+external 60-second process deadline. That deadline supplies no within-call
+cancellation. The second execution does not erase the first execution's tail.
+
+This is negative evidence for admitting UI-thread execution from the 16 KiB
+input cap alone. Worker placement alone would not establish bounded completion
+or cancellation. Scheduling and work subdivision remain unselected; no
+end-to-end latency, geometry correctness or speedup conclusion follows.
+
+Returned-vector and encoded-font capacities were observed, but internal peak
+allocations, library caches and temporary capacities remain unknown. The
+16,383-byte enormous-grapheme case has one missing cluster in both executions,
+so it does not establish complete coverage. Repeated glyph/cluster hashes and
+aggregate checks provide limited repeatability, not full geometry or independent
+shaping parity. Any optimization comparison needs complete baseline geometry
+validation outside timing. Allocation-failure atomicity was not tested.
+
+The receipt's house-style review covers the diagnostic and its narrow CMake
+target only. It does not certify the production engine or vendor sources.
+Public D3a/D2a, frozen SDKs, runtime availability and the separate input bugfix
+are not changed by this evidence receipt.
+
+## Worker development direction and consumer reply 002
+
+**OBSERVED** — After baseline checkpoint `28ecc70`, the coordinator authorized
+a concrete private worker proving direction: a worker-owned font engine, one
+replacement job/result slot, one coalesced desired intent, generation-checked
+publication, and close/drain/join. Private proof may follow narrow diagnostic
+attribution. Public prepared-layout APIs are not frozen by that direction.
+
+SwiftEdit confirmed that page, font or width changes immediately revoke stale
+page/layout authority while preserving source and selection. An occupied slot
+retains its job, result and reservations through cancellation until completion
+and release acknowledgement. New input replaces only the latest desired
+metadata; the latest job dispatches after the old slot is released. Explicit
+pending-region status must not relabel old geometry as the target region.
+
+Close disables new requests and revokes callbacks before drain/join. The native
+shape call remains noninterruptible: cancellation suppresses publication but
+does not promise bounded call completion or join latency. Model/service and
+worker-owned resources must survive until join completes. No detached worker
+or early slot release follows from requesting cancellation.
+
+Prepared-result storage and font leases remain under concrete provider review.
+The worker owns mutable HarfBuzz/FreeType engine state. The proposed paint path
+must identify which immutable font bytes and glyph/run data survive in a result,
+whether paint creates independent font objects, and which thread releases each
+resource. An immutable wrapper does not establish that a mutable native face is
+safe to share across threads. Revoked publication/paint authority is distinct
+from the memory lifetime needed for safe release.
+
+The measured-capacity profile must separately account for checked input/result
+arrays and known font bytes, simultaneous active/replacement/input storage and
+overlapping old/new font owners. Opaque library peak/cache allocations remain
+unknown pending evidence. Lack of complete opaque quotas does not prohibit this
+authorized private native experiment; it prohibits claiming a proved hard bound.
+
+### Separate input-normalization correction
+
+**OBSERVED** — The coordinator separately authorized the provider to add missing
+`PhysicalKey::slash` (HID `0x38`) and the Windows `VK_OEM_2` mapping, with focused
+US-layout Ctrl+Shift+slash tests. This is an additive development correction
+within existing VK-derived normalization, not a new keyboard architecture gate.
+It does not establish character-based Ctrl+? across keyboard layouts. Frozen
+SDKs remain unchanged; implementation/test evidence is a separate provider
+receipt. This authorization does not widen the document-layout API work.
+
+Provider completion receipt:
+[Windows slash-key audit](../../gui_forms/docs/WINDOWS_SLASH_KEY_AUDIT_2026-10-01.md).
+**OBSERVED** — The provider reports the public slash constant and `VK_OEM_2`
+case are implemented in a private translator called by the actual host.
+**MEASURED** — The coordinator reran the Windows Release host build and focused
+mapper test after removing construction-only synthetic-event assertions; 1/1
+passed in 0.05 seconds. Evidence covers the actual mapper's behavior, not
+modifier/down-up dispatch. Orchestrator read the receipt and coordinator report;
+it did not rerun the test. Native keyboard delivery, active layout, WM_CHAR
+behavior and SwiftEdit command dispatch remain untested by this fixture.
+Installed consumer/native US-layout acceptance remain pending. The provider's
+house-style review covers the named correction scope, not surrounding legacy
+host code. No runtime-availability promotion follows from this source receipt.
+
+## Provider reply 003 — concrete private prepared-result ownership
+
+**CANDIDATE** — The provider nominated a private prototype route that makes the
+worker/painter boundary concrete without freezing the public Painter API:
+
+- The worker exclusively owns mutable HarfBuzz/FreeType engines and faces.
+- The prepared result owns copied text and `ShapedText` glyph/run arrays, plus
+  an immutable encoded-font lease and table mapping result-local face IDs to
+  exact encoded bytes and face index. Those IDs are not current-provider globals.
+- The painter creates its own mutable raster faces from the retained encoded
+  bytes on its own executor. It draws the prepared glyph positions without
+  reshaping and never shares worker `FT_Face` or `hb_font` objects.
+- The encoded-byte lease may outlive the worker. Each executor destroys its own
+  native faces. Revoked generation authority still forbids stale publication or
+  current paint even while bytes remain alive for safe release.
+
+This route resolves the proposed ownership boundary for the private experiment;
+it does not establish implemented thread safety or glyph/paint parity. Exact
+font bytes, face index and effective font configuration must remain consistent
+with the prepared identity. The prototype must verify result-local lookup and
+glyph-ID/position compatibility on the paint path, reject missing dependencies,
+and preserve previous coherent presentation on failure. The existing shaping
+receipt does not establish complete-vs-resource-failed atomicity.
+
+The provider confirms active geometry plus one replacement slot, including
+cancelled results until release, one coalesced desired intent and full-generation
+publication. On close, admission stops; the worker completes any noninterruptible
+shape call, drains/releases and joins before engine/service destruction. Worst
+close latency must be measured; no instantaneous cancellation is claimed.
+
+The concrete measured-capacity experiment accounts for controlled input/output
+and immutable font owners separately from opaque worker and painter caches.
+The independent paint faces may add memory beyond the shaping probe's known
+font bytes and returned arrays; those additions must be measured or marked
+unknown. Numerical byte/count profiles and simultaneous lifetime totals remain
+to be reconciled from prototype evidence. Opaque quotas are not a prerequisite
+for this authorized experiment and are not claimed by it.
+
+Provider attribution and private prototype evidence are the next review input.
+No public layout seam, installed capability or final native editor availability
+is admitted by this records-only reconciliation.
