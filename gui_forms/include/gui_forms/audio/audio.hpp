@@ -3,12 +3,13 @@
 #include <filesystem>
 #include <memory>
 #include <span>
+#include <stop_token>
 #include <vector>
 
 namespace gui_forms {
 enum class AudioStatus {
     ok, invalid_format, invalid_value, file_error, allocation_failed,
-    quota_exceeded, device_unavailable, backend_error, closed
+    quota_exceeded, device_unavailable, backend_error, closed, cancelled
 };
 class AudioClip;
 struct AudioClipResult final {
@@ -27,6 +28,15 @@ public:
     // latency-sensitive path. Little-endian RIFF PCM16/float32 stereo 48 kHz only.
     [[nodiscard]] static AudioClipResult load_wav(const std::filesystem::path& path,
                                   std::uint64_t trim_frames = 0);
+    // Single-stream Ogg Vorbis, stereo 48 kHz, <=64 MiB encoded input and
+    // <=600 seconds decoded. Owns input plus a 16 MiB codec arena until close.
+    // Output is charged to the live-clip budget before allocation. Vorbis
+    // overshoot is saturated to [-1,1]. Failure publishes no partial clip.
+    // Synchronous: use a background executor. Cancellation is observed between
+    // reads, pages and <=4096-frame decode calls and before publication; foreign
+    // codec open/decode calls and the serialized open wait cannot be interrupted.
+    [[nodiscard]] static AudioClipResult load_ogg(const std::filesystem::path& path,
+                                  std::stop_token cancellation = {});
     std::span<const float> samples() const noexcept;
     std::uint64_t frames() const noexcept;
 private:

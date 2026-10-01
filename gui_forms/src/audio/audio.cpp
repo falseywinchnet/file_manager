@@ -8,6 +8,47 @@
 #include <cmath>
 #include <fstream>
 #include <limits>
+#include <mutex>
+
+namespace {
+// stb_vorbis sorts codewords and floor points through qsort. Some C libraries
+// allocate a temporary merge buffer there, outside the supplied codec arena.
+// This private foreign-call adapter uses an in-place heap and constant scratch.
+using VorbisCompare = int (*)(const void*, const void*);
+void vorbis_swap(unsigned char* first, unsigned char* second, std::size_t width) {
+    for (std::size_t i = 0; i < width; ++i) { std::swap(first[i], second[i]); }
+}
+void vorbis_sift(unsigned char* data, std::size_t root, std::size_t count,
+                 std::size_t width, VorbisCompare compare) {
+    while (root < count / 2) {
+        std::size_t child = root * 2 + 1;
+        if (child + 1 < count) {
+            const int order = compare(data + child * width, data + (child + 1) * width);
+            if (order < 0) { ++child; }
+        }
+        const int order = compare(data + root * width, data + child * width);
+        if (order >= 0) { return; }
+        vorbis_swap(data + root * width, data + child * width, width);
+        root = child;
+    }
+}
+void vorbis_sort(void* buffer, std::size_t count, std::size_t width, VorbisCompare compare) {
+    if (count < 2) { return; }
+    unsigned char* data = static_cast<unsigned char*>(buffer);
+    for (std::size_t i = count / 2; i > 0; --i) { vorbis_sift(data, i - 1, count, width, compare); }
+    for (std::size_t end = count; end > 1; --end) {
+        vorbis_swap(data, data + (end - 1) * width, width);
+        vorbis_sift(data, 0, end - 1, width, compare);
+    }
+}
+}
+#define STB_VORBIS_NO_STDIO
+#define STB_VORBIS_NO_PUSHDATA_API
+#define STB_VORBIS_NO_INTEGER_CONVERSION
+#define STB_VORBIS_MAX_CHANNELS 2
+#define qsort vorbis_sort
+#include "extras/stb_vorbis.c"
+#undef qsort
 
 namespace gui_forms {
 namespace {
@@ -15,10 +56,24 @@ constexpr std::uint64_t maximum_frames = 28800000;
 constexpr std::uint64_t maximum_clip_bytes = maximum_frames * 2 * sizeof(float);
 constexpr std::uint64_t clip_budget = 512ULL * 1024 * 1024;
 constexpr std::uint64_t file_limit = 256ULL * 1024 * 1024;
+constexpr std::uint64_t ogg_file_limit = 64ULL * 1024 * 1024;
+constexpr std::size_t vorbis_arena_bytes = 16 * 1024 * 1024;
+// Upstream initializes a process-global CRC table on each open. Our decoder
+// uses sequential pull only (never seek/length/push, which read that table).
+std::mutex vorbis_open_mutex{};
 std::atomic<std::uint64_t> clip_bytes{0};
+#ifdef GUI_FORMS_AUDIO_TESTING
+thread_local std::size_t test_arena_bytes = vorbis_arena_bytes;
+thread_local std::stop_source* test_cancel_after_chunk = nullptr;
+thread_local std::uint64_t test_clip_budget = clip_budget;
+#endif
 bool charge_clip(std::uint64_t bytes) {
+    std::uint64_t budget = clip_budget;
+#ifdef GUI_FORMS_AUDIO_TESTING
+    budget = test_clip_budget;
+#endif
     std::uint64_t current = clip_bytes.load();
-    while (current <= clip_budget && bytes <= clip_budget - current) {
+    while (current <= budget && bytes <= budget - current) {
         const bool accepted = clip_bytes.compare_exchange_weak(current, current + bytes);
         if (accepted) {
             return true;
@@ -56,6 +111,84 @@ bool decode_float32(const unsigned char* bytes, std::span<float> output) {
     }
     return true;
 }
+constexpr std::array<std::uint32_t, 256> make_ogg_crc_table() {
+    std::array<std::uint32_t, 256> table{};
+    for (std::size_t i = 0; i < table.size(); ++i) {
+        std::uint32_t value = static_cast<std::uint32_t>(i) << 24;
+        for (unsigned bit = 0; bit < 8; ++bit) {
+            value = (value & 0x80000000U) != 0 ? (value << 1) ^ 0x04c11db7U : value << 1;
+        }
+        table[i] = value;
+    }
+    return table;
+}
+constexpr std::array<std::uint32_t, 256> ogg_crc_table = make_ogg_crc_table();
+std::uint32_t ogg_crc(std::span<const unsigned char> page) {
+    std::uint32_t crc = 0;
+    // The checksum field is treated as four zero bytes by the Ogg checksum.
+    for (std::size_t i = 0; i < page.size(); ++i) {
+        const unsigned char value = i >= 22 && i < 26 ? 0 : page[i];
+        crc = (crc << 8) ^ ogg_crc_table[(crc >> 24) ^ value];
+    }
+    return crc;
+}
+struct OggExtent final {
+    std::uint64_t frames{};
+    AudioStatus status{AudioStatus::invalid_format};
+};
+// Validate complete framing before passing packets to the codec. Reject chained
+// streams, missing end pages, damaged checksums and inconsistent continuation.
+OggExtent inspect_ogg(std::span<const unsigned char> bytes, std::stop_token cancellation) {
+    std::size_t offset = 0;
+    std::uint32_t serial = 0, sequence = 0;
+    std::uint64_t previous_granule = 0;
+    bool continued = false;
+    while (offset < bytes.size()) {
+        if (cancellation.stop_requested()) { return {0, AudioStatus::cancelled}; }
+        if (bytes.size() - offset < 27) { return {}; }
+        const unsigned char* header = bytes.data() + offset;
+        const unsigned flags = header[5];
+        const std::size_t segments = header[26];
+        if (!tag(header, "OggS") || header[4] != 0 || flags > 7 ||
+            segments == 0 || bytes.size() - offset < 27 + segments) { return {}; }
+        if (offset == 0) {
+            if (flags != 2) { return {}; }
+            serial = little32(header + 14);
+        } else if ((flags & 2) != 0) { return {}; }
+        if (little32(header + 14) != serial || little32(header + 18) != sequence ||
+            ((flags & 1) != 0) != continued) { return {}; }
+        ++sequence;
+        std::size_t page_bytes = 27 + segments;
+        for (std::size_t i = 0; i < segments; ++i) { page_bytes += header[27 + i]; }
+        if (page_bytes > bytes.size() - offset) { return {}; }
+        const std::span<const unsigned char> page(header, page_bytes);
+        const std::uint32_t checksum = ogg_crc(page);
+        if (checksum != little32(header + 22)) { return {}; }
+        continued = header[26 + segments] == 255;
+        const std::uint64_t granule = std::uint64_t(little32(header + 6)) |
+                                      (std::uint64_t(little32(header + 10)) << 32);
+        if (granule != std::numeric_limits<std::uint64_t>::max()) {
+            if (granule < previous_granule || granule > maximum_frames) { return {}; }
+            previous_granule = granule;
+        }
+        offset += page_bytes;
+        if ((flags & 4) != 0) {
+            if (offset != bytes.size() || continued || granule == 0 || granule > maximum_frames) { return {}; }
+            return {granule, AudioStatus::ok};
+        }
+    }
+    return {};
+}
+struct VorbisOwner final {
+    // Member order keeps input and arena alive until the decoder has closed.
+    std::unique_ptr<unsigned char[]> input{};
+    std::unique_ptr<std::max_align_t[]> arena{};
+    stb_vorbis* decoder{};
+    VorbisOwner() = default;
+    VorbisOwner(const VorbisOwner&) = delete;
+    VorbisOwner& operator=(const VorbisOwner&) = delete;
+    ~VorbisOwner() { if (decoder != nullptr) { stb_vorbis_close(decoder); } }
+};
 }
 
 AudioClip::~AudioClip() { clip_bytes.fetch_sub(charged_bytes_); }
@@ -179,6 +312,95 @@ AudioClipResult AudioClip::load_wav(const std::filesystem::path& path, std::uint
     }
 }
 
+AudioClipResult AudioClip::load_ogg(const std::filesystem::path& path, std::stop_token cancellation) {
+    std::uint64_t reserved_bytes = 0;
+    bool owned_charge = false;
+    try {
+        if (cancellation.stop_requested()) { return {{}, AudioStatus::cancelled}; }
+        std::error_code error{};
+        const std::uint64_t file_bytes = std::filesystem::file_size(path, error);
+        if (error) { return {{}, AudioStatus::file_error}; }
+        if (file_bytes < 58 || file_bytes > ogg_file_limit) { return {{}, AudioStatus::invalid_format}; }
+        VorbisOwner owner{};
+        owner.input = std::make_unique<unsigned char[]>(static_cast<std::size_t>(file_bytes));
+        std::ifstream file(path, std::ios::binary);
+        std::size_t offset = 0;
+        while (offset < file_bytes) {
+            if (cancellation.stop_requested()) { return {{}, AudioStatus::cancelled}; }
+            const std::size_t count = std::min<std::size_t>(65536, static_cast<std::size_t>(file_bytes) - offset);
+            file.read(reinterpret_cast<char*>(owner.input.get() + offset), static_cast<std::streamsize>(count));
+            if (!file) { return {{}, AudioStatus::file_error}; }
+            offset += count;
+        }
+        const int trailing = file.peek();
+        if (trailing != std::char_traits<char>::eof()) { return {{}, AudioStatus::invalid_format}; }
+        const std::span<const unsigned char> bytes(owner.input.get(), static_cast<std::size_t>(file_bytes));
+        const OggExtent extent = inspect_ogg(bytes, cancellation);
+        if (extent.status != AudioStatus::ok) { return {{}, extent.status}; }
+        std::size_t arena_bytes = vorbis_arena_bytes;
+#ifdef GUI_FORMS_AUDIO_TESTING
+        arena_bytes = test_arena_bytes;
+#endif
+        owner.arena = std::make_unique<std::max_align_t[]>(arena_bytes / sizeof(std::max_align_t));
+        const stb_vorbis_alloc allocation{reinterpret_cast<char*>(owner.arena.get()), static_cast<int>(arena_bytes)};
+        int decoder_error = 0;
+        {
+            std::lock_guard<std::mutex> lock(vorbis_open_mutex);
+            if (cancellation.stop_requested()) { return {{}, AudioStatus::cancelled}; }
+            owner.decoder = stb_vorbis_open_memory(owner.input.get(), static_cast<int>(file_bytes), &decoder_error, &allocation);
+        }
+        if (owner.decoder == nullptr) {
+            const AudioStatus status = decoder_error == VORBIS_outofmem ? AudioStatus::allocation_failed : AudioStatus::invalid_format;
+            return {{}, status};
+        }
+        const stb_vorbis_info info = stb_vorbis_get_info(owner.decoder);
+        if (info.channels != 2 || info.sample_rate != 48000) { return {{}, AudioStatus::invalid_format}; }
+        if (cancellation.stop_requested()) { return {{}, AudioStatus::cancelled}; }
+        reserved_bytes = extent.frames * 2 * sizeof(float);
+        const bool accepted = charge_clip(reserved_bytes);
+        if (!accepted) { reserved_bytes = 0; return {{}, AudioStatus::quota_exceeded}; }
+        std::shared_ptr<AudioClip> clip(new AudioClip);
+        AudioClip& owned = *clip;
+        owned.charged_bytes_ = reserved_bytes;
+        owned_charge = true;
+        owned.sample_count_ = static_cast<std::size_t>(extent.frames * 2);
+        owned.samples_ = std::make_unique<float[]>(owned.sample_count_);
+        std::array<float, 8192> block{};
+        std::uint64_t decoded_frames = 0;
+        for (;;) {
+            if (cancellation.stop_requested()) { return {{}, AudioStatus::cancelled}; }
+            const int frames = stb_vorbis_get_samples_float_interleaved(owner.decoder, 2, block.data(), static_cast<int>(block.size()));
+            decoder_error = stb_vorbis_get_error(owner.decoder);
+            if (decoder_error != VORBIS__no_error || frames < 0 || frames > 4096) { return {{}, AudioStatus::invalid_format}; }
+            if (frames == 0) { break; }
+            const std::uint64_t count = static_cast<std::uint64_t>(frames);
+            if (count > maximum_frames - decoded_frames || count > extent.frames - decoded_frames) {
+                return {{}, AudioStatus::invalid_format};
+            }
+            const std::size_t destination = static_cast<std::size_t>(decoded_frames * 2);
+            for (std::size_t i = 0; i < static_cast<std::size_t>(frames) * 2; ++i) {
+                if (!std::isfinite(block[i])) { return {{}, AudioStatus::invalid_value}; }
+                owned.samples_[destination + i] = std::clamp(block[i], -1.0f, 1.0f);
+            }
+            decoded_frames += count;
+#ifdef GUI_FORMS_AUDIO_TESTING
+            if (test_cancel_after_chunk != nullptr) { (*test_cancel_after_chunk).request_stop(); }
+#endif
+        }
+        if (decoded_frames != extent.frames) { return {{}, AudioStatus::invalid_format}; }
+        if (cancellation.stop_requested()) { return {{}, AudioStatus::cancelled}; }
+        AudioClipResult result{std::move(clip), AudioStatus::ok};
+        return result;
+    } catch (const std::bad_alloc&) {
+        if (!owned_charge) { clip_bytes.fetch_sub(reserved_bytes); }
+        return {{}, AudioStatus::allocation_failed};
+    } catch (const std::filesystem::filesystem_error&) {
+        return {{}, AudioStatus::file_error};
+    } catch (const std::ios_base::failure&) {
+        return {{}, AudioStatus::file_error};
+    }
+}
+
 struct AudioEngineState final {
     ma_engine engine{};
     ma_device device{};
@@ -251,6 +473,16 @@ struct AudioVoiceState final {
 };
 
 #ifdef GUI_FORMS_AUDIO_TESTING
+void audio_test_decode_limits(std::size_t arena_bytes, std::uint64_t budget,
+                              std::stop_source* cancel_after_chunk) {
+    test_arena_bytes = std::min(arena_bytes, vorbis_arena_bytes);
+    test_clip_budget = std::min(budget, clip_budget);
+    test_cancel_after_chunk = cancel_after_chunk;
+}
+std::uint64_t audio_test_clip_bytes() {
+    const std::uint64_t result = clip_bytes.load();
+    return result;
+}
 // Private regression seam: model callback errors arriving after revocation.
 AudioStatus audio_test_revoked_callback_status() {
     AudioEngineState state{};
@@ -260,6 +492,8 @@ AudioStatus audio_test_revoked_callback_status() {
     const AudioStatus result = state.status.load();
     return result;
 }
+
+
 #endif
 
 AudioVoice::AudioVoice() = default;
