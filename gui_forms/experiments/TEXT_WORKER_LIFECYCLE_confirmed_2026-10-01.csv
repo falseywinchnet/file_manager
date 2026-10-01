@@ -1,0 +1,4 @@
+input_bytes,foreground_ticks,running_ticks,max_gap_ms,elapsed_ms,close_ms,completed
+16384,7,6,18.9779,107.543,90.269,5
+retained_text_capacity,retained_run_capacity_elements,retained_glyph_capacity_elements,shared_encoded_capacity_bytes
+16384,4096,10752,1314192
