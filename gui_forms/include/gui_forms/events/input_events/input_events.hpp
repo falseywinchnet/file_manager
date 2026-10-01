@@ -118,6 +118,7 @@ struct PhysicalKey final {
     static constexpr std::uint32_t space = 0x2CU;
     static constexpr std::uint32_t minus = 0x2DU;
     static constexpr std::uint32_t equal = 0x2EU;
+    static constexpr std::uint32_t slash = 0x38U;
     static constexpr std::uint32_t f1 = 0x3AU;
     static constexpr std::uint32_t f2 = 0x3BU;
     static constexpr std::uint32_t f3 = 0x3CU;

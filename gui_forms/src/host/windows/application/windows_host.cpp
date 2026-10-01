@@ -2,6 +2,7 @@
 #include "../accessibility/windows_accessibility.hpp"
 #include "../services/windows_clipboard_image.hpp"
 #include "../services/windows_cursor.hpp"
+#include "../input/windows_key_translation.hpp"
 
 #include "gui_forms/live_surface.hpp"
 #include "gui_forms/text.hpp"
@@ -501,32 +502,6 @@ PointerButton pointer_button(UINT message, WPARAM state) noexcept {
         if ((state & MK_RBUTTON) != 0U) return PointerButton::secondary;
         if ((state & MK_MBUTTON) != 0U) return PointerButton::middle;
         return PointerButton::none;
-    }
-}
-
-std::uint32_t physical_key(WPARAM key) noexcept {
-    if (key >= 'A' && key <= 'Z') return 0x04U + static_cast<std::uint32_t>(key - 'A');
-    if (key >= '1' && key <= '9') return 0x1EU + static_cast<std::uint32_t>(key - '1');
-    if (key == '0') return 0x27U;
-    switch (key) {
-    case VK_RETURN: return PhysicalKey::enter;
-    case VK_ESCAPE: return PhysicalKey::escape;
-    case VK_BACK: return PhysicalKey::backspace;
-    case VK_TAB: return PhysicalKey::tab;
-    case VK_SPACE: return PhysicalKey::space;
-    case VK_HOME: return PhysicalKey::home;
-    case VK_PRIOR: return PhysicalKey::page_up;
-    case VK_END: return PhysicalKey::end;
-    case VK_NEXT: return PhysicalKey::page_down;
-    case VK_DELETE: return PhysicalKey::delete_forward;
-    case VK_F1: return PhysicalKey::f1;
-    case VK_F2: return PhysicalKey::f2;
-    case VK_F4: return PhysicalKey::f4;
-    case VK_RIGHT: return PhysicalKey::right;
-    case VK_LEFT: return PhysicalKey::left;
-    case VK_DOWN: return PhysicalKey::down;
-    case VK_UP: return PhysicalKey::up;
-    default: return 0;
     }
 }
 
@@ -2799,7 +2774,7 @@ private:
     void key(KeyAction action, WPARAM wparam, LPARAM lparam) {
         KeyEvent event;
         event.action = action;
-        event.physical_key = physical_key(wparam);
+        event.physical_key = detail::physical_key_from_virtual_key(wparam);
         event.modifiers = modifiers();
         event.repeat = action == KeyAction::down && (lparam & (1LL << 30)) != 0;
         dispatch(std::move(event));
