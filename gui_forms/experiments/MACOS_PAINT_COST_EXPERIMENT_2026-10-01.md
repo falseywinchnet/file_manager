@@ -129,3 +129,17 @@ All timing limits and acceptance checks remain unchanged. These authored hunks
 were source-reviewed for explicit types, failure ordering and diagnostic failure
 containment; the wrapper passes Python compilation. Native re-execution remains
 required. The final source manifest includes these diagnostics.
+
+## Second native attempt: precise rejection retained
+
+Run `36883661867` at `275a133` completed the ordinary Mac job successfully.
+The optional experiment again rejected the comparison: exit 1, 18.17112675
+seconds of process wall time, no accepted marker. The new diagnostic identifies
+interval 1 (exposure), three completed ticks, elapsed 2.25212375 seconds and
+maximum lateness 131,070,458 ns, beyond the unchanged 100 ms limit. Interval 0
+had completed, but its printed values are not an accepted ABBA comparison and
+do not establish the cause of consumer idle CPU. Raw log and receipt are retained
+in the run's `build-evidence-macos-arm64` artifact and locally under
+`.build/provider-275a133-evidence/paint-cost/`. Two cadence failures on hosted CI
+are a limitation of this experiment's usable evidence, not a reason to loosen
+the declared gate or claim the blank-document CPU problem is solved.
