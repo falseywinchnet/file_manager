@@ -1,0 +1,17 @@
+initial_status,0,0,missing_clusters=0,missing_primary=0
+refused,real missing cluster,2
+refused,missing lease,2
+refused,provider generation,1
+refused,revoked epoch with living bytes,1
+refused,effective size,1
+refused,font generation,3
+refused,face index,3
+refused,registered style,3
+refused,wrong encoded font,3
+refused,unknown local face,3
+refused,glyph range,4
+refused,missing glyph zero,4
+refused,nonfinite position,5
+refused,position conversion bound,5
+raster_bytes,ink_pixels,runs
+102400,1443,7

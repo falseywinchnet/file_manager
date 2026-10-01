@@ -233,13 +233,28 @@ public:
 
     [[nodiscard]] static bool covers(Face& face,
                                      std::span<const char32_t> scalars) {
+        bool nominal = true;
         for (const char32_t scalar : scalars) {
             if (ignorable_for_coverage(scalar)) continue;
             if (FT_Get_Char_Index(face.face, static_cast<FT_ULong>(scalar)) == 0U) {
-                return false;
+                nominal = false;
+                break;
             }
         }
-        return true;
+        if (nominal) { return true; }
+        // HarfBuzz can canonically compose a two-scalar cluster even when the
+        // face has no nominal glyph for its combining mark. Keep original text
+        // and offsets; this is only a bounded same-face coverage check.
+        if (scalars.size() != 2) { return false; }
+        const hb_codepoint_t first = static_cast<hb_codepoint_t>(scalars[0]);
+        const hb_codepoint_t second = static_cast<hb_codepoint_t>(scalars[1]);
+        hb_codepoint_t composed{};
+        hb_unicode_funcs_t* unicode = hb_unicode_funcs_get_default();
+        const hb_bool_t combined = hb_unicode_compose(unicode, first, second, &composed);
+        if (!combined) { return false; }
+        const FT_ULong scalar = static_cast<FT_ULong>(composed);
+        const bool covered = FT_Get_Char_Index(face.face, scalar) != 0U;
+        return covered;
     }
 
     [[nodiscard]] std::optional<FontFaceId> register_face(

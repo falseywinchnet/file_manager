@@ -106,7 +106,7 @@ void refuse(paint_probe::Painter& painter, const Prepared& altered,
 }
 
 void exercise(const std::shared_ptr<const FontSet>& fonts) {
-    const Prepared prepared = worker_result(fonts, "ABC שלום العربية 123 office");
+    const Prepared prepared = worker_result(fonts, "ABC שלום العربية 123 a\xcc\x81 office");
     const Prepared reference = reference_result(prepared);
     // Both shaping engines have been destroyed before either painter opens FT.
     paint_probe::Painter painter(fonts);
@@ -124,7 +124,7 @@ void exercise(const std::shared_ptr<const FontSet>& fonts) {
     std::size_t ink_pixels = 0;
     for (const std::uint8_t coverage : baseline) { if (coverage != 0) { ++ink_pixels; } }
     require(ink_pixels > 0, "nonempty actual raster output");
-    const Prepared uncovered = worker_result(fonts, "ABC שלום العربية 123 a\xcc\x81 office");
+    const Prepared uncovered = worker_result(fonts, "\xcc\x81");
     require(uncovered.geometry.missing_clusters == 1, "retained real missing-coverage fixture");
     const paint_probe::Status missing_coverage = painter.paint(uncovered, uncovered.identity, uncovered.authority_epoch);
     require(missing_coverage == paint_probe::Status::missing_font && painter.pixels() == baseline &&

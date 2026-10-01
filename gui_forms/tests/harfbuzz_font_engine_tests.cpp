@@ -460,8 +460,49 @@ void test_call_failure_preserves_caller_and_recovers() {
 } // namespace
 #endif
 
+namespace {
+void test_canonical_pair_coverage_preserves_source() {
+    HarfBuzzFontEngine engine{};
+    const std::vector<std::byte> bytes = read_file(GUI_FORMS_TEST_CARLITO_REGULAR);
+    const std::optional<FontFaceId> registered =
+        engine.register_typeface(FontRole::content, 400, false, bytes);
+    require(registered.has_value(), "canonical pair primary registers");
+    constexpr FontSpec font{FontRole::content, 20.0, 400, false};
+    const ShapedText decomposed = engine.shape("a\xcc\x81", font);
+    const ShapedText composed = engine.shape("\xc3\xa1", font);
+    require(decomposed.missing_clusters == 0 && composed.missing_clusters == 0,
+            "canonical pair uses composed glyph coverage");
+    require(decomposed.runs.size() == 1 && composed.runs.size() == 1,
+            "canonical equivalents use one run");
+    const ShapedFontRun& first = decomposed.runs[0];
+    const ShapedFontRun& second = composed.runs[0];
+    require(first.face == *registered && second.face == *registered &&
+            first.glyphs.size() == 1 && first.glyphs == second.glyphs,
+            "canonical equivalents have identical glyph identity and geometry");
+    require(first.glyphs[0].glyph.value == 1955 && first.glyphs[0].cluster == Utf8Offset(0),
+            "pinned Carlito composition and original cluster");
+    require(first.source_range.start == Utf8Offset(0) && first.source_range.end == Utf8Offset(3) &&
+            second.source_range.start == Utf8Offset(0) && second.source_range.end == Utf8Offset(2),
+            "different original source byte extents remain authoritative");
+    require(decomposed.width == composed.width && decomposed.height == composed.height &&
+            decomposed.ascent == composed.ascent && decomposed.descent == composed.descent,
+            "canonical equivalents have identical metrics");
+    struct MissingCase final { std::string_view input{}; const char* description{}; };
+    constexpr std::array<MissingCase, 3> missing_inputs{
+        MissingCase{"\xcc\x81", "isolated mark remains reported"},
+        MissingCase{"q\xcc\x81", "noncomposable q plus acute remains reported"},
+        MissingCase{"a\xcc\x81\xcc\x81", "longer unsupported cluster remains reported"}};
+    for (const MissingCase& test : missing_inputs) {
+        const ShapedText missing = engine.shape(test.input, font);
+        std::cout << "coverage_case," << test.description << ',' << missing.missing_clusters << '\n';
+        require(missing.missing_clusters == 1, test.description);
+    }
+}
+} // namespace
+
 int main() {
     try {
+        test_canonical_pair_coverage_preserves_source();
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
         test_call_failure_preserves_caller_and_recovers();
 #endif
