@@ -93,3 +93,23 @@ The next evidence needed is the consumer/provider lifecycle agreement, replacing
 the initial request merely to confirm whether a route exists. No runtime
 availability, frozen SDK change or host implementation is authorized by this
 reply. D1-D4 and print P1 remain independent.
+
+## Consumer reply 001 — requested W1 lifecycle
+
+**OBSERVED** — SwiftEdit's consumer chat confirmed New Window means an
+independent blank document with its own main window and picker/find/font owned
+dialogs. No shared document/history or tabs are requested. Failed creation must
+leave existing windows intact. Each main has independent Save As and unsaved
+continuation state.
+
+Closing one main prompts only that document. Cancelling close leaves its state
+and windows live; committed close revokes its queued callbacks and closes its
+owned dialogs without terminating other documents. The final main close exits
+after owned tasks drain. Application shutdown should preflight save/cancel for
+dirty mains, avoid discarding any cancelled document, and preserve already-saved
+documents if a later prompt cancels shutdown.
+
+These are consumer-requested semantics awaiting provider reconciliation, not a
+runtime contract. The precise interaction between shutdown preflight, successful
+saves, queued creation, modal dialogs and committed teardown remains to be
+specified before implementation permission or availability can be recorded.
