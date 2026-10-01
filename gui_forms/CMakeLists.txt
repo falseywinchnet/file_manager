@@ -22,6 +22,7 @@ option(GUI_FORMS_BUILD_BENCHMARKS "Build measurement harnesses" OFF)
 option(GUI_FORMS_BUILD_DOCUMENT_VIEW_BENCHMARK "Build the renderer-neutral D1 measurement harness" OFF)
 option(GUI_FORMS_BUILD_TEXT_LAYOUT_PROBE "Build the private text shaping diagnostic" OFF)
 option(GUI_FORMS_BUILD_TEXT_WORKER_PROBE "Build the private text worker lifecycle proof" OFF)
+option(GUI_FORMS_BUILD_TEXT_PAINT_PROBE "Build the private prepared glyph raster proof" OFF)
 option(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS "Instrument private text shaping phases" OFF)
 option(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE "Record private run directions for geometry comparison" OFF)
 option(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD
@@ -1470,6 +1471,20 @@ if(GUI_FORMS_BUILD_TEXT_WORKER_PROBE)
         src/render/text/worker_probe/worker_probe.cpp)
     target_include_directories(gui_forms_text_worker_probe PRIVATE src/render/text/worker_probe)
     target_link_libraries(gui_forms_text_worker_probe PRIVATE gui_forms_text_engine Threads::Threads)
+endif()
+
+if(GUI_FORMS_BUILD_TEXT_PAINT_PROBE)
+    if(NOT TARGET gui_forms_text_engine)
+        message(FATAL_ERROR "The text paint probe requires GUI_FORMS_ENABLE_HARFBUZZ_TEXT")
+    endif()
+    find_package(Threads REQUIRED)
+    add_executable(gui_forms_text_paint_probe
+        benchmarks/text_paint_probe.cpp
+        src/render/text/paint_probe/paint_probe.cpp
+        src/render/text/worker_probe/worker_probe.cpp)
+    target_include_directories(gui_forms_text_paint_probe PRIVATE
+        src/render/text/paint_probe src/render/text/worker_probe)
+    target_link_libraries(gui_forms_text_paint_probe PRIVATE gui_forms_text_engine freetype Threads::Threads)
 endif()
 
 if(GUI_FORMS_BUILD_DOCUMENT_VIEW_BENCHMARK)
