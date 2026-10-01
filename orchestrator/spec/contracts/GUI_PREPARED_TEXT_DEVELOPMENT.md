@@ -297,3 +297,109 @@ Private fixture parity does not satisfy this installed/backend gate.
 All later implementation/tests/tooling require exact-scope semantic review
 against `planning/PROGRAMMING_HOUSE_STYLE.md`; scans and functional tests are
 separate evidence. This candidate adds no implementation or new architecture ADR.
+
+## A2 finite development profile — reconciliation 002
+
+**OBSERVED** — Following A1 checkpoint `f26b143`, the coordinator accepted the
+following finite A2 profile in principle for implementation. Exact record names,
+units and ownership accounting are reconciled with the provider before headers
+freeze; no further owner approval or shared-new-file assignment is required.
+Provider owns the new `prepared_text` public hierarchy, private `prepared_*`
+files and focused tests; root owns CMake. Portable mask/service work proceeds
+first without waiting for Window integration. Audio files remain Games-owned.
+
+| Controlled quantity | First development limit |
+|---|---|
+| Display input | 16,384 bytes; complete single paragraph |
+| Source/context permission | D1 maximum 65,536 bytes |
+| Mapping/endpoint records | At most 16,385 under a combined 1 MiB metadata budget; result metadata is included in its 8 MiB, not additional |
+| Run/glyph records | At most 16,384 runs and 65,536 glyphs; counts do not override byte limits |
+| One prepared payload | At most 8 MiB of requested allocation capacity, including text, table/control records and array capacity times actual record size |
+| Distinct retained prepared generations | At most three and 24 MiB combined, including active, replacement and retired command/frame-held owners; a fourth refuses |
+| First-party shape workspace | At most 16 MiB, including TextStore/segment/bidi and other first-party growth; every allocation/growth path guarded |
+| Encoded font owners | At most eight faces, 4 MiB per face and 8 MiB aggregate retained bytes across current/old sets and leases |
+| Gray mask | Each dimension <=4,096; product <=4,194,304 pixels; gray8 capacity <=4 MiB |
+| Mask staging | Two masks / 8 MiB combined including previous and candidate; no hidden third retained output |
+
+Font changes may retain up to two banks only when combined distinct encoded
+owners fit the aggregate 8 MiB limit; shared identical owners count once. Old
+leases remain charged until actual release. Admission refuses/defers when the
+limit would be exceeded and never destroys valid active presentation merely to
+make the new request fit. The earlier two-bank/16 MiB suggestion was not selected.
+
+Reserve replacement-generation and payload budget before dispatch/allocation.
+Cancelled/ready results retain reservations; command/frame references extend
+them after view replacement. Only actual storage retirement releases the charge.
+Transfer to active ownership is not deallocation. Input, output metadata and
+copied text coexist where required and need explicit separate accounting, not
+double use of a single reservation. The implementation must state allocation
+overhead coverage separately; these limits are not process RSS or vendor quotas.
+
+The 16 MiB workspace claim covers all first-party buffers, not just a named
+scratch vector. FT/HB opaque allocations/cache peaks remain unknown. FT glyph
+bitmap dimension/64 MiB guards are post-native-allocation checks and do not
+establish pre-allocation quotas. Existing unbounded result growth must receive
+scoped admission checks before the bounded overload is advertised.
+
+The initial raster profile is static/default variation, no synthetic style,
+FT outline-to-grayscale, font size 4..128 DIPs and scale 0.5..4. No tabs, newlines,
+wrapping or monochrome-mask capability is claimed. Exact 26.6 size rounding,
+glyph position units and shape/paint conversion must match, with noninteger and
+limit-scale tests; scale 1 private proof alone does not establish this range.
+Empty/space-only mask success, zero-ink extent/bearing and owner lifetime require
+explicit result rules before implementation conformance can be assessed.
+
+Games' six-role wrapped/newline/monochrome mask needs are a concrete follow-on,
+not satisfied by this profile. SwiftEdit accepts this visual-only intermediate
+stage; full interaction/editing remains open. No installed capability is inferred
+from acceptance of these development limits.
+
+### Provider agreement 003 — names, reservations and coordinate law
+
+The provider accepts `PreparedTextService` as the owning per-view-lifetime
+context, `PreparedTextSession` as the worker/session, `PreparedTextLayout` as the
+unique wrapper over typed immutable retained storage, and `GrayTextMask` as a
+unique movable output with const borrows only. Names identify the matched source
+development projection; no ABI or installed capability is frozen by this reply.
+
+One private ledger survives with every session/layout/command/mask that retains
+its resources. Reopening a session through the service cannot evade charges for
+retired payloads or encoded-font owners. No global process quota is implied.
+Up to two font banks may coexist only under the same aggregate 8 MiB admission;
+the same allocation shared by several owners is charged once. Initial use may
+keep one immutable bank until session drain and all retained payload release.
+
+Each replacement reserves a full 8 MiB and one of three generation slots before
+queuing. That reservation includes owned text, mapping/proof, run/glyph arrays,
+font-table/control capacities; encoded font bytes and opaque native storage are
+separate categories. Smaller actual retained capacity is reported, but unused
+reservation remains held until generation retirement for this first profile.
+The input slot is independently bounded to 16 KiB text plus 1 MiB mapping/proof
+while it owns those bytes. Transfer into the prepared result moves that owner
+and its charge; it does not create an unaccounted simultaneous copy. If validation
+or construction requires a copy, both live allocations must fit named budgets.
+
+The exact scale law is: compute positive device size by rounding
+`font_size_dip * device_scale * 64` to the nearest integer (positive half ties
+up), then use that same 26.6 size at 72 DPI in FT and HB. Letter spacing is
+multiplied by scale once. Prepared glyph coordinates and advances are device
+pixels; public logical metrics divide by scale. Raster consumption never scales
+prepared glyph positions again. Placement/clip conversion from DIPs is separate
+and checked once. Identity includes scale and this versioned rounding/profile.
+
+Default variation and no synthetic styling are required; requested primary
+registered weight/style must exist, while actual fallback style is explicit.
+All paragraph line separators, tabs and wrapping requests are unsupported in
+this first profile. Source and display mapping/proof are owned and tied to the
+full D1 token/interval with certified complete paragraph boundaries; missing
+certification returns context-required, not fabricated endpoints.
+
+Gray-mask dimension/product/capacity admission precedes growth. A zero-ink
+success has width/height zero and bearing (0,0), retaining logical advance and
+line metrics separately. Old successful and candidate masks share the 8 MiB
+two-surface ledger; const borrows do not create external shared payload copies
+and end on owner release/replacement. Refusal leaves old output intact.
+
+These exact laws permit scoped implementation under the already assigned files.
+Conformance still requires tests for fractional scale/rounding, font retirement,
+fourth generation refusal, queued/failed/cancelled ownership and zero-ink masks.

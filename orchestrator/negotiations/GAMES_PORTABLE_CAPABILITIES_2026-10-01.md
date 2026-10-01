@@ -170,3 +170,40 @@ the handoff/retirement design before claiming callback safety. Bounded synchrono
 WAV loading belongs off UI/audio execution; shared-clip quota is separate from
 read/conversion peak storage and process RSS. Development may progress within
 the reserved scope while these guarantees receive source review.
+
+## Additional Switchbox interaction intake
+
+Games reports Switchbox remake integration at `de23ab8` and shared text-mask
+needs matching Eggy: six bundled roles, left word wrapping, explicit newlines,
+approximately 0.05em additional line spacing, and monochrome versus grayscale
+coverage by role. Exact metrics/rounding remain to reconcile with the shared
+text provider; this report does not establish mask availability.
+
+The coordinator separately requested the minimal
+[window cursor proposal](GAMES_WINDOW_CURSOR_2026-10-01.md) for scoped native
+hide/restore and finite client-DIP warp. No implementation assignment is made
+while Windows host A1 hunks remain owned by the active provider. Transparent
+cursor appearance, native hiding, capture and warping remain distinct.
+
+## Shutdown checkpoint — codec extension remains candidate
+
+**OBSERVED** — Games reports a later owner direction permitting a small shared
+portable decoder for compact releases. Its initial FLAC proposal was superseded
+by a Vorbis comparison candidate after reported asset-size comparisons. The
+proposed source is the pinned miniaudio tree's independent `extras/stb_vorbis.c`;
+the engine's `MA_NO_DECODING` configuration and existing WAV foundation remain
+separate. Vorbis is lossy; smaller output alone does not establish acceptance.
+
+No decoder admission or edit permission was granted in this shutdown turn.
+Outstanding: exact new paths, immutable source/hash/license, persisted format/
+size comparison, actual coverage of the proposed 16 MiB arena, bounded owned
+encoded input <=64 MiB, actual decoded frames <=28,800,000 independent of header
+claims, finite stereo 48 kHz output, shared clip-budget reservations, typed
+malformed/truncated/failure results, background-only loading, bounded-chunk
+cancellation, prepublication cancellation and shutdown/drain cleanup. A partial
+clip must never publish on failure. Opaque/stack/temporary memory cannot be
+assumed covered by the arena without source evidence.
+
+Coordinator owns dependency/codec admission and shared repository checkpoint.
+Owner-directed imminent shutdown stops further record edits after handoff;
+this checkpoint does not open decoder implementation or widen availability.

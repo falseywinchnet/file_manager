@@ -54,6 +54,41 @@ struct ShapedText final {
     bool missing_primary_face{};
 };
 
+struct BoundedFontRun final {
+    FontFaceId face{};
+    Utf8Range source_range{};
+    std::size_t glyph_begin{};
+    std::size_t glyph_count{};
+};
+
+struct ShapeStorageLimits final {
+    std::size_t input_bytes{16'384};
+    std::size_t runs{16'384};
+    std::size_t glyphs{65'536};
+    std::size_t output_bytes{8U * 1024U * 1024U};
+    std::size_t workspace_bytes{16U * 1024U * 1024U};
+};
+
+// Private complete geometry owner. Arrays have fixed allocated capacity and
+// explicit live counts. Native allocator payload is not included in these
+// controlled byte reports. The enclosing unique owner transfers as one unit.
+struct BoundedShapedText final {
+    std::unique_ptr<BoundedFontRun[]> runs{};
+    std::unique_ptr<ShapedGlyph[]> glyphs{};
+    std::size_t run_count{};
+    std::size_t glyph_count{};
+    std::size_t run_capacity{};
+    std::size_t glyph_capacity{};
+    std::size_t controlled_output_bytes{};
+    std::size_t controlled_workspace_peak{};
+    double width{};
+    double height{};
+    double ascent{};
+    double descent{};
+    std::size_t missing_clusters{};
+    bool missing_primary_face{};
+};
+
 // Private portable text engine. It owns every encoded face and never consults
 // a host font catalog. The renderer maps returned face IDs to its own private
 // raster objects; HarfBuzz/FreeType objects never cross this boundary.
@@ -87,6 +122,11 @@ public:
     // Native setup/allocation failures throw; a call-owned partial result never
     // becomes a successful return. Callers retain old state until return succeeds.
     [[nodiscard]] ShapedText shape(std::string_view utf8, FontSpec font);
+    // Throws length_error before a controlled allocation would exceed limits;
+    // invalid input and native/resource failures also throw. The caller's old
+    // owner survives until it explicitly adopts the complete returned owner.
+    [[nodiscard]] std::unique_ptr<BoundedShapedText> shape_bounded(
+        std::string_view utf8, FontSpec font, ShapeStorageLimits limits);
     [[nodiscard]] ResolvedTextLayout resolve(std::string_view utf8,
                                              FontSpec font);
     [[nodiscard]] std::size_t face_count() const noexcept;

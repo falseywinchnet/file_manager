@@ -1,4 +1,5 @@
 #include "harfbuzz_font_engine.hpp"
+#include "../../../core/text/unicode/unicode_grapheme.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -19,6 +20,38 @@ namespace {
 constexpr std::size_t maximum_face_bytes = 64U * 1024U * 1024U;
 constexpr std::size_t maximum_faces = 64U;
 constexpr FT_Long maximum_glyphs = 1'000'000L;
+
+void account_array(std::size_t count, std::size_t element_bytes,
+                   std::size_t limit, std::size_t& used) {
+    if (used > limit || count > (limit - used) / element_bytes) {
+        throw std::length_error("Controlled shaping storage exceeds its admitted limit");
+    }
+    const std::size_t bytes = count * element_bytes;
+    used += bytes;
+}
+
+std::size_t decode_scalars_to(std::string_view utf8, Utf8Range range,
+                              std::span<char32_t> output) {
+    std::size_t offset = range.start.value();
+    std::size_t written = 0;
+    while (offset < range.end.value()) {
+        const unsigned char first = static_cast<unsigned char>(utf8[offset]);
+        char32_t value{};
+        std::size_t count{};
+        if (first < 0x80U) { value = first; count = 1U; }
+        else if ((first & 0xe0U) == 0xc0U) { value = first & 0x1fU; count = 2U; }
+        else if ((first & 0xf0U) == 0xe0U) { value = first & 0x0fU; count = 3U; }
+        else { value = first & 0x07U; count = 4U; }
+        for (std::size_t index = 1U; index < count; ++index) {
+            value = (value << 6U) | (static_cast<unsigned char>(utf8[offset + index]) & 0x3fU);
+        }
+        if (written == output.size()) throw std::length_error("Scalar scratch capacity exceeded");
+        output[written] = value;
+        ++written;
+        offset += count;
+    }
+    return written;
+}
 
 struct BidiOwner final {
     SBAlgorithmRef algorithm = nullptr;
@@ -301,9 +334,15 @@ public:
         HarfBuzzBufferOwner buffer{nullptr, hb_buffer_destroy};
     };
 
+    template <bool Bounded = false>
     void append_run(ShapeCall& call, ShapedText& result, Face& face, std::string_view utf8,
                     Utf8Range range, FontSpec font, double run_origin,
-                    bool add_trailing_spacing, bool rtl) {
+                    bool add_trailing_spacing, bool rtl, BoundedShapedText* bounded = nullptr) {
+        if constexpr (Bounded) {
+            if ((*bounded).run_count == (*bounded).run_capacity) {
+                throw std::length_error("Prepared run capacity exceeded");
+            }
+        }
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
         ++diagnostics.append_calls;
         TextLayoutPhaseTimer append_timer(diagnostics, TextLayoutPhase::append_total);
@@ -419,7 +458,13 @@ public:
 #if defined(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE)
         run.diagnostic_rtl = rtl;
 #endif
-        run.glyphs.reserve(count);
+        if constexpr (Bounded) {
+            if (count > (*bounded).glyph_capacity - (*bounded).glyph_count) {
+                throw std::length_error("Prepared glyph capacity exceeded");
+            }
+        } else {
+            run.glyphs.reserve(count);
+        }
         double pen_x = run_origin;
         double pen_y{};
         double ink_ascent = font.size * 0.8, ink_descent = font.size * 0.2;
@@ -433,11 +478,16 @@ public:
             if (cluster_end && (index + 1U != count || add_trailing_spacing)) {
                 advance_x += static_cast<float>(font.letter_spacing);
             }
-            run.glyphs.push_back({GlyphId{infos[index].codepoint},
+            const ShapedGlyph glyph{GlyphId{infos[index].codepoint},
                                   Utf8Offset(infos[index].cluster),
                                   static_cast<float>(pen_x) + offset_x,
                                   static_cast<float>(pen_y) + offset_y,
-                                  advance_x, advance_y});
+                                  advance_x, advance_y};
+            if constexpr (Bounded) {
+                (*bounded).glyphs[(*bounded).glyph_count + index] = glyph;
+            } else {
+                run.glyphs.push_back(glyph);
+            }
             hb_glyph_extents_t extents{};
             if (!face.role && hb_font_get_glyph_extents(hb_font, infos[index].codepoint, &extents)) {
                 const double top = pen_y + offset_y - extents.y_bearing / 64.0;
@@ -459,7 +509,15 @@ public:
             result.descent = std::max(result.descent, descent);
             result.height = result.ascent + result.descent;
         }
-        result.runs.push_back(std::move(run));
+        if constexpr (Bounded) {
+            (*bounded).runs[(*bounded).run_count] = BoundedFontRun{
+                .face = face.id, .source_range = range,
+                .glyph_begin = (*bounded).glyph_count, .glyph_count = count};
+            ++(*bounded).run_count;
+            (*bounded).glyph_count += count;
+        } else {
+            result.runs.push_back(std::move(run));
+        }
     }
 };
 
@@ -617,6 +675,175 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
         origin += std::max(0.0, result.width - before);
     }
     return result;
+}
+
+std::unique_ptr<BoundedShapedText> HarfBuzzFontEngine::shape_bounded(
+    std::string_view utf8, FontSpec font, ShapeStorageLimits limits) {
+#if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
+    (*impl_).diagnostics = TextLayoutDiagnostics{};
+#endif
+    if (limits.input_bytes == 0 || limits.runs == 0 || limits.glyphs == 0 ||
+        utf8.size() > limits.input_bytes || utf8.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+        throw std::length_error("Bounded shaping input capacity exceeded");
+    }
+    if (!valid_font_spec(font)) throw std::invalid_argument("Invalid bounded shaping font");
+    const gui_forms::detail::GraphemeStorageRequirement grapheme_requirement =
+        gui_forms::detail::grapheme_storage_requirement(utf8);
+    if (grapheme_requirement.status == gui_forms::detail::GraphemeStorageStatus::invalid_utf8) {
+        throw std::invalid_argument("Invalid bounded shaping UTF-8");
+    }
+    if (grapheme_requirement.status != gui_forms::detail::GraphemeStorageStatus::success) {
+        throw std::length_error("Grapheme storage arithmetic overflow");
+    }
+    struct Segment final { Impl::Face* face{}; Utf8Range range{}; };
+    struct VisualSegment final { Impl::Face* face{}; Utf8Range range{}; bool rtl{}; };
+    using FaceCandidates = std::array<Impl::Face*, maximum_faces>;
+    const std::size_t scalar_capacity = grapheme_requirement.scalar_count;
+    if (scalar_capacity > std::numeric_limits<std::size_t>::max() / 2U) {
+        throw std::length_error("Visual intersection capacity overflow");
+    }
+    const std::size_t visual_capacity = scalar_capacity * 2U;
+    std::size_t workspace = 0;
+    account_array(1, sizeof(FaceCandidates), limits.workspace_bytes, workspace);
+    account_array(1, sizeof(Impl::ShapeCall), limits.workspace_bytes, workspace);
+    const std::size_t fixed_workspace = workspace;
+    account_array(grapheme_requirement.boundary_capacity, sizeof(std::size_t), limits.workspace_bytes, workspace);
+    account_array(scalar_capacity, sizeof(char32_t), limits.workspace_bytes, workspace);
+    account_array(scalar_capacity, sizeof(Segment), limits.workspace_bytes, workspace);
+    account_array(scalar_capacity, sizeof(DirectionRun), limits.workspace_bytes, workspace);
+    account_array(visual_capacity, sizeof(VisualSegment), limits.workspace_bytes, workspace);
+    std::size_t segmentation_peak = fixed_workspace;
+    account_array(grapheme_requirement.peak_bytes, 1, limits.workspace_bytes, segmentation_peak);
+    const std::size_t workspace_peak = std::max(workspace, segmentation_peak);
+    std::size_t output_bytes = sizeof(BoundedShapedText);
+    account_array(limits.runs, sizeof(BoundedFontRun), limits.output_bytes, output_bytes);
+    account_array(limits.glyphs, sizeof(ShapedGlyph), limits.output_bytes, output_bytes);
+
+    std::unique_ptr<BoundedShapedText> owner = std::make_unique<BoundedShapedText>();
+    BoundedShapedText& output = *owner;
+    output.runs = std::make_unique<BoundedFontRun[]>(limits.runs);
+    output.glyphs = std::make_unique<ShapedGlyph[]>(limits.glyphs);
+    output.run_capacity = limits.runs;
+    output.glyph_capacity = limits.glyphs;
+    output.controlled_output_bytes = output_bytes;
+    output.controlled_workspace_peak = workspace_peak;
+    if (utf8.empty()) { output.height = font.size; return owner; }
+
+    FaceCandidates candidates{};
+    std::size_t candidate_count = 0;
+    const Impl::FacePreference preference{font};
+    for (Impl::Face& face : (*impl_).faces) {
+        if (!face.role || *face.role == font.role ||
+            (font.role != FontRole::content && *face.role == FontRole::content)) {
+            if (candidate_count == candidates.size()) throw std::length_error("Face candidate capacity exceeded");
+            // Stable insertion into the fixed face table: no hidden sort scratch.
+            std::size_t position = candidate_count;
+            while (position != 0 && preference(&face, candidates[position - 1U])) {
+                candidates[position] = candidates[position - 1U];
+                --position;
+            }
+            candidates[position] = &face;
+            ++candidate_count;
+        }
+    }
+    if (!(*impl_).has_primary(font.role) || candidate_count == 0) {
+        output.missing_primary_face = true;
+        return owner;
+    }
+    gui_forms::detail::GraphemeBoundaryBuffer boundaries{};
+    const gui_forms::detail::GraphemeStorageStatus segmented =
+        gui_forms::detail::bounded_grapheme_boundaries(utf8,
+            limits.workspace_bytes - fixed_workspace, boundaries);
+    if (segmented == gui_forms::detail::GraphemeStorageStatus::resource_failure) throw std::bad_alloc();
+    if (segmented != gui_forms::detail::GraphemeStorageStatus::success) {
+        throw std::length_error("Bounded grapheme preparation failed");
+    }
+    std::unique_ptr<char32_t[]> scalars = std::make_unique<char32_t[]>(scalar_capacity);
+    std::unique_ptr<Segment[]> segments = std::make_unique<Segment[]>(scalar_capacity);
+    std::unique_ptr<DirectionRun[]> directions = std::make_unique<DirectionRun[]>(scalar_capacity);
+    std::unique_ptr<VisualSegment[]> visual = std::make_unique<VisualSegment[]>(visual_capacity);
+    const std::span<const std::size_t> edges = boundaries.boundaries();
+    const std::span<char32_t> scalar_scratch(scalars.get(), scalar_capacity);
+    std::size_t segment_count = 0;
+    for (std::size_t index = 1; index < edges.size(); ++index) {
+        const Utf8Range range{Utf8Offset(edges[index - 1U]), Utf8Offset(edges[index])};
+        const std::size_t scalar_count = decode_scalars_to(utf8, range, scalar_scratch);
+        const std::span<const char32_t> cluster(scalars.get(), scalar_count);
+        Impl::Face* selected = nullptr;
+        for (std::size_t face_index = 0; face_index < candidate_count; ++face_index) {
+            if (Impl::covers(*candidates[face_index], cluster)) { selected = candidates[face_index]; break; }
+        }
+        if (selected == nullptr) { selected = candidates[0]; ++output.missing_clusters; }
+        if (segment_count != 0 && segments[segment_count - 1U].face == selected) {
+            segments[segment_count - 1U].range.end = range.end;
+        } else {
+            if (segment_count == scalar_capacity) throw std::length_error("Font segment capacity exceeded");
+            segments[segment_count] = Segment{.face = selected, .range = range};
+            ++segment_count;
+        }
+    }
+
+    BidiOwner bidi{};
+    const SBCodepointSequence sequence{SBStringEncodingUTF8, utf8.data(), utf8.size()};
+    bidi.algorithm = SBAlgorithmCreate(&sequence);
+    if (bidi.algorithm == nullptr) throw std::bad_alloc();
+    std::size_t offset = 0;
+    std::size_t direction_count = 0;
+    while (offset < utf8.size()) {
+        bidi.paragraph = SBAlgorithmCreateParagraph(bidi.algorithm, offset, utf8.size() - offset, SBLevelDefaultLTR);
+        if (bidi.paragraph == nullptr) throw std::bad_alloc();
+        const std::size_t length = SBParagraphGetLength(bidi.paragraph);
+        if (length == 0 || length > utf8.size() - offset) throw std::runtime_error("Invalid bounded bidi paragraph");
+        bidi.line = SBParagraphCreateLine(bidi.paragraph, offset, length);
+        if (bidi.line == nullptr) throw std::bad_alloc();
+        const std::size_t count = SBLineGetRunCount(bidi.line);
+        if (count > scalar_capacity - direction_count) throw std::length_error("Direction capacity exceeded");
+        const SBRun* runs = SBLineGetRunsPtr(bidi.line);
+        for (std::size_t index = 0; index < count; ++index) {
+            const SBRun& run = runs[index];
+            if (run.offset > utf8.size() || run.length > utf8.size() - run.offset) {
+                throw std::runtime_error("Invalid bounded bidi run");
+            }
+            directions[direction_count] = DirectionRun{
+                .range = {Utf8Offset(run.offset), Utf8Offset(run.offset + run.length)}, .rtl = (run.level & 1U) != 0};
+            ++direction_count;
+        }
+        offset += length;
+        bidi.clear_line();
+    }
+    std::size_t visual_count = 0;
+    for (std::size_t index = 0; index < direction_count; ++index) {
+        const DirectionRun& direction = directions[index];
+        const std::size_t begin = visual_count;
+        for (std::size_t segment_index = 0; segment_index < segment_count; ++segment_index) {
+            const Segment& segment = segments[segment_index];
+            const std::size_t start = std::max(segment.range.start.value(), direction.range.start.value());
+            const std::size_t end = std::min(segment.range.end.value(), direction.range.end.value());
+            if (start < end) {
+                if (visual_count == visual_capacity) throw std::length_error("Visual run capacity exceeded");
+                visual[visual_count] = VisualSegment{.face = segment.face,
+                    .range = {Utf8Offset(start), Utf8Offset(end)}, .rtl = direction.rtl};
+                ++visual_count;
+            }
+        }
+        if (direction.rtl) std::reverse(visual.get() + begin, visual.get() + visual_count);
+    }
+    if (visual_count > limits.runs) throw std::length_error("Prepared run capacity exceeded");
+    ShapedText metrics{};
+    Impl::ShapeCall call{};
+    double origin = 0;
+    for (std::size_t index = 0; index < visual_count; ++index) {
+        const VisualSegment& segment = visual[index];
+        const double before = metrics.width;
+        (*impl_).append_run<true>(call, metrics, *segment.face, utf8, segment.range, font,
+            origin, index + 1U != visual_count, segment.rtl, &output);
+        origin += std::max(0.0, metrics.width - before);
+    }
+    output.width = metrics.width;
+    output.height = metrics.height;
+    output.ascent = metrics.ascent;
+    output.descent = metrics.descent;
+    return owner;
 }
 
 std::size_t HarfBuzzFontEngine::face_count() const noexcept {

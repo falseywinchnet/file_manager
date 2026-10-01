@@ -10,6 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(GUI_FORMS_BUILD_GALLERY "Build the native control gallery" ${PROJECT_IS_TOP_LEVEL})
 option(GUI_FORMS_BUILD_TESTS "Build automated proving-slice tests" ${PROJECT_IS_TOP_LEVEL})
+option(GUI_FORMS_BUILD_AUDIO "Build portable PCM audio service" OFF)
 option(GUI_FORMS_ENABLE_SKIA "Build the private CPU-only Skia adapter" ON)
 option(GUI_FORMS_ENABLE_MACOS_HOST "Build the native AppKit host" ${APPLE})
 option(GUI_FORMS_ENABLE_WINDOWS_HOST "Build the native Win32 host" ${WIN32})
@@ -1720,6 +1721,11 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_text_store_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_text_store_tests COMMAND gui_forms_text_store_tests)
 
+    add_executable(gui_forms_bounded_grapheme_tests tests/bounded_grapheme_tests.cpp)
+    target_include_directories(gui_forms_bounded_grapheme_tests PRIVATE src/core/text/unicode)
+    target_link_libraries(gui_forms_bounded_grapheme_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_bounded_grapheme_tests COMMAND gui_forms_bounded_grapheme_tests)
+
     add_executable(gui_forms_document_view_tests tests/document_view_tests.cpp)
     target_link_libraries(gui_forms_document_view_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_document_view_tests COMMAND gui_forms_document_view_tests)
@@ -1741,6 +1747,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_text_shaping_tests COMMAND gui_forms_text_shaping_tests)
 
     if(TARGET gui_forms_text_engine)
+        add_executable(gui_forms_bounded_shape_tests tests/bounded_shape_tests.cpp)
+        target_link_libraries(gui_forms_bounded_shape_tests PRIVATE gui_forms_text_engine)
+        add_test(NAME gui_forms_bounded_shape_tests COMMAND gui_forms_bounded_shape_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+
         add_executable(gui_forms_harfbuzz_font_engine_tests
             tests/harfbuzz_font_engine_tests.cpp
         )
@@ -2388,6 +2398,10 @@ if(GUI_FORMS_BUILD_FUZZERS)
 endif()
 
 # Installed consumers need the notices for the code incorporated in the library.
+if(GUI_FORMS_BUILD_AUDIO)
+    include(cmake/Audio.cmake)
+endif()
+
 install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
 install(FILES third_party/unicode/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Unicode-LICENSE.txt)
 if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
