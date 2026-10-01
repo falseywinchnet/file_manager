@@ -72,8 +72,9 @@ needs reconciliation; no generic type-erasure container is proposed.
 
 ### Proposed resource and cancellation profile
 
-Initial D3a work unit: at most 16 KiB display input including context, at most
-16,384 caret boundaries and 65,536 glyphs, at most 512 visual rows. These are
+Initial D3a work unit: at most 16 KiB display input including context, with
+separate endpoint/visual-stop caps refined below, 65,536 glyphs and at most
+512 visual rows. These are
 **CANDIDATE** comparison values, not accepted product limits. Output byte capacity
 and private shaper workspace must be measured and explicitly capped before
 publishing capability. A byte cap does not prove a time cap for shaping.
@@ -174,3 +175,262 @@ All executable implementation/tests/tooling must receive full semantic review
 against `../../planning/PROGRAMMING_HOUSE_STYLE.md`, with exact scope and remaining
 violations recorded separately from scanners and test results. No source,
 installed SDK, native-platform or finished-product claim follows from this draft.
+
+## D3a refinement 002: concrete seam for reconciliation
+
+**CANDIDATE**, following parent review. This section makes the preferred seam
+concrete but does not authorize source mutation. Previous route alternatives
+remain comparison evidence. The initial executable slice can prove the
+renderer-neutral publication contract with an explicitly estimated fixture
+provider; native prepared painting requires its own allocator/font evidence.
+
+### Identity and immutable input
+
+```text
+TextProviderIdentity { uint64 instance; uint64 generation; }
+TextFontSetIdentity { uint64 instance; uint64 generation; }
+TextLayoutIdentity {
+    DocumentPageRequest page;
+    uint64 layout_serial;
+    TextProviderIdentity provider;
+    TextFontSetIdentity font_set;
+    FontSpec effective_font;
+    double device_scale;
+    double wrap_width_dip;
+    TextWrapMode wrap;
+    TextTabPolicy tabs;
+    uint64 boundary_context_generation;
+}
+TextBoundaryProof {
+    DocumentPageRequest page;
+    uint64 generation;
+    TextContextKind context;
+    owned ordered pairs<absolute SourceByteOffset, page-local DisplayByteOffset>;
+}
+TextLayoutInput {
+    TextLayoutIdentity identity;
+    page-local display interval;
+    owned valid UTF-8 interval, mapping spans and TextBoundaryProof;
+}
+TextLayoutRequest { const TextLayoutInput& input; }
+```
+
+Each identity component is validated, nonreused within its lifetime, and
+compared exactly. No hash alone substitutes for equality. Nonfinite scale,
+font/width values and invalid tab settings are refused; zero wrap width is
+admitted only under explicitly no-wrap mode. Font size, tracking, fallback
+set and effective font role remain part of geometry identity. Page-local ranges
+stay distinguished from absolute source ranges.
+
+The adapter input **owns** its bounded bytes and proof once queued. A builder may borrow
+a D1 page synchronously to validate and copy that interval, but the task never
+retains a D1 `page()` borrow across dispatch. Account for this additional bounded
+copy explicitly. No worker calls Window or uses the UI thread's mutable shaper.
+
+The consumer supplies source-grapheme boundaries certified against exact source
+bytes/context at the same revision. GUI.Forms validates ordered endpoint spans,
+page identity, display mapping and counts; it cannot independently prove source
+bytes it does not own. Identity text boundaries may additionally be checked
+against grapheme segmentation of complete-context display text. Expanded tokens
+allow endpoints only; source-grapheme proof may remove a token endpoint when
+adjacent source scalars share a grapheme. Literal label text has no special rule.
+An invalid-byte unit has both source endpoints admitted under the consumer's
+explicit invalid-byte projection policy. Shaping clusters or glyph counts never
+replace source-grapheme proof. Stale/absent proof returns context-required and
+supplies no caret/edit authorization.
+
+### Service, ownership and proposed operations
+
+```text
+TextLayoutService::capabilities() -> TextLayoutCapabilities
+TextLayoutService::open_session(TextLayoutBudget, TextFontSetIdentity)
+    -> TextLayoutSessionResult
+TextLayoutSession::prepare(const TextLayoutRequest&) -> TextPrepareResult
+TextPrepareResult { status; optional<PreparedTextLayout> prepared; }
+PreparedTextLayout::identity() const -> const TextLayoutIdentity&
+PreparedTextLayout::rows() const -> borrowed immutable rows
+PreparedTextLayout::caret_stops() const -> borrowed immutable caret stops
+PreparedTextLayout::storage_usage() const -> TextLayoutStorageUsage
+Painter::draw_prepared_text(const PreparedTextLayout&, placement, clip, color)
+    -> TextPaintStatus
+PreparedLayoutState::adopt(PreparedTextLayout&&, expected_identity) -> status
+PreparedLayoutState::hit(expected_identity, local_point, affinity) -> result
+```
+
+`TextLayoutService` is the separate typed capability. Window observes it only
+while the host attachment is alive; replacement increments provider generation,
+invalidates geometry and revokes queued publication. A session owns its mutable
+workspace and is confined to one nominated executor. `prepare` is synchronous
+**on that executor**, not specified as UI-thread work. Session destruction runs
+after its job completes. No detached callback owns a Window/model reference.
+
+`PreparedTextLayout` is a unique immutable value with private typed storage,
+movable and noncopyable. It retains explicit immutable font dependencies through
+a font-set lease so the result cannot reference destroyed face data. Its public
+surface exposes no native handles or untyped payload. A renderer validates the
+provider/font-set lease identity and device scale before drawing; mismatches
+return unsupported/stale without drawing a partially compatible subset. Lease
+revocation prevents new paint; retained bytes remain alive until the layout is
+released. A lease therefore distinguishes memory lifetime from authority.
+
+One concrete native storage candidate is CPU glyph/font-run data privately owned
+by this result, paired with portable caret/row geometry. The painter draws those
+positions directly without reshaping. Font-face lookup uses the retained lease,
+not whichever unrelated current host font happens to share an integer ID.
+Public glyph-array layout and backend type erasure are not selected here.
+
+`prepare` borrows immutable input only for this synchronous executor call. Its
+caller owns that input throughout; no pointer, span or reference is retained
+after return. It first validates identity, input and budget, then constructs an
+independently owned result using its admitted output capacity. Refusal preserves
+input and yields no prepared result. Copying the bounded text needed by the
+result is explicit and budgeted while the caller's input still exists; avoid
+pretending this simultaneous ownership is a move. A future move-admission
+optimization requires separate semantics and is not part of this minimum seam.
+
+`adopt` validates the entire expected identity and complete geometry before any
+swap. Failed adoption preserves both last valid geometry and incoming owner;
+caller releases rejected payload and acknowledges job completion. Successful
+adoption moves the candidate, releases the previous owner and invalidates affected
+paint. It emits no callback until coherent state is installed. Hit testing
+requires the current full layout identity, not merely D1 page identity.
+
+On font/scale/provider replacement, old geometry may remain retained for orderly
+release but is **not current paint or hit state**. Failure to produce replacement
+cannot relabel old glyph positions as the new font/scale. Drawing a stale previous
+page is allowed only as explicitly previous coverage under its still-valid exact
+identity; consumer chooses whether to display it or an unavailable state.
+
+### Resource guarantee and current native blocker
+
+The refined candidate request ceilings are 16 KiB display/context, 16,385 caret
+stops, 65,536 glyphs and 512 rows; N single-byte graphemes require N+1 stops.
+Numbers remain subject to agreement before source. Proposed comparison profile:
+
+| Category | Candidate capacity ceiling | Counted lifetime |
+|---|---|---|
+| Input display bytes | 16 KiB | Adapter input through prepare return |
+| Input mapping/proof | 16,384 spans / 16,385 endpoints, at most 1 MiB / 128 KiB | Adapter input |
+| Result copied text and mapping/proof | Same limits as input | Each active/replacement result |
+| Glyphs | 65,536 records and at most 4 MiB | Each result |
+| Caret geometry | 32,770 visual-affinity records and at most 1 MiB | Each result |
+| Rows | 512 records and at most 64 KiB | Each result |
+| Mutable provider workspace/cache | At most 16 MiB combined | One session, not multiplied invisibly by calls |
+| Immutable font-set dependency storage | At most 128 MiB | Shared explicit font-set owner; overlapping old/new sets both charged |
+
+These are requested allocation-capacity comparison values, not measured fit or
+selected production constants. Both record count and byte capacity must pass;
+actual record sizes and allocator behavior are part of the implementation
+receipt. Session/lease metadata, string terminators and allocation overhead need
+an explicit owner accounting category. Native hard-quota availability remains
+unavailable while hidden allocations lack established bounds. A separately
+labelled measured-capacity native experiment may proceed while reporting those
+internals unknown; this does not claim the stronger guarantee.
+Source context stays within D1's 64 KiB; a 9x display expansion can force a much
+smaller paragraph. No source admission threshold is inferred from display caps.
+
+`TextLayoutBudget` must declare independent capacity bytes for copied input,
+mapping/proof arrays, glyph storage, row/caret storage, scratch, retained font
+dependencies and provider cache. Every multiplication/addition is checked before
+reserve/allocation; allocator rounding/headers and terminators are separately
+accounted where they are not part of requested capacity. Provider capabilities
+state whether these are hard enforced allocations or only measured capacities.
+An adapter lacking a required hard guarantee returns unsupported before starting
+work; it cannot advertise hard bounded native preparation based on byte count.
+
+Provider-owned arrays use supplied/session-owned reusable storage sized within
+the admitted budgets before processing. Shared immutable font data is charged
+once to its explicit font-set owner budget; per-session face/size/cache objects
+and every retained lease's contribution remain visible. Swapping a font set may
+temporarily retain old and new font owners; both count until old layouts release.
+No request can pull an arbitrary host font or unbounded fallback catalogue.
+
+**OBSERVED unresolved native edge:** the current private HarfBuzz/FreeType path
+does not demonstrate a pre-allocation quota over all internal shape/cache
+allocations. Calling `shape` with a short input and checking output afterward
+does not prove hard quotas. Inspect the pinned libraries' allocation controls,
+face/cache ownership and worst admitted font behavior. Compare a measured-capacity
+native experimental profile reporting opaque internals with a future proven
+hard-quota profile; fixture-provider geometry may prove the protocol independently.
+A generic allocator framework, process sandbox or new font/storage architecture
+is not authorized by this proposal. None of these comparisons by itself grants
+public D3a source go-ahead or native shape/paint parity.
+
+Per view, one active result and one replacement job/result may coexist; cancelled
+jobs retain that slot and all reservations until completion/release. One desired
+metadata value coalesces changes. D1 payload slots are counted independently.
+Missing job capacity gives busy, not an unbounded task queue. Cancellation is
+checked between bounded work phases; a noninterruptible library call's worst
+stall must be measured. No assumption puts that call on UI by default.
+
+### Outcomes and proving matrix
+
+Expected outcomes: success, invalid-input, stale-page,
+stale-layout, revoked-provider, stale-font-set, context-required, budget-exceeded,
+busy, cancelled, unsupported, missing-font-coverage and allocation-failure.
+Resource exceptions are contained at the session boundary; failed output is
+never published. Native exact availability requires shape/paint parity evidence.
+
+Before the first source go-ahead, reconcile: (1) exact boundary-proof encoding;
+(2) prepared value's private typed storage and font lease; (3) numerical capacity
+profile including observable workspace/font categories and unknown internals;
+(4) measured-capacity native, hard-quota native or fixture profile appropriate
+to the admitted guarantee; (5) executor/lifetime ownership.
+Required fixtures vary each identity field separately, fail each admission and
+adoption step, revoke font/provider leases with a pending result, exercise N+1
+caret limits, and prove old geometry preserved but never painted under a changed
+identity. Native workloads measure preparation on its selected executor and UI
+publication/paint independently, plus complete page-to-frame latency.
+
+### Registry refinement 003: endpoint proof and capability distinction
+
+**CANDIDATE clarification accepted by provider:** source-grapheme proof contains
+explicit paired absolute uint64 source-byte endpoints and page-local uint32
+display-byte endpoints. Both orders are strictly increasing; duplicates in
+either coordinate are rejected. Every pair must round-trip under the exact D1
+page token. No endpoint is synthesized merely because it is a page or mapping
+edge. For an empty document or admitted empty EOF page, exactly one certified
+pair maps source EOF to display zero. Nonempty text with no certified endpoints
+is not hit-testable and reports context-required. Partial endpoint proof does
+not authorize unseen endpoints; D3a complete-paragraph profile requires both
+actual paragraph edges to be certified, or refuses that profile.
+
+One certified endpoint may have multiple visual caret stops for bidi or soft
+wrap affinity. Endpoint and visual-stop capacities are independent: the
+comparison profile proposes 16,385 endpoint pairs and 32,770 visual stops,
+still subject to the declared caret byte ceiling. There is no assumption that
+one glyph, one shaping cluster and one source grapheme share an index. Unknown
+or stale proof grants no current hit authorization, including when an old
+layout remains retained for release or previous-coverage display.
+
+Terminal status `success` means a complete result within its **reported**
+capability class. Estimated fixture geometry is a separate capability metadata
+value, not a success alternative that a caller could mistake for native exact
+support. `estimated-fixture-only` in the earlier outcome list is superseded by
+this distinction. Native controls must require native-exact metadata before
+claiming native preparation/paint support. Numerical profiles, native quotas,
+executor and exact private storage remain unresolved; only partial semantic
+reconciliation is sought at this point, not source go-ahead.
+
+### Parent clarification 004: native experimental capacity is a distinct candidate
+
+The earlier hard-quota prerequisite language is **superseded** where it implies
+that every native experiment must enforce a cap over every third-party
+allocation. The parent requires preallocation admission for controlled arrays
+and known output/workspace needs; it has not selected a new allocator
+architecture. Keep three comparison profiles explicit: estimated fixture,
+native measured-capacity experiment with opaque internals reported unknown,
+and native hard-quota capability only after that stronger guarantee is proved.
+Fixture-only versus hard quota is not an exhaustive choice.
+
+Read-only pinned-library allocation/face/cache audit and a bounded diagnostic
+shape benchmark of existing native code are authorized independently of any
+public D3a implementation. They may measure noninterruptible call latency and
+observable returned capacities; they must not claim whole-process allocation
+coverage or hard quotas. No generic allocator, sandbox or production host API
+change follows from this diagnostic authorization.
+
+Numerical note: 16,385 absolute-source/display endpoint pairs can occupy
+262,160 bytes at a 16-byte record layout, exceeding the earlier 128 KiB proof
+comparison ceiling. Count and byte caps both apply; that table does not imply
+every maximum fits simultaneously. Final record layout/profile remains open.

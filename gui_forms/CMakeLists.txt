@@ -20,6 +20,7 @@ option(GUI_FORMS_ENABLE_HARFBUZZ_TEXT
 option(GUI_FORMS_BUILD_FUZZERS "Build libFuzzer entry points" OFF)
 option(GUI_FORMS_BUILD_BENCHMARKS "Build measurement harnesses" OFF)
 option(GUI_FORMS_BUILD_DOCUMENT_VIEW_BENCHMARK "Build the renderer-neutral D1 measurement harness" OFF)
+option(GUI_FORMS_BUILD_TEXT_LAYOUT_PROBE "Build the private text shaping diagnostic" OFF)
 option(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD
        "Build the deterministic native File Manager first-party consumer" OFF)
 
@@ -1440,6 +1441,14 @@ if(GUI_FORMS_BUILD_GALLERY)
             endif()
         endif()
     endif()
+endif()
+
+if(GUI_FORMS_BUILD_TEXT_LAYOUT_PROBE)
+    if(NOT TARGET gui_forms_text_engine)
+        message(FATAL_ERROR "The text layout probe requires GUI_FORMS_ENABLE_HARFBUZZ_TEXT")
+    endif()
+    add_executable(gui_forms_text_layout_probe benchmarks/text_layout_probe.cpp)
+    target_link_libraries(gui_forms_text_layout_probe PRIVATE gui_forms_text_engine)
 endif()
 
 if(GUI_FORMS_BUILD_DOCUMENT_VIEW_BENCHMARK)
