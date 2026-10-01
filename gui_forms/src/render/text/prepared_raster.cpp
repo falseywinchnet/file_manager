@@ -1,4 +1,4 @@
-#include "prepared_storage.hpp"
+#include "../../core/text/prepared/prepared_storage.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -45,7 +45,7 @@ struct GlyphBitmap final {
     std::int64_t top{};
 };
 
-std::size_t raster_face_index(const detail::PreparedTextStorage& storage, FontFaceId id) noexcept {
+std::size_t raster_face_index(const detail::PreparedTextStorage& storage, const FontFaceId id) noexcept {
     const std::size_t count = (*storage.fonts).face_count;
     for (std::size_t index = 0; index < count; ++index) {
         if (storage.face_ids[index] == id) return index;
@@ -53,7 +53,7 @@ std::size_t raster_face_index(const detail::PreparedTextStorage& storage, FontFa
     return count;
 }
 
-PreparedTextStatus load_bitmap(FT_Face face, const render::text::ShapedGlyph& glyph, GlyphBitmap& output) {
+PreparedTextStatus load_bitmap(const FT_Face face, const render::text::ShapedGlyph& glyph, GlyphBitmap& output) {
     const double x = static_cast<double>(glyph.x);
     const double y = static_cast<double>(glyph.y);
     const double integral_x = std::floor(x);
@@ -235,7 +235,7 @@ PreparedTextStatus detail::validate_prepared_fonts(const PreparedFontBank& bank)
     catch (const std::runtime_error&) { return PreparedTextStatus::native_failure; }
 }
 
-PreparedTextStatus rasterize_prepared_text(const PreparedTextLayout& layout, LayoutAuthority expected, GrayTextMask& output) {
+PreparedTextStatus rasterize_prepared_text(const PreparedTextLayout& layout, const LayoutAuthority expected, GrayTextMask& output) {
     const std::shared_ptr<const detail::PreparedTextStorage> storage = detail::PreparedTextAccess::layout(layout);
     if (!storage) return PreparedTextStatus::invalid_input;
     if (!detail::prepared_authority_current(*storage, expected)) return PreparedTextStatus::stale;

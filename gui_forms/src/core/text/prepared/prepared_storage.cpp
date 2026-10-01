@@ -8,7 +8,7 @@
 
 namespace gui_forms {
 
-bool same_layout_authority(LayoutAuthority left, LayoutAuthority right) noexcept {
+bool same_layout_authority(const LayoutAuthority left, const LayoutAuthority right) noexcept {
     const bool equal = left.session == right.session && left.epoch == right.epoch;
     return equal;
 }
@@ -88,7 +88,7 @@ PreparedReservation& PreparedReservation::operator=(PreparedReservation&& other)
     return *this;
 }
 PreparedTextStatus PreparedReservation::acquire(std::shared_ptr<PreparedLedger> ledger,
-    PreparedResource resource, std::size_t bytes) {
+    const PreparedResource resource, const std::size_t bytes) {
     if (ledger_ || !ledger) return PreparedTextStatus::invalid_input;
     std::lock_guard<std::mutex> lock((*ledger).mutex);
     if ((*ledger).closing) return PreparedTextStatus::closing;
@@ -167,7 +167,7 @@ PreparedTextStatus validate_prepared_key(const PreparedTextKey& key) noexcept {
     return PreparedTextStatus::success;
 }
 
-bool scalar_edge(std::string_view text, std::size_t offset) noexcept {
+bool scalar_edge(const std::string_view text, const std::size_t offset) noexcept {
     if (offset > text.size()) return false;
     if (offset == text.size()) return true;
     const unsigned char value = static_cast<unsigned char>(text[offset]);
@@ -175,9 +175,9 @@ bool scalar_edge(std::string_view text, std::size_t offset) noexcept {
     return boundary;
 }
 
-PreparedTextStatus validate_prepared_input(const PreparedTextKey& key, std::string_view text,
-    std::span<const DocumentMapSpan> mapping, std::span<const PreparedSourceEndpoint> endpoints,
-    PreparedParagraphProof proof, std::size_t& bytes) noexcept {
+PreparedTextStatus validate_prepared_input(const PreparedTextKey& key, const std::string_view text,
+    const std::span<const DocumentMapSpan> mapping, const std::span<const PreparedSourceEndpoint> endpoints,
+    const PreparedParagraphProof proof, std::size_t& bytes) noexcept {
     const PreparedTextStatus key_status = validate_prepared_key(key);
     if (key_status != PreparedTextStatus::success) return key_status;
     if (text.size() != key.display_end.value - key.display_begin.value || !validate_utf8(text).valid()) {
@@ -253,7 +253,7 @@ PreparedTextStatus validate_prepared_input(const PreparedTextKey& key, std::stri
     return PreparedTextStatus::success;
 }
 
-bool prepared_authority_current(const PreparedTextStorage& storage, LayoutAuthority expected) {
+bool prepared_authority_current(const PreparedTextStorage& storage, const LayoutAuthority expected) {
     if (!storage.authority_state || !same_layout_authority(storage.authority, expected)) return false;
     PreparedAuthorityState& state = *storage.authority_state;
     std::lock_guard<std::mutex> lock(state.mutex);
@@ -261,7 +261,7 @@ bool prepared_authority_current(const PreparedTextStorage& storage, LayoutAuthor
     return current;
 }
 
-bool prepared_authority_current_locked(const PreparedTextStorage& storage, LayoutAuthority expected) noexcept {
+bool prepared_authority_current_locked(const PreparedTextStorage& storage, const LayoutAuthority expected) noexcept {
     if (!storage.authority_state || !same_layout_authority(storage.authority, expected)) return false;
     const PreparedInputStorage& input = *storage.input;
     const PreparedAuthorityState& state = *storage.authority_state;
@@ -270,16 +270,12 @@ bool prepared_authority_current_locked(const PreparedTextStorage& storage, Layou
     return current;
 }
 
-PreparedTextMetrics prepared_device_metrics(FontSpec font, double scale) {
+PreparedTextMetrics prepared_device_metrics(const FontSpec font, const double scale) {
     const double device_fixed = font.size * scale * 64.0;
     const std::int64_t size = static_cast<std::int64_t>(std::llround(device_fixed));
     const PreparedTextMetrics metrics{.device_scale = scale, .device_size_26_6 = size};
     return metrics;
 }
 
-std::unique_ptr<PreparedTextSession> PreparedTextAccess::session(std::shared_ptr<PreparedSessionState> state) {
-    std::unique_ptr<PreparedTextSession> result(new PreparedTextSession(std::move(state)));
-    return result;
-}
 } // namespace detail
 } // namespace gui_forms

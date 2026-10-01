@@ -6,6 +6,13 @@
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
 #include "../raster/dib_frame_store.hpp"
 #endif
+#if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT) && defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+#include "../raster/prepared_text_compositor.hpp"
+#include "../../../core/text/prepared/prepared_storage.hpp"
+#endif
+#if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST)
+#include "../../../../tests/prepared_text_test_support.hpp"
+#endif
 
 #include "gui_forms/live_surface.hpp"
 #include "gui_forms/text.hpp"
@@ -566,6 +573,9 @@ class DibPainter final : public Painter {
 #if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
     friend struct DibHostFixture;
 #endif
+#if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST)
+    friend struct PreparedHostFixture;
+#endif
     struct PaintTiming final {
         std::uint64_t calls{};
         std::uint64_t nanoseconds{};
@@ -665,6 +675,9 @@ public:
     }
 
     bool begin_frame() {
+#if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT) && defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+        clear_prepared_frame();
+#endif
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
         if (!surface_size_valid_) return false;
         const detail::DibFrameStatus begun = frames_.begin(width_, height_);
@@ -686,6 +699,9 @@ public:
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
     void abort_frame() noexcept {
         frames_.abort();
+#if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT)
+        clear_prepared_frame();
+#endif
         memory_dc_ = metrics_dc_;
         pixels_ = nullptr;
     }
@@ -698,6 +714,21 @@ public:
         return matches;
     }
     [[nodiscard]] bool commit_frame(HDC target, const RECT& damage, PaintReceipt receipt) {
+#if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT)
+        if (prepared_frame_failed_) { abort_frame(); return false; }
+        // Retain owners before acquiring guards. abort_frame clears the member
+        // owners, but these locals keep every guarded mutex alive until unlock.
+        const std::array<std::shared_ptr<const gui_forms::detail::PreparedTextStorage>, 64> retained = prepared_frame_;
+        std::array<std::unique_lock<std::mutex>, 64> authority_locks{};
+        for (std::size_t index = 0; index < prepared_frame_count_; ++index) {
+            gui_forms::detail::PreparedAuthorityState& authority = *(*retained[index]).authority_state;
+            authority_locks[index] = std::unique_lock<std::mutex>(authority.mutex);
+            if (!gui_forms::detail::prepared_authority_current_locked(*retained[index], (*retained[index]).authority)) {
+                abort_frame();
+                return false;
+            }
+        }
+#endif
         const detail::DibFrameKey key{.revision = receipt.rendered_revision,
             .epoch = receipt.surface_epoch, .scale = scale_};
         const detail::DibFrameStatus status = frames_.commit(target, damage, key);
@@ -1097,6 +1128,57 @@ public:
         DeleteObject(pen);
     }
 
+#if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT) && defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+    [[nodiscard]] PreparedTextPaintResult draw_prepared_text(const PreparedTextLayout& layout,
+        const LayoutAuthority expected, const Point baseline, const Color color) override {
+        PreparedTextPaintResult result{};
+        const std::shared_ptr<const gui_forms::detail::PreparedTextStorage>& storage = gui_forms::detail::PreparedTextAccess::layout(layout);
+        if (!storage || pixels_ == nullptr || width_ <= 0 || height_ <= 0 || states_.empty()) {
+            result.status = PreparedTextStatus::invalid_input;
+        } else if ((*(*storage).authority_state).executor != std::this_thread::get_id()) {
+            result.status = PreparedTextStatus::wrong_executor;
+        } else if ((*storage).metrics.device_scale != scale_) {
+            result.status = PreparedTextStatus::unsupported_profile;
+        } else {
+            GrayTextMask mask{};
+            result.status = rasterize_prepared_text(layout, expected, mask);
+            if (result.status == PreparedTextStatus::success) {
+                // Finish any batched GDI writes before reading/compositing the
+                // selected candidate DIB through its CPU pointer.
+                const BOOL flushed = GdiFlush();
+                if (flushed == FALSE) result.status = PreparedTextStatus::native_failure;
+            }
+            if (result.status == PreparedTextStatus::success) {
+                gui_forms::detail::PreparedAuthorityState& authority = *(*storage).authority_state;
+                std::lock_guard<std::mutex> lock(authority.mutex);
+                if (!gui_forms::detail::prepared_authority_current_locked(*storage, expected)) {
+                    result.status = PreparedTextStatus::stale;
+                } else {
+                    result.status = retain_prepared_frame(storage);
+                    if (result.status == PreparedTextStatus::success) {
+                        const std::size_t pixel_count = static_cast<std::size_t>(width_) * static_cast<std::size_t>(height_);
+                        const detail::PreparedCompositeTarget target{
+                            .pixels = std::span<std::uint32_t>(pixels_, pixel_count),
+                            .width = static_cast<std::uint32_t>(width_), .height = static_cast<std::uint32_t>(height_),
+                            .stride = static_cast<std::size_t>(width_)};
+                        detail::PreparedCompositeClip clip{.rect = state().clip};
+                        if (state().rounded_clip) {
+                            clip.rounded = true;
+                            clip.rounded_rect = (*state().rounded_clip).rect;
+                            clip.radius = (*state().rounded_clip).radius;
+                        }
+                        const Point translated{baseline.x + state().tx, baseline.y + state().ty};
+                        result.status = detail::composite_prepared_mask(mask, target, clip, translated, scale_, color);
+                    }
+                }
+            }
+        }
+        if (result.status == PreparedTextStatus::success) result.disposition = PreparedTextPaintDisposition::staged;
+        else prepared_frame_failed_ = true;
+        return result;
+    }
+#endif
+
     void draw_text_utf8(Point origin, std::string_view text,
                         FontSpec font, Color color) override {
         const PaintTimer timer(timings_[5]);
@@ -1484,6 +1566,27 @@ public:
     }
 
 private:
+#if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT) && defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+    void clear_prepared_frame() noexcept {
+        for (std::size_t index = 0; index < prepared_frame_count_; ++index) prepared_frame_[index].reset();
+        prepared_frame_count_ = 0;
+        prepared_frame_failed_ = false;
+    }
+    PreparedTextStatus retain_prepared_frame(const std::shared_ptr<const gui_forms::detail::PreparedTextStorage>& storage) {
+        const LayoutAuthority authority = (*storage).authority;
+        std::size_t position = 0;
+        while (position < prepared_frame_count_ && (*prepared_frame_[position]).authority.session < authority.session) ++position;
+        if (position < prepared_frame_count_ && (*prepared_frame_[position]).authority.session == authority.session) {
+            if (!same_layout_authority((*prepared_frame_[position]).authority, authority)) return PreparedTextStatus::stale;
+            return PreparedTextStatus::success;
+        }
+        if (prepared_frame_count_ == prepared_frame_.size()) return PreparedTextStatus::budget_exceeded;
+        for (std::size_t index = prepared_frame_count_; index > position; --index) prepared_frame_[index] = std::move(prepared_frame_[index - 1U]);
+        prepared_frame_[position] = storage;
+        ++prepared_frame_count_;
+        return PreparedTextStatus::success;
+    }
+#endif
     [[nodiscard]] static std::uint32_t sample_image_pixel(
         const DecodedImage& image, Rect bounds, double x, double y,
         ImageSampling sampling) noexcept {
@@ -2226,6 +2329,13 @@ private:
     HBITMAP bitmap_{};
     HGDIOBJ old_bitmap_{};
     std::uint32_t* pixels_{};
+#if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT) && defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+    // Finite host frame profile: at most 64 distinct session authorities. A
+    // repeated command shares its entry; ordering gives one global lock order.
+    std::array<std::shared_ptr<const gui_forms::detail::PreparedTextStorage>, 64> prepared_frame_{};
+    std::size_t prepared_frame_count_{};
+    bool prepared_frame_failed_{};
+#endif
     int width_{};
     int height_{};
     Size logical_size_{};
@@ -2246,6 +2356,9 @@ private:
 class WindowsHostState final {
 #if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
     friend struct DibHostFixture;
+#endif
+#if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST)
+    friend struct PreparedHostFixture;
 #endif
 public:
     WindowsHostState(std::unique_ptr<Window> model, WindowsHostOptions options)
@@ -3461,11 +3574,17 @@ LRESULT CALLBACK window_procedure(HWND window, UINT message, WPARAM wparam, LPAR
 #if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
 #include "windows_dib_lifecycle_fixture.inc"
 #endif
+#if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST)
+#include "windows_prepared_text_fixture.inc"
+#endif
 
 } // namespace
 
 #if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
 void run_windows_dib_lifecycle_fixture() { DibHostFixture::run(); }
+#endif
+#if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST)
+void run_windows_prepared_text_fixture(const std::span<const std::byte> fonts) { PreparedHostFixture::run(fonts); }
 #endif
 
 HostCapabilities windows_capabilities() {

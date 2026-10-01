@@ -1,10 +1,27 @@
 #include "replay_display_chunk.hpp"
+#if defined(GUI_FORMS_PREPARED_TEXT)
+#include "../../text/prepared/prepared_storage.hpp"
+#endif
 
 namespace gui_forms::detail {
 
 std::uint64_t replay_display_chunk(const DisplayChunk& chunk, Painter& painter) {
     for (const DisplayCommand& command : chunk.commands()) {
         switch (command.operation) {
+#if defined(GUI_FORMS_PREPARED_TEXT)
+        case DisplayOperation::draw_prepared_text: {
+            if (!command.prepared_text || !prepared_authority_current(*command.prepared_text, command.prepared_authority)) {
+                throw PreparedTextPaintFailure(PreparedTextStatus::stale);
+            }
+            PreparedTextLayout layout = PreparedTextAccess::retained_layout(command.prepared_text);
+            const PreparedTextPaintResult result = painter.draw_prepared_text(layout, command.prepared_authority,
+                command.first, command.color);
+            if (result.status != PreparedTextStatus::success || result.disposition == PreparedTextPaintDisposition::refused) {
+                throw PreparedTextPaintFailure(result.status);
+            }
+            break;
+        }
+#endif
         case DisplayOperation::save: painter.save(); break;
         case DisplayOperation::restore: painter.restore(); break;
         case DisplayOperation::translate: painter.translate(command.first); break;

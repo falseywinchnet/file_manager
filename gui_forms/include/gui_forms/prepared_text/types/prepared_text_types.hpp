@@ -14,7 +14,13 @@ enum class PreparedTextStatus {
     success, pending, busy, invalid_input, stale, cancelled, closing, closed,
     generation_exhausted, context_required, budget_exceeded, unsupported_profile,
     missing_font_coverage, incompatible_font, invalid_geometry, resource_failure,
-    native_failure, wrong_executor
+    native_failure, wrong_executor, incompatible_backend
+};
+
+enum class PreparedTextPaintDisposition { refused, recorded, staged };
+struct PreparedTextPaintResult final {
+    PreparedTextPaintDisposition disposition{PreparedTextPaintDisposition::refused};
+    PreparedTextStatus status{PreparedTextStatus::incompatible_backend};
 };
 
 enum class PreparedTextSlot { empty, queued, running, ready };
@@ -110,6 +116,6 @@ struct PreparedTextSessionSnapshot final {
 };
 
 [[nodiscard]] bool same_prepared_text_key(const PreparedTextKey& left, const PreparedTextKey& right) noexcept;
-[[nodiscard]] bool same_layout_authority(LayoutAuthority left, LayoutAuthority right) noexcept;
+[[nodiscard]] bool same_layout_authority(const LayoutAuthority left, const LayoutAuthority right) noexcept;
 
 } // namespace gui_forms

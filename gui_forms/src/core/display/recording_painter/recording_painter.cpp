@@ -1,9 +1,42 @@
 #include "recording_painter.hpp"
+#if defined(GUI_FORMS_PREPARED_TEXT)
+#include "../../text/prepared/prepared_storage.hpp"
+#include <cmath>
+#include <new>
+#endif
 
 #include <stdexcept>
 #include <utility>
 
 namespace gui_forms::detail {
+#if defined(GUI_FORMS_PREPARED_TEXT)
+PreparedTextPaintResult RecordingPainter::draw_prepared_text(const PreparedTextLayout& layout,
+    const LayoutAuthority expected, const Point baseline, const Color color) {
+    PreparedTextPaintResult result{};
+    const std::shared_ptr<const PreparedTextStorage>& storage = PreparedTextAccess::layout(layout);
+    if (!storage || !std::isfinite(baseline.x) || !std::isfinite(baseline.y)) {
+        result.status = PreparedTextStatus::invalid_input;
+    } else if (!prepared_authority_current(*storage, expected)) {
+        result.status = PreparedTextStatus::stale;
+    } else {
+        try {
+            DisplayCommand command{};
+            command.operation = DisplayOperation::draw_prepared_text;
+            command.first = baseline;
+            command.color = color;
+            command.prepared_text = storage;
+            command.prepared_authority = expected;
+            commands_.push_back(std::move(command));
+            result.disposition = PreparedTextPaintDisposition::recorded;
+            result.status = PreparedTextStatus::success;
+            return result;
+        } catch (const std::bad_alloc&) { result.status = PreparedTextStatus::resource_failure; }
+    }
+    // A caller ignoring refusal cannot publish an incomplete candidate chunk.
+    if (!prepared_failure_) prepared_failure_ = result.status;
+    return result;
+}
+#endif
 
 void RecordingPainter::save() {
     DisplayCommand command;
@@ -254,6 +287,9 @@ void RecordingPainter::fill_image_pattern(
 
 std::shared_ptr<const DisplayChunk> RecordingPainter::finish(
     std::uint64_t generation, PaintPlane plane, Rect logical_bounds) {
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    if (prepared_failure_) throw PreparedTextPaintFailure(*prepared_failure_);
+#endif
     if (save_depth_ != 0U) {
         throw std::logic_error("GUI.Forms display chunk has an unbalanced painter save");
     }

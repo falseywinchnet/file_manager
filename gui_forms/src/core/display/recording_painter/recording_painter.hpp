@@ -3,6 +3,7 @@
 #include "../chunk/display_chunk.hpp"
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace gui_forms::detail {
@@ -38,6 +39,10 @@ public:
     void draw_line(Point from, Point to, Color color, double width) override;
     void draw_text_utf8(Point origin, std::string_view text,
                         FontSpec font, Color color) override;
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    [[nodiscard]] PreparedTextPaintResult draw_prepared_text(const PreparedTextLayout& layout,
+        const LayoutAuthority expected, const Point baseline, const Color color) override;
+#endif
     [[nodiscard]] Size measure_text_utf8(std::string_view text,
                                          FontSpec font) override;
     [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(
@@ -61,6 +66,9 @@ private:
     std::vector<DisplayCommand> commands_;
     std::uint64_t save_depth_{};
     TextMetricsProvider* text_metrics_{};
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    std::optional<PreparedTextStatus> prepared_failure_{};
+#endif
 };
 
 } // namespace gui_forms::detail

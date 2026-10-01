@@ -11,10 +11,21 @@
 namespace gui_forms {
 
 class LiveSurface;
+#if defined(GUI_FORMS_PREPARED_TEXT)
+class PreparedTextLayout;
+struct LayoutAuthority;
+struct PreparedTextPaintResult;
+#endif
 
 class Painter : public TextMetricsProvider {
 public:
     virtual ~Painter() = default;
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    // Development surface: recording retains immutable storage; a compatible
+    // backend stages pixels. Only the host's successful frame commit presents.
+    [[nodiscard]] virtual PreparedTextPaintResult draw_prepared_text(
+        const PreparedTextLayout& layout, const LayoutAuthority expected, const Point baseline, const Color color);
+#endif
 
     virtual void save() = 0;
     virtual void restore() = 0;

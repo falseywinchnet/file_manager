@@ -1,9 +1,17 @@
 #include "gui_forms/types.hpp"
+#if defined(GUI_FORMS_PREPARED_TEXT)
+#include "gui_forms/prepared_text/types/prepared_text_types.hpp"
+#endif
 
 #include <algorithm>
 #include <cmath>
 
 namespace gui_forms {
+#if defined(GUI_FORMS_PREPARED_TEXT)
+PreparedTextPaintResult Painter::draw_prepared_text(const PreparedTextLayout&, const LayoutAuthority, const Point, const Color) {
+    return {};
+}
+#endif
 namespace {
 
 std::uint8_t interpolate_channel(std::uint8_t left, std::uint8_t right,

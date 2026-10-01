@@ -1,5 +1,5 @@
 #include "prepared_text_test_support.hpp"
-#include "../src/render/text/prepared_storage.hpp"
+#include "../src/core/text/prepared/prepared_storage.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -7,7 +7,7 @@
 namespace {
 using namespace prepared_test;
 
-void test_generations(std::span<const std::byte> bytes) {
+void test_generations(const std::span<const std::byte> bytes) {
     PreparedTextService service{};
     EncodedFontLease bank = make_bank(service, bytes);
     Wake wake{};
@@ -51,7 +51,7 @@ void test_generations(std::span<const std::byte> bytes) {
     require(wake.count.load(std::memory_order_acquire) == 4, "one wake per observed completion");
 }
 
-void test_authority(std::span<const std::byte> bytes) {
+void test_authority(const std::span<const std::byte> bytes) {
     PreparedTextService service{};
     EncodedFontLease bank = make_bank(service, bytes);
     Wake wake{};
@@ -106,7 +106,7 @@ void test_authority(std::span<const std::byte> bytes) {
     require(budget.payload_generations == 1, "join retains only caller old layout");
 }
 
-void test_validation_and_fonts(std::span<const std::byte> bytes) {
+void test_validation_and_fonts(const std::span<const std::byte> bytes) {
     PreparedTextService service{};
     EncodedFontLease first = make_bank(service, bytes);
     EncodedFontLease shared = first;
@@ -138,7 +138,7 @@ void test_validation_and_fonts(std::span<const std::byte> bytes) {
     require(budget.input_owners == 1 && budget.font_banks == 2, "close does not uncharge external owners");
 }
 
-void test_failed_slot(std::span<const std::byte> bytes) {
+void test_failed_slot(const std::span<const std::byte> bytes) {
     PreparedTextService service{};
     const std::array<std::byte, 8> invalid_font{};
     const std::array<PreparedFontSource, 1> sources{{{.encoded = invalid_font, .role = FontRole::content}}};
@@ -172,7 +172,7 @@ void test_failed_slot(std::span<const std::byte> bytes) {
     require(after.payload_generations == 0, "failed slot retired");
 }
 
-void test_font_byte_budget(std::span<const std::byte> bytes) {
+void test_font_byte_budget(const std::span<const std::byte> bytes) {
     PreparedTextService service{};
     std::vector<std::byte> padded(PreparedTextLimits::font_face_bytes);
     std::copy(bytes.begin(), bytes.end(), padded.begin());
@@ -192,7 +192,7 @@ void test_font_byte_budget(std::span<const std::byte> bytes) {
     require(status == PreparedTextStatus::success, "retired bank releases actual bytes");
 }
 
-void test_mapping(std::span<const std::byte> bytes) {
+void test_mapping(const std::span<const std::byte> bytes) {
     PreparedTextService service{};
     EncodedFontLease bank = make_bank(service, bytes);
     PreparedTextKey key = make_key(service, bank, "[x]a");
@@ -218,7 +218,7 @@ void test_mapping(std::span<const std::byte> bytes) {
     }
 }
 
-void test_cross_service_authority(std::span<const std::byte> bytes) {
+void test_cross_service_authority(const std::span<const std::byte> bytes) {
     PreparedTextService first_service{};
     PreparedTextService second_service{};
     EncodedFontLease first_bank = make_bank(first_service, bytes);
@@ -268,7 +268,7 @@ void test_cross_service_authority(std::span<const std::byte> bytes) {
 }
 } // namespace
 
-int main(int argc, char** argv) {
+int main(const int argc, char** const argv) {
     try {
         require(argc == 2, "font directory required");
         const std::vector<std::byte> bytes = read_font(std::filesystem::path(argv[1]));

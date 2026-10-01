@@ -1,4 +1,5 @@
-#include "prepared_storage.hpp"
+#include "../../core/text/prepared/prepared_storage.hpp"
+#include "harfbuzz/harfbuzz_font_engine.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -40,7 +41,7 @@ bool owner_executor(const detail::PreparedServiceState& service) noexcept {
     return current;
 }
 
-bool matching_primary(const detail::PreparedFontBank& bank, FontSpec font) noexcept {
+bool matching_primary(const detail::PreparedFontBank& bank, const FontSpec font) noexcept {
     for (std::size_t index = 0; index < bank.face_count; ++index) {
         const detail::PreparedFontFace& face = bank.faces[index];
         if (face.role && *face.role == font.role && face.weight == font.weight && face.italic == font.italic) return true;
@@ -63,7 +64,7 @@ PreparedTextBudgetSnapshot PreparedTextService::budget_snapshot() const {
     std::lock_guard<std::mutex> lock(ledger.mutex);
     return ledger.usage;
 }
-PreparedTextStatus PreparedTextService::create_font_bank(std::span<const PreparedFontSource> sources,
+PreparedTextStatus PreparedTextService::create_font_bank(const std::span<const PreparedFontSource> sources,
     EncodedFontLease& output) {
     if (!owner_executor(*state_)) return PreparedTextStatus::wrong_executor;
     if (sources.empty() || sources.size() > PreparedTextLimits::font_faces) return PreparedTextStatus::invalid_input;
@@ -119,9 +120,9 @@ PreparedTextStatus PreparedTextService::create_font_bank(std::span<const Prepare
     }
 }
 
-PreparedTextStatus PreparedTextService::create_input(const PreparedTextKey& key, std::string_view text,
-    std::span<const DocumentMapSpan> mapping, std::span<const PreparedSourceEndpoint> endpoints,
-    PreparedParagraphProof proof, PrepareInput& output) {
+PreparedTextStatus PreparedTextService::create_input(const PreparedTextKey& key, const std::string_view text,
+    const std::span<const DocumentMapSpan> mapping, const std::span<const PreparedSourceEndpoint> endpoints,
+    const PreparedParagraphProof proof, PrepareInput& output) {
     if (!owner_executor(*state_)) return PreparedTextStatus::wrong_executor;
     std::size_t bytes = 0;
     const PreparedTextStatus validated = detail::validate_prepared_input(key, text, mapping, endpoints, proof, bytes);
@@ -159,7 +160,7 @@ PreparedTextStatus PreparedTextService::create_input(const PreparedTextKey& key,
 }
 
 PreparedTextStatus PreparedTextService::open_session(const EncodedFontLease& fonts,
-    PreparedTextWakeTarget* wake, std::unique_ptr<PreparedTextSession>& output) {
+    PreparedTextWakeTarget* const wake, std::unique_ptr<PreparedTextSession>& output) {
     if (!owner_executor(*state_)) return PreparedTextStatus::wrong_executor;
     const std::shared_ptr<const detail::PreparedFontBank>& bank = detail::PreparedTextAccess::fonts(fonts);
     if (!bank || (*bank).ledger != (*state_).ledger) return PreparedTextStatus::invalid_input;
@@ -182,6 +183,7 @@ PreparedTextStatus PreparedTextService::open_session(const EncodedFontLease& fon
         (*state).fonts = bank;
         (*state).authority = std::make_shared<detail::PreparedAuthorityState>();
         (*(*state).authority).current.session = session_id;
+        (*(*state).authority).executor = (*state_).executor;
         (*state).executor = (*state_).executor;
         (*state).wake = wake;
         std::unique_ptr<PreparedTextSession> session = detail::PreparedTextAccess::session(state);
@@ -228,7 +230,7 @@ PreparedTextStatus PreparedTextSession::desire(const PreparedTextKey& key, Layou
     return PreparedTextStatus::success;
 }
 
-PreparedTextStatus PreparedTextSession::submit(LayoutAuthority authority, PrepareInput& input) {
+PreparedTextStatus PreparedTextSession::submit(const LayoutAuthority authority, PrepareInput& input) {
     if ((*state_).executor != std::this_thread::get_id()) return PreparedTextStatus::wrong_executor;
     std::unique_ptr<detail::PreparedInputStorage>& payload = detail::PreparedTextAccess::input(input);
     if (!payload || (*payload).ledger != (*(*state_).service).ledger) return PreparedTextStatus::invalid_input;
@@ -282,7 +284,7 @@ PreparedTextSessionSnapshot PreparedTextSession::inspect_ready() const {
     return snapshot;
 }
 
-PreparedTextStatus PreparedTextSession::adopt_ready(LayoutAuthority expected, PreparedTextLayout& output) {
+PreparedTextStatus PreparedTextSession::adopt_ready(const LayoutAuthority expected, PreparedTextLayout& output) {
     if ((*state_).executor != std::this_thread::get_id()) return PreparedTextStatus::wrong_executor;
     std::lock_guard<std::mutex> lock((*state_).mutex);
     if ((*state_).snapshot.closing) return PreparedTextStatus::closing;
@@ -320,6 +322,10 @@ void PreparedTextSession::join_and_release() {
 }
 
 namespace detail {
+std::unique_ptr<PreparedTextSession> PreparedTextAccess::session(std::shared_ptr<PreparedSessionState> state) {
+    std::unique_ptr<PreparedTextSession> result(new PreparedTextSession(std::move(state)));
+    return result;
+}
 PreparedSessionState::~PreparedSessionState() { close(); join(); }
 void PreparedSessionState::close() {
     if (authority) {

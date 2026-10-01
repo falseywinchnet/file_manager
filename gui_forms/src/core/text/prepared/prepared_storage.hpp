@@ -1,14 +1,16 @@
 #pragma once
 
 #include "gui_forms/prepared_text.hpp"
-#include "harfbuzz/harfbuzz_font_engine.hpp"
+#include "../shaping/shaped_text_geometry.hpp"
 
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <exception>
 #include <mutex>
 #include <optional>
 #include <thread>
+#include <utility>
 
 namespace gui_forms::detail {
 
@@ -30,7 +32,7 @@ public:
     PreparedReservation(PreparedReservation&& other) noexcept;
     PreparedReservation& operator=(PreparedReservation&& other) noexcept;
     [[nodiscard]] PreparedTextStatus acquire(std::shared_ptr<PreparedLedger> ledger,
-        PreparedResource resource, std::size_t bytes);
+        const PreparedResource resource, const std::size_t bytes);
     void release() noexcept;
 private:
     std::shared_ptr<PreparedLedger> ledger_{};
@@ -73,6 +75,7 @@ struct PreparedInputStorage final {
 
 struct PreparedAuthorityState final {
     std::mutex mutex{};
+    std::thread::id executor{};
     LayoutAuthority current{};
     std::optional<PreparedTextKey> key{};
     bool closing{};
@@ -139,17 +142,31 @@ struct PreparedTextAccess final {
     static const std::shared_ptr<const PreparedTextStorage>& layout(const PreparedTextLayout& value) noexcept { return value.storage_; }
     static std::unique_ptr<PreparedMaskStorage>& mask(GrayTextMask& value) noexcept { return value.storage_; }
     static std::unique_ptr<PreparedTextSession> session(std::shared_ptr<PreparedSessionState> state);
+    static PreparedTextLayout retained_layout(std::shared_ptr<const PreparedTextStorage> storage) {
+        PreparedTextLayout layout{};
+        layout.storage_ = std::move(storage);
+        return layout;
+    }
+};
+
+class PreparedTextPaintFailure final : public std::exception {
+public:
+    explicit PreparedTextPaintFailure(const PreparedTextStatus status) noexcept : status_(status) {}
+    [[nodiscard]] PreparedTextStatus status() const noexcept { return status_; }
+    [[nodiscard]] const char* what() const noexcept override { return "Prepared text paint refused"; }
+private:
+    PreparedTextStatus status_{};
 };
 
 [[nodiscard]] PreparedTextStatus validate_prepared_key(const PreparedTextKey& key) noexcept;
-[[nodiscard]] PreparedTextStatus validate_prepared_input(const PreparedTextKey& key, std::string_view text,
-    std::span<const DocumentMapSpan> mapping, std::span<const PreparedSourceEndpoint> endpoints,
-    PreparedParagraphProof proof, std::size_t& bytes) noexcept;
-[[nodiscard]] bool prepared_authority_current(const PreparedTextStorage& storage, LayoutAuthority expected);
+[[nodiscard]] PreparedTextStatus validate_prepared_input(const PreparedTextKey& key, const std::string_view text,
+    const std::span<const DocumentMapSpan> mapping, const std::span<const PreparedSourceEndpoint> endpoints,
+    const PreparedParagraphProof proof, std::size_t& bytes) noexcept;
+[[nodiscard]] bool prepared_authority_current(const PreparedTextStorage& storage, const LayoutAuthority expected);
 // Caller holds the mutex of storage.authority_state through the complete
 // operation whose authority is being checked, including publication if any.
-[[nodiscard]] bool prepared_authority_current_locked(const PreparedTextStorage& storage, LayoutAuthority expected) noexcept;
-[[nodiscard]] PreparedTextMetrics prepared_device_metrics(FontSpec font, double scale);
+[[nodiscard]] bool prepared_authority_current_locked(const PreparedTextStorage& storage, const LayoutAuthority expected) noexcept;
+[[nodiscard]] PreparedTextMetrics prepared_device_metrics(const FontSpec font, const double scale);
 [[nodiscard]] PreparedTextStatus validate_prepared_fonts(const PreparedFontBank& bank);
 
 } // namespace gui_forms::detail

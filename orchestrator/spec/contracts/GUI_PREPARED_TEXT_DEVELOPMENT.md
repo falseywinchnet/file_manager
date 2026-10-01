@@ -527,3 +527,61 @@ incomplete headers or a changed Painter vtable ABI. Ordinary OFF SDK behavior
 remains unchanged. This is an assigned development slice, not SDK publication,
 production backend readiness or runtime availability. Subsequent evidence must
 identify exact source review, tests and any remaining native behavior limits.
+
+### Windows frame authority — reviewed development implementation
+
+**OBSERVED reviewed development implementation:** a prepared Windows frame admits
+at most 64 distinct session authorities in a fixed sorted table. Multiple
+commands sharing one authority do not consume extra distinct-authority entries.
+Duplicate references share one entry; mixed epochs of one session refuse. A
+65th distinct authority returns budget-exceeded and prevents candidate commit;
+commands are not dropped and authority validation is not skipped. This Windows
+development frame limit is not a global service quota or installed capability.
+
+The commit acquires authority locks in process-session order and holds
+them through DIB commit. The ordering assumes the single linked provider session
+identity model described above; independently loaded duplicate providers remain
+unadmitted. Strong storage/authority owners outlive all lock guards on abort as
+well as success, so cleanup cannot destroy a mutex still held by a guard.
+The coordinator reports completing source review of table lifetime, lock order,
+stale abort and rounding. This is attributed review evidence, not an independent
+source audit by this contract-recording chat or a general concurrency proof.
+
+Host drawing and frame commit use the owning UI executor. Baseline placement
+converts DIPs to integer device coordinates with half-away-from-zero rounding,
+including negative half ties, and checked representable range. This placement
+rule is separate from the positive 26.6 font-size quantization and does not
+rescale prepared device-pixel glyph positions.
+
+**OBSERVED evidence:**
+`../../../gui_forms/experiments/PREPARED_TEXT_A2_INTEGRATION_2026-10-01.md`
+records retained command/replay and Windows candidate-DIB integration, generated
+authority-table fixtures, stale/cancelled and failed-commit preservation, and
+signed placement/compositor checks. Its final provider run after parameter
+qualifier corrections reports **9/9 passed in 1.16 seconds**. This is focused
+Windows correctness evidence, not visible typography or latency measurement.
+
+The coordinator reports independent source review complete, all 21 manifest
+hashes verified, and final house-style qualifier corrections reviewed across
+17 files. Review is scoped to the authored integration and corrections described
+in that receipt, with CMake reviewed by the coordinator; unrelated legacy and
+vendor source is not certified. The receipt's earlier independent-review-pending
+statement is historical relative to its appended independent acceptance. The
+coordinator independently rebuilt the native host and nine focused test targets
+after the final source freeze: **9/9 passed in 0.99 seconds**. This chat read
+that receipt and did not independently rerun the tests or verify the hashes.
+
+The coordinator also reports prepared-ON installation refuses before copying
+files. A fresh ordinary OFF Application build/install and separate Controls
+consumer configure/link/run pass; prepared headers and definitions are absent
+from that OFF SDK. The OFF checks preceded the final top-level-const corrections;
+they establish extraction/export separation, not a new distributable artifact.
+These checks establish the reported development isolation,
+not prepared SDK publication or public backend-capability negotiation.
+
+Caller-owned service lifetime remains in force. Window/document-view attachment
+and consumer-ready lifecycle binding are not established. macOS/Linux prepared
+painting, wrapped/mono profiles, editing geometry and broader resource/race or
+responsiveness evidence remain open. Earlier proposal language records the
+history of this slice; this stanza records coordinator acceptance as Windows
+development integration only, with no availability promotion.

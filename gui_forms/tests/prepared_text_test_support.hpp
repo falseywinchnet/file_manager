@@ -2,6 +2,7 @@
 
 #include "gui_forms/prepared_text.hpp"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -14,7 +15,7 @@
 namespace prepared_test {
 using namespace gui_forms;
 
-inline void require(bool condition, const char* message) {
+inline void require(const bool condition, const char* const message) {
     if (!condition) throw std::runtime_error(message);
 }
 
@@ -37,7 +38,7 @@ inline std::vector<std::byte> read_font(const std::filesystem::path& directory) 
     return bytes;
 }
 
-inline EncodedFontLease make_bank(PreparedTextService& service, std::span<const std::byte> bytes) {
+inline EncodedFontLease make_bank(PreparedTextService& service, const std::span<const std::byte> bytes) {
     const std::array<PreparedFontSource, 1> sources{{{.encoded = bytes, .role = FontRole::content}}};
     EncodedFontLease bank{};
     const PreparedTextStatus status = service.create_font_bank(sources, bank);
@@ -46,7 +47,7 @@ inline EncodedFontLease make_bank(PreparedTextService& service, std::span<const 
 }
 
 inline PreparedTextKey make_key(const PreparedTextService& service, const EncodedFontLease& fonts,
-    std::string_view text, double size = 16.0, double scale = 1.0) {
+    const std::string_view text, const double size = 16.0, const double scale = 1.0) {
     require(text.size() <= PreparedTextLimits::display_bytes, "test text bound");
     PreparedTextKey key{};
     key.page.revision = {1, 1};
@@ -68,7 +69,7 @@ inline PreparedTextKey make_key(const PreparedTextService& service, const Encode
 }
 
 inline PreparedTextStatus make_input(PreparedTextService& service, const PreparedTextKey& key,
-    std::string_view text, PrepareInput& output, PreparedParagraphProof proof = {true, true}) {
+    const std::string_view text, PrepareInput& output, const PreparedParagraphProof proof = {true, true}) {
     const std::array<DocumentMapSpan, 1> mapping{{{
         .source = key.source, .begin = key.display_begin, .end = key.display_end}}};
     const std::array<PreparedSourceEndpoint, 2> endpoints{{
@@ -93,7 +94,7 @@ inline PreparedTextSessionSnapshot wait_ready(PreparedTextSession& session) {
 }
 
 inline void prepare(PreparedTextService& service, PreparedTextSession& session, const PreparedTextKey& key,
-    std::string_view text, PreparedTextLayout& output) {
+    const std::string_view text, PreparedTextLayout& output) {
     LayoutAuthority authority{};
     const PreparedTextStatus desired = session.desire(key, authority);
     require(desired == PreparedTextStatus::success, "desire");

@@ -70,6 +70,7 @@ add_library(gui_forms_core STATIC
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
     src/core/surface_material/types/surface_material_types.cpp
     src/core/text/text_store/text_store.cpp
+    src/core/text/prepared/prepared_storage.cpp
     src/core/document_view/document_view_state.cpp
     src/core/text_shaping/validation/text_shaping_validation.cpp
     src/core/text/unicode/unicode_grapheme.cpp
@@ -197,8 +198,9 @@ if(GUI_FORMS_BUILD_PREPARED_TEXT)
         message(FATAL_ERROR "GUI_FORMS_BUILD_PREPARED_TEXT requires GUI_FORMS_ENABLE_HARFBUZZ_TEXT")
     endif()
     find_package(Threads REQUIRED)
+    target_compile_definitions(gui_forms_core PUBLIC
+        $<BUILD_INTERFACE:GUI_FORMS_PREPARED_TEXT>)
     add_library(gui_forms_prepared_text STATIC
-        src/render/text/prepared_storage.cpp
         src/render/text/prepared_service.cpp
         src/render/text/prepared_raster.cpp)
     target_link_libraries(gui_forms_prepared_text
@@ -413,6 +415,9 @@ set_target_properties(gui_forms_core PROPERTIES EXPORT_NAME Core)
 set_target_properties(gui_forms_controls PROPERTIES EXPORT_NAME Controls)
 set_target_properties(gui_drawing_core PROPERTIES EXPORT_NAME Drawing)
 
+if(GUI_FORMS_BUILD_PREPARED_TEXT)
+    install(CODE "message(FATAL_ERROR \"The development prepared-text interface is not admitted for SDK installation\")")
+endif()
 if(GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT)
     install(CODE "message(FATAL_ERROR \"The development audio loop transport is not admitted for SDK installation\")")
 endif()
@@ -868,6 +873,13 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
             src/host/windows/raster/dib_frame_store.cpp)
         target_compile_definitions(gui_forms_host_windows PRIVATE
             GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1)
+        if(TARGET gui_forms_prepared_text)
+            target_sources(gui_forms_host_windows PRIVATE
+                src/host/windows/raster/prepared_text_compositor.cpp)
+            target_link_libraries(gui_forms_host_windows PRIVATE gui_forms_prepared_text)
+            target_compile_definitions(gui_forms_host_windows PRIVATE
+                GUI_FORMS_WINDOWS_PREPARED_TEXT=1)
+        endif()
     endif()
     target_link_libraries(gui_forms_host_windows
         PUBLIC gui_forms_core
@@ -1574,6 +1586,10 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_prepared_text_raster_tests PRIVATE gui_forms_prepared_text)
         add_test(NAME gui_forms_prepared_text_raster_tests
             COMMAND gui_forms_prepared_text_raster_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+        add_executable(gui_forms_prepared_display_tests tests/prepared_display_tests.cpp)
+        target_link_libraries(gui_forms_prepared_display_tests PRIVATE gui_forms_prepared_text)
+        add_test(NAME gui_forms_prepared_display_tests
+            COMMAND gui_forms_prepared_display_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
     endif()
     add_executable(gui_forms_cursor_interaction_tests tests/cursor_interaction_tests.cpp)
     target_link_libraries(gui_forms_cursor_interaction_tests PRIVATE gui_forms_core)
@@ -1622,6 +1638,28 @@ if(GUI_FORMS_BUILD_TESTS)
             add_test(NAME gui_forms_windows_dib_lifecycle_tests
                      COMMAND gui_forms_windows_dib_lifecycle_tests)
             set_tests_properties(gui_forms_windows_dib_lifecycle_tests PROPERTIES TIMEOUT 30)
+            if(TARGET gui_forms_prepared_text)
+                add_executable(gui_forms_windows_prepared_text_tests
+                    tests/windows_prepared_text_tests.cpp
+                    src/host/windows/application/windows_host.cpp
+                    src/host/windows/accessibility/windows_accessibility.cpp
+                    src/host/windows/services/windows_clipboard_image.cpp
+                    src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
+                    src/host/windows/raster/dib_frame_store.cpp
+                    src/host/windows/raster/prepared_text_compositor.cpp)
+                target_include_directories(gui_forms_windows_prepared_text_tests PRIVATE
+                    include src/host/windows)
+                target_compile_definitions(gui_forms_windows_prepared_text_tests PRIVATE
+                    WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+                    GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1
+                    GUI_FORMS_WINDOWS_PREPARED_TEXT=1 GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST=1)
+                target_link_libraries(gui_forms_windows_prepared_text_tests PRIVATE
+                    gui_forms_prepared_text user32 gdi32 ole32 oleaut32 oleacc uuid
+                    windowscodecs comdlg32 shell32 usp10)
+                add_test(NAME gui_forms_windows_prepared_text_tests
+                    COMMAND gui_forms_windows_prepared_text_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+                set_tests_properties(gui_forms_windows_prepared_text_tests PROPERTIES TIMEOUT 30)
+            endif()
         endif()
     endif()
     if(GUI_FORMS_ENABLE_LINUX_HOST)

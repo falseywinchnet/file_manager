@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gui_forms/text_shaping.hpp"
+#include "../../../core/text/shaping/shaped_text_geometry.hpp"
 #include "gui_forms/typography.hpp"
 #include "gui_forms/types.hpp"
 
@@ -17,23 +17,6 @@
 #include <vector>
 
 namespace gui_forms::render::text {
-
-struct ShapedGlyph final {
-    GlyphId glyph{};
-    Utf8Offset cluster{};
-    float x{};
-    float y{};
-    float advance_x{};
-    float advance_y{};
-    friend constexpr bool operator==(const ShapedGlyph& left,
-                                     const ShapedGlyph& right) noexcept {
-        const bool equal = left.glyph == right.glyph && left.cluster == right.cluster &&
-               left.x == right.x && left.y == right.y &&
-               left.advance_x == right.advance_x &&
-               left.advance_y == right.advance_y;
-        return equal;
-    }
-};
 
 struct ShapedFontRun final {
     FontFaceId face{};
@@ -54,39 +37,12 @@ struct ShapedText final {
     bool missing_primary_face{};
 };
 
-struct BoundedFontRun final {
-    FontFaceId face{};
-    Utf8Range source_range{};
-    std::size_t glyph_begin{};
-    std::size_t glyph_count{};
-};
-
 struct ShapeStorageLimits final {
     std::size_t input_bytes{16'384};
     std::size_t runs{16'384};
     std::size_t glyphs{65'536};
     std::size_t output_bytes{8U * 1024U * 1024U};
     std::size_t workspace_bytes{16U * 1024U * 1024U};
-};
-
-// Private complete geometry owner. Arrays have fixed allocated capacity and
-// explicit live counts. Native allocator payload is not included in these
-// controlled byte reports. The enclosing unique owner transfers as one unit.
-struct BoundedShapedText final {
-    std::unique_ptr<BoundedFontRun[]> runs{};
-    std::unique_ptr<ShapedGlyph[]> glyphs{};
-    std::size_t run_count{};
-    std::size_t glyph_count{};
-    std::size_t run_capacity{};
-    std::size_t glyph_capacity{};
-    std::size_t controlled_output_bytes{};
-    std::size_t controlled_workspace_peak{};
-    double width{};
-    double height{};
-    double ascent{};
-    double descent{};
-    std::size_t missing_clusters{};
-    bool missing_primary_face{};
 };
 
 // Private portable text engine. It owns every encoded face and never consults
