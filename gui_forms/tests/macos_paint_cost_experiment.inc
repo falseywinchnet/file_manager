@@ -242,8 +242,23 @@ void advance_cost(void* context) {
     } catch (const std::exception& error) {
         probe.failure = error.what();
         std::fprintf(stderr, "cost-experiment-rejected: %s\n", error.what());
+        const std::chrono::duration<double> elapsed =
+            std::chrono::steady_clock::now() - probe.started;
+        std::fprintf(stderr,
+            "cost-rejection-context|interval=%zu|mode=%s|completed_ticks=%zu|running=%d|elapsed_seconds=%.9f|max_lateness_ns=%lld\n",
+            probe.phase, cost_rebuild(probe.phase) ? "rebuild" : "exposure",
+            probe.tick, probe.running ? 1 : 0, elapsed.count(),
+            static_cast<long long>(probe.maximum_lateness.count()));
         NSWindow* primary = probe.primary;
         if (primary == nil) primary = find_window(@"Paint cost window 0");
+        try {
+            if (primary != nil) {
+                const std::string host = [primary.contentView hostJSON];
+                std::fprintf(stderr, "cost-rejection-host|host=%s\n", host.c_str());
+            }
+        } catch (const std::exception& diagnostic_error) {
+            std::fprintf(stderr, "cost-rejection-diagnostic-failed: %s\n", diagnostic_error.what());
+        }
         [primary performClose:nil];
     }
 }
@@ -290,6 +305,7 @@ int run_paint_cost_experiment() {
         windows.push_back(std::move(entry));
     }
     std::printf("cost-experiment=static-unfocused-provider-surrogate|order=ABBA|intervals=4x10s|cadence_ms=530|tick_validation_overhead=included\n");
+    std::fflush(stdout);
     const int result = gui_forms::host::run_macos_application(std::move(windows));
     if (result != 0 || !probe.completed || probe.closed != cost_window_count || !probe.failure.empty()) return 1;
     std::printf("cost-experiment=accepted-comparable-intervals|cpu_rebuild_0=%.9f|cpu_exposure_1=%.9f|cpu_exposure_2=%.9f|cpu_rebuild_3=%.9f\n",

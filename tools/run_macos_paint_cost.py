@@ -43,6 +43,12 @@ def main() -> int:
     accepted_marker: bool = 'cost-experiment=accepted-comparable-intervals|' in output
     if exit_code == 0 and accepted_marker:
         status = 'accepted'
+    if status == 'rejected':
+        line: str
+        for line in output.splitlines():
+            if line.startswith('cost-experiment-rejected:'):
+                detail = line
+                break
     receipt: dict[str, object] = {
         'source_revision': git_output('rev-parse', 'HEAD'),
         'command': command, 'status': status, 'exit_code': exit_code,

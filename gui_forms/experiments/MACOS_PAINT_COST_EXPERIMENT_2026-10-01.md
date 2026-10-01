@@ -113,3 +113,19 @@ SDK; a green build therefore does not imply an accepted experiment. Consumers
 must inspect its receipt. Timeout, launch failure and rejected comparisons remain
 explicit results in uploaded evidence. The wrapper passed Python compilation and
 language-neutral house-style source review; native execution is pending.
+
+## First native attempt: rejected, retained
+
+Native run `36881268179` at `4448dde` passed the ordinary build/test suites on
+all three platforms. Its optional Mac experiment exited 1 after 10.749817833
+seconds with `cadence exceeded declared lateness bound`; the receipt records
+`status=rejected` and `accepted_marker=false`. No interval comparison was
+accepted. This is negative experiment evidence, not a CPU result.
+
+The coordinator added rejection-only interval, mode, completed-tick, elapsed-time,
+maximum-lateness and host-snapshot diagnostics. The wrapper copies the rejection
+reason into its receipt, and the initial header is flushed before the run loop.
+All timing limits and acceptance checks remain unchanged. These authored hunks
+were source-reviewed for explicit types, failure ordering and diagnostic failure
+containment; the wrapper passes Python compilation. Native re-execution remains
+required. The final source manifest includes these diagnostics.
