@@ -28,6 +28,7 @@ option(GUI_FORMS_BUILD_TEXT_LAYOUT_PROBE "Build the private text shaping diagnos
 option(GUI_FORMS_BUILD_TEXT_WORKER_PROBE "Build the private text worker lifecycle proof" OFF)
 option(GUI_FORMS_BUILD_TEXT_PAINT_PROBE "Build the private prepared glyph raster proof" OFF)
 option(GUI_FORMS_BUILD_PREPARED_TEXT "Build the development prepared-text service" OFF)
+option(GUI_FORMS_BUILD_TEXT_MASKS "Build the development logical text-mask service" OFF)
 option(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS "Instrument private text shaping phases" OFF)
 option(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE "Record private run directions for geometry comparison" OFF)
 option(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD
@@ -208,6 +209,22 @@ if(GUI_FORMS_BUILD_PREPARED_TEXT)
         PRIVATE gui_forms_text_engine freetype Threads::Threads)
     target_compile_features(gui_forms_prepared_text PUBLIC cxx_std_20)
     set_target_properties(gui_forms_prepared_text PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
+
+if(GUI_FORMS_BUILD_TEXT_MASKS)
+    if(NOT TARGET gui_forms_text_engine)
+        message(FATAL_ERROR "GUI_FORMS_BUILD_TEXT_MASKS requires GUI_FORMS_ENABLE_HARFBUZZ_TEXT")
+    endif()
+    find_package(Threads REQUIRED)
+    add_library(gui_forms_text_masks STATIC
+        src/core/text/text_mask/text_mask_budget.cpp
+        src/core/text/text_mask/text_mask_storage.cpp
+        src/core/text/text_mask/text_mask_queue.cpp
+        src/core/text/text_mask/text_mask_service.cpp)
+    target_link_libraries(gui_forms_text_masks
+        PUBLIC gui_forms_core PRIVATE Threads::Threads)
+    target_compile_features(gui_forms_text_masks PUBLIC cxx_std_20)
+    set_target_properties(gui_forms_text_masks PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
 # GUI.Drawing is a renderer-free compatibility substrate.  It deliberately
@@ -421,6 +438,9 @@ endif()
 if(GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT)
     install(CODE "message(FATAL_ERROR \"The development audio loop transport is not admitted for SDK installation\")")
 endif()
+if(GUI_FORMS_BUILD_TEXT_MASKS)
+    install(CODE "message(FATAL_ERROR \"The development text-mask interface is not admitted for SDK installation\")")
+endif()
 install(TARGETS gui_forms_core gui_forms_controls gui_drawing_core
         EXPORT GUIFormsTargets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -430,6 +450,8 @@ install(DIRECTORY include/gui_forms
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         PATTERN "prepared_text.hpp" EXCLUDE
         PATTERN "prepared_text" EXCLUDE
+        PATTERN "text_mask.hpp" EXCLUDE
+        PATTERN "text_mask" EXCLUDE
         PATTERN "loop_transport" EXCLUDE)
 install(EXPORT GUIFormsTargets
         FILE GUIFormsTargets.cmake
@@ -1577,6 +1599,13 @@ endif()
 
 if(GUI_FORMS_BUILD_TESTS)
     enable_testing()
+    if(TARGET gui_forms_text_masks)
+        add_executable(gui_forms_text_mask_lifecycle_tests tests/text_mask_lifecycle_tests.cpp)
+        target_link_libraries(gui_forms_text_mask_lifecycle_tests PRIVATE gui_forms_text_masks)
+        add_test(NAME gui_forms_text_mask_lifecycle_tests
+            COMMAND gui_forms_text_mask_lifecycle_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+        set_tests_properties(gui_forms_text_mask_lifecycle_tests PROPERTIES TIMEOUT 30)
+    endif()
     if(TARGET gui_forms_prepared_text)
         add_executable(gui_forms_prepared_text_service_tests tests/prepared_text_service_tests.cpp)
         target_link_libraries(gui_forms_prepared_text_service_tests PRIVATE gui_forms_prepared_text)

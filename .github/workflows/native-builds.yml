@@ -19,6 +19,7 @@ jobs:
         run: |
           python3 -B -m unittest discover -s tools -p test_house_style.py
           python3 -B tools/check_house_style.py frontend/include frontend/src frontend/tests frontend/examples orchestrator/conformance/clients/cpp
+          python3 -B tools/check_house_style.py gui_forms/include/gui_forms/text_mask.hpp gui_forms/include/gui_forms/text_mask gui_forms/src/core/text/text_mask gui_forms/tests/text_mask_lifecycle_tests.cpp
   native:
     name: ${{ matrix.platform }}
     needs: house-style
@@ -112,6 +113,22 @@ jobs:
           xvfb-run -a python3 tools/build_native.py --jobs 2
           python3 -B tools/export_native_sdks_tests.py
           python3 -B tools/export_native_sdks.py
+      # Export the normal OFF SDK above before enabling source-only development
+      # tests. This option does not change the Core/Painter ABI or install headers.
+      - name: Test development text-mask ownership on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          cmake -S gui_forms -B .build/native-${{ matrix.platform }}/gui-forms -DGUI_FORMS_BUILD_TEXT_MASKS=ON
+          cmake --build .build/native-${{ matrix.platform }}/gui-forms --target gui_forms_text_mask_lifecycle_tests --parallel 2
+          ctest --test-dir .build/native-${{ matrix.platform }}/gui-forms -R '^gui_forms_text_mask_lifecycle_tests$' --output-on-failure
+      - name: Test development text-mask ownership on macOS and Linux
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cmake -S gui_forms -B .build/native-${{ matrix.platform }}/gui-forms -DGUI_FORMS_BUILD_TEXT_MASKS=ON
+          cmake --build .build/native-${{ matrix.platform }}/gui-forms --target gui_forms_text_mask_lifecycle_tests --parallel 2
+          ctest --test-dir .build/native-${{ matrix.platform }}/gui-forms -R '^gui_forms_text_mask_lifecycle_tests$' --output-on-failure
       - name: Measure Mac paint phases with a controlled surrogate
         if: runner.os == 'macOS'
         # Scheduling can reject comparability on a shared runner. Preserve the

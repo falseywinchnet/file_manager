@@ -5,6 +5,15 @@ installed-header availability, renderer golden, or adapter freeze is claimed.
 Owner assignment is proposal/preparation only. Orchestrator must reconcile this
 reply before the coordinator assigns implementation. Existing A2 remains intact.
 
+**Subsequent reconciliation (2026-10-01):** Games accepted the full bounded
+profile and the coordinator assigned source-only development implementation.
+The canonical negotiation records that assignment; the original proposal above
+is retained as intake history. During Stage 1 review, the coordinator and
+provider refined service `begin_close` to nonblocking revocation. Explicit
+session join or service destruction establishes worker/wake quiescence. Cached
+submit completions receive the same coalesced worker-side wake as other results.
+These refinements do not claim installed availability or freeze the headers.
+
 ## Separate profile and literal source ownership
 
 The profile name is `logical_wrapped_mask_v1`. It produces shared immutable masks
@@ -315,7 +324,7 @@ public:
     [[nodiscard]] TextMaskResult open_session(PreparedTextWakeTarget* const wake,
         std::unique_ptr<TextMaskSession>& output);
     [[nodiscard]] TextMaskBudgetSnapshot budget_snapshot() const;
-    void begin_close(); // Closes/joins its current session before returning.
+    void begin_close(); // Nonblocking close; explicit session join/destructor waits.
 };
 ```
 

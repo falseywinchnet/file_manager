@@ -664,3 +664,38 @@ this assignment is not header installation, SDK publication or consumer readines
 The complete house-style review and scoped test evidence above are implementation
 acceptance work, not another permission gate. This chat owns only this negotiation
 record; the coordinator owns commit integration.
+
+### Stage 1 ownership/lifecycle — observed development checkpoint
+
+**OBSERVED:** the provider receipt
+[`TEXT_MASK_STAGE1_2026-10-01.md`](../../gui_forms/experiments/TEXT_MASK_STAGE1_2026-10-01.md)
+records the four development headers, lifetime ledger, immutable lease/source
+ownership, fixed exact-key cache, nine-slot worker queue, cancellation retirement
+and structural font-byte registration. Its private backend fixtures exercise
+bounded ownership and failure behavior; the default backend still returns
+`unsupported_profile`. Native font validity, wrapping/bidi/shaping and gray/mono
+raster remain unsupported Stage 2 work. A2 and its budgets are unchanged.
+
+**OBSERVED accepted coordinator refinement:** service `begin_close`, like session
+begin-close, is nonblocking. Explicit session join waits for worker retirement
+and wake-target quiescence; destruction still waits. This supersedes the original
+proposal's service begin-close join-on-return spelling. Cache-hit submit
+completions request the same coalesced payload-free worker-delivered wake as other
+completions, never call the target on the opening executor or under the session
+mutex. A previously selected wake may still post after close, but cannot confer
+completion authority; the target must survive through join. Replacement remains
+refused until the previous worker joins, and retained leases remain charged.
+
+**OBSERVED verification reports:** the provider's final strict compile and eleven
+private lifecycle groups passed in 13.864 seconds. The coordinator independently
+reports all eleven manifest hashes match, both lifecycle findings fixed and
+reviewed, and a fresh CMake build with prepared text OFF/text masks ON compiled;
+its focused CTest covering eleven groups passed in 13.82 seconds (13.83 total).
+The provider receipt identifies exact eleven-file source review against
+`planning/PROGRAMMING_HOUSE_STYLE.md`; no unrelated legacy/vendor compliance is
+inferred. This recording chat read the receipt, not reran tests or hash checks.
+
+The coordinator reports ON installation refused before copying files and an OFF
+SDK installed without text-mask headers. The coordinator owns CMake, CI, install
+review and integration receipt. These are development isolation checks, not
+installed text-mask availability, native renderer evidence or a new approval gate.
