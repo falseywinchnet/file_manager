@@ -3,6 +3,7 @@
 #include "file_manager/filesystem_model.hpp"
 
 #include <cstddef>
+#include <optional>
 #include <span>
 #include <system_error>
 
@@ -14,6 +15,11 @@
 #endif
 
 namespace file_manager {
+
+// Follows directory aliases for navigation and returns the observed target path.
+// This is not a retained I/O authority; callers recheck admitted roots and identity.
+[[nodiscard]] std::optional<std::filesystem::path> resolve_native_directory(
+    const std::filesystem::path& path);
 
 #if defined(_WIN32)
 // Observes the opened object, including all 128 file-ID bits. Reparse points

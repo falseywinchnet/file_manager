@@ -15,6 +15,51 @@
 
 namespace file_manager {
 
+std::optional<std::filesystem::path> resolve_native_directory(
+    const std::filesystem::path& path) {
+#if defined(_WIN32)
+    // Allocate before acquiring the handle. No throwing work occurs until it is
+    // closed. Verify identity when converting the returned extended namespace
+    // into the DOS/UNC spelling used by the admitted-root path model.
+    constexpr DWORD capacity = 32'768;
+    std::wstring target(capacity, L'\0');
+    const HANDLE handle = CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+        OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) return {};
+    BY_HANDLE_FILE_INFORMATION information{};
+    const BOOL observed = GetFileInformationByHandle(handle, &information);
+    const ObjectIdentity identity = identity_from_handle(handle);
+    DWORD length = 0;
+    if (observed && (information.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+        length = GetFinalPathNameByHandleW(handle, target.data(), capacity,
+                                         FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+    }
+    CloseHandle(handle);
+    if (length == 0 || length >= capacity || !identity.available()) return {};
+    target.resize(length);
+    if (target.starts_with(L"\\\\?\\UNC\\")) {
+        target.replace(0, 8, L"\\\\");
+    } else if (target.starts_with(L"\\\\?\\") && target.size() >= 7 &&
+               target[5] == L':' && target[6] == L'\\') {
+        target.erase(0, 4);
+    } else {
+        return {};
+    }
+    const std::filesystem::path resolved(target);
+    const ObjectIdentity normalized_identity = observe_identity(resolved);
+    if (!normalized_identity.available() || !(normalized_identity == identity)) return {};
+    return resolved;
+#else
+    std::error_code error{};
+    const std::filesystem::path resolved = std::filesystem::canonical(path, error);
+    if (error) return {};
+    const bool directory = std::filesystem::is_directory(resolved, error);
+    if (error || !directory) return {};
+    return resolved;
+#endif
+}
+
 #if defined(_WIN32)
 namespace {
 

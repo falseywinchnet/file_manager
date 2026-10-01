@@ -1,5 +1,6 @@
 #include "file_manager/platform_paths.hpp"
 #include "file_manager/document_picker.hpp"
+#include "native_file.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -45,13 +46,10 @@ const DocumentTypeFilter* find_filter(const std::vector<DocumentTypeFilter>& fil
 // and returns observations of the canonical target, never of the alias.
 std::optional<NavigationTarget> trusted_directory_target(
     const DocumentPickerRequest& request, const std::filesystem::path& location) {
-    std::error_code error{};
-    const std::filesystem::path canonical = std::filesystem::canonical(location, error);
-    if (error) return {};
-    const bool directory = std::filesystem::is_directory(canonical, error);
-    if (error || !directory) return {};
+    const std::optional<std::filesystem::path> canonical = resolve_native_directory(location);
+    if (!canonical) return {};
     const std::optional<NavigationTarget> target = resolve_navigation_target(
-        request.admitted_roots, canonical, request.home_location, canonical);
+        request.admitted_roots, *canonical, request.home_location, *canonical);
     return target;
 }
 
