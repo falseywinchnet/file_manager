@@ -378,3 +378,157 @@ links its review and ON 2/2 / OFF 1/1 independent evidence. Pending polls now
 reflect parent engine backend failure while preserving receipt phase/timing and
 completed outcomes. Development-ON installation still refuses. No installed SDK,
 native listening or macOS/Linux runtime availability follows.
+
+## Candidate mask extension — existing text negotiation
+
+**OBSERVED consumer request:** Games needs pixel-width-limited word wrapping,
+hard newlines and monochrome pixel-font masks in addition to the current
+grayscale paragraph profile. It identifies encoded serif text for Four Pegs and
+condensed sans text for Atom Probe. Masks would be consumed through existing
+LiveSurface, without depending on typed Painter readiness. This does not prove
+that the requested mask generation is available.
+
+These are **CANDIDATE** extensions of the existing shared text-mask negotiation,
+not a selected layout/raster algorithm or a new architecture. The current A2
+single-paragraph/no-wrap/no-newline/grayscale scope is unchanged. The active
+GUI.Forms text provider retains shared source ownership; no parallel Games text
+implementation assignment is granted. Games owns consumer requirements and
+fixtures and may continue its separate LiveSurface integration.
+
+The requested concrete reply must state width units and pixel/DIP/scale rounding;
+hard-newline sequences, CRLF, empty/trailing-line behavior; word-break whitespace
+retention and long-word overflow; cache keys, invalidation, capacity and ownership;
+and exact mono coverage/raster semantics. Thresholding a gray mask is not silently
+equivalent to a monochrome font-rendering request. Bundled font roles, exact
+encoded-font fixtures, licenses and expected mask/advance/bearing results are
+needed for the serif and condensed-sans cases. The earlier approximate extra
+line-spacing request also needs an exact conversion/rounding rule.
+
+Provider feasibility, bounded context/work/storage and explicit failure behavior
+must be reconciled before an implementation choice. No feature, SDK or runtime
+availability is promoted by this candidate intake.
+
+### Consumer mask fixtures — concrete candidate reply
+
+**OBSERVED** — Orchestrator read external Games files
+`C:/Users/Shadow/games/docs/PORTABLE_TEXT_REQUIREMENTS.md`,
+`tests/fixtures/portable_text.json` and `assets/fonts/manifest.json`. The latter
+two paths are relative to that checkout. Local font/license file hashes match
+their manifest; this checks supplied bytes, not independent upstream license
+interpretation or accepted renderer coverage. The manifest records upstream pins
+and OFL notices; numeric mask goldens remain explicitly pending the shared raster.
+
+The consumer proposes pre-DPI logical mask-pixel units, double layout arithmetic
+and one-time nearest 1/64 size/width quantization with ties away from zero. Zero
+width means no soft wrap. It requests identical logical line breaks at scales
+1, 1.25, 1.5 and 2. This invariant needs provider feasibility: current device-size
+quantization/hinting must not be assumed to produce it automatically.
+
+Requested line semantics preserve LF, treat CRLF as one break and normalize
+isolated CR at the adapter boundary; explicit empty/trailing lines contribute
+height. Leading/repeated spaces retain advance. Soft-wrap spaces may be consumed
+without ink at the next line start. No automatic hyphenation/ellipsis; long-word
+fallback must respect extended grapheme and shaping boundaries. An indivisible
+overwide cluster remains intact with explicit overflow, leaving clipping to the
+compositor. Tabs may refuse. Additional line gap is proposed as 0.05 times size,
+with baseline, logical extent and signed ink bounds reported separately.
+
+Mono means matching monochrome glyph loading/hinting and 0/255 coverage expanded
+to gray8 storage, not thresholding grayscale output. Requested masks retain
+overhangs/accents, signed origin and stride; an optional transparent border cannot
+clip to the logical advance. Pixel roles use integer-scale mono, others grayscale.
+
+Consumer candidate limits are 16 KiB input, 4,096 logical pixels per axis,
+256 lines and 16 MiB mask storage; cache <=700 entries/32 MiB per active game,
+keyed by text, face revision, size/width/spacing, raster profile and scale.
+Eviction must not invalidate a composed frame; detach drops cache authority and
+stale work cannot revive it. These requests do not override A2's current 4 MiB
+mask/two-mask 8 MiB limits. Physical raster dimensions at scale, retained output
+owners and cache/working peaks need an explicitly reconciled profile.
+
+Encoded-face candidates are Libre Baskerville regular/bold for Four Pegs,
+Barlow Condensed regular/bold for Atom Probe, Comic Neue for Switchbox, Cousine
+for pixel roles and Carlito for neutral UI. They remain independently registered
+consumer faces, not silent replacements for toolkit-wide roles. Fixtures include
+actual help text/widths, score spacing, CRLF/empty/trailing lines, long words and
+combining text. Goldens and ordinary/fractional-DPI help-panel inspection remain
+future evidence. No shared-source assignment or feature availability changes.
+
+### Provider wrapped-mask profile — reconciliation pending
+
+**OBSERVED provider report:** the provider read the Games requirements and
+fixtures and proposed `logical_wrapped_mask_v1` as a separate profile from A2's
+device-sized paragraph path. Standalone wrapping and mono implementation remain
+untouched. The provider reports A2 integration frozen for coordinator review;
+its reported 9/9 test result in 0.91 seconds is not an independently reviewed
+wrapped-mask result or an availability change.
+
+**CANDIDATE:** scale-1 logical, unhinted layout with contextual per-line bidi and
+shaping, followed by raster placement scaled exactly once; true FreeType mono
+at integer scale is a separate raster profile. Hard/soft-break metadata and
+overflow retain source correspondence. This proposes a mechanism for invariant
+logical line breaks, not measured proof. Consumer 1/64 quantization, line-gap
+rounding, raster bearings and fractional-scale coverage still require explicit
+agreement and fixtures.
+
+The provider proposes retaining 16 KiB input and existing font, prepared-payload
+and workspace limits while evaluating the proposed 256-line bound. It recommends
+an initial 4 MiB per-mask and 4,096-device-pixel axis limit. Supplied widths up to
+704 logical pixels do not establish a need for 16 MiB masks. The consumer's
+4,096-logical-pixel axis at scale 2 would permit 8,192 device pixels and therefore
+conflicts with that initial provider limit; neither axis nor storage limit is
+implicitly increased.
+
+A 700-entry/32 MiB cache requires a proposed shared immutable mask lease and
+accounting for every distinct live allocation, including the candidate and
+evicted masks retained by frames. Consumer LRU eviction alone cannot establish
+the memory bound. Key/metadata capacity must have a separate finite bound;
+cache bytes, retained output bytes, active/candidate masks and workspace peaks
+must be reconciled without bypassing A2's current two-mask/8 MiB scope.
+
+Coordinate units, scaled-axis refusal, individual-mask capacity, all-live mask
+ownership/accounting and cache metadata remain open for coordinator, provider
+and consumer reconciliation before implementation assignment. This record does
+not select the profile or modify A2's accepted development limits.
+
+### Consumer acceptance of initial candidate limits
+
+**OBSERVED consumer reply:** Games accepts an initial 4 MiB mask and 4,096
+device-pixel axis limit with explicit refusal. Its supplied fixtures do not
+require 16 MiB or a 4,096-logical-pixel axis at scale 2. It accepts the proposed
+scale-1 unhinted logical layout, contextual per-line bidi/shaping, one-time
+position scaling and true FreeType mono at integer scale as candidate behavior.
+
+Games defines 32 MiB as the total distinct live coverage allocations per session,
+including candidates and evicted frame-held leases. Shared reuse counts one
+allocation; reclamation occurs only after the last owner. It proposes separate
+key limits of 700 records and 2 MiB aggregate retained UTF-8 storage, charging
+owning-string capacity, with fixed metadata bounded by record count and bounded
+pending requests. No unbounded auxiliary map is implied. The provider may tighten
+these limits with explicit refusals; exact pending-request and metadata bounds
+still require provider reconciliation.
+
+The requested rounding is size and wrap width quantized once to nearest 1/64
+with ties away from zero; additional line gap is quantized once from size times
+0.05 and reused for every line. The final profile must specify whether that
+formula uses already-quantized size. Per-device rerounding must not change
+logical line breaks. This is consumer acceptance of candidate constraints,
+not implementation proof, numeric goldens, coordinator selection or a change to
+A2's separate two-mask/8 MiB scope.
+
+**OBSERVED consumer clarification:** line gap is
+`quantize_1/64(quantized_size * 0.05)`, using the already quantized size. Both
+quantizations use nearest with ties away from zero. This closes the consumer's
+rounding-input question, pending provider reconciliation and fixture evidence.
+
+Games proposes at most one executing request plus eight queued requests per
+session. Additional admission refuses without replacing retained visible masks.
+Cache metadata is limited to 700 records and pending metadata to nine records;
+all retained UTF-8 keys across cache and pending requests share the 2 MiB
+capacity bound. A transient candidate counts toward the total 32 MiB live mask
+allocation budget. Completed results retain their bounded request slots until
+consumed or cancelled; there is no additional unbounded completion queue.
+Provider reconciliation must define slot retirement and actual byte accounting
+for fixed metadata and cancellation-held work. These are consumer-acceptable
+upper bounds that the provider may tighten explicitly, not assigned source work
+or changes to A2's independent replacement-slot and mask limits.
