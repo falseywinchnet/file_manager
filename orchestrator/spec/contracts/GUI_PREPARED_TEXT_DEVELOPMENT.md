@@ -403,3 +403,59 @@ and end on owner release/replacement. Refusal leaves old output intact.
 These exact laws permit scoped implementation under the already assigned files.
 Conformance still requires tests for fractional scale/rounding, font retirement,
 fourth generation refusal, queued/failed/cancelled ownership and zero-ink masks.
+
+## A2 source-component checkpoint — pending independent coordinator review
+
+**OBSERVED** — The provider submitted
+[A2 service/raster receipt](../../../gui_forms/experiments/PREPARED_TEXT_A2_SERVICE_2026-10-01.md),
+[raw focused tests](../../../gui_forms/experiments/PREPARED_TEXT_A2_SERVICE_TESTS_2026-10-01.txt)
+and [14-file hash manifest](../../../gui_forms/experiments/PREPARED_TEXT_A2_SOURCE_HASHES_2026-10-01.csv).
+Orchestrator read the receipt/raw results and independently matched all 14
+manifest hashes to current files, with zero mismatches. It did not rerun tests
+or perform the independent coordinator's implementation review.
+
+**MEASURED provider evidence:** two service/raster suites and four Unicode/
+shaping dependencies passed 6/6 in 0.75 seconds. These are correctness-test
+durations, not application latency. Coverage includes full-key authority and
+same-key cancellation, input transfer, failed adoption, retained generations/
+font leases across sessions, mask capacity, fractional/end-point scale and
+rounding, stale/oversized rejection preserving pixels, join/wake revocation and
+zero-ink masks. Command-held retention is modeled with the private typed owner;
+actual display recording/replay is not implemented by this checkpoint.
+
+The submitted source provides the public declaration hierarchy and private
+storage/service/raster component, an OFF-by-default standalone target and focused
+tests. Bounded HB registration uses admitted persistent table storage charged
+within the shaping-workspace allowance. Font registration and position-conversion
+corrections are within the provider's reported exact authored review scope.
+Root owns CMake review. Independent root acceptance remains pending; this status
+is source-component test-ready, not accepted production integration.
+
+Requested first-party capacities do not measure allocator/control-block overhead,
+thread stacks or opaque FT/HB/SheenBidi caches/peaks. FT bitmap checks follow
+native allocation. No exhaustion injection, thread sanitizer, responsiveness
+benchmark or visible native-window test is claimed. Native shape remains
+noninterruptible and close/join may block. The receipt's semantic review is
+provider-attributed and does not certify unchanged legacy or vendor code.
+
+Draft headers are excluded from blanket installation; no export, new SDK,
+Application stage or runtime availability is published. Window attachment/
+revocation, typed Painter operation, display-command/record/replay retention and
+Windows DIB grayscale compositing with failure/receipt propagation are proposed
+next hunks only: no assignment is granted here. Existing cursor baseline
+`50ea223` is preserved. Wrapping, tabs, monochrome, hit/caret/selection and D4
+remain outside the current profile.
+
+### Shutdown correction checkpoint — review remains pending
+
+**OBSERVED coordinator correction:** session identity must be process-wide and
+nonreused, with exhaustion refusal rather than recycling. Authority validation
+and publication must occur under the authority lock as one protected operation;
+a check followed by unlocked publication must not admit a concurrently revoked
+result. These are recorded correctness requirements/corrections, not independent
+acceptance or a claim that the earlier 14-file hashes cover later source edits.
+
+The owner directed imminent machine shutdown. This record is saved for the
+coordinator's shared checkpoint; source review, corrected hashes and any required
+validation remain pending. No A2 acceptance, runtime availability or next-slice
+assignment follows from this shutdown checkpoint.

@@ -51,8 +51,11 @@ RequestResult LoopScheduler::change(ClipShape clip, ChangeTiming timing) noexcep
     item.kind = CommandKind::change;
     item.payload = payload;
     item.timing = timing;
-    const RequestResult result = enqueue(item);
-    if (result.status == ScheduleStatus::ok) { payloads_[payload] = {PayloadPhase::retained, clip}; }
+    RequestResult result = enqueue(item);
+    if (result.status == ScheduleStatus::ok) {
+        payloads_[payload] = {PayloadPhase::retained, clip};
+        result.payload = payload;
+    }
     return result;
 }
 RequestResult LoopScheduler::command(CommandKind kind, double gain, std::uint64_t target) noexcept {
@@ -101,6 +104,7 @@ void LoopScheduler::finish(std::uint64_t id, RequestPhase phase) noexcept {
         if (receipt.id == id) {
             receipt.phase = phase;
             receipt.application_frame = frame_;
+            if (phase == RequestPhase::rejected) { receipt.reason = ScheduleStatus::overflow; }
             return;
         }
     }

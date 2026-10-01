@@ -18,11 +18,12 @@ struct ChangeTiming final {
     std::uint64_t lead_frames{3840};
     std::uint64_t fade_frames{2400};
 };
-struct RequestResult final { ScheduleStatus status{}; std::uint64_t id{}; };
+struct RequestResult final { ScheduleStatus status{}; std::uint64_t id{}; std::size_t payload{32}; };
 struct Receipt final {
     ScheduleStatus status{ScheduleStatus::expired};
     std::uint64_t id{}, epoch{}, admission_frame{}, application_frame{};
     RequestPhase phase{RequestPhase::empty};
+    ScheduleStatus reason{ScheduleStatus::ok};
 };
 struct BoundaryResult final { ScheduleStatus status{}; std::uint64_t frame{}; };
 struct SamplePlan final {

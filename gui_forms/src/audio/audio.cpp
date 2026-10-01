@@ -1,6 +1,9 @@
 #include "gui_forms/audio/audio.hpp"
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
+#ifdef GUI_FORMS_AUDIO_LOOP_TRANSPORT
+#include "loop_transport/loop_transport_state.hpp"
+#endif
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -406,6 +409,10 @@ struct AudioEngineState final {
     ma_engine engine{};
     ma_device device{};
     std::array<AudioVoiceState*, 64> voices{}; // Non-owning, control-thread only.
+#ifdef GUI_FORMS_AUDIO_LOOP_TRANSPORT
+    std::array<AudioLoopTransportState*, 64> transports{};
+    const std::thread::id control_thread{std::this_thread::get_id()};
+#endif
     std::atomic<AudioStatus> status{AudioStatus::closed};
     bool initialized{false}, device_initialized{false}, offline{false};
     void callback_failure(AudioStatus failure) {
@@ -449,6 +456,15 @@ struct AudioEngineState final {
         }
     }
 };
+#ifdef GUI_FORMS_AUDIO_LOOP_TRANSPORT
+AudioLoopStatus loop_engine_status(const AudioEngineState& engine) noexcept {
+    const AudioLoopStatus result = engine.status.load() == AudioStatus::ok ? AudioLoopStatus::ok : AudioLoopStatus::closed;
+    return result;
+}
+void release_loop_slot(AudioEngineState& engine, AudioLoopTransportState& transport, std::size_t slot) noexcept {
+    if (engine.transports[slot] == &transport) { engine.transports[slot] = nullptr; }
+}
+#endif
 struct AudioVoiceState final {
     std::shared_ptr<AudioEngineState> engine{};
     std::shared_ptr<const AudioClip> clip{};
@@ -593,7 +609,11 @@ AudioStatus AudioEngine::voice(std::shared_ptr<const AudioClip> clip, bool loop,
     if (!clip || (*clip).frames() == 0) { return AudioStatus::invalid_value; }
     AudioEngineState& engine = *state_;
     std::size_t slot = 0;
+#ifdef GUI_FORMS_AUDIO_LOOP_TRANSPORT
+    while (slot < engine.voices.size() && (engine.voices[slot] != nullptr || engine.transports[slot] != nullptr)) { ++slot; }
+#else
     while (slot < engine.voices.size() && engine.voices[slot] != nullptr) { ++slot; }
+#endif
     if (slot == engine.voices.size()) { return AudioStatus::quota_exceeded; }
     try {
         std::unique_ptr<AudioVoiceState> candidate = std::make_unique<AudioVoiceState>();
@@ -627,6 +647,34 @@ AudioStatus AudioEngine::render(std::span<float> stereo) {
     const AudioStatus result = status();
     return result;
 }
+#ifdef GUI_FORMS_AUDIO_LOOP_TRANSPORT
+AudioLoopStatus AudioEngine::loop_transport(AudioLoopTransport& output) {
+    if (!state_ || status() != AudioStatus::ok) { return AudioLoopStatus::closed; }
+    AudioEngineState& engine = *state_;
+    if (std::this_thread::get_id() != engine.control_thread) { return AudioLoopStatus::wrong_thread; }
+    std::size_t slot{};
+    while (slot < engine.voices.size() && (engine.voices[slot] != nullptr || engine.transports[slot] != nullptr)) { ++slot; }
+    if (slot == engine.voices.size()) { return AudioLoopStatus::quota_exceeded; }
+    static std::atomic<std::uint64_t> next_epoch{1};
+    std::uint64_t epoch = next_epoch.load();
+    while (epoch != 0) {
+        const std::uint64_t next = epoch == std::numeric_limits<std::uint64_t>::max() ? 0 : epoch + 1;
+        const bool assigned = next_epoch.compare_exchange_weak(epoch, next);
+        if (assigned) { break; }
+    }
+    if (epoch == 0) { return AudioLoopStatus::overflow; }
+    try {
+        std::unique_ptr<AudioLoopTransportState> candidate = std::make_unique<AudioLoopTransportState>(epoch);
+        (*candidate).engine = state_;
+        (*candidate).engine_slot = slot;
+        const AudioLoopStatus initialized = (*candidate).initialize(engine.engine);
+        if (initialized != AudioLoopStatus::ok) { return initialized; }
+        engine.transports[slot] = &(*candidate);
+        output.state_ = std::move(candidate);
+        return AudioLoopStatus::ok;
+    } catch (const std::bad_alloc&) { return AudioLoopStatus::quota_exceeded; }
+}
+#endif
 AudioStatus AudioEngine::status() const noexcept {
     const AudioStatus result = state_ ? (*state_).status.load() : AudioStatus::closed;
     return result;
@@ -642,6 +690,11 @@ void AudioEngine::shutdown() {
     for (AudioVoiceState* voice : state.voices) {
         if (voice != nullptr) { (*voice).close(); }
     }
+#ifdef GUI_FORMS_AUDIO_LOOP_TRANSPORT
+    for (AudioLoopTransportState* transport : state.transports) {
+        if (transport != nullptr) { (*transport).close(); }
+    }
+#endif
     if (state.initialized) {
         ma_engine_uninit(&state.engine);
         state.initialized = false;

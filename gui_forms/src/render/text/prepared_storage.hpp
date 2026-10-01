@@ -1,0 +1,155 @@
+#pragma once
+
+#include "gui_forms/prepared_text.hpp"
+#include "harfbuzz/harfbuzz_font_engine.hpp"
+
+#include <array>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <optional>
+#include <thread>
+
+namespace gui_forms::detail {
+
+enum class PreparedResource { font_bank, input, payload, mask };
+
+struct PreparedLedger final {
+    std::mutex mutex{};
+    PreparedTextBudgetSnapshot usage{};
+    std::uint64_t next_bank{1};
+    bool closing{};
+};
+
+class PreparedReservation final {
+public:
+    PreparedReservation() = default;
+    ~PreparedReservation();
+    PreparedReservation(const PreparedReservation&) = delete;
+    PreparedReservation& operator=(const PreparedReservation&) = delete;
+    PreparedReservation(PreparedReservation&& other) noexcept;
+    PreparedReservation& operator=(PreparedReservation&& other) noexcept;
+    [[nodiscard]] PreparedTextStatus acquire(std::shared_ptr<PreparedLedger> ledger,
+        PreparedResource resource, std::size_t bytes);
+    void release() noexcept;
+private:
+    std::shared_ptr<PreparedLedger> ledger_{};
+    PreparedResource resource_{PreparedResource::input};
+    std::size_t bytes_{};
+};
+
+struct PreparedFontFace final {
+    std::unique_ptr<std::byte[]> bytes{};
+    std::size_t size{};
+    std::optional<FontRole> role{};
+    std::uint16_t weight{400};
+    bool italic{};
+    std::uint32_t index{};
+};
+
+struct PreparedFontBank final {
+    PreparedReservation reservation{};
+    std::shared_ptr<PreparedLedger> ledger{};
+    std::uint64_t identity{};
+    std::uint64_t generation{1};
+    std::array<PreparedFontFace, PreparedTextLimits::font_faces> faces{};
+    std::size_t face_count{};
+    std::size_t encoded_bytes{};
+};
+
+struct PreparedInputStorage final {
+    PreparedReservation reservation{};
+    std::shared_ptr<PreparedLedger> ledger{};
+    PreparedTextKey key{};
+    PreparedParagraphProof proof{};
+    std::unique_ptr<char[]> text{};
+    std::size_t text_bytes{};
+    std::unique_ptr<DocumentMapSpan[]> mapping{};
+    std::size_t mapping_count{};
+    std::unique_ptr<PreparedSourceEndpoint[]> endpoints{};
+    std::size_t endpoint_count{};
+    std::size_t requested_bytes{};
+};
+
+struct PreparedAuthorityState final {
+    std::mutex mutex{};
+    LayoutAuthority current{};
+    std::optional<PreparedTextKey> key{};
+    bool closing{};
+};
+
+struct PreparedTextStorage final {
+    PreparedReservation reservation{};
+    std::shared_ptr<PreparedLedger> ledger{};
+    std::shared_ptr<PreparedAuthorityState> authority_state{};
+    std::shared_ptr<const PreparedFontBank> fonts{};
+    LayoutAuthority authority{};
+    PreparedTextMetrics metrics{};
+    std::unique_ptr<PreparedInputStorage> input{};
+    std::unique_ptr<render::text::BoundedShapedText> geometry{};
+    std::array<FontFaceId, PreparedTextLimits::font_faces> face_ids{};
+    std::size_t requested_bytes{};
+    std::size_t workspace_peak_bytes{};
+};
+
+struct PreparedMaskStorage final {
+    PreparedReservation reservation{};
+    PreparedTextMetrics metrics{};
+    std::unique_ptr<std::uint8_t[]> pixels{};
+    std::uint32_t width{};
+    std::uint32_t height{};
+    std::int32_t left{};
+    std::int32_t top{};
+    std::size_t pixel_count{};
+};
+
+struct PreparedServiceState final {
+    std::shared_ptr<PreparedLedger> ledger{};
+    std::weak_ptr<PreparedSessionState> session{};
+    std::thread::id executor{};
+    std::uint64_t instance{};
+};
+
+struct PreparedSessionState final {
+    std::shared_ptr<PreparedServiceState> service{};
+    std::shared_ptr<const PreparedFontBank> fonts{};
+    std::shared_ptr<PreparedAuthorityState> authority{};
+    std::thread::id executor{};
+    std::mutex mutex{};
+    std::condition_variable condition{};
+    std::thread worker{};
+    PreparedTextWakeTarget* wake{};
+    PreparedTextSessionSnapshot snapshot{};
+    std::unique_ptr<PreparedTextStorage> job{};
+    std::shared_ptr<const PreparedTextStorage> ready{};
+    bool wake_pending{};
+    void run() noexcept;
+    void close();
+    void join();
+    ~PreparedSessionState();
+};
+
+// Private typed access for the provider and retained integration; no native
+// handle, void payload or mutable prepared-storage alias crosses public headers.
+struct PreparedTextAccess final {
+    static std::shared_ptr<const PreparedFontBank>& fonts(EncodedFontLease& value) noexcept { return value.storage_; }
+    static const std::shared_ptr<const PreparedFontBank>& fonts(const EncodedFontLease& value) noexcept { return value.storage_; }
+    static std::unique_ptr<PreparedInputStorage>& input(PrepareInput& value) noexcept { return value.storage_; }
+    static std::shared_ptr<const PreparedTextStorage>& layout(PreparedTextLayout& value) noexcept { return value.storage_; }
+    static const std::shared_ptr<const PreparedTextStorage>& layout(const PreparedTextLayout& value) noexcept { return value.storage_; }
+    static std::unique_ptr<PreparedMaskStorage>& mask(GrayTextMask& value) noexcept { return value.storage_; }
+    static std::unique_ptr<PreparedTextSession> session(std::shared_ptr<PreparedSessionState> state);
+};
+
+[[nodiscard]] PreparedTextStatus validate_prepared_key(const PreparedTextKey& key) noexcept;
+[[nodiscard]] PreparedTextStatus validate_prepared_input(const PreparedTextKey& key, std::string_view text,
+    std::span<const DocumentMapSpan> mapping, std::span<const PreparedSourceEndpoint> endpoints,
+    PreparedParagraphProof proof, std::size_t& bytes) noexcept;
+[[nodiscard]] bool prepared_authority_current(const PreparedTextStorage& storage, LayoutAuthority expected);
+// Caller holds the mutex of storage.authority_state through the complete
+// operation whose authority is being checked, including publication if any.
+[[nodiscard]] bool prepared_authority_current_locked(const PreparedTextStorage& storage, LayoutAuthority expected) noexcept;
+[[nodiscard]] PreparedTextMetrics prepared_device_metrics(FontSpec font, double scale);
+[[nodiscard]] PreparedTextStatus validate_prepared_fonts(const PreparedFontBank& bank);
+
+} // namespace gui_forms::detail

@@ -365,3 +365,9 @@ scheduler/model/tests/receipt scope recorded there. Clarification 004 resolves
 its bar-grid, timeline, fade, cancellation and retirement model laws. Public
 Audio APIs, miniaudio-node integration and concurrent callback guarantees remain
 unadmitted Stage 2 work; model success cannot establish those properties.
+
+The coordinator subsequently reviewed/integrated Stage 1 at `8e5368f` and opened
+the exact Stage 2 development scope recorded in the dedicated negotiation.
+This supersedes the prior unadmitted implementation state, not the requirement
+for actual PCM, concurrency, ownership and shutdown evidence. API freeze, device
+playback and SDK publication are not authorized by that development assignment.

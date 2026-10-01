@@ -5,6 +5,9 @@
 #include <span>
 #include <stop_token>
 #include <vector>
+#ifdef GUI_FORMS_AUDIO_LOOP_TRANSPORT
+#include "gui_forms/audio/loop_transport/loop_transport.hpp"
+#endif
 
 namespace gui_forms {
 enum class AudioStatus {
@@ -81,6 +84,9 @@ public:
     // Fixed-rate voices bypass it, preserving exact PCM sample positions.
     AudioStatus voice(std::shared_ptr<const AudioClip> clip, bool loop, AudioVoice& output,
                       bool pitch_enabled = false);
+#ifdef GUI_FORMS_AUDIO_LOOP_TRANSPORT
+    [[nodiscard]] AudioLoopStatus loop_transport(AudioLoopTransport& output);
+#endif
     AudioStatus render(std::span<float> stereo);
     AudioStatus status() const noexcept;
     // Immediately stop output, quiesce device callback, then release backend

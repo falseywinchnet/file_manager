@@ -1,54 +1,43 @@
-# Shutdown checkpoint — 2026-10-01
+# Shadow shutdown checkpoint — 2026-10-01
 
-The owner announced a machine shutdown in five minutes. This checkpoint preserves
-work in progress; it does not declare a release or new runtime availability.
-Plan Paint is excluded from this push.
+The owner announced shutdown in five minutes. This checkpoint preserves ongoing
+development; it does not accept unfinished interfaces or certify release readiness.
+Plan Paint is outside this checkpoint and must remain untouched.
 
-## Verified foundation
+## File Manager restart
 
-Windows candidate/committed DIB development transaction is committed at f26b143.
-The optional GUIForms::Audio PCM foundation is OFF by default. Coordinator source
-review covered its public header, implementation, tests, Audio.cmake and package
-wiring against planning/PROGRAMMING_HOUSE_STYLE.md. Corrections include staged
-test effects, named returns, format selection before sample loops, loader failure
-boundaries, and callback status that cannot overwrite closed state. Vendored
-miniaudio is not claimed house-style compliant.
+- Previous reviewed checkpoint: `8e5368f` (serial audio scheduler and records).
+- Prepared-text A2 service/raster source and focused tests are preserved with
+  receipts under `gui_forms/experiments/PREPARED_TEXT_A2_*`. The coordinator
+  reviewed the initial implementation and independently ran six passing suites.
+  That review found cross-service authority collisions and an unlocked raster
+  publication interval. The provider corrected both and reports six passing
+  suites on the corrected source. Independent review of those corrections is
+  still required. Process-wide nonreused session identities and publication under
+  the authority mutex are the intended corrected laws.
+- Audio Stage 2 transport is unfinished development source. The owning sibling
+  reports initial PCM/concurrency tests passing; coordinator source review,
+  shutdown/quiescence proof, packaging verification and full house-style review
+  remain pending. Do not infer these from passing tests.
+- Both prepared text and loop transport are opt-in, OFF by default. Prepared
+  headers are excluded from ordinary SDK installation. Development loop transport
+  installation is explicitly refused. Neither is an available released SDK API.
+- Root owns `gui_forms/CMakeLists.txt` and `gui_forms/cmake/Audio.cmake`; the
+  prepared-text sibling owns prepared text and its bounded HarfBuzz changes;
+  Games owns the transport slice. Coordinate before resuming edits.
+- Window/Painter/display-command/DIB integration for A2 is unassigned. Dynamic
+  SwiftEdit windows remain a negotiation, not an implemented capability.
 
-MEASURED on Shadow Windows immediately before checkpoint: source audio CTest 1/1
-passed (0.05 seconds); independent installed consumer CTest 2/2 passed (4.04
-seconds), including complete prepared asset decoding. Build directories are
-C:/Users/Shadow/games/.build/audio-build and audio-consumer-build. These are
-focused offline checks, not physical audio listening or macOS/Linux validation.
+## Evidence and review limits
 
-Dependency: miniaudio 0.11.23 commit f40cf03f80cdb7e741d43e53b7e706e8c1394bcf;
-LF-normalized miniaudio.h SHA256
-7e4f3f13c8fe66df2080ac3dd12a89193e3c2463cb7f067c798abd7331cd8ee6.
-Upstream license is MIT-0 or Unlicense; unchanged notice is installed. Mixing
-uses ma_engine. Decode/resource-manager/generation features are disabled.
-Native backend definitions exist for WASAPI, CoreAudio and ALSA; only Windows
-was exercised here. PCM input is stereo 48 kHz, at most 600 seconds per clip;
-aggregate live clip payload is 512 MiB. These are controlled payload bounds,
-not process RSS or hard real-time guarantees. Native-device tests remain open.
+Use `planning/PROGRAMMING_HOUSE_STYLE.md` for every first-party source review.
+Preserved source is not automatically house-style accepted. Prepared-text
+receipts identify reviewed scope and unresolved proof limits. Audio Stage 2
+requires independent review of actual PCM ownership, SPSC publication, receipt
+reuse, engine shutdown, callback allocation/destruction and executor enforcement.
+No new native device or visible desktop test is implied by this checkpoint.
 
-## Unfinished work and next steps
-
-- Bounded grapheme and bounded HarfBuzz shaping work is preserved in source.
-  Provider reports grapheme tests passed; coordinator acceptance of this new
-  bounded text scope remains pending. Bounded shape tests and CMake integration
-  may be incomplete. Resume with provider handoff and compile/test before use.
-- A2 public prepared text service, typed Painter integration and updated SDK
-  remain unfinished. Do not describe existing installed SDK as supporting A2.
-- Orchestrator prepared text and Games cursor/audio records are development
-  negotiations. Cursor and compact decoder proposals are not availability.
-- Games owner requested compact portable audio decoding. Vorbis is a candidate;
-  admission, pinned source/license review and bounded decode evidence remain
-  open. Do not silently freeze PCM-only release packaging as the final answer.
-- SwiftEdit owner requests downloadable MacBook builds. POSIX adapters and
-  coherent public GUI.Forms/picker SDK distribution need completion. No Mac
-  artifact is claimed by this checkpoint.
-- Preserve the frozen Windows SDK. New provider builds require new prefixes.
-- Resume exact source review, component gates and house-style checks before
-  declaring any unfinished checkpoint scope complete.
-
-Build products and fetched dependencies remain ignored local data, not Git
-source. Reconstruct them through the checked-in build tools after restart.
+SwiftEdit and Games are separate repositories; their owning sibling chats are
+responsible for committing and pushing their checkpoints. Build directories and
+ignored dependencies remain local and can be regenerated. Resume from Git source
+and recorded receipts, not from assumptions about surviving build processes.

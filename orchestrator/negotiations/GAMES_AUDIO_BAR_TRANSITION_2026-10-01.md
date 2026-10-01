@@ -1,7 +1,7 @@
 # Games next-bar audio transition — intake 001
 
-Status: **Stage 1 private scheduler experiment authorized; public API and Stage 2
-node integration remain proposals; no installed capability**. Orchestrator owns
+Status: **Stage 1 reviewed; Stage 2 development assigned in exact scope;
+API not frozen, runtime/installed availability not asserted**. Orchestrator owns
 this record; Games supplies
 its API/profile reply through the established coordination channel.
 
@@ -227,3 +227,48 @@ reads and explicit writer/retirement handoff. No public Audio/node scope expands
 These clarifications complete the named Stage 1 model laws for the already
 authorized private experiment. Functional evidence and exact authored review
 must precede any separate Stage 2 admission.
+
+## Stage 1 reviewed evidence and Stage 2 development assignment
+
+**OBSERVED** — The coordinator integrated the private model, receipt and prior
+negotiation batch at `8e5368f`. The durable
+[Stage 1 receipt](../../gui_forms/experiments/AUDIO_LOOP_SCHEDULER_2026-10-01.md)
+records the exact three source hashes, authored review and test scope.
+Orchestrator read the receipt; it did not rerun the experiment or repeat the
+implementation review.
+
+**MEASURED coordinator evidence:** the focused test passed 1/1 in 0.07 seconds,
+including 470,028 independent comparisons with a frame-by-frame boundary oracle.
+All three source hashes matched; the coordinator reported no blocking finding
+in the exact private model/test scope. Different admission frames deliberately
+produce different boundaries in the retained negative fixture. No actual PCM,
+atomic publication, native callback, shared-owner destruction or quiescence is
+proved by the serial model.
+
+The coordinator now authorizes Stage 2 development in the proposed exact scope:
+
+- New `gui_forms/include/gui_forms/audio/loop_transport/loop_transport.hpp`.
+- New `gui_forms/src/audio/loop_transport/loop_transport.cpp` and
+  `loop_transport_state.hpp`.
+- New `gui_forms/tests/audio/audio_loop_transport_tests.cpp`.
+- Necessary private scheduler adaptations under `src/audio/loop_transport/`.
+- Additive factory, voice-quota and lifetime bridge only in existing
+  `include/gui_forms/audio/audio.hpp` and `src/audio/audio.cpp`.
+
+Root retains Audio.cmake/CMake wiring. No new dependency, physical device
+playback or SDK publication is authorized by this scope. Games owns the named
+implementation/tests; Orchestrator owns semantic reconciliation. A development
+header does not freeze the public contract or establish runtime availability.
+
+Required Stage 2 evidence includes actual PCM sample output, concurrency and
+clip-owner lifetime/retirement tests, callback-exclusive scheduler ownership,
+and the 16-command/32-payload/64-receipt atomic publication and handoff protocol.
+Quiescence must be demonstrated before owner destruction, including shutdown;
+the serial Stage 1 acknowledgement model is insufficient. Wrong-thread, closed
+and existing 64-voice quota outcomes remain explicit.
+
+Rejected receipt phase must carry a reason such as arithmetic overflow rather
+than collapse unlike failures into an unexplained terminal state. Queue admission,
+render admission, application, rejection and release remain different events.
+Exact status projection and ownership/concurrency implementation receive review
+before API freeze. No native listening or cross-platform result is inferred.

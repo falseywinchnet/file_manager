@@ -1,6 +1,7 @@
 #include "harfbuzz_font_engine.hpp"
 
 #include <array>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -82,6 +83,11 @@ void test_geometry(HarfBuzzFontEngine& engine) {
     const ShapedText expected = engine.shape(marks, fonts[0]);
     const std::unique_ptr<BoundedShapedText> actual = engine.shape_bounded(marks, fonts[0], {});
     compare_geometry(expected, *actual);
+    const std::unique_ptr<BoundedShapedText> horizontal = engine.shape_bounded("abc", fonts[0], {});
+    for (std::size_t index = 0; index < (*horizontal).glyph_count; ++index) {
+        const float advance_y = (*horizontal).glyphs[index].advance_y;
+        require(advance_y == 0.0F && !std::signbit(advance_y), "horizontal zero advance preserves positive sign");
+    }
 }
 
 void expect_budget_refusal(HarfBuzzFontEngine& engine, std::unique_ptr<BoundedShapedText>& old,

@@ -11,6 +11,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(GUI_FORMS_BUILD_GALLERY "Build the native control gallery" ${PROJECT_IS_TOP_LEVEL})
 option(GUI_FORMS_BUILD_TESTS "Build automated proving-slice tests" ${PROJECT_IS_TOP_LEVEL})
 option(GUI_FORMS_BUILD_AUDIO "Build portable PCM audio service" OFF)
+option(GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT "Build the development audio loop transport" OFF)
 option(GUI_FORMS_ENABLE_SKIA "Build the private CPU-only Skia adapter" ON)
 option(GUI_FORMS_ENABLE_MACOS_HOST "Build the native AppKit host" ${APPLE})
 option(GUI_FORMS_ENABLE_WINDOWS_HOST "Build the native Win32 host" ${WIN32})
@@ -26,6 +27,7 @@ option(GUI_FORMS_BUILD_DOCUMENT_VIEW_BENCHMARK "Build the renderer-neutral D1 me
 option(GUI_FORMS_BUILD_TEXT_LAYOUT_PROBE "Build the private text shaping diagnostic" OFF)
 option(GUI_FORMS_BUILD_TEXT_WORKER_PROBE "Build the private text worker lifecycle proof" OFF)
 option(GUI_FORMS_BUILD_TEXT_PAINT_PROBE "Build the private prepared glyph raster proof" OFF)
+option(GUI_FORMS_BUILD_PREPARED_TEXT "Build the development prepared-text service" OFF)
 option(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS "Instrument private text shaping phases" OFF)
 option(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE "Record private run directions for geometry comparison" OFF)
 option(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD
@@ -188,6 +190,22 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     endif()
     set_target_properties(gui_forms_text_engine PROPERTIES
         POSITION_INDEPENDENT_CODE ON)
+endif()
+
+if(GUI_FORMS_BUILD_PREPARED_TEXT)
+    if(NOT TARGET gui_forms_text_engine)
+        message(FATAL_ERROR "GUI_FORMS_BUILD_PREPARED_TEXT requires GUI_FORMS_ENABLE_HARFBUZZ_TEXT")
+    endif()
+    find_package(Threads REQUIRED)
+    add_library(gui_forms_prepared_text STATIC
+        src/render/text/prepared_storage.cpp
+        src/render/text/prepared_service.cpp
+        src/render/text/prepared_raster.cpp)
+    target_link_libraries(gui_forms_prepared_text
+        PUBLIC gui_forms_core
+        PRIVATE gui_forms_text_engine freetype Threads::Threads)
+    target_compile_features(gui_forms_prepared_text PUBLIC cxx_std_20)
+    set_target_properties(gui_forms_prepared_text PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
 # GUI.Drawing is a renderer-free compatibility substrate.  It deliberately
@@ -395,13 +413,19 @@ set_target_properties(gui_forms_core PROPERTIES EXPORT_NAME Core)
 set_target_properties(gui_forms_controls PROPERTIES EXPORT_NAME Controls)
 set_target_properties(gui_drawing_core PROPERTIES EXPORT_NAME Drawing)
 
+if(GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT)
+    install(CODE "message(FATAL_ERROR \"The development audio loop transport is not admitted for SDK installation\")")
+endif()
 install(TARGETS gui_forms_core gui_forms_controls gui_drawing_core
         EXPORT GUIFormsTargets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(DIRECTORY include/gui_forms
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        PATTERN "prepared_text.hpp" EXCLUDE
+        PATTERN "prepared_text" EXCLUDE
+        PATTERN "loop_transport" EXCLUDE)
 install(EXPORT GUIFormsTargets
         FILE GUIFormsTargets.cmake
         NAMESPACE GUIForms::
@@ -1541,6 +1565,16 @@ endif()
 
 if(GUI_FORMS_BUILD_TESTS)
     enable_testing()
+    if(TARGET gui_forms_prepared_text)
+        add_executable(gui_forms_prepared_text_service_tests tests/prepared_text_service_tests.cpp)
+        target_link_libraries(gui_forms_prepared_text_service_tests PRIVATE gui_forms_prepared_text)
+        add_test(NAME gui_forms_prepared_text_service_tests
+            COMMAND gui_forms_prepared_text_service_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+        add_executable(gui_forms_prepared_text_raster_tests tests/prepared_text_raster_tests.cpp)
+        target_link_libraries(gui_forms_prepared_text_raster_tests PRIVATE gui_forms_prepared_text)
+        add_test(NAME gui_forms_prepared_text_raster_tests
+            COMMAND gui_forms_prepared_text_raster_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+    endif()
     add_executable(gui_forms_cursor_interaction_tests tests/cursor_interaction_tests.cpp)
     target_link_libraries(gui_forms_cursor_interaction_tests PRIVATE gui_forms_core)
     add_test(NAME cursor_interaction COMMAND gui_forms_cursor_interaction_tests)

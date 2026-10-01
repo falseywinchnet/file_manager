@@ -98,6 +98,11 @@ public:
     ~HarfBuzzFontEngine();
     HarfBuzzFontEngine(const HarfBuzzFontEngine&) = delete;
     HarfBuzzFontEngine& operator=(const HarfBuzzFontEngine&) = delete;
+    // Before registering faces, preallocate a finite record table and omit
+    // copied family labels (prepared glyph consumers do not use them). Returns
+    // requested first-party persistent bytes, excluding shared encoded owners
+    // and opaque FT/HB allocations. No subsequent table growth is admitted.
+    [[nodiscard]] std::size_t configure_bounded_registration(std::size_t face_limit, std::size_t byte_limit);
 
     [[nodiscard]] std::optional<FontFaceId> register_typeface(
         FontRole role, std::uint16_t weight, bool italic,

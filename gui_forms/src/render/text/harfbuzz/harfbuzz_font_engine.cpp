@@ -237,6 +237,7 @@ public:
     LibraryOwner library{};
     std::vector<Face> faces{};
     std::uint64_t next_face_id{1U};
+    std::size_t bounded_face_limit{};
 
     [[nodiscard]] std::vector<Face*> candidates(FontSpec font) {
         std::vector<Face*> result{};
@@ -294,6 +295,7 @@ public:
         std::optional<FontRole> role, std::uint16_t weight, bool italic,
         std::span<const std::byte> bytes, std::shared_ptr<const void> owned,
         std::uint32_t face_index) {
+        if (bounded_face_limit != 0 && faces.size() == bounded_face_limit) return std::nullopt;
         if (!owned || bytes.empty() || bytes.size() > maximum_face_bytes ||
             faces.size() >= maximum_faces || face_index > 255U) {
             return std::nullopt;
@@ -314,8 +316,10 @@ public:
         // Retain native cleanup until the owning Face has been constructed.
         // Family-name allocation and vector growth can both throw.
         const FontFaceId id{next_face_id++};
-        std::string family = (*native).family_name != nullptr
-            ? (*native).family_name : "unknown bundled face";
+        std::string family{};
+        if (bounded_face_limit == 0) {
+            family = (*native).family_name != nullptr ? (*native).family_name : "unknown bundled face";
+        }
         faces.emplace_back(id, role, weight, italic, !role.has_value(),
                            std::move(family), std::move(owned), native);
         static_cast<void>(pending_face.release());
@@ -450,8 +454,12 @@ public:
 
         unsigned count{};
         const hb_glyph_info_t* infos = hb_buffer_get_glyph_infos(buffer, &count);
+        unsigned position_count{};
         const hb_glyph_position_t* positions =
-            hb_buffer_get_glyph_positions(buffer, &count);
+            hb_buffer_get_glyph_positions(buffer, &position_count);
+        if (position_count != count || (count != 0U && (infos == nullptr || positions == nullptr))) {
+            throw std::runtime_error("Incomplete HarfBuzz glyph records");
+        }
         ShapedFontRun run{};
         run.face = face.id;
         run.source_range = range;
@@ -469,10 +477,12 @@ public:
         double pen_y{};
         double ink_ascent = font.size * 0.8, ink_descent = font.size * 0.2;
         for (unsigned index = 0U; index < count; ++index) {
-            const float offset_x = positions[index].x_offset / 64.0F;
-            const float offset_y = -positions[index].y_offset / 64.0F;
-            float advance_x = positions[index].x_advance / 64.0F;
-            const float advance_y = -positions[index].y_advance / 64.0F;
+            const float offset_x = static_cast<float>(positions[index].x_offset) / 64.0F;
+            const std::int64_t inverted_y_offset = -static_cast<std::int64_t>(positions[index].y_offset);
+            const float offset_y = static_cast<float>(inverted_y_offset) / 64.0F;
+            float advance_x = static_cast<float>(positions[index].x_advance) / 64.0F;
+            const std::int64_t inverted_y_advance = -static_cast<std::int64_t>(positions[index].y_advance);
+            const float advance_y = static_cast<float>(inverted_y_advance) / 64.0F;
             const bool cluster_end = index + 1U == count ||
                 infos[index + 1U].cluster != infos[index].cluster;
             if (cluster_end && (index + 1U != count || add_trailing_spacing)) {
@@ -523,6 +533,20 @@ public:
 
 HarfBuzzFontEngine::HarfBuzzFontEngine() : impl_(std::make_unique<Impl>()) {}
 HarfBuzzFontEngine::~HarfBuzzFontEngine() = default;
+
+std::size_t HarfBuzzFontEngine::configure_bounded_registration(std::size_t face_limit, std::size_t byte_limit) {
+    Impl& implementation = *impl_;
+    if (!implementation.faces.empty() || implementation.bounded_face_limit != 0 ||
+        face_limit == 0 || face_limit > maximum_faces) throw std::invalid_argument("Bounded face initialization order");
+    std::size_t bytes = sizeof(HarfBuzzFontEngine) + sizeof(Impl);
+    account_array(face_limit, sizeof(Impl::Face), byte_limit, bytes);
+    implementation.faces.reserve(face_limit);
+    implementation.bounded_face_limit = face_limit;
+    // Count actual capacity too; no face insertion may grow this table.
+    bytes = sizeof(HarfBuzzFontEngine) + sizeof(Impl);
+    account_array(implementation.faces.capacity(), sizeof(Impl::Face), byte_limit, bytes);
+    return bytes;
+}
 
 std::optional<FontFaceId> HarfBuzzFontEngine::register_shared_typeface(
     std::optional<FontRole> role, std::uint16_t weight, bool italic,
