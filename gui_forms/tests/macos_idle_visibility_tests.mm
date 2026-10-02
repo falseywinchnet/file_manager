@@ -13,16 +13,20 @@
 #include <exception>
 #include <functional>
 #include <memory>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <time.h>
 
 // Private diagnostics already used by native exposure fixtures; no public ABI.
 @interface NSView (IdleVisibilityProbe)
 - (std::string)hostJSON;
 - (void)collectDamage;
+- (BOOL)setCpuAttributionEnabled:(const BOOL)enabled;
+- (std::array<std::uint64_t, 13>)cpuAttributionSnapshot;
 @end
 
 namespace {
@@ -236,8 +240,13 @@ private:
 } // namespace
 
 #include "macos_paint_cost_experiment.inc"
+#include "macos_focused_cpu_experiment.inc"
 
 int main(const int argc, char** const argv) {
+    if (argc == 2 && std::strcmp(argv[1], "--focused-cpu-attribution") == 0) {
+        const int result = run_focused_cpu_experiment();
+        return result;
+    }
     if (argc == 2 && std::strcmp(argv[1], "--paint-cost-experiment") == 0) {
         const int result = run_paint_cost_experiment();
         return result;

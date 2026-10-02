@@ -8,6 +8,7 @@
 #include "../../../render/skia/raster/skia_raster.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -16,6 +17,8 @@
 #include <cstdio>
 #include <exception>
 #include <limits>
+#include <optional>
+#include <time.h>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -89,9 +92,103 @@ using gui_forms::Window;
 using gui_forms::CursorKind;
 using gui_forms::render::SkiaRaster;
 
-// Main-thread diagnostic aggregates only. These measure completed synchronous
-// phases, not process CPU time, deferred AppKit work, or physical bytes copied.
 namespace {
+// Private opt-in diagnostics. Array layout is shared only with the native test:
+// draw calls/ns, collect calls/ns, clock failures, overlapping scopes, saturation,
+// extent mismatches, first/last draw wall ns, min/max draw gap ns, draw count.
+// All access is on the main executor. Disabled views never sample a CPU clock.
+struct MacCpuAttribution final {
+    std::array<std::uint64_t, 13> values{};
+    std::array<double, 4> extents{};
+    std::size_t source_bytes{0};
+    bool enabled{false};
+    bool active{false};
+
+    void add(const std::size_t index, const std::uint64_t amount) noexcept {
+        const std::uint64_t limit = std::numeric_limits<std::uint64_t>::max();
+        if (amount > limit - values[index]) {
+            values[index] = limit;
+            values[6] = 1U;
+        } else {
+            values[index] += amount;
+        }
+    }
+
+    void record_draw(const std::uint64_t wall_ns,
+                     const std::array<double, 4>& current,
+                     const std::size_t bytes) noexcept {
+        if (values[12] == 0U) {
+            extents = current;
+            source_bytes = bytes;
+            values[8] = wall_ns;
+        } else {
+            if (current != extents || bytes != source_bytes) add(7U, 1U);
+            if (wall_ns < values[9]) {
+                add(4U, 1U);
+            } else {
+                const std::uint64_t gap = wall_ns - values[9];
+                if (values[12] == 1U) values[10] = gap;
+                else values[10] = std::min(values[10], gap);
+                values[11] = std::max(values[11], gap);
+            }
+        }
+        values[9] = wall_ns;
+        add(12U, 1U);
+    }
+};
+
+bool read_mac_thread_cpu(std::uint64_t& output) noexcept {
+    timespec value{};
+    const int status = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &value);
+    if (status != 0 || value.tv_sec < 0 || value.tv_nsec < 0 ||
+        value.tv_nsec >= 1000000000L) return false;
+    const std::uint64_t seconds = static_cast<std::uint64_t>(value.tv_sec);
+    const std::uint64_t fraction = static_cast<std::uint64_t>(value.tv_nsec);
+    const std::uint64_t limit = std::numeric_limits<std::uint64_t>::max();
+    if (seconds > (limit - fraction) / 1000000000U) return false;
+    output = seconds * 1000000000U + fraction;
+    return true;
+}
+
+class MacCpuScope final {
+public:
+    explicit MacCpuScope(MacCpuAttribution& owner, const std::size_t index) noexcept
+        : owner_(owner), index_(index) {
+        if (owner_.active) {
+            owner_.add(5U, 1U);
+            return;
+        }
+        owner_.active = true;
+        owns_scope_ = true;
+        valid_ = read_mac_thread_cpu(start_);
+        if (!valid_) owner_.add(4U, 1U);
+    }
+    ~MacCpuScope() {
+        if (!owns_scope_) return;
+        if (valid_) {
+            std::uint64_t end{0};
+            const bool read = read_mac_thread_cpu(end);
+            if (!read || end < start_) {
+                owner_.add(4U, 1U);
+            } else {
+                const std::uint64_t elapsed = end - start_;
+                owner_.add(index_, 1U);
+                owner_.add(index_ + 1U, elapsed);
+            }
+        }
+        owner_.active = false;
+    }
+    MacCpuScope(const MacCpuScope&) = delete;
+    MacCpuScope& operator=(const MacCpuScope&) = delete;
+private:
+    MacCpuAttribution& owner_; // Borrowed view field outlives this stack scope.
+    const std::size_t index_;
+    std::uint64_t start_{0};
+    bool owns_scope_{false};
+    bool valid_{false};
+};
+
+// Completed synchronous wall phases; not CPU, deferred AppKit work or bytes copied.
 struct MacPaintPhase final {
     std::uint64_t calls{0};
     std::uint64_t nanoseconds{0};
@@ -496,6 +593,7 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     MacPaintPhase _cgSetupPhase;
     MacPaintPhase _cgDrawPhase;
     MacPaintPhase _cgReleasePhase;
+    MacCpuAttribution _cpuAttribution;
     double _lastNativeDirtyArea;
     double _lastFrameDamageBoundsArea;
     double _lastCGDestinationArea;
@@ -541,6 +639,8 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 - (DragEvent)dragEventFor:(id<NSDraggingInfo>)sender action:(DragAction)action;
 - (std::string)metricsJSON;
 - (std::string)hostJSON;
+- (BOOL)setCpuAttributionEnabled:(const BOOL)enabled;
+- (std::array<std::uint64_t, 13>)cpuAttributionSnapshot;
 - (NSRect)accessibilityFrameForSemanticBounds:(GFRect)bounds;
 - (BOOL)performSemanticAction:(SemanticAction)action
                      stableId:(NSString*)stableId
@@ -849,6 +949,7 @@ private:
         _cgSetupPhase = {};
         _cgDrawPhase = {};
         _cgReleasePhase = {};
+        _cpuAttribution = {};
         _lastNativeDirtyArea = 0.0;
         _lastFrameDamageBoundsArea = 0.0;
         _lastCGDestinationArea = 0.0;
@@ -1283,6 +1384,8 @@ private:
 }
 
 - (void)collectDamage {
+    std::optional<MacCpuScope> cpuScope{};
+    if (_cpuAttribution.enabled) cpuScope.emplace(_cpuAttribution, 2U);
     ++_damageCollectionCount;
     try {
         if (!_model) {
@@ -1515,6 +1618,8 @@ private:
     if (!_model) {
         return;
     }
+    std::optional<MacCpuScope> cpuScope{};
+    if (_cpuAttribution.enabled) cpuScope.emplace(_cpuAttribution, 0U);
     const std::chrono::steady_clock::time_point started =
         std::chrono::steady_clock::now();
     const double scale = self.window == nil ? 1.0 : self.window.backingScaleFactor;
@@ -1634,6 +1739,13 @@ private:
     // The retained deadline source owns the next poll; arm it after presenting
     // and collect damage from its main-queue callback.
     [self armWakeTimer];
+    if (_cpuAttribution.enabled) {
+        const std::array<double, 4> extents{
+            _lastNativeDirtyArea, _lastFrameDamageBoundsArea,
+            _lastCGDestinationArea, _lastCGClipBoundsArea};
+        const std::uint64_t wallNs = host_now_nanoseconds();
+        _cpuAttribution.record_draw(wallNs, extents, _lastCGSourceBytes);
+    }
 }
 
 - (GFPoint)modelPointForEvent:(NSEvent*)event {
@@ -1856,6 +1968,17 @@ private:
 
 - (std::string)metricsJSON {
     return _model ? (*_model).metrics_snapshot().to_json() : std::string("{}");
+}
+
+- (BOOL)setCpuAttributionEnabled:(const BOOL)enabled {
+    if (![NSThread isMainThread] || _cpuAttribution.active) return NO;
+    if (enabled == YES) _cpuAttribution = {};
+    _cpuAttribution.enabled = enabled == YES;
+    return YES;
+}
+
+- (std::array<std::uint64_t, 13>)cpuAttributionSnapshot {
+    return _cpuAttribution.values;
 }
 
 - (std::string)hostJSON {
