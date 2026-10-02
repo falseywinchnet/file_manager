@@ -59,6 +59,7 @@ type session struct {
 	root        api.RootSpec
 	scope       api.LiveQueryScope
 	text        string
+	matcher     pathMatcher
 	rootHandle  *os.Root
 	frames      []directoryFrame
 	pending     *pendingEntry
@@ -253,9 +254,10 @@ func newSession(root api.RootSpec, expectedObjectID string, query api.LiveQuery,
 		rootHandle.Close()
 		return nil, api.WrapFault(api.ErrorInternal, "create live-query scan identity", err)
 	}
+	var lowerText string = strings.ToLower(query.Text)
 	return &session{
 		cursor: cursor, scanID: "live-" + scanID, queryID: query.QueryID, root: root,
-		scope: query.Scope, text: strings.ToLower(query.Text), rootHandle: rootHandle,
+		scope: query.Scope, text: lowerText, matcher: newPathMatcher(lowerText), rootHandle: rootHandle,
 		frames: []directoryFrame{{relative: scope, handle: directory}}, expires: now.Add(sessionTTL),
 		warningSet: make(map[string]struct{}),
 	}, nil
@@ -307,8 +309,9 @@ func (s *session) page(ctx context.Context, budget api.LiveQueryBudget, owns Own
 				continue
 			}
 			visited++
-			relative := filepath.Join(frame.relative, entries[0].Name())
-			entry = &pendingEntry{relative: relative, name: entries[0].Name(), isDir: entries[0].IsDir()}
+			var name string = entries[0].Name()
+			var relative string = filepath.Join(frame.relative, name)
+			entry = &pendingEntry{relative: relative, name: name, isDir: entries[0].IsDir()}
 		}
 
 		absolute := filepath.Join(s.root.Path, entry.relative)
@@ -316,8 +319,9 @@ func (s *session) page(ctx context.Context, budget api.LiveQueryBudget, owns Own
 			s.pending = nil
 			continue
 		}
-		matched := strings.Contains(strings.ToLower(entry.name), s.text) ||
-			strings.Contains(strings.ToLower(filepath.ToSlash(entry.relative)), s.text)
+		// The relative path includes the entire filename, so a second name-only
+		// match cannot add a result. Keep the existing path substring semantics.
+		var matched bool = s.matcher.contains(entry.relative)
 		needsStat := matched || (entry.isDir && s.scope.Descendants)
 		if needsStat && stats >= budget.MaxStatCalls {
 			s.pending = entry

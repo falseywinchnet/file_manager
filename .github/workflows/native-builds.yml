@@ -88,6 +88,12 @@ jobs:
       - name: Check reference search behavior and listener ownership
         shell: bash
         run: node gui_forms/tests/api_reference_search_tests.js
+      - name: Verify Engine query behavior on the native platform
+        shell: bash
+        working-directory: engine
+        run: |
+          go test ./...
+          go vet ./...
       - name: Identify dependency compiler
         id: dependency-compiler
         if: runner.os != 'Windows'
