@@ -9,6 +9,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gui_forms {
@@ -49,6 +50,10 @@ public:
     [[nodiscard]] HostServiceStatus show() const;
     [[nodiscard]] HostServiceStatus hide() const;
     [[nodiscard]] HostServiceStatus toggle_full_screen() const;
+    // UI-thread request; title is borrowed only for this call. Empty is allowed;
+    // malformed UTF-8, embedded NUL and more than 65536 bytes are refused.
+    // Acceptance is a native update request, not a compositor presentation receipt.
+    [[nodiscard]] HostServiceStatus set_title(const std::string_view title) const;
 
 private:
     friend struct detail::ApplicationHandleAccess;

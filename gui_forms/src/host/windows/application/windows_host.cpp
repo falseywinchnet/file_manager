@@ -2353,6 +2353,28 @@ private:
     std::size_t gradient_cache_pixels_{};
 };
 
+// Only the UI thread reads or revokes window. A retained callback owns no host
+// or native window; the immutable thread id is checked before mutable access.
+struct TitleCallbackState final {
+    const DWORD thread{GetCurrentThreadId()};
+    HWND window{};
+};
+struct RequestWindowTitle final {
+    std::weak_ptr<TitleCallbackState> owner{};
+    HostServiceStatus operator()(const std::string_view title) const {
+        const std::shared_ptr<TitleCallbackState> state = owner.lock();
+        if (!state) return {HostServiceError::after_shutdown};
+        if ((*state).thread != GetCurrentThreadId()) return {HostServiceError::wrong_thread};
+        if ((*state).window == nullptr) return {HostServiceError::after_shutdown};
+        try {
+            if (title.size() > 65536U || title.find('\0') != std::string_view::npos ||
+                !validate_utf8(title).valid()) return {HostServiceError::invalid_argument};
+            const std::wstring native = wide_from_utf8(title);
+            if (!SetWindowTextW((*state).window, native.c_str())) return {HostServiceError::backend_failure};
+            return {};
+        } catch (...) { return {HostServiceError::backend_failure}; }
+    }
+};
 class WindowsHostState final {
 #if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
     friend struct DibHostFixture;
@@ -2372,6 +2394,7 @@ public:
     }
 
     ~WindowsHostState() {
+        (*title_state_).window = nullptr;
         accessibility_.detach();
         // Initialization can unwind before WM_DESTROY. Detach the callback
         // address before releasing the native window so no later message can
@@ -2402,6 +2425,7 @@ public:
     void bind_window(HWND window) noexcept {
         if (native_phase_ != NativePhase::creating) return;
         hwnd_ = window;
+        (*title_state_).window = window;
         services_.bind_owner(window, *model_);
         native_phase_ = NativePhase::bound;
     }
@@ -2466,6 +2490,9 @@ public:
         if (options_.full_screen_ready) {
             options_.full_screen_ready(gui_forms::detail::BoundMemberFunction<void (WindowsHostState::*)() noexcept>(
                 *this, &WindowsHostState::toggle_full_screen));
+        }
+        if (options_.title_ready) {
+            options_.title_ready(RequestWindowTitle{title_state_});
         }
         if (options_.visibility_ready) {
             options_.visibility_ready(
@@ -2679,6 +2706,7 @@ public:
         case WM_COPYDATA: return automation(reinterpret_cast<const COPYDATASTRUCT*>(lparam));
         case WM_CLOSE: return close();
         case WM_DESTROY:
+            (*title_state_).window = nullptr;
             services_.revoke_cursor_interaction(CursorError::closing);
             accessibility_.detach();
             if (!closed_) {
@@ -3551,6 +3579,7 @@ private:
     std::uint64_t live_present_duration_nanoseconds_{};
     std::uint64_t live_worst_present_duration_nanoseconds_{};
     bool in_size_move_{};
+    std::shared_ptr<TitleCallbackState> title_state_{std::make_shared<TitleCallbackState>()};
     bool closed_{};
     NativePhase native_phase_{NativePhase::creating};
     std::vector<std::wstring> private_font_paths_;

@@ -58,7 +58,8 @@ public:
         return selected_item_id_;
     }
     void set_selected_item_id(std::string_view stable_id);
-    bool open(std::size_t index);
+    // Unknown modes throw invalid_argument before reusing or replacing a popup.
+    bool open(const std::size_t index, const MenuOpenMode mode = MenuOpenMode::keyboard);
     void close() noexcept;
     [[nodiscard]] bool is_open() const noexcept;
 

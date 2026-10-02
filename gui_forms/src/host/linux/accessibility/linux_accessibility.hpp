@@ -10,6 +10,7 @@ class LinuxAccessibility final {
     LinuxAccessibility(Display* display, ::Window native, Window& model, const std::string& title);
     ~LinuxAccessibility();
     void update();
+    void set_title(const std::string& title);
     void detach();
     struct Impl;
   private:

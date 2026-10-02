@@ -25,6 +25,10 @@ enum class MenuItemKind : std::uint8_t {
     submenu,
 };
 
+// Pointer opening keeps the popup focused without selecting a command until
+// hover or keyboard navigation. Keyboard opening selects the first enabled row.
+enum class MenuOpenMode : std::uint8_t { keyboard, pointer };
+
 // Declarative presentation of shared command authority. Command state is
 // snapshotted immediately before the menu opens; one invocation still flows
 // through Command::execute regardless of pointer, keyboard, or semantic input.
@@ -76,7 +80,9 @@ public:
     }
     void set_preferred_width(double width);
 
-    void show(const Control::Ptr& owner, Point window_position);
+    // Unknown modes throw invalid_argument without closing an existing popup.
+    void show(const Control::Ptr& owner, const Point window_position,
+              const MenuOpenMode mode = MenuOpenMode::keyboard);
     void close() noexcept;
     [[nodiscard]] bool is_open() const noexcept;
 

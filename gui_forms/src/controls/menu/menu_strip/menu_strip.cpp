@@ -150,8 +150,10 @@ void MenuStrip::set_item_padding(double padding) {
                Dirty::hit_test | Dirty::semantics);
 }
 
-bool MenuStrip::open(std::size_t index) {
+bool MenuStrip::open(const std::size_t index, const MenuOpenMode mode) {
     require_mutable();
+    if (mode != MenuOpenMode::keyboard && mode != MenuOpenMode::pointer)
+        throw std::invalid_argument("MenuStrip opening mode is invalid");
     if (index >= items_.size() || !items_[index].visible ||
         !items_[index].enabled || !attached_window()) return false;
     if (active_index_ == index && (*popup_).is_open()) return true;
@@ -164,7 +166,7 @@ bool MenuStrip::open(std::size_t index) {
     const Rect absolute = absolute_bounds();
     (*popup_).show(shared_from_this(),
                  {absolute.x + bounds[index].x,
-                  absolute.y + bounds[index].y + bounds[index].height - 1.0});
+                  absolute.y + bounds[index].y + bounds[index].height - 1.0}, mode);
     switching_ = false;
     invalidate(Dirty::paint | Dirty::semantics);
     publish_change(open_changed_, active_index_);
@@ -273,12 +275,12 @@ bool MenuStrip::handle_popup_pointer(const PointerEvent& event) {
     if (!index || !items_[*index].enabled) return false;
     set_hot(index);
     if (event.action == PointerAction::move && active_index_ != index) {
-        const bool opened = open(*index);
+        const bool opened = open(*index, MenuOpenMode::pointer);
         return opened;
     }
     if (event.action == PointerAction::down) {
         if (active_index_ == index) close();
-        else static_cast<void>(open(*index));
+        else static_cast<void>(open(*index, MenuOpenMode::pointer));
         return true;
     }
     return true;
@@ -353,7 +355,7 @@ void MenuStrip::on_pointer(PointerEvent& event) {
         set_hot(index);
         if (is_open() && index && active_index_ != index &&
             items_[*index].enabled) {
-            static_cast<void>(open(*index));
+            static_cast<void>(open(*index, MenuOpenMode::pointer));
         }
         event.handled = hot_index_.has_value();
     } else if (event.action == PointerAction::leave && !is_open()) {
@@ -363,7 +365,7 @@ void MenuStrip::on_pointer(PointerEvent& event) {
         const std::optional<std::size_t> index = index_at(event.position);
         if (index && items_[*index].enabled) {
             if (active_index_ == index && is_open()) close();
-            else static_cast<void>(open(*index));
+            else static_cast<void>(open(*index, MenuOpenMode::pointer));
             event.handled = true;
         }
     }

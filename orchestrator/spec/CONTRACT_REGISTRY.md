@@ -157,6 +157,17 @@ admission cutoff is the consumer's documented interpretation of the owner's
 16 MB requirement, not a new GIVEN or a provider storage mandate. Historical
 FM0 artifacts and the planning-only `text_editor/` gate are unchanged.
 
+### Retained Details and title/menu development — 2026-10-02
+
+**OBSERVED:** bounded provider source and consumer requirements are reconciled
+under ORC-GUI-001 in
+[ObjectView Details](contracts/GUI_OBJECT_DETAILS_DEVELOPMENT.md) and
+[dynamic titles and menu opening](contracts/GUI_TITLE_MENU_DEVELOPMENT.md).
+Their named source changes have been reviewed; native conformance and matching
+SDK consumer acceptance remain pending. These are in-process C++ development
+seams, not new daemon operations, stable ABI promises, or executable capability
+advertisements. Existing frozen FM0 manifests are unchanged.
+
 ## Explicitly forbidden edges
 
 - plugin worker → Go engine writable/index API;

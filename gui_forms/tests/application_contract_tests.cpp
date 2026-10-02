@@ -35,6 +35,57 @@ struct CountRequest final {
     unsigned* count{};
     void operator()() const { ++*count; }
 };
+struct TitleRequest final {
+    std::string* observed{};
+    unsigned* calls{};
+    HostServiceStatus operator()(const std::string_view value) const {
+        (*observed).assign(value);
+        ++*calls;
+        return {};
+    }
+};
+struct TitleOnWorker final {
+    ApplicationWindowHandle handle{};
+    HostServiceStatus* result{};
+    void operator()() const { *result = handle.set_title("worker"); }
+};
+struct RefuseTitle final {
+    HostServiceStatus operator()(std::string_view) const { return {HostServiceError::unsupported}; }
+};
+struct ThrowTitle final {
+    HostServiceStatus operator()(std::string_view) const { throw std::runtime_error("title adapter failure"); }
+};
+void titles() {
+    const std::shared_ptr<detail::ApplicationWindowState> state = std::make_shared<detail::ApplicationWindowState>();
+    const ApplicationWindowHandle handle = detail::ApplicationHandleAccess::make(state);
+    require(handle.set_title("early").error == HostServiceError::backend_failure, "unready title accepted");
+    (*state).ready = true;
+    require(handle.set_title("missing").error == HostServiceError::unsupported, "missing title adapter accepted");
+    std::string observed{};
+    unsigned calls = 0;
+    (*state).set_title = TitleRequest{&observed, &calls};
+    const std::string title = "notes \xe6\x97\xa5 \xf0\x9f\x98\x80 - Editor";
+    require(handle.set_title(title).accepted() && observed == title, "Unicode title changed");
+    require(handle.set_title(std::string_view("bad\0title", 9)).error == HostServiceError::invalid_argument,
+        "embedded title NUL accepted");
+    require(handle.set_title("\xc0\xaf").error == HostServiceError::invalid_argument, "malformed title accepted");
+    require(handle.set_title(std::string(65537, 'x')).error == HostServiceError::invalid_argument, "oversized title accepted");
+    require(calls == 1 && observed == title, "invalid title reached native adapter");
+    HostServiceStatus worker{};
+    std::thread thread(TitleOnWorker{handle, &worker});
+    thread.join();
+    require(worker.error == HostServiceError::wrong_thread && calls == 1, "foreign-thread title reached adapter");
+    require(handle.set_title(std::string(65536, 'x')).accepted() && observed.size() == 65536U,
+        "maximum length title refused");
+    require(handle.set_title("").accepted() && observed.empty(), "empty title refused");
+    (*state).set_title = RefuseTitle{};
+    require(handle.set_title("refused").error == HostServiceError::unsupported, "native refusal lost");
+    (*state).set_title = ThrowTitle{};
+    require(handle.set_title("throw").error == HostServiceError::backend_failure, "native exception escaped");
+    (*state).closed = true;
+    require(handle.set_title("closed").error == HostServiceError::after_shutdown && calls == 3, "closed title reached adapter");
+    require(ApplicationWindowHandle{}.set_title("expired").error == HostServiceError::after_shutdown, "empty title handle callable");
+}
 struct ChangeHidePolicy final {
     void operator()(HostCloseRequest& request) const { request.hide_on_accept = false; }
 };
@@ -171,6 +222,7 @@ void reusable_hide() {
 }
 }
 int main() {
+    titles();
     validation();
     handles();
     reusable_hide();

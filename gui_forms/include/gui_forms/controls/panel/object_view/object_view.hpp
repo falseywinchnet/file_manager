@@ -11,6 +11,8 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace gui_forms {
 
@@ -28,21 +30,61 @@ enum class ObjectGlyph : std::uint8_t {
     code,
 };
 
+struct ObjectColumnId final {
+    std::string value{};
+    friend bool operator==(const ObjectColumnId& left, const ObjectColumnId& right) {
+        const bool equal = left.value == right.value;
+        return equal;
+    }
+};
+
+enum class ObjectCellAvailability : std::uint8_t { available, unavailable, not_applicable };
+enum class ObjectColumnAlignment : std::uint8_t { left, right };
+enum class ObjectSortDirection : std::uint8_t { ascending, descending };
+
+struct ObjectDetailsColumn final {
+    ObjectColumnId id{};
+    std::string label{};
+    double width{160.0};
+    double minimum_width{40.0};
+    double maximum_width{4096.0};
+    ObjectColumnAlignment alignment{ObjectColumnAlignment::left};
+    bool sortable{true};
+};
+
+struct ObjectDetailsCell final {
+    ObjectColumnId column{};
+    std::string text{};
+    ObjectCellAvailability availability{ObjectCellAvailability::available};
+};
+
+struct ObjectDetailsSort final {
+    ObjectColumnId column{}; // Empty means no accepted sort indicator.
+    ObjectSortDirection direction{ObjectSortDirection::ascending};
+};
+
+struct ObjectDetailsPaintWork final {
+    std::size_t rows{};
+    std::size_t cells{};
+    std::size_t text_preparations{};
+};
+
 struct ObjectViewItem final {
-    std::string stable_id;
-    std::string name;
-    std::string secondary_text;
-    std::string description;
+    std::string stable_id{};
+    std::string name{};
+    std::string secondary_text{};
+    std::string description{};
     ObjectGlyph glyph{ObjectGlyph::document};
     bool enabled{true};
-    std::string image_key;
+    std::string image_key{};
+    std::vector<ObjectDetailsCell> cells{};
 };
 
 struct ObjectSelectionChange final {
-    std::string previous_id;
-    std::string current_id;
-    std::vector<std::string> previous_ids;
-    std::vector<std::string> current_ids;
+    std::string previous_id{};
+    std::string current_id{};
+    std::vector<std::string> previous_ids{};
+    std::vector<std::string> current_ids{};
 };
 
 enum class ObjectSelectionMode : std::uint8_t {
@@ -51,7 +93,7 @@ enum class ObjectSelectionMode : std::uint8_t {
 };
 
 struct ObjectContextRequest final {
-    std::string stable_id;
+    std::string stable_id{};
     Point screen_position{};
 };
 
@@ -61,6 +103,8 @@ struct ObjectContextRequest final {
 class ObjectView final : public Panel {
 public:
     explicit ObjectView(StableId stable_id);
+    // Provisional development admission guard, not measured product capacity.
+    static constexpr std::size_t maximum_details_text_bytes = 64U * 1024U * 1024U;
 
     [[nodiscard]] std::span<const ObjectViewItem> items() const noexcept {
         return items_;
@@ -70,6 +114,21 @@ public:
     // transfer authority.
     [[nodiscard]] std::string_view item_id_at(Point absolute) const noexcept;
     void set_items(std::vector<ObjectViewItem> items);
+    // UI-thread complete replacement. See OBJECT_VIEW_DETAILS_DEVELOPMENT_001.md.
+    // Validation/preparation failure preserves the prior model. Spans borrow
+    // this control and expire at replacement/disposal or column mutation.
+    void set_details_model(std::vector<ObjectDetailsColumn> columns,
+                           std::vector<ObjectViewItem> items);
+    [[nodiscard]] std::span<const ObjectDetailsColumn> details_columns() const noexcept {
+        return details_columns_;
+    }
+    void set_details_column_width(const ObjectColumnId& column, double width);
+    void set_details_sort(ObjectDetailsSort state);
+    [[nodiscard]] const ObjectDetailsSort& details_sort() const noexcept { return details_sort_; }
+    [[nodiscard]] Event<const ObjectDetailsSort&>& sort_requested() noexcept { return sort_requested_; }
+    void set_horizontal_offset(double offset);
+    [[nodiscard]] double horizontal_offset() const noexcept { return horizontal_offset_; }
+    [[nodiscard]] ObjectDetailsPaintWork details_paint_work() const noexcept { return details_paint_work_; }
     [[nodiscard]] ObjectViewMode view_mode() const noexcept { return view_mode_; }
     void set_view_mode(ObjectViewMode mode);
     [[nodiscard]] std::string_view selected_id() const noexcept {
@@ -138,6 +197,65 @@ protected:
     void on_attached_to_window() override;
 
 private:
+    struct ItemIdHash final {
+        using is_transparent = void;
+        [[nodiscard]] std::size_t operator()(const std::string_view id) const noexcept {
+            const std::size_t result = std::hash<std::string_view>{}(id);
+            return result;
+        }
+    };
+    using ItemIndices = std::unordered_map<std::string, std::size_t, ItemIdHash, std::equal_to<>>;
+    using SelectionIds = std::unordered_set<std::string, ItemIdHash, std::equal_to<>>;
+    struct DetailsTextCache final {
+        std::size_t item{};
+        std::size_t column{};
+        double width{};
+        double measured_width{};
+        bool header{};
+        bool valid{};
+        std::string text{};
+    };
+    [[nodiscard]] bool has_details_columns() const noexcept;
+    [[nodiscard]] double header_height() const noexcept;
+    [[nodiscard]] double total_column_width() const noexcept;
+    [[nodiscard]] std::optional<std::size_t> column_index(const ObjectColumnId& id) const noexcept;
+    [[nodiscard]] Rect column_bounds(std::size_t column) const noexcept;
+    void clamp_horizontal_offset() noexcept;
+    void reveal_header();
+    void cancel_header_interaction();
+    void request_header_sort(std::size_t column);
+    struct DetailsPointerContext final {
+        Window* attached{}; // Borrowed only across synchronous input delivery.
+        std::uint64_t revision{};
+        Rect bounds{};
+        double scale{};
+        double offset{};
+        double header{};
+    };
+    [[nodiscard]] bool details_pointer_context_valid(const DetailsPointerContext& context) const;
+    [[nodiscard]] bool details_pointer(PointerEvent& event);
+    [[nodiscard]] bool details_key(KeyEvent& event);
+    void paint_details(Painter& painter);
+    void clear_details_cache() noexcept;
+    [[nodiscard]] const std::string& details_text(Painter& painter,
+        std::size_t slot, std::size_t item, std::size_t column, bool header,
+        std::string_view text, double width, FontSpec font);
+    std::vector<ObjectDetailsColumn> details_columns_{};
+    std::uint64_t details_revision_{};
+    ItemIndices item_indices_{};
+    SelectionIds selected_lookup_{};
+    ObjectDetailsSort details_sort_{};
+    Event<const ObjectDetailsSort&> sort_requested_{};
+    double horizontal_offset_{};
+    bool header_focused_{};
+    std::size_t focused_column_{};
+    std::optional<std::size_t> pressed_column_{};
+    std::optional<std::size_t> resizing_column_{};
+    double resize_start_x_{};
+    double resize_start_width_{};
+    std::vector<DetailsTextCache> details_cache_{};
+    FontSpec details_cache_font_{};
+    ObjectDetailsPaintWork details_paint_work_{};
     [[nodiscard]] std::optional<std::size_t> item_index(
         std::string_view stable_id) const noexcept;
     [[nodiscard]] std::size_t columns() const noexcept;
@@ -164,13 +282,13 @@ private:
     void paint_glyph(Painter& painter, Rect bounds, ObjectGlyph glyph,
                      bool enabled) const;
 
-    std::vector<ObjectViewItem> items_;
-    std::string selected_id_;
-    std::vector<std::string> selected_ids_;
-    std::string focused_id_;
-    std::string selection_anchor_id_;
-    std::optional<std::size_t> hovered_index_;
-    std::optional<std::size_t> pressed_index_;
+    std::vector<ObjectViewItem> items_{};
+    std::string selected_id_{};
+    std::vector<std::string> selected_ids_{};
+    std::string focused_id_{};
+    std::string selection_anchor_id_{};
+    std::optional<std::size_t> hovered_index_{};
+    std::optional<std::size_t> pressed_index_{};
     std::uint32_t pressed_click_count_{1U};
     PointerButton pressed_button_{PointerButton::none};
     ObjectSelectionMode selection_mode_{ObjectSelectionMode::multiple};
@@ -180,14 +298,14 @@ private:
     bool show_secondary_text_{true};
     std::size_t top_row_{};
     FontSpec font_{FontRole::content, 11.0, 400, false};
-    std::string type_prefix_;
+    std::string type_prefix_{};
     std::chrono::steady_clock::time_point last_type_time_{};
     bool focused_{};
-    std::shared_ptr<ImageList> image_list_;
-    SubscriptionToken image_list_changed_;
-    Event<const ObjectSelectionChange&> selection_changed_;
-    Event<const std::string&> item_activated_;
-    Event<const ObjectContextRequest&> context_requested_;
+    std::shared_ptr<ImageList> image_list_{};
+    SubscriptionToken image_list_changed_{};
+    Event<const ObjectSelectionChange&> selection_changed_{};
+    Event<const std::string&> item_activated_{};
+    Event<const ObjectContextRequest&> context_requested_{};
 };
 
 } // namespace gui_forms

@@ -285,6 +285,13 @@ LinuxAccessibility::LinuxAccessibility(Display* display, ::Window native, Window
     update();
 }
 LinuxAccessibility::~LinuxAccessibility() { detach(); }
+void LinuxAccessibility::set_title(const std::string& title) {
+    if (!(*impl_).model || !(*impl_).frame) return;
+    NodeData& frame = data((*impl_).frame);
+    if (frame.node.name == title) return;
+    frame.node.name = title;
+    g_object_notify(G_OBJECT((*impl_).frame), "accessible-name");
+}
 void LinuxAccessibility::detach() {
     if (!(*impl_).model) { return; }
     (*impl_).model = nullptr;

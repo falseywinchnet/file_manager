@@ -25,6 +25,15 @@ struct LinuxHostOptions final {
   std::function<void(std::function<void()> show, std::function<void()> hide)>
       visibility_ready;
   std::function<void(std::function<void()> toggle)> full_screen_ready;
+  // Published on the host UI thread during initialization. The returned title
+  // operation borrows its UTF-8 input only through the call; empty is allowed,
+  // NUL/malformed UTF-8/>65536 bytes are invalid_argument. Invoke on the host
+  // UI thread; wrong-thread calls are refused before native mutable access.
+  // Copies do not own the host/window and may be discarded after run returns.
+  // Calls on the UI thread after native lifetime ends return after_shutdown.
+  // Adapter/conversion exceptions become backend_failure; accepted means the
+  // native request was submitted, not that title pixels were presented.
+  std::function<void(std::function<HostServiceStatus(std::string_view)>)> title_ready;
   std::function<void(HostCloseRequest &)> close_request;
   std::function<void(
       std::function<void()> wake, std::function<void()> request_close,

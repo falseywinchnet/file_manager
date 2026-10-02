@@ -1,5 +1,16 @@
 # Orchestrator ↔ GUI.Forms interface negotiation
 
+## Details and title/menu source reconciliation — 2026-10-02
+
+The bounded source candidates are registered in the canonical
+[Details contract](../../orchestrator/spec/contracts/GUI_OBJECT_DETAILS_DEVELOPMENT.md)
+and [title/menu contract](../../orchestrator/spec/contracts/GUI_TITLE_MENU_DEVELOPMENT.md).
+Provider evidence is in [Details development](OBJECT_VIEW_DETAILS_DEVELOPMENT_001.md)
+and [title/menu development](TITLE_MENU_DEVELOPMENT_2026-10-02.md).
+Named source review and local tests passed; native CI and matching installed SDK
+consumption remain pending. C++ layout/signature changes require coherent
+consumer rebuilds. No stable ABI or runtime availability promotion is claimed.
+
 ## SwiftEdit staged document-view proposal — 2026-10-01
 
 The concrete additive provider proposal is
