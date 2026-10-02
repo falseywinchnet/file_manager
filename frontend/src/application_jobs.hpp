@@ -460,6 +460,18 @@ struct Application::CriteriaReady final {
     }
 };
 
+// Query jobs retain Application. Supersession is observed at each synchronous
+// service boundary; the transport call itself has no cancellation argument.
+struct Application::SearchCancelled final {
+    std::shared_ptr<Application> self{};
+    std::uint64_t generation{};
+    bool operator()() const {
+        const bool cancelled = (*self).stopping_.load() ||
+            (*self).search_generation_.load() != generation;
+        return cancelled;
+    }
+};
+
 struct Application::CriteriaWork final {
     std::shared_ptr<Application> self{};
     std::string engine_root_id{};
@@ -470,14 +482,19 @@ struct Application::CriteriaWork final {
     std::optional<fileman::orchestrator::SearchCursorInfo> cursor{};
     bool append{};
     void operator()() {
+        const SearchCancelled cancelled{self, generation};
+        if (cancelled()) return;
         try {
             fileman::orchestrator::Client client = fileman::orchestrator::Client::connect_default(
                 "file-manager-criteria-1.0");
+            if (cancelled()) return;
             fileman::orchestrator::SearchPageInfo page = client.search_subtree(
                 engine_root_id, relative_path, {}, maximum_results, cursor,
                 filters);
+            if (cancelled()) return;
             (*self).post_ui(CriteriaReady{self, std::move(page), std::move(filters), generation, append});
         } catch (const std::exception& error) {
+            if (cancelled()) return;
             const std::string message = error.what();
             (*self).post_ui(CriteriaUnavailable{self, generation, message});
         }
@@ -519,13 +536,18 @@ struct Application::SearchWork final {
     std::optional<fileman::orchestrator::SearchCursorInfo> cursor{};
     bool append{};
     void operator()() const {
+        const SearchCancelled cancelled{self, generation};
+        if (cancelled()) return;
         try {
             fileman::orchestrator::Client client = fileman::orchestrator::Client::connect_default(
                 "file-manager-search-1.0");
+            if (cancelled()) return;
             fileman::orchestrator::SearchPageInfo page = client.search_subtree(
                 engine_root_id, relative_path, query, maximum_results, cursor);
+            if (cancelled()) return;
             (*self).post_ui(SearchReady{self, std::move(page), query, generation, append});
         } catch (const std::exception& error) {
+            if (cancelled()) return;
             const std::string message = error.what();
             (*self).post_ui(SearchUnavailable{self, generation, message});
         }

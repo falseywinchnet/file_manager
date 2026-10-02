@@ -1,6 +1,7 @@
 #include "file_manager/platform_paths.hpp"
 #include "fixture_links.hpp"
 #include "application.hpp"
+#include "application_jobs.hpp"
 
 #include "gui_forms/gui_forms.hpp"
 
@@ -54,6 +55,34 @@ class ApplicationInteractionProbe final {
     static std::uint64_t search_generation(const Application& application) {
         const std::uint64_t generation = application.search_generation_.load();
         return generation;
+    }
+    static void advance_search_generation(Application& application) {
+        application.search_generation_.fetch_add(1U);
+    }
+    static bool search_cancelled(const std::shared_ptr<Application>& application,
+                                 const std::uint64_t generation) {
+        const Application::SearchCancelled cancelled{application, generation};
+        const bool result = cancelled();
+        return result;
+    }
+    static void run_search_job(const std::shared_ptr<Application>& application,
+                                const std::uint64_t generation, const bool criteria) {
+        if (criteria) {
+            Application::CriteriaWork work{};
+            work.self = application;
+            work.generation = generation;
+            work.engine_root_id = "obsolete-fixture-root";
+            work.maximum_results = 25U;
+            work();
+        } else {
+            Application::SearchWork work{};
+            work.self = application;
+            work.generation = generation;
+            work.engine_root_id = "obsolete-fixture-root";
+            work.maximum_results = 25U;
+            work.query = "obsolete";
+            work();
+        }
     }
     static bool search_showing(const Application& application) {
         return application.search_showing_;
@@ -1378,6 +1407,33 @@ void test_details_headers_sort_without_opening_objects() {
                 (*objects).details_sort().column == before_rejection.column &&
                 (*objects).details_sort().direction == before_rejection.direction,
             "rejected publication must restore application sort intent and old indicator");
+}
+
+void test_search_supersession_retires_replies_and_shutdown() {
+    TemporaryTree fixture{};
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(fixture.root(), std::nullopt, false, "");
+    ApplicationStopGuard guard{*application};
+    const std::uint64_t old_generation =
+        file_manager::ApplicationInteractionProbe::search_generation(*application);
+    require(!file_manager::ApplicationInteractionProbe::search_cancelled(application, old_generation),
+            "the current query must remain eligible before supersession");
+    file_manager::ApplicationInteractionProbe::advance_search_generation(*application);
+    require(file_manager::ApplicationInteractionProbe::search_cancelled(application, old_generation),
+            "a superseded query must become ineligible");
+    file_manager::ApplicationInteractionProbe::run_search_job(application, old_generation, false);
+    file_manager::ApplicationInteractionProbe::run_search_job(application, old_generation, true);
+    require(file_manager::ApplicationInteractionProbe::pending_ui_count(*application) == 0U,
+            "obsolete search and criteria jobs must not enqueue success or failure replies");
+    const std::uint64_t current_generation =
+        file_manager::ApplicationInteractionProbe::search_generation(*application);
+    require(!file_manager::ApplicationInteractionProbe::search_cancelled(application, current_generation),
+            "supersession must leave the replacement query eligible");
+    (*application).stop();
+    require(file_manager::ApplicationInteractionProbe::search_cancelled(application, current_generation),
+            "shutdown must retire even the current query");
+    file_manager::ApplicationInteractionProbe::run_search_job(application, current_generation, false);
+    file_manager::ApplicationInteractionProbe::run_search_job(application, current_generation, true);
 }
 
 void test_selected_file_previews_reach_visible_layout() {
@@ -3946,6 +4002,7 @@ int main() {
         test_stop_during_ui_drain_revokes_remaining_callbacks();
         test_application_controls_navigate_real_directories();
         test_details_headers_sort_without_opening_objects();
+        test_search_supersession_retires_replies_and_shutdown();
         test_selected_file_previews_reach_visible_layout();
         test_application_command_surfaces_and_house_mark();
         test_application_command_truth_across_files_search_and_settings();

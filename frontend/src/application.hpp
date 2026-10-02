@@ -77,6 +77,7 @@ private:
     struct TreeExpansionWork;
     struct CriteriaUnavailable;
     struct CriteriaReady;
+    struct SearchCancelled;
     struct CriteriaWork;
     struct SearchUnavailable;
     struct SearchReady;

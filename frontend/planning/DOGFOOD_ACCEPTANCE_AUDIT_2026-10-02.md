@@ -45,9 +45,16 @@ Focused loader cases cover exact-limit input, UTF-8 splits at every byte of
 multibyte characters, and empty input. The assembled test uses a longer-than-
 limit, multiline file and requires the notice outside the body; switching to
 PNG retires the text notice. Local 12/12 tests pass (3.21 seconds). The Mac
-harness now checks caption pixels and preserves a text-preview screenshot;
-native validation of this follow-up is pending. This change is not retroactively
-included in `v0.001-alpha.6e74434`.
+harness checks caption pixels and preserves a text-preview screenshot. Source
+`0873f9cb02dbfaf811b1a31c90be3af5db1b100a` passed both complete native runs
+`36992163185` and `36992189991`; PR7 rebase-merged as
+`f03ae65034b487d87bd193cca48a9c3a5154ff27`, with identical complete tree
+`2ca745b1aa7f4784951b41c2428ff50ede865a75`. Release
+`v0.001-alpha.0873f9c` publishes the independently verified three archives
+(40 Linux, 42 Mac, 44 Windows receipt-listed files). The actual Mac screenshot
+was visually reviewed: text and its separate limit caption are readable;
+the native test counted 235 caption pixels. This supersedes the preceding
+downloadable checkpoint without changing the supported-format boundary.
 
 The final named-caption assembly also passes the focused preview/interaction
 checks (2/2, 2.74 seconds). The unavailable search placeholder now says
@@ -60,6 +67,33 @@ Application's text branch, loader/interaction/native fixture assertions and
 artifact path. Explicit values/types, owned caption/payload, no new callback or
 retained borrow, no added per-character allocation or format dispatch. Existing
 preview lifecycle and unrelated legacy test/tool implementation are not certified.
+
+## Queued search supersession follow-up — 2026-10-02
+
+**OBSERVED:** SearchWork and CriteriaWork previously connected and queried even
+when their generation was already obsolete on dequeue. Both now use one named
+SearchCancelled predicate before connection, after connection, after query and
+on failure. It observes atomic shutdown/generation state; jobs retain Application
+through invocation. Obsolete replies are retired before UI enqueue, with the
+existing UI generation check still guarding the final enqueue/drain race.
+Already-running synchronous connection/query calls remain non-interruptible
+through this API. This change does not claim end-to-end transport cancellation
+or measured input-to-present speed.
+
+**MEASURED:** matching Windows frontend build and 12/12 tests pass (2.88 s).
+The added interaction case verifies current/replacement eligibility, superseded
+ordinary and criteria jobs producing no queued replies, and shutdown revocation.
+It does not instrument the transport's connection count or inject cancellation
+mid-connection/query; those boundaries were source reviewed. Existing installed
+provider probes remain separate integration checks. Native matrices for this
+follow-up are pending; it is excluded from `v0.001-alpha.0873f9c`.
+
+**House-style source review:** SearchCancelled declaration/definition, the
+changed SearchWork/CriteriaWork bodies, named test-probe methods and the new
+interaction case. Explicit types/initialized state, owned job lifetime, atomic
+observations, synchronous operation order, failure retirement and no added
+per-result work were reviewed. The changed-scope spelling scanner reports zero
+findings in three files; that is not a certification of unrelated legacy code.
 
 ## Authority and evidence
 
