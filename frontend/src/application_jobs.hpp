@@ -559,8 +559,13 @@ struct Application::PreviewWork final {
     DirectoryEntry entry{};
     std::uint64_t generation{};
     void operator()() const {
+        const PreviewCancelled cancelled{self, generation};
+        if (cancelled()) return;
         PreviewResult result = load_preview(root, entry.path, entry.identity,
-            PreviewCancelled{self, generation});
+            cancelled);
+        // Selection can change during the read. Retire obsolete output here;
+        // the UI still revalidates generation in case it changes after enqueue.
+        if (cancelled()) return;
         (*self).post_ui(PreviewReady{self, std::move(result), entry.stable_id, generation});
     }
 };

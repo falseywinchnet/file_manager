@@ -181,3 +181,27 @@ region; it is deliberately a correctness test, not a timing harness. Scanner
 reports zero candidates in the new Objective-C++ file. Windows CMake
 reconfiguration and the unaffected frontend tests pass **12/12**, 2.70 seconds.
 Native Mac compile/execution remain **pending** at this checkpoint.
+
+## Obsolete preview work retirement
+
+**OBSERVED:** a queued PreviewWork called the loader even after a newer selection
+had superseded it. The loader checked cancellation only inside its read loop,
+after canonicalization, path/link checks, opening, identity observation and
+buffer allocation. Obsolete results were still queued for UI-side rejection.
+
+The job now checks its existing generation/stop token before loading and again
+before publishing a UI completion. The loader checks cancellation before path
+resolution. UI-side generation/revision checks remain necessary for a selection
+change after enqueue and are retained. This does not preempt a blocked OS call,
+replace the application's single worker queue or claim an end-to-end latency
+improvement.
+
+**MEASURED:** the added already-cancelled request against an unavailable root
+fails against `e123fd8`'s loader and passes after this change. It must retire as
+cancelled before attempting root resolution. Current Windows Release preview
+and assembled-application tests pass **2/2**, 2.39 seconds. Source review covers
+the loader's new early exit, the complete PreviewWork call operator and its
+existing owned generation token, and the new regression/named callback. No
+borrow crosses a queue boundary; no extra per-selection buffer is introduced.
+Spelling scanner on those three files reports zero candidates. The rest of
+`application_jobs.hpp` is not certified by this scoped review.
