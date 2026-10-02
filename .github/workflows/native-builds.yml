@@ -22,7 +22,9 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: native-${{ github.ref }}
+  # Manual diagnostics must not cancel the checks attached to a pushed commit.
+  # PR checks validate the merge ref independently of branch and manual builds.
+  group: native-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   house-style:
@@ -38,7 +40,6 @@ jobs:
   native:
     name: ${{ matrix.platform }}
     needs: house-style
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     strategy:
       fail-fast: false
       matrix:
