@@ -1,10 +1,39 @@
 // Opt-in native deferred-paint diagnostic. No change to the static cost probe.
+#include <cerrno>
+
 namespace {
 
 constexpr std::size_t focused_window_count = 9U;
 constexpr std::size_t focused_interval_count = 4U;
 constexpr std::chrono::seconds focused_settle(3);
 constexpr std::chrono::seconds focused_interval(10);
+
+struct FocusedClockRead final {
+    timespec raw{};
+    int status{-1};
+    int error{0};
+    bool attempted{false};
+    bool valid{false};
+    std::uint64_t nanoseconds{0};
+};
+
+struct FocusedWindowObservation final {
+    std::array<std::uint64_t, 13> cpu{};
+    gui_forms::MetricsSnapshot metrics{};
+    std::string host{};
+    std::string capture_failure{};
+    NSRect bounds{};
+    double scale{0.0};
+    bool present{false};
+    bool disabled{false};
+    bool captured{false};
+    bool visible{false};
+    bool occluded{false};
+    bool focused{false};
+    bool deadline{false};
+    bool key{false};
+    bool application_active{false};
+};
 
 struct FocusedCpuProbe final {
     // Models belong to the synchronous native run; one deferred callback borrows
@@ -17,14 +46,23 @@ struct FocusedCpuProbe final {
     std::array<double, 4> expected_extents{};
     std::uint64_t expected_source_bytes{0};
     std::uint64_t expected_focused_draws{0};
-    std::uint64_t process_start{0};
-    std::uint64_t thread_start{0};
+    FocusedClockRead process_start{};
+    FocusedClockRead thread_start{};
+    FocusedClockRead process_end{};
+    FocusedClockRead thread_end{};
+    std::array<FocusedWindowObservation, focused_window_count> observations{};
     std::chrono::steady_clock::time_point wall_start{};
+    std::chrono::steady_clock::time_point wall_end{};
     std::size_t phase{0};
     std::size_t closed{0};
     bool measuring{false};
     bool completed{false};
     bool have_geometry{false};
+    bool wall_started{false};
+    bool wall_ended{false};
+    bool observations_captured{false};
+    bool raw_emitted{false};
+    bool raw_complete{false};
     std::string failure{};
 };
 
@@ -49,18 +87,21 @@ NSWindow* focused_window(const std::size_t index) {
     return window;
 }
 
-std::uint64_t focused_cpu_clock(const clockid_t clock_id) {
-    timespec value{};
-    const int status = clock_gettime(clock_id, &value);
-    focused_require(status == 0 && value.tv_sec >= 0 && value.tv_nsec >= 0 &&
-        value.tv_nsec < 1000000000L, "CPU clock read failed");
-    const std::uint64_t seconds = static_cast<std::uint64_t>(value.tv_sec);
-    const std::uint64_t fraction = static_cast<std::uint64_t>(value.tv_nsec);
+void read_focused_cpu_clock(const clockid_t clock_id, FocusedClockRead& result) noexcept {
+    result.attempted = true;
+    result.status = clock_gettime(clock_id, &result.raw);
+    if (result.status != 0) {
+        result.error = errno;
+        return;
+    }
+    if (result.raw.tv_sec < 0 || result.raw.tv_nsec < 0 ||
+        result.raw.tv_nsec >= 1000000000L) return;
+    const std::uint64_t seconds = static_cast<std::uint64_t>(result.raw.tv_sec);
+    const std::uint64_t fraction = static_cast<std::uint64_t>(result.raw.tv_nsec);
     const std::uint64_t limit = std::numeric_limits<std::uint64_t>::max();
-    focused_require(seconds <= (limit - fraction) / 1000000000U,
-                    "CPU clock conversion overflow");
-    const std::uint64_t nanoseconds = seconds * 1000000000U + fraction;
-    return nanoseconds;
+    if (seconds > (limit - fraction) / 1000000000U) return;
+    result.nanoseconds = seconds * 1000000000U + fraction;
+    result.valid = true;
 }
 
 std::uint64_t focused_delta(const std::string& before, const std::string& after,
@@ -118,6 +159,19 @@ void check_focused_state(FocusedCpuProbe& probe, const std::size_t index) {
 }
 
 void begin_focused_interval(FocusedCpuProbe& probe) {
+    probe.process_start = {};
+    probe.thread_start = {};
+    probe.process_end = {};
+    probe.thread_end = {};
+    probe.observations = {};
+    probe.wall_start = {};
+    probe.wall_end = {};
+    probe.wall_started = false;
+    probe.wall_ended = false;
+    probe.observations_captured = false;
+    probe.raw_emitted = false;
+    probe.raw_complete = false;
+    for (std::string& before : probe.before) before.clear();
     for (std::size_t index = 0; index < focused_window_count; ++index) {
         check_focused_state(probe, index);
         NSWindow* window = focused_window(index);
@@ -132,22 +186,150 @@ void begin_focused_interval(FocusedCpuProbe& probe) {
     probe.have_geometry = true;
     // Sequential CPU readings use the same clocks at each boundary. Their small
     // skew is not interpreted as other-thread CPU. Logging/snapshots stay outside.
-    probe.process_start = focused_cpu_clock(CLOCK_PROCESS_CPUTIME_ID);
-    probe.thread_start = focused_cpu_clock(CLOCK_THREAD_CPUTIME_ID);
+    read_focused_cpu_clock(CLOCK_PROCESS_CPUTIME_ID, probe.process_start);
+    read_focused_cpu_clock(CLOCK_THREAD_CPUTIME_ID, probe.thread_start);
     probe.wall_start = std::chrono::steady_clock::now();
+    probe.wall_started = true;
+    focused_require(probe.process_start.valid && probe.thread_start.valid,
+                    "CPU start clock read or conversion failed");
     probe.measuring = true;
     queue_focused_cpu(probe, focused_interval);
 }
 
+void capture_focused_windows(FocusedCpuProbe& probe) {
+    // Freeze attribution on ALL views before serializing any host/metrics data.
+    // This main-queue callback neither pumps events nor requests painting.
+    std::array<NSWindow*, focused_window_count> windows{};
+    for (std::size_t index = 0; index < focused_window_count; ++index) {
+        NSWindow* const window = find_window(focused_title(index));
+        windows[index] = window;
+        FocusedWindowObservation& observation = probe.observations[index];
+        observation.present = window != nil && window.contentView != nil;
+        if (observation.present) {
+            const BOOL disabled = [window.contentView setCpuAttributionEnabled:NO];
+            observation.disabled = disabled == YES;
+        }
+    }
+    // No printing, validation or metrics-to-JSON work between window captures.
+    for (std::size_t index = 0; index < focused_window_count; ++index) {
+        FocusedWindowObservation& observation = probe.observations[index];
+        if (!observation.present) continue;
+        NSWindow* const window = windows[index];
+        gui_forms::Window& model = *probe.models[index];
+        try {
+            observation.cpu = [window.contentView cpuAttributionSnapshot];
+            observation.metrics = model.metrics_snapshot();
+            observation.bounds = window.contentView.bounds;
+            observation.scale = window.backingScaleFactor;
+            observation.visible = static_cast<bool>(window.isVisible);
+            observation.occluded = model.occluded();
+            observation.focused = static_cast<bool>(model.focused_control());
+            observation.deadline = model.next_wake().has_value();
+            observation.key = static_cast<bool>(window.isKeyWindow);
+            observation.application_active = static_cast<bool>(NSApp.isActive);
+            observation.captured = true;
+        } catch (const std::exception& error) {
+            observation.capture_failure = error.what();
+        }
+    }
+    // hostJSON serializes native counters. Defer it until every attribution,
+    // model metric and state snapshot above has been taken.
+    for (std::size_t index = 0; index < focused_window_count; ++index) {
+        FocusedWindowObservation& observation = probe.observations[index];
+        if (!observation.present) continue;
+        NSWindow* const window = windows[index];
+        try {
+            observation.host = [window.contentView hostJSON];
+        } catch (const std::exception& error) {
+            observation.captured = false;
+            observation.capture_failure = error.what();
+        }
+    }
+    probe.observations_captured = true;
+}
+
+void emit_focused_clock(const std::size_t phase, const char* const name,
+                         const FocusedClockRead& value) {
+    std::printf("focused-cpu-raw-clock|interval=%zu|comparison_accepted=false|name=%s|attempted=%d|status=%d|errno=%d|raw_sec=%lld|raw_nsec=%lld|conversion_valid=%d|ns=%llu\n",
+        phase, name, value.attempted, value.status, value.error,
+        static_cast<long long>(value.raw.tv_sec), static_cast<long long>(value.raw.tv_nsec),
+        value.valid, static_cast<unsigned long long>(value.nanoseconds));
+}
+
+void emit_focused_observations(FocusedCpuProbe& probe) {
+    bool complete{true};
+    const std::chrono::duration<double> wall = probe.wall_end - probe.wall_start;
+    const std::chrono::steady_clock::duration start = probe.wall_start.time_since_epoch();
+    const std::chrono::steady_clock::duration end = probe.wall_end.time_since_epoch();
+    std::printf("focused-cpu-raw-interval|interval=%zu|comparison_accepted=false|mode=%s|wall_started=%d|wall_ended=%d|wall_start_ticks=%lld|wall_end_ticks=%lld|wall_tick_ratio=%lld/%lld|wall_seconds=%.9f|expected_focused_draws=%llu|expected_extents=%.17g,%.17g,%.17g,%.17g|expected_source_bytes=%llu\n",
+        probe.phase, focused_mode(probe.phase) ? "focused" : "cleared",
+        probe.wall_started, probe.wall_ended, static_cast<long long>(start.count()),
+        static_cast<long long>(end.count()),
+        static_cast<long long>(std::chrono::steady_clock::period::num),
+        static_cast<long long>(std::chrono::steady_clock::period::den), wall.count(),
+        static_cast<unsigned long long>(probe.expected_focused_draws),
+        probe.expected_extents[0], probe.expected_extents[1], probe.expected_extents[2],
+        probe.expected_extents[3], static_cast<unsigned long long>(probe.expected_source_bytes));
+    emit_focused_clock(probe.phase, "process_start", probe.process_start);
+    emit_focused_clock(probe.phase, "thread_start", probe.thread_start);
+    emit_focused_clock(probe.phase, "thread_end", probe.thread_end);
+    emit_focused_clock(probe.phase, "process_end", probe.process_end);
+    for (std::size_t index = 0; index < focused_window_count; ++index) {
+        const FocusedWindowObservation& observation = probe.observations[index];
+        if (!observation.present || !observation.captured) complete = false;
+        const std::array<std::uint64_t, 13>& cpu = observation.cpu;
+        const NSRect& expected = probe.bounds[index];
+        std::printf("focused-cpu-raw-window|interval=%zu|window=%zu|comparison_accepted=false|present=%d|disabled=%d|captured=%d|capture_failure=%s|visible=%d|occluded=%d|focused=%d|deadline=%d|key=%d|application_active=%d|bounds=%.17g,%.17g,%.17g,%.17g|scale=%.17g|expected_bounds=%.17g,%.17g,%.17g,%.17g|expected_scale=%.17g|draw_calls=%llu|draw_cpu_ns=%llu|collect_calls=%llu|collect_cpu_ns=%llu|clock_failures=%llu|overlaps=%llu|saturated=%llu|extent_mismatches=%llu|first_draw_wall_ns=%llu|last_draw_wall_ns=%llu|min_draw_gap_ns=%llu|max_draw_gap_ns=%llu|draw_wall_count=%llu|host_before=%s|host=%s\n",
+            probe.phase, index, observation.present, observation.disabled,
+            observation.captured, observation.capture_failure.c_str(),
+            observation.visible, observation.occluded, observation.focused,
+            observation.deadline, observation.key, observation.application_active,
+            observation.bounds.origin.x, observation.bounds.origin.y,
+            observation.bounds.size.width, observation.bounds.size.height, observation.scale,
+            expected.origin.x, expected.origin.y, expected.size.width, expected.size.height,
+            probe.scales[index], static_cast<unsigned long long>(cpu[0]),
+            static_cast<unsigned long long>(cpu[1]), static_cast<unsigned long long>(cpu[2]),
+            static_cast<unsigned long long>(cpu[3]), static_cast<unsigned long long>(cpu[4]),
+            static_cast<unsigned long long>(cpu[5]), static_cast<unsigned long long>(cpu[6]),
+            static_cast<unsigned long long>(cpu[7]), static_cast<unsigned long long>(cpu[8]),
+            static_cast<unsigned long long>(cpu[9]), static_cast<unsigned long long>(cpu[10]),
+            static_cast<unsigned long long>(cpu[11]), static_cast<unsigned long long>(cpu[12]),
+            probe.before[index].c_str(), observation.host.c_str());
+        try {
+            const std::string metrics_json = observation.metrics.to_json();
+            std::printf("focused-cpu-raw-metrics|interval=%zu|window=%zu|comparison_accepted=false|metrics=%s\n",
+                probe.phase, index, metrics_json.c_str());
+        } catch (const std::exception& error) {
+            complete = false;
+            std::printf("focused-cpu-raw-metrics|interval=%zu|window=%zu|comparison_accepted=false|serialization_failed=%s\n",
+                probe.phase, index, error.what());
+        }
+    }
+    std::fflush(stdout);
+    probe.raw_emitted = true;
+    probe.raw_complete = complete && std::ferror(stdout) == 0;
+}
+
 void verify_focused_window(FocusedCpuProbe& probe, const std::size_t index,
                            std::uint64_t& draw_cpu, std::uint64_t& collect_cpu) {
-    check_focused_state(probe, index);
-    NSWindow* window = focused_window(index);
-    const BOOL disabled = [window.contentView setCpuAttributionEnabled:NO];
-    focused_require(disabled == YES, "could not disable private CPU diagnostic");
-    const std::array<std::uint64_t, 13> cpu = [window.contentView cpuAttributionSnapshot];
-    const std::string after = [window.contentView hostJSON];
-    const gui_forms::MetricsSnapshot metrics = (*probe.models[index]).metrics_snapshot();
+    const FocusedWindowObservation& observation = probe.observations[index];
+    focused_require(observation.present && observation.captured, "window snapshot unavailable");
+    focused_require(observation.disabled, "could not disable private CPU diagnostic");
+    const bool primary = index == 0U;
+    focused_require(observation.visible == primary && observation.occluded == !primary,
+                    "visibility or occlusion changed");
+    const bool expect_focus = primary && focused_mode(probe.phase);
+    focused_require(observation.focused == expect_focus, "model focus changed");
+    focused_require(observation.deadline == expect_focus, "unexpected autonomous deadline state");
+    if (primary) {
+        focused_require(observation.key && observation.application_active,
+                        "native key window or application activation changed");
+    }
+    focused_require(NSEqualRects(observation.bounds, probe.bounds[index]) &&
+        observation.scale == probe.scales[index], "view extent or backing scale changed");
+    const std::array<std::uint64_t, 13>& cpu = observation.cpu;
+    const std::string& after = observation.host;
+    const gui_forms::MetricsSnapshot& metrics = observation.metrics;
     const bool active = index == 0U && focused_mode(probe.phase);
     const std::uint64_t draws = focused_delta(probe.before[index], after, "native_draw_count");
     const std::uint64_t wakes = focused_delta(probe.before[index], after, "scheduled_wake_count");
@@ -211,28 +393,27 @@ void verify_focused_window(FocusedCpuProbe& probe, const std::size_t index,
         draw_cpu = cpu[1];
         collect_cpu = cpu[3];
     }
-    const std::string metrics_json = metrics.to_json();
-    std::printf("focused-cpu-window|interval=%zu|window=%zu|draw_calls=%llu|draw_cpu_ns=%llu|collect_calls=%llu|collect_cpu_ns=%llu|clock_failures=%llu|overlaps=%llu|saturated=%llu|extent_mismatches=%llu|min_draw_gap_ns=%llu|max_draw_gap_ns=%llu|metrics=%s|host=%s\n",
-        probe.phase, index, static_cast<unsigned long long>(cpu[0]),
-        static_cast<unsigned long long>(cpu[1]), static_cast<unsigned long long>(cpu[2]),
-        static_cast<unsigned long long>(cpu[3]), static_cast<unsigned long long>(cpu[4]),
-        static_cast<unsigned long long>(cpu[5]), static_cast<unsigned long long>(cpu[6]),
-        static_cast<unsigned long long>(cpu[7]), static_cast<unsigned long long>(cpu[10]),
-        static_cast<unsigned long long>(cpu[11]), metrics_json.c_str(), after.c_str());
 }
 
 void end_focused_interval(FocusedCpuProbe& probe) {
-    const std::chrono::steady_clock::time_point wall_end = std::chrono::steady_clock::now();
-    const std::uint64_t thread_end = focused_cpu_clock(CLOCK_THREAD_CPUTIME_ID);
-    const std::uint64_t process_end = focused_cpu_clock(CLOCK_PROCESS_CPUTIME_ID);
+    probe.wall_end = std::chrono::steady_clock::now();
+    probe.wall_ended = true;
+    read_focused_cpu_clock(CLOCK_THREAD_CPUTIME_ID, probe.thread_end);
+    read_focused_cpu_clock(CLOCK_PROCESS_CPUTIME_ID, probe.process_end);
     probe.measuring = false;
-    const std::chrono::duration<double> wall = wall_end - probe.wall_start;
+    capture_focused_windows(probe);
+    emit_focused_observations(probe);
+    focused_require(probe.raw_complete, "raw interval evidence incomplete");
+    const std::chrono::duration<double> wall = probe.wall_end - probe.wall_start;
     focused_require(wall.count() >= 10.0 && wall.count() <= 10.1,
                     "ten-second interval exceeded declared duration bound");
-    focused_require(thread_end >= probe.thread_start && process_end >= probe.process_start,
+    focused_require(probe.thread_end.valid && probe.process_end.valid,
+                    "CPU end clock read or conversion failed");
+    focused_require(probe.thread_end.nanoseconds >= probe.thread_start.nanoseconds &&
+        probe.process_end.nanoseconds >= probe.process_start.nanoseconds,
                     "interval CPU clock regressed");
-    const std::uint64_t thread_cpu = thread_end - probe.thread_start;
-    const std::uint64_t process_cpu = process_end - probe.process_start;
+    const std::uint64_t thread_cpu = probe.thread_end.nanoseconds - probe.thread_start.nanoseconds;
+    const std::uint64_t process_cpu = probe.process_end.nanoseconds - probe.process_start.nanoseconds;
     std::uint64_t draw_cpu{0};
     std::uint64_t collect_cpu{0};
     for (std::size_t index = 0; index < focused_window_count; ++index) {
@@ -243,7 +424,7 @@ void end_focused_interval(FocusedCpuProbe& probe) {
     const std::uint64_t rest_cpu = thread_cpu - draw_cpu - collect_cpu;
     const double process_percent = static_cast<double>(process_cpu) / 1.0e7 / wall.count();
     const char* const mode = focused_mode(probe.phase) ? "focused" : "cleared";
-    std::printf("focused-cpu-interval|interval=%zu|mode=%s|wall_seconds=%.9f|process_cpu_ns=%llu|main_thread_cpu_ns=%llu|draw_cpu_ns=%llu|collect_cpu_ns=%llu|remaining_main_cpu_ns=%llu|one_core_percent=%.9f|remaining_is_not_CA_attribution=true\n",
+    std::printf("focused-cpu-interval|interval=%zu|mode=%s|interval_gates_passed=true|comparison_accepted=false|wall_seconds=%.9f|process_cpu_ns=%llu|main_thread_cpu_ns=%llu|draw_cpu_ns=%llu|collect_cpu_ns=%llu|remaining_main_cpu_ns=%llu|one_core_percent=%.9f|remaining_is_not_CA_attribution=true\n",
         probe.phase, mode, wall.count(), static_cast<unsigned long long>(process_cpu),
         static_cast<unsigned long long>(thread_cpu), static_cast<unsigned long long>(draw_cpu),
         static_cast<unsigned long long>(collect_cpu), static_cast<unsigned long long>(rest_cpu),
@@ -266,6 +447,10 @@ void advance_focused_cpu(void* const context) {
         else begin_focused_interval(probe);
     } catch (const std::exception& error) {
         probe.failure = error.what();
+        // Setup/clock failures also retain all available evidence. End validation
+        // already emitted its immutable snapshot; never recapture it after logging.
+        if (!probe.observations_captured) capture_focused_windows(probe);
+        if (!probe.raw_emitted) emit_focused_observations(probe);
         std::fprintf(stderr, "focused-cpu-rejected|interval=%zu|reason=%s\n",
                      probe.phase, probe.failure.c_str());
         std::fflush(stdout);
@@ -327,6 +512,7 @@ int run_focused_cpu_experiment() {
         windows.push_back(std::move(entry));
     }
     std::printf("focused-cpu-protocol|order=focused,cleared,cleared,focused|interval_seconds=10|settle_seconds=3|duration_max_seconds=10.1|caret_draws=18..19_equal_between_focused_intervals|native_wakes=draws..2*draws+1|draw_gap_ms=430..630|native_deferred_paint=true|clock_overhead_included=true|performance_threshold=none\n");
+    std::fflush(stdout);
     const int status = gui_forms::host::run_macos_application(std::move(windows));
     if (status != 0 || !probe.completed || probe.closed != focused_window_count || !probe.failure.empty()) return 1;
     std::printf("focused-cpu-attribution=accepted-comparable-intervals|CA_causation=unmeasured\n");
