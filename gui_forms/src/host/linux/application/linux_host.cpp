@@ -20,6 +20,177 @@
 
 namespace gui_forms::host::linux_detail {
 namespace {
+#if defined(GUI_FORMS_PREPARED_TEXT)
+struct PreparedPresentationImage final {
+  XImage* value{};
+  PreparedPresentationImage() = default;
+  ~PreparedPresentationImage() {
+    if (value != nullptr) {
+      // Pixel storage is borrowed from NativeWindow::presentation, not Xlib.
+      (*value).data = nullptr;
+      XDestroyImage(value);
+    }
+  }
+  PreparedPresentationImage(const PreparedPresentationImage&) = delete;
+  PreparedPresentationImage& operator=(const PreparedPresentationImage&) = delete;
+};
+
+struct PreparedNativeChannel final {
+  unsigned long mask{0};
+  unsigned long maximum{0};
+  unsigned shift{0};
+};
+struct PreparedNativePixels final {
+  const unsigned char* source{};
+  std::size_t source_stride{0};
+  std::size_t destination_stride{0};
+  int left{0};
+  int top{0};
+  int right{0};
+  int bottom{0};
+  std::array<PreparedNativeChannel, 3> channels{};
+};
+
+unsigned long pack_prepared_pixel(const unsigned char* const pixel,
+                                 const std::array<PreparedNativeChannel, 3>& channels) {
+  unsigned long value = 0;
+  for (std::size_t channel = 0; channel < channels.size(); ++channel) {
+    const PreparedNativeChannel component = channels[channel];
+    const std::uint64_t intensity = static_cast<std::uint64_t>(pixel[channel]);
+    const std::uint64_t scaled_value = (intensity * static_cast<std::uint64_t>(component.maximum) + 127U) / 255U;
+    const unsigned long scaled = static_cast<unsigned long>(scaled_value);
+    value |= (scaled << component.shift) & component.mask;
+  }
+  return value;
+}
+void convert_prepared_pixels32(XImage& image, const PreparedNativePixels& pixels) {
+  for (int row = pixels.top; row < pixels.bottom; ++row) {
+    const std::size_t source_row = static_cast<std::size_t>(row) * pixels.source_stride;
+    const std::size_t destination_row = static_cast<std::size_t>(row) * pixels.destination_stride;
+    for (int column = pixels.left; column < pixels.right; ++column) {
+      const std::size_t offset = static_cast<std::size_t>(column) * 4U;
+      const unsigned long value = pack_prepared_pixel(pixels.source + source_row + offset, pixels.channels);
+      const std::uint32_t packed = static_cast<std::uint32_t>(value);
+      std::memcpy(image.data + destination_row + offset, &packed, sizeof(packed));
+    }
+  }
+}
+void convert_prepared_pixels_generic(XImage& image, const PreparedNativePixels& pixels) {
+  for (int row = pixels.top; row < pixels.bottom; ++row) {
+    const std::size_t source_row = static_cast<std::size_t>(row) * pixels.source_stride;
+    for (int column = pixels.left; column < pixels.right; ++column) {
+      const std::size_t offset = static_cast<std::size_t>(column) * 4U;
+      const unsigned long value = pack_prepared_pixel(pixels.source + source_row + offset, pixels.channels);
+      XPutPixel(&image, column, row, value);
+    }
+  }
+}
+
+// Submits only coherent front pixels. Source and native conversion storage are
+// disjoint; both borrows end before the renderer can begin another transaction.
+bool present_prepared_front(NativeWindow& window, const Rect requested) {
+  render::SkiaRaster& raster = window.raster;
+  const std::uint32_t width = raster.pixel_width();
+  const std::uint32_t height = raster.pixel_height();
+  const unsigned char* const source = static_cast<const unsigned char*>(raster.pixels());
+  if (source == nullptr || width == 0 || height == 0 || width > 16384 || height > 16384 ||
+      raster.prepared_front_scale() != 1.0) return false;
+  if (!std::isfinite(window.size.width) || !std::isfinite(window.size.height) ||
+      window.size.width <= 0.0 || window.size.height <= 0.0) return false;
+  if (!std::isfinite(requested.x) || !std::isfinite(requested.y) || !std::isfinite(requested.width) ||
+      !std::isfinite(requested.height) || !std::isfinite(requested.right()) || !std::isfinite(requested.bottom())) return false;
+  const double visible_width = std::min(static_cast<double>(width), window.size.width);
+  const double visible_height = std::min(static_cast<double>(height), window.size.height);
+  const Rect extent{0.0, 0.0, visible_width, visible_height};
+  const Rect clipped = Rect::intersection(requested, extent);
+  if (clipped.empty()) return false;
+  PreparedNativePixels pixels{};
+  pixels.source = source;
+  pixels.source_stride = raster.row_bytes();
+  pixels.left = static_cast<int>(std::floor(clipped.x));
+  pixels.top = static_cast<int>(std::floor(clipped.y));
+  pixels.right = static_cast<int>(std::ceil(clipped.right()));
+  pixels.bottom = static_cast<int>(std::ceil(clipped.bottom()));
+  PreparedPresentationImage owner{};
+  Display* const display = window.runtime.display;
+  const int screen = DefaultScreen(display);
+  owner.value = XCreateImage(display, DefaultVisual(display, screen),
+      static_cast<unsigned>(DefaultDepth(display, screen)), ZPixmap, 0, nullptr, width, height, 32, 0);
+  if (owner.value == nullptr) return false;
+  XImage& image = *owner.value;
+  const std::size_t maximum_row = static_cast<std::size_t>(width) * 4U;
+  if (image.bytes_per_line <= 0 || image.bits_per_pixel <= 0 || image.bits_per_pixel > 32 ||
+      static_cast<std::size_t>(image.bytes_per_line) > maximum_row || pixels.source_stride < maximum_row) return false;
+  pixels.destination_stride = static_cast<std::size_t>(image.bytes_per_line);
+  const std::size_t bytes = pixels.destination_stride * static_cast<std::size_t>(height);
+  if (bytes > 64U * 1024U * 1024U) return false;
+  window.presentation.resize(bytes);
+  image.data = window.presentation.data();
+  const std::array<unsigned long, 3> masks{image.red_mask, image.green_mask, image.blue_mask};
+  for (std::size_t channel = 0; channel < masks.size(); ++channel) {
+    if (masks[channel] > std::numeric_limits<std::uint32_t>::max()) return false;
+    pixels.channels[channel].mask = masks[channel];
+    if (masks[channel] != 0) {
+      pixels.channels[channel].shift = static_cast<unsigned>(std::countr_zero(masks[channel]));
+      pixels.channels[channel].maximum = masks[channel] >> pixels.channels[channel].shift;
+    }
+  }
+  const bool native32 = image.bits_per_pixel == 32 &&
+      (image.byte_order == LSBFirst) == (std::endian::native == std::endian::little);
+  if (native32) convert_prepared_pixels32(image, pixels);
+  else convert_prepared_pixels_generic(image, pixels);
+  const unsigned columns = static_cast<unsigned>(pixels.right - pixels.left);
+  const unsigned rows = static_cast<unsigned>(pixels.bottom - pixels.top);
+  XPutImage(display, window.xid, window.gc, &image, pixels.left, pixels.top,
+            pixels.left, pixels.top, columns, rows);
+  XFlush(display);
+  // Xlib submission is not a server-error/physical-display atomicity guarantee.
+  return true;
+}
+
+void update_prepared_window(NativeWindow& window) {
+  render::SkiaRaster& raster = window.raster;
+  const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
+  std::optional<PaintReceipt> committed{};
+  try {
+    const bool images_ready = raster.synchronize_images((*window.entry.model).image_resources());
+    if (images_ready) {
+      const PreparedTextStatus begun = raster.begin_prepared_frame(window.size, 1.0, window.damage);
+      if (begun == PreparedTextStatus::success) {
+        const std::optional<PaintReceipt> receipt = (*window.entry.model).paint(raster, window.damage.bounds());
+        raster.end_frame();
+        if (receipt) {
+          const PreparedTextStatus status = raster.commit_prepared_frame(*receipt);
+          if (status == PreparedTextStatus::success) committed = *receipt;
+          else raster.abort_prepared_frame();
+        } else raster.abort_prepared_frame();
+      } else raster.abort_prepared_frame();
+    } else raster.abort_prepared_frame();
+  } catch (...) {
+    raster.abort_prepared_frame();
+    // Keep host damage and the coherent front for exposure/recovery. A failed
+    // replay cannot terminate the event loop or claim a presentation receipt.
+  }
+  const PaintReceipt front = raster.prepared_front_receipt();
+  if (!front) return;
+  bool presented = false;
+  try { presented = present_prepared_front(window, window.damage.bounds()); }
+  catch (...) { return; }
+  if (!presented || !committed) return;
+  const std::chrono::steady_clock::time_point finished = std::chrono::steady_clock::now();
+  const std::chrono::nanoseconds duration = std::chrono::duration_cast<std::chrono::nanoseconds>(finished - started);
+  const std::uint64_t elapsed = static_cast<std::uint64_t>(duration.count());
+  const bool acknowledged = (*window.entry.model).notify_presented(*committed, elapsed);
+  if (acknowledged) window.damage.clear();
+  else {
+    // An exposure can repaint an already acknowledged revision. Clear only if
+    // that exact front is still the current, presented model surface.
+    const PaintLeaseSnapshot lease = (*window.entry.model).paint_lease_snapshot();
+    if (lease.surface_epoch == front.surface_epoch && lease.content_revision == front.rendered_revision &&
+        lease.presented_revision == front.rendered_revision && raster.prepared_front_matches(window.size, 1.0)) window.damage.clear();
+  }
+}
+#endif
 std::uint64_t now_ns() {
   return static_cast<std::uint64_t>(
       std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -672,6 +843,10 @@ void NativeWindow::update() {
     damage.add(fresh.rectangles()[i]);
   if (!visible || damage.empty())
     return;
+#if defined(GUI_FORMS_PREPARED_TEXT)
+  update_prepared_window(*this);
+  return;
+#else
   raster.resize(size, 1.0);
   static_cast<void>(
       raster.synchronize_images((*entry.model).image_resources()));
@@ -748,6 +923,7 @@ void NativeWindow::update() {
           .count());
   if ((*entry.model).notify_presented(*receipt, elapsed))
     damage.clear();
+#endif
 }
 void Runtime::dispatch(XEvent &event) {
   if (event.type == SelectionRequest) {

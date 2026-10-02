@@ -1756,6 +1756,16 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_linux_host_tests PRIVATE gui_forms_host_linux X11::X11)
         add_test(NAME gui_forms_linux_host_tests COMMAND gui_forms_linux_host_tests)
         set_tests_properties(gui_forms_linux_host_tests PROPERTIES TIMEOUT 45)
+        if(TARGET gui_forms_prepared_text)
+            add_executable(gui_forms_linux_prepared_text_host_tests
+                tests/linux_prepared_text_host_tests.cpp)
+            target_link_libraries(gui_forms_linux_prepared_text_host_tests PRIVATE
+                gui_forms_host_linux gui_forms_prepared_text X11::X11)
+            add_test(NAME gui_forms_linux_prepared_text_host_tests
+                COMMAND gui_forms_linux_prepared_text_host_tests
+                    "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+            set_tests_properties(gui_forms_linux_prepared_text_host_tests PROPERTIES TIMEOUT 45)
+        endif()
     endif()
     add_library(gui_forms_reference_examples OBJECT
         examples/reference/clipboard_image.cpp
