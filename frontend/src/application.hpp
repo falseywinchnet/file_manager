@@ -193,6 +193,7 @@ private:
     void on_selection_split_splitter_changed(const gui_forms::SplitChangeEvent&);
     void update_adaptive_layout(gui_forms::Rect bounds);
     void update_adaptive_preview();
+    void toggle_preview();
     bool focus_search_accelerator();
     void focus_search_command();
     void focus_location_command();
@@ -444,6 +445,8 @@ private:
     std::shared_ptr<gui_forms::PropertyList> property_list_{};
     std::shared_ptr<gui_forms::PictureBox> preview_picture_{};
     std::shared_ptr<gui_forms::Label> preview_text_{};
+    // UI-thread session preference; unset preserves automatic height adaptation.
+    std::optional<bool> preview_expanded_override_{};
     std::shared_ptr<gui_forms::Button> preview_house_icon_{};
     std::shared_ptr<gui_forms::TextBox> expected_checksum_box_{};
     std::shared_ptr<gui_forms::TextBox> rename_box_{};

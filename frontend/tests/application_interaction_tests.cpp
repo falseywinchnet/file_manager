@@ -360,17 +360,49 @@ class ImageRecordingPainter final : public gui_forms::Painter {
     void draw_line(gui_forms::Point, gui_forms::Point, gui_forms::Color, double) override {
         ++lines;
     }
-    void draw_text_utf8(gui_forms::Point, std::string_view, gui_forms::FontSpec,
-                        gui_forms::Color) override {}
+    void draw_text_utf8(gui_forms::Point, std::string_view text, gui_forms::FontSpec,
+                        gui_forms::Color color) override {
+        if (!text.empty()) {
+            ++text_runs;
+            text_color = color;
+        }
+    }
     void draw_image(gui_forms::ImageId, gui_forms::Rect, double) override {
         ++images;
     }
 
     std::size_t images{};
     std::size_t lines{};
+    std::size_t text_runs{};
+    gui_forms::Color text_color{};
 };
 
 void host_noop() {}
+
+// The poll borrows controls owned by the window for this synchronous wait only.
+struct TextPreviewReady final {
+    const gui_forms::Label& text;
+    bool operator()() const {
+        const bool ready = text.visible() && text.text().starts_with("root");
+        return ready;
+    }
+};
+
+struct ImagePreviewReady final {
+    const gui_forms::PictureBox& picture;
+    bool operator()() const {
+        const bool ready = picture.visible() && picture.has_valid_image();
+        return ready;
+    }
+};
+
+struct UnavailablePreviewReady final {
+    const gui_forms::Label& text;
+    bool operator()() const {
+        const bool ready = text.visible() && text.text().starts_with("Preview is not available");
+        return ready;
+    }
+};
 
 // Application stores the bound observer. Stop clears host callbacks and joins the worker before
 // state dies, including assertion unwinding. Wake is deliberately inert in this headless test.
@@ -1152,6 +1184,92 @@ void test_application_controls_navigate_real_directories() {
             "current ancestry must remain hierarchical and select its folder row");
 
     (*application).stop();
+}
+
+void test_selected_file_previews_reach_visible_layout() {
+    TemporaryTree fixture{};
+    const std::filesystem::path source = std::filesystem::path(__FILE__).parent_path().parent_path() /
+        "ui/boards/file_manager/assets/house/view@2x.png";
+    const bool copied = std::filesystem::copy_file(source, fixture.root() / "preview.png");
+    require(copied, "preview fixture must contain a real decodable PNG");
+    const bool unsupported_copied = std::filesystem::copy_file(source, fixture.root() / "unsupported.bin");
+    require(unsupported_copied, "unsupported fixture must exist before enumeration");
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(fixture.root(), std::nullopt, false, std::string{});
+    ApplicationStopGuard stop_guard(*application);
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
+    (*application).bind_host(host_noop, host_noop);
+    const std::shared_ptr<gui_forms::ObjectView> objects =
+        std::dynamic_pointer_cast<gui_forms::ObjectView>((*window).find("fm.objects.current-folder"));
+    const std::shared_ptr<gui_forms::Label> text =
+        std::dynamic_pointer_cast<gui_forms::Label>((*window).find("fm.inspector.preview.text"));
+    const std::shared_ptr<gui_forms::PictureBox> picture =
+        std::dynamic_pointer_cast<gui_forms::PictureBox>((*window).find("fm.inspector.preview.image"));
+    require(objects && text && picture, "assembled application must own preview controls");
+    require_eventually(*application, ObjectNamed{*objects, "preview.png"}, "preview fixture must enumerate");
+    const std::string text_id = object_id(*objects, "root.txt");
+    const bool text_selected = (*window).perform_semantic_action(text_id, gui_forms::SemanticAction::select);
+    require(text_selected, "text must be selected through the public user action");
+    require_eventually(*application, TextPreviewReady{*text}, "selected text must reach the preview control");
+    (*window).perform_layout();
+    const gui_forms::Rect text_bounds = (*text).committed_arranged_bounds();
+    require((*text).effectively_visible() && text_bounds.width >= 100.0 && text_bounds.height >= 60.0,
+        "selected text must have a visible readable layout, not merely loaded bytes");
+    ImageRecordingPainter text_painter{};
+    (*text).on_paint(text_painter, {0.0, 0.0, text_bounds.width, text_bounds.height});
+    require(text_painter.text_runs > 0U && text_painter.text_color.red >= 200U &&
+        text_painter.text_color.green >= 200U && text_painter.text_color.blue >= 200U,
+        "preview must paint readable light text against its authored dark surface");
+    const std::string image_id = object_id(*objects, "preview.png");
+    const bool image_selected = (*window).perform_semantic_action(image_id, gui_forms::SemanticAction::select);
+    require(image_selected, "image must be selected through the public user action");
+    require_eventually(*application, ImagePreviewReady{*picture}, "selected PNG must enter the application image registry");
+    (*window).perform_layout();
+    const gui_forms::Rect image_bounds = (*picture).image_bounds();
+    require((*picture).effectively_visible() && image_bounds.width > 0.0 && image_bounds.height > 0.0,
+        "selected PNG must have visible image geometry");
+    ImageRecordingPainter painter{};
+    const gui_forms::Rect picture_bounds = (*picture).committed_arranged_bounds();
+    (*picture).on_paint(painter, {0.0, 0.0, picture_bounds.width, picture_bounds.height});
+    require(painter.images == 1U, "selected PNG must issue an image draw");
+
+    constexpr std::string_view toggle_id = "file-manager-app.shell.workspace.selection.inspector.facts.preview.toggle";
+    const std::shared_ptr<gui_forms::Button> toggle = std::dynamic_pointer_cast<gui_forms::Button>(
+        (*window).find(toggle_id));
+    const std::shared_ptr<gui_forms::PropertyList> properties = std::dynamic_pointer_cast<gui_forms::PropertyList>(
+        (*window).find("fm.selection.properties"));
+    require(toggle && properties, "preview must expose an ordinary expansion control in the single scroll owner");
+    const double expanded_height = (*properties).header_height();
+    (*window).resize({1340.0, 500.0});
+    (*window).perform_layout();
+    const double compact_height = (*properties).header_height();
+    require(!(*picture).effectively_visible() && compact_height < expanded_height && (*toggle).enabled(),
+        "short-window collapse must release header space and leave expansion available");
+    require((*toggle).effectively_visible(), "short-window preview expansion control must remain visible");
+    const gui_forms::Rect toggle_bounds = (*toggle).committed_arranged_bounds();
+    require(toggle_bounds.width > 0.0 && toggle_bounds.height > 0.0,
+        "preview expansion control must have a nonempty target");
+    const bool expanded = (*window).perform_semantic_action(toggle_id, gui_forms::SemanticAction::press);
+    require(expanded, "short-window preview expansion must accept a user action");
+    (*window).perform_layout();
+    require((*picture).effectively_visible() && (*properties).header_height() == expanded_height &&
+        (*objects).selected_id() == image_id,
+        "manual expansion must restore the existing preview without changing selection");
+    const bool collapsed = (*window).perform_semantic_action(toggle_id, gui_forms::SemanticAction::press);
+    require(collapsed, "preview collapse must accept a user action");
+    (*window).resize({1340.0, 850.0});
+    (*window).perform_layout();
+    require(!(*picture).effectively_visible() && (*properties).header_height() == compact_height,
+        "an explicit collapsed preference must survive later resize");
+    const std::string unsupported_id = object_id(*objects, "unsupported.bin");
+    const bool unsupported_selected = (*window).perform_semantic_action(unsupported_id, gui_forms::SemanticAction::select);
+    require(unsupported_selected, "unsupported file must accept ordinary selection");
+    require_eventually(*application, UnavailablePreviewReady{*text}, "unsupported format must explain its limitation in the preview body");
+    const bool explanation_expanded = (*window).perform_semantic_action(toggle_id, gui_forms::SemanticAction::press);
+    require(explanation_expanded, "unavailable preview explanation must be expandable");
+    (*window).perform_layout();
+    require((*text).effectively_visible() && !(*picture).visible(),
+        "an unavailable preview must display its explanation without retaining the previous file image");
 }
 
 void test_application_command_surfaces_and_house_mark() {
@@ -3570,6 +3688,7 @@ int main() {
     try {
         test_stop_during_ui_drain_revokes_remaining_callbacks();
         test_application_controls_navigate_real_directories();
+        test_selected_file_previews_reach_visible_layout();
         test_application_command_surfaces_and_house_mark();
         test_application_command_truth_across_files_search_and_settings();
         test_criteria_virtual_folder_is_retained_exact_and_catalogue_only();

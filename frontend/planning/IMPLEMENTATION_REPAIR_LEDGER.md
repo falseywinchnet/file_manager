@@ -2,6 +2,22 @@
 
 Status: **ACTIVE WORKING RECORD — 0.001-alpha repair toward real daily use**.
 
+## Current owner dogfood correction — 2026-10-02
+
+**GIVEN:** the owner tested the macOS package across multiple file types and
+reported no working previews, no thumbnails, slow/unsmooth interaction,
+incomplete Details columns and headers, missing content-size folder icons, and
+substantial ribbon/interface deviations from the interviews. Treat these as
+open acceptance failures. Earlier test passes or visual claims below do not
+close them. The exact file-type corpus and macOS reproduction remain pending.
+
+The active checkout is now `C:\Users\Shadow\file_manager`; the root AGENTS.md
+Shadow directions supersede this ledger's historical Neo-only workflow.
+Current product acceptance is tracked in
+[`DOGFOOD_ACCEPTANCE_AUDIT_2026-10-02.md`](DOGFOOD_ACCEPTANCE_AUDIT_2026-10-02.md).
+This is an extension of the repair register, not a declaration that earlier
+rows are all solved or that the audit is exhaustive.
+
 This file is the durable handoff for ongoing implementation. Update it before
 and after every material repair so conversation compaction cannot erase why a
 change exists, what has actually been proved, or what remains unresolved.
