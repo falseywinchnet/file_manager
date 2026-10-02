@@ -48,7 +48,8 @@ class ApplicationInteractionProbe final {
         page.source = "live";
         page.complete = true;
         page.results = std::move(results);
-        application.apply_engine_search(std::move(page), std::move(query), generation, false);
+        PreparedSearchPage prepared = prepare_search_page(application.protected_root_, std::move(page));
+        application.apply_engine_search(std::move(prepared), std::move(query), generation, false);
         return generation;
     }
 
@@ -121,7 +122,8 @@ class ApplicationInteractionProbe final {
         page.complete = true;
         page.generation = catalogue_generation;
         page.results = std::move(results);
-        application.apply_engine_criteria(std::move(page), {}, generation, false);
+        PreparedSearchPage prepared = prepare_search_page(application.protected_root_, std::move(page));
+        application.apply_engine_criteria(std::move(prepared), {}, generation, false);
         return generation;
     }
     static bool criteria_showing(const Application& application) {
@@ -1407,6 +1409,73 @@ void test_details_headers_sort_without_opening_objects() {
                 (*objects).details_sort().column == before_rejection.column &&
                 (*objects).details_sort().direction == before_rejection.direction,
             "rejected publication must restore application sort intent and old indicator");
+}
+
+struct PreparationCancellation final {
+    std::size_t& checks;
+    std::size_t stop_at{};
+    bool operator()() const {
+        ++checks;
+        const bool stop = checks >= stop_at;
+        return stop;
+    }
+};
+
+void test_search_preparation_owns_observations_and_cancellation() {
+    TemporaryTree fixture{};
+    const std::uintmax_t fixture_size = std::filesystem::file_size(fixture.root() / "root.txt");
+    fileman::orchestrator::SearchPageInfo page{};
+    page.source = "live";
+    page.complete = true;
+    page.results = {
+        {"provider-name", fixture.root() / "root.txt", "directory", 999U, false},
+        {"folder", fixture.root() / "Documents", "file", 999U, false},
+        {"missing", fixture.root() / "missing.txt", "file", 0U, false},
+        {"outside", fixture.quarantine(), "directory", 0U, false},
+        {"unavailable", fixture.root() / "root.txt", "file", 0U, true},
+    };
+    file_manager::PreparedSearchPage prepared =
+        file_manager::prepare_search_page(fixture.root(), page);
+    require(!prepared.cancelled && prepared.rejected == 3U && prepared.entries.size() == 2U,
+            "preparation must reject unavailable, absent and outside-root paths");
+    require(prepared.page.source == "live" && prepared.page.complete && prepared.page.results.empty(),
+            "preparation must keep provenance and retire raw provider addresses");
+    require(prepared.entries[0].name == "root.txt" && !prepared.entries[0].directory &&
+                prepared.entries[0].metadata.logical_size == fixture_size &&
+                prepared.entries[0].identity.available() && prepared.entries[1].directory,
+            "prepared rows must use native facts rather than provider display metadata");
+    std::size_t checks{};
+    const file_manager::PreparedSearchPage cancelled = file_manager::prepare_search_page(
+        fixture.root(), page, PreparationCancellation{checks, 5U});
+    require(cancelled.cancelled && cancelled.entries.empty() && cancelled.rejected == 0U && checks == 5U,
+            "cancellation between records must discard the partial prepared page");
+    checks = 0U;
+    const file_manager::PreparedSearchPage precancelled = file_manager::prepare_search_page(
+        fixture.root(), page, PreparationCancellation{checks, 1U});
+    require(precancelled.cancelled && precancelled.entries.empty() && checks == 1U,
+            "pre-cancelled preparation must return before inspecting records");
+    fileman::orchestrator::SearchPageInfo oversized{};
+    oversized.results.resize(501U);
+    bool refused{};
+    try {
+        const file_manager::PreparedSearchPage invalid =
+            file_manager::prepare_search_page(fixture.root(), std::move(oversized));
+        (void)invalid;
+    } catch (const std::length_error&) { refused = true; }
+    require(refused, "oversized provider pages must fail before observation/allocation of entries");
+    const bool linked = create_fixture_link(fixture.root() / "Documents", fixture.root() / "alias", true);
+    if (linked) {
+        fileman::orchestrator::SearchPageInfo linked_page{};
+        linked_page.results = {{"inside", fixture.root() / "alias/inside.txt", "file", 0U, false}};
+        const file_manager::PreparedSearchPage linked_result =
+            file_manager::prepare_search_page(fixture.root(), std::move(linked_page));
+        require(linked_result.entries.empty() && linked_result.rejected == 1U,
+                "preparation must preserve the refusal to traverse a symlink parent");
+    }
+    const bool removed = std::filesystem::remove(fixture.root() / "root.txt");
+    require(removed && prepared.entries[0].name == "root.txt" &&
+                prepared.entries[0].metadata.logical_size == fixture_size,
+            "prepared values must own their observation without retaining source-file handles");
 }
 
 void test_search_supersession_retires_replies_and_shutdown() {
@@ -4003,6 +4072,7 @@ int main() {
         test_application_controls_navigate_real_directories();
         test_details_headers_sort_without_opening_objects();
         test_search_supersession_retires_replies_and_shutdown();
+        test_search_preparation_owns_observations_and_cancellation();
         test_selected_file_previews_reach_visible_layout();
         test_application_command_surfaces_and_house_mark();
         test_application_command_truth_across_files_search_and_settings();

@@ -1,0 +1,2 @@
+# Preserve evidence bytes, including meaningful unified-diff context prefixes.
+*.patch -text -whitespace

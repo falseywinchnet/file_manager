@@ -450,7 +450,7 @@ struct Application::CriteriaUnavailable final {
 
 struct Application::CriteriaReady final {
     std::shared_ptr<Application> self{};
-    fileman::orchestrator::SearchPageInfo page{};
+    PreparedSearchPage page{};
     std::vector<fileman::orchestrator::SearchExactFilter> filters{};
     std::uint64_t generation{};
     bool append{};
@@ -492,7 +492,14 @@ struct Application::CriteriaWork final {
                 engine_root_id, relative_path, {}, maximum_results, cursor,
                 filters);
             if (cancelled()) return;
-            (*self).post_ui(CriteriaReady{self, std::move(page), std::move(filters), generation, append});
+            PreparedSearchPage prepared{};
+            if (page.source == "catalogue") {
+                prepared = prepare_search_page((*self).protected_root_, std::move(page), cancelled);
+            } else {
+                prepared.page = std::move(page);
+            }
+            if (prepared.cancelled || cancelled()) return;
+            (*self).post_ui(CriteriaReady{self, std::move(prepared), std::move(filters), generation, append});
         } catch (const std::exception& error) {
             if (cancelled()) return;
             const std::string message = error.what();
@@ -516,7 +523,7 @@ struct Application::SearchUnavailable final {
 
 struct Application::SearchReady final {
     std::shared_ptr<Application> self{};
-    fileman::orchestrator::SearchPageInfo page{};
+    PreparedSearchPage page{};
     std::string query{};
     std::uint64_t generation{};
     bool append{};
@@ -545,7 +552,10 @@ struct Application::SearchWork final {
             fileman::orchestrator::SearchPageInfo page = client.search_subtree(
                 engine_root_id, relative_path, query, maximum_results, cursor);
             if (cancelled()) return;
-            (*self).post_ui(SearchReady{self, std::move(page), query, generation, append});
+            PreparedSearchPage prepared = prepare_search_page(
+                (*self).protected_root_, std::move(page), cancelled);
+            if (prepared.cancelled || cancelled()) return;
+            (*self).post_ui(SearchReady{self, std::move(prepared), query, generation, append});
         } catch (const std::exception& error) {
             if (cancelled()) return;
             const std::string message = error.what();

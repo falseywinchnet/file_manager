@@ -4,6 +4,7 @@
 #include "gui_forms/application.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -41,6 +42,22 @@ public:
         application.apply_filter();
     }
     static bool searching(const Application& application) { return application.search_loading_; }
+    static std::uint64_t begin_projection(Application& application) {
+        const std::uint64_t previous = application.search_generation_.fetch_add(1U);
+        application.filter_ = "entry";
+        (*application.search_box_).set_text("entry");
+        const std::uint64_t generation = previous + 1U;
+        return generation;
+    }
+    static void project_page(Application& application,
+                             PreparedSearchPage page,
+                             const std::uint64_t generation, const bool append) {
+        application.apply_engine_search(std::move(page), "entry", generation, append);
+    }
+    static std::size_t result_count(const Application& application) {
+        const std::size_t count = application.search_order_.size();
+        return count;
+    }
     static bool found(const Application& application, const std::string& filename) {
         if (!application.search_showing_) return false;
         for (const std::string& id : application.search_order_) {
@@ -224,7 +241,12 @@ struct DisposableFixture final {
     DisposableFixture() {
         const Clock::duration elapsed = Clock::now().time_since_epoch();
         const std::string name = "fm-latency-" + std::to_string(elapsed.count());
-        path = std::filesystem::temp_directory_path() / name;
+        const std::filesystem::path temporary_directory = std::filesystem::temp_directory_path();
+        const std::filesystem::path parent = std::filesystem::canonical(temporary_directory);
+        path = parent / name;
+        if (!path.is_absolute() || path.parent_path() != parent) {
+            throw std::runtime_error("generated benchmark fixture must stay inside its temporary parent");
+        }
         const bool created = std::filesystem::create_directory(path);
         if (!created) throw std::runtime_error("benchmark fixture already exists");
     }
@@ -235,6 +257,102 @@ struct DisposableFixture final {
     DisposableFixture(const DisposableFixture&) = delete;
     DisposableFixture& operator=(const DisposableFixture&) = delete;
 };
+
+// Generated provider pages isolate Application publication and retained layout.
+// Native filesystem observations are real; no service or native presentation is
+// simulated as available. Fixture creation and result checks are outside timing.
+fileman::orchestrator::SearchPageInfo projection_page(
+    const std::filesystem::path& root, const std::size_t first,
+    const std::size_t count) {
+    fileman::orchestrator::SearchPageInfo page{};
+    page.source = "live";
+    page.terminal = "complete";
+    page.complete = true;
+    page.results.reserve(count);
+    for (std::size_t offset = 0U; offset < count; ++offset) {
+        const std::string name = "entry-" + std::to_string(first + offset) + ".txt";
+        fileman::orchestrator::SearchResultInfo result{};
+        result.name = name;
+        result.path = root / name;
+        result.kind = "file";
+        result.size = 10U;
+        page.results.push_back(std::move(result));
+    }
+    return page;
+}
+
+void run_projection_case(const std::filesystem::path& root,
+                          const std::size_t page_size, const std::size_t page_count,
+                          const std::size_t repetitions) {
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(root, std::nullopt, false, "");
+    StopGuard stop{*application};
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
+    (*window).perform_layout();
+    // This case intentionally does not bind/start navigation or bootstrap work.
+    // The constructor's worker remains idle; the measured call is UI-owned.
+    for (std::size_t repetition = 0U; repetition < repetitions; ++repetition) {
+        const std::uint64_t generation =
+            file_manager::ApplicationLatencyProbe::begin_projection(*application);
+        for (std::size_t page_index = 0U; page_index < page_count; ++page_index) {
+            const std::size_t first = page_index * page_size;
+            fileman::orchestrator::SearchPageInfo page = projection_page(root, first, page_size);
+            page.complete = page_index + 1U == page_count;
+            if (!page.complete) {
+                page.terminal = "partial";
+                page.cursor = fileman::orchestrator::SearchCursorInfo{"live", "fixture-only-continuation"};
+            }
+            (*window).reset_activity_metrics();
+            const Clock::time_point preparation_started = Clock::now();
+            file_manager::PreparedSearchPage prepared =
+                file_manager::prepare_search_page(root, std::move(page));
+            const Clock::time_point started = Clock::now();
+            file_manager::ApplicationLatencyProbe::project_page(
+                *application, std::move(prepared), generation, page_index != 0U);
+            const Clock::time_point published = Clock::now();
+            (*window).perform_layout();
+            const Clock::time_point laid_out = Clock::now();
+            const std::size_t expected = first + page_size;
+            const std::size_t actual =
+                file_manager::ApplicationLatencyProbe::result_count(*application);
+            const std::string first_name = "entry-" + std::to_string(first) + ".txt";
+            const std::string last_name = "entry-" + std::to_string(expected - 1U) + ".txt";
+            if (actual != expected ||
+                !file_manager::ApplicationLatencyProbe::found(*application, first_name) ||
+                !file_manager::ApplicationLatencyProbe::found(*application, last_name)) {
+                throw std::runtime_error("projection lost generated identity-checked results");
+            }
+            const gui_forms::MetricsSnapshot metrics = (*window).metrics_snapshot();
+            std::cout << "projection,page_size=" << page_size << ",page_count=" << page_count
+                      << ",repetition=" << repetition << ",page=" << page_index
+                      << ",results=" << actual
+                      << ",prepare_ms=" << milliseconds(started - preparation_started)
+                      << ",apply_ms=" << milliseconds(published - started)
+                      << ",layout_ms=" << milliseconds(laid_out - published)
+                      << ",flushes=" << metrics.flush_count
+                      << ",measure_passes=" << metrics.measure_passes
+                      << ",arrange_passes=" << metrics.arrange_passes << '\n';
+        }
+    }
+}
+
+void run_search_projection() {
+    const DisposableFixture fixture{};
+    constexpr std::size_t count{1000U};
+    for (std::size_t index = 0U; index < count; ++index) {
+        const std::string name = "entry-" + std::to_string(index) + ".txt";
+        const std::filesystem::path path = fixture.path / name;
+        std::ofstream output{path, std::ios::binary};
+        output << "benchmark\n";
+        output.close();
+        if (!output.good()) throw std::runtime_error("cannot finish projection fixture");
+    }
+    constexpr std::array<std::size_t, 3U> first_page_sizes{25U, 100U, 500U};
+    for (const std::size_t page_size : first_page_sizes) {
+        run_projection_case(fixture.path, page_size, 1U, 30U);
+    }
+    run_projection_case(fixture.path, 100U, 10U, 10U);
+}
 
 void run_live_search(const std::filesystem::path& root, const std::string& root_id,
                      const std::string& query, const std::string& expected_filename) {
@@ -266,12 +384,18 @@ void run_live_search(const std::filesystem::path& root, const std::string& root_
 
 int main(int argc, char** argv) {
     try {
+        if (argc == 2 && std::string_view(argv[1]) == "--search-projection") {
+            std::cout << std::fixed << std::setprecision(6);
+            run_search_projection();
+            return 0;
+        }
         if (argc == 6 && std::string_view(argv[2]) == "--live-search") {
             run_live_search(file_manager::path_from_utf8(argv[1]), argv[3], argv[4], argv[5]);
             return 0;
         }
         if (argc != 2 && argc != 3) throw std::runtime_error(
             "usage: application_latency_benchmark REPOSITORY [--native|--native-partial]\n"
+            "or: application_latency_benchmark --search-projection\n"
             "or: application_latency_benchmark ROOT --live-search ROOT_ID QUERY EXPECTED_FILENAME");
         std::cout << std::fixed << std::setprecision(3);
         if (argc == 3) {
