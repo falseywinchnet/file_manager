@@ -91,7 +91,7 @@ std::optional<std::size_t> utf8_preview_extent(const std::string_view value,
     return extent;
 }
 
-std::string readable_text(std::string value, const bool truncated) {
+std::string readable_text(std::string value) {
     std::replace(value.begin(), value.end(), '\t', ' ');
     for (char& character : value) {
         const unsigned char byte = static_cast<unsigned char>(character);
@@ -99,7 +99,6 @@ std::string readable_text(std::string value, const bool truncated) {
             character = ' ';
         }
     }
-    if (truncated) value += "\n\n… preview limited to 64 KiB";
     return value;
 }
 
@@ -250,8 +249,8 @@ PreviewResult load_preview(const std::filesystem::path& protected_root,
         value.resize(*extent);
         result.kind = PreviewKind::text;
         result.message = "bounded UTF-8 text preview";
-        result.text_utf8 = readable_text(
-            std::move(value), truncated);
+        result.text_utf8 = readable_text(std::move(value));
+        result.text_truncated = truncated;
     }
     return result;
 }

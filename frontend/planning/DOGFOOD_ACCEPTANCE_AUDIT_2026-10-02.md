@@ -16,14 +16,50 @@ atomic row/indicator publication, and a measured reduction in PNG validation
 cost. Source `17a748f` passed both native workflows, but visual review rejected
 its clipped Date modified column and short-folder sort viewport. Corrections
 and their exact local/native acceptance status are tracked in
-`DETAILS_INTEGRATION_2026-10-02.md`. They are not yet part of the published
-preview release. Physical-input smoothness remains unverified.
+`DETAILS_INTEGRATION_2026-10-02.md`. The corrected source is now published in
+`v0.001-alpha.6e74434`, with both native matrices passing, independently verified
+archives, rebase-merged source and a visually reviewed Mac screenshot. Physical-
+input smoothness remains unverified.
 
 The search audit `SEARCH_NEXT_STAGE_AUDIT_2026-10-02.md` and Orchestrator
 proposal `ENGINE_CATALOGUE_SUBSTRING_001.md` are **CANDIDATE** next-stage
 records. Ordinary text currently uses live traversal, not catalogue substring
-acceleration. Their contracts, identity projection and bounded reference
-remain work to implement and verify. No new persistent index is selected.
+acceleration. A private 10k checked-generation reference now has differential
+fixture, warm paired, cancellation-boundary and full Go test/race/vet evidence
+in `../../engine/results/SUBSTRING_REFERENCE_EXPERIMENT_2026-10-02.md`.
+It exposes strict read/decode/output bounds still needed before public admission;
+it activates no search route. Contracts and typed identity projection remain
+open. No new persistent index is selected.
+
+## Text coverage follow-up — 2026-10-02
+
+**OBSERVED:** the old loader appended its byte-limit notice to file contents,
+where the seven-line excerpt could hide it. The new source returns a separate
+initialized `text_truncated` fact and preserves only sanitized file contents in
+the text payload. Application uses the existing persistent caption for
+`Text excerpt · 64 KiB limit`, `Text excerpt · UTF-8`, or the empty-file state.
+This discloses excerpt coverage even when the body elides lines. A subsequent
+selection replaces the caption through its ordinary preview state.
+
+Focused loader cases cover exact-limit input, UTF-8 splits at every byte of
+multibyte characters, and empty input. The assembled test uses a longer-than-
+limit, multiline file and requires the notice outside the body; switching to
+PNG retires the text notice. Local 12/12 tests pass (3.21 seconds). The Mac
+harness now checks caption pixels and preserves a text-preview screenshot;
+native validation of this follow-up is pending. This change is not retroactively
+included in `v0.001-alpha.6e74434`.
+
+The final named-caption assembly also passes the focused preview/interaction
+checks (2/2, 2.74 seconds). The unavailable search placeholder now says
+`Search not configured here`: the former `root not indexed` wording falsely
+implied that ordinary live filename/path search requires a persistent index.
+This wording correction does not activate a search provider.
+
+**House-style review:** changed PreviewResult member, readable-text assembly,
+Application's text branch, loader/interaction/native fixture assertions and
+artifact path. Explicit values/types, owned caption/payload, no new callback or
+retained borrow, no added per-character allocation or format dispatch. Existing
+preview lifecycle and unrelated legacy test/tool implementation are not certified.
 
 ## Authority and evidence
 

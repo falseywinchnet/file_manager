@@ -77,6 +77,8 @@ public:
         image.close();
         std::ofstream text(root_ / "native-preview.txt", std::ios::binary);
         text << "NATIVE PREVIEW CHECK\nReadable text in the actual Mac window.\n";
+        text << "\n\n\n\n\n\n\n\n";
+        text << std::string(file_manager::maximum_text_preview_bytes, 'x');
         text.close();
         std::ofstream unsupported(root_ / "native-preview.bin", std::ios::binary);
         unsupported << "Explicit unsupported format explanation";
@@ -155,7 +157,7 @@ bool select_file(PreviewState& state, const std::string_view name) {
 // AppKit snapshot evidence includes clipping, the native Skia decoder and
 // backing-scale presentation. It can force display; it is not paint-latency or
 // ordinary pointer-delivery evidence. Sample only the selected preview bounds.
-enum class PixelMatch { light_text, image, dark_text };
+enum class PixelMatch { light_text, image, dark_text, caption_text };
 
 std::size_t matching_pixels(NSView* const view, const gui_forms::Rect bounds,
                             const PixelMatch target) {
@@ -187,6 +189,8 @@ std::size_t matching_pixels(NSView* const view, const gui_forms::Rect bounds,
                     color.blueComponent > 0.65 && color.blueComponent < 0.9;
             } else if (target == PixelMatch::dark_text) {
                 matched = color.redComponent < 0.2 && color.greenComponent < 0.25 && color.blueComponent < 0.3;
+            } else if (target == PixelMatch::caption_text) {
+                matched = color.redComponent < 0.6 && color.greenComponent < 0.65 && color.blueComponent < 0.7;
             } else {
                 matched = color.redComponent > 0.65 && color.greenComponent > 0.7 && color.blueComponent > 0.75;
             }
@@ -294,6 +298,26 @@ void exercise(PreviewState& state) {
     if (!content_ready || !(*text).effectively_visible() || (*picture).visible()) return;
     const std::size_t pixels = matching_pixels(native.contentView, (*text).absolute_bounds(), PixelMatch::light_text);
     if (pixels < 25U) return;
+    if (!unsupported) {
+        const std::shared_ptr<gui_forms::Label> coverage = std::dynamic_pointer_cast<gui_forms::Label>(
+            (*state.model).find("file-manager-app.shell.workspace.selection.inspector.facts.preview.kind"));
+        if (!coverage || !(*coverage).effectively_visible() ||
+            (*coverage).text() != "Text excerpt · 64 KiB limit" ||
+            (*coverage).absolute_bounds().y < (*text).absolute_bounds().bottom()) {
+            throw std::runtime_error("native text truncation notice must remain outside the clipped body");
+        }
+        const std::size_t caption_pixels = matching_pixels(
+            native.contentView, (*coverage).absolute_bounds(), PixelMatch::caption_text);
+        if (caption_pixels < 25U) return;
+        NSView* const view = native.contentView;
+        NSBitmapImageRep* const bitmap = [view bitmapImageRepForCachingDisplayInRect:view.bounds];
+        if (bitmap == nil) throw std::runtime_error("native text snapshot unavailable");
+        [view cacheDisplayInRect:view.bounds toBitmapImageRep:bitmap];
+        NSData* const encoded = [bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+        const BOOL saved = [encoded writeToFile:@"native-text-preview.png" atomically:YES];
+        if (saved != YES) throw std::runtime_error("cannot save native text-preview evidence");
+        std::cout << "macOS TXT coverage: caption_pixels=" << caption_pixels << " outside_body=passed\n";
+    }
     std::cout << "macOS " << (unsupported ? "unsupported explanation" : "TXT preview")
               << ": readable_pixels=" << pixels << '\n';
     if (unsupported) {
