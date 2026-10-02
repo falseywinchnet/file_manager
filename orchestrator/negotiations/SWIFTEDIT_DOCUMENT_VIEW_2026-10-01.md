@@ -638,3 +638,59 @@ reconciliation before source freeze. The candidate names these implementation
 scopes. The later route-A development selection in that candidate records
 coordinated A1 host transaction work and A2 prepared-text integration under
 existing implementation authorization; it does not imply installed availability.
+
+## P1 native print and layout preview — concrete candidate draft
+
+**OBSERVED coordinator assignment:** under the existing owner feature direction,
+Orchestrator prepared
+[`GUI_PRINT_DEVELOPMENT.md`](../spec/contracts/GUI_PRINT_DEVELOPMENT.md)
+for provider/consumer reconciliation. P1 is independent of D1–D4/A2 and does not
+open the planning-only `text_editor/` implementation gate. The new record is a
+**CANDIDATE semantic draft**, not accepted architecture, assigned executable
+implementation or installed print/preview availability.
+
+The draft binds an owned session to frozen document/projection and layout
+revisions, exact font/ticket geometry, bounded content requests and immutable
+page leases. SwiftEdit owns source-byte interpretation, selection and range
+joining, plain/rendered policy and parser-produced content; GUI.Forms owns
+reusable layout/preview and native dialog/spool mechanics. A retained mutable
+file handle alone is not an immutable print snapshot. Preview uses the same
+logical page plan as print and never changes source/history/selection.
+
+Concrete initial defaults are whole-document plain source, explicit registered
+monospace 12-point black text, wrapping, no automatic decorations and one copy.
+Native queried paper/imageable geometry supplies printing defaults; printerless
+preview requires explicit geometry. Rendered content is explicit and unsupported
+blocks refuse rather than silently reverting to plain text. Numerical limits,
+one executing slot plus one desired preview intent, all-live page/raster
+accounting, unknown-until-complete pagination, cancellation retirement and
+owner/dialog teardown are specified for direct acceptance or bounded correction.
+
+Native ticket choice, page generation and submission are distinct. A final ticket
+that changes geometry requires a new layout revision. Spool acceptance is not
+physical print success; failures after possible output report partial/unknown,
+and ambiguous jobs never retry automatically. All three platforms remain
+proposed/unverified with separate preview, dialog, spool and cancellation states.
+
+Requested replies are SwiftEdit's snapshot/projection defaults and concrete
+unsupported rendered examples, the provider's numerical capacity/work reply,
+page-plan/native-ticket fidelity and close protocol, and the first native
+capability subset. The fixture obligations include revision/cancellation races,
+resource failure, page identity/zoom invariance, native owner lifetime and exact
+spool outcomes. This closes a concrete contract round under existing direction;
+it adds no owner permission gate, executable source or API/SDK freeze.
+
+## Separate prepared-paint assignment — private Skia adapter
+
+**OBSERVED coordinator direction:** the GUI.Forms provider is assigned private
+Skia prepared-paint feasibility/adapter work under the existing
+[`GUI_PREPARED_TEXT_DEVELOPMENT.md`](../spec/contracts/GUI_PREPARED_TEXT_DEVELOPMENT.md)
+A2 semantics. The coordinator retains host and CMake ownership. This assignment
+does not change frozen source/layout authority, retained command lifetime,
+executor-owned native resources, recorded/staged/committed distinctions or
+failure preservation. It does not extend A2 to wrapping, printing or editing.
+Any adapter must consume the existing prepared result contract and report
+unsupported until its actual compatibility and frame behavior are established.
+Source/fixture review and native integration evidence remain pending; no installed
+backend capability or SDK availability is claimed. This work is separate from
+the P1 candidate and does not select a print backend.
