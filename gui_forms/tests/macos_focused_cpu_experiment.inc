@@ -1,6 +1,12 @@
 // Opt-in native deferred-paint diagnostic. No change to the static cost probe.
 #include <cerrno>
 
+// Private native-fixture wire image, independent of the existing 13-field CPU ABI.
+using FocusedCausalSnapshot = std::array<std::array<std::uint64_t, 13>, 257>;
+@interface NSView (FocusedCausalProbe)
+- (FocusedCausalSnapshot)cpuCausalTraceSnapshot;
+@end
+
 namespace {
 
 constexpr std::size_t focused_window_count = 9U;
@@ -19,6 +25,7 @@ struct FocusedClockRead final {
 
 struct FocusedWindowObservation final {
     std::array<std::uint64_t, 13> cpu{};
+    FocusedCausalSnapshot causal{};
     gui_forms::MetricsSnapshot metrics{};
     std::string host{};
     std::string capture_failure{};
@@ -218,6 +225,7 @@ void capture_focused_windows(FocusedCpuProbe& probe) {
         gui_forms::Window& model = *probe.models[index];
         try {
             observation.cpu = [window.contentView cpuAttributionSnapshot];
+            observation.causal = [window.contentView cpuCausalTraceSnapshot];
             observation.metrics = model.metrics_snapshot();
             observation.bounds = window.contentView.bounds;
             observation.scale = window.backingScaleFactor;
@@ -256,6 +264,35 @@ void emit_focused_clock(const std::size_t phase, const char* const name,
         value.valid, static_cast<unsigned long long>(value.nanoseconds));
 }
 
+void emit_focused_causal_trace(const std::size_t phase, const std::size_t window,
+                              const FocusedCausalSnapshot& snapshot) {
+    const std::array<std::uint64_t, 13>& header = snapshot[0];
+    // Header fields: version/count, overflow/ambiguity/clock/serial failures,
+    // unpaired/unfinished draw, pending deadlines, enabled, then reserved x3.
+    const bool complete = header[0] == 1U && header[1] <= 256U &&
+        header[2] == 0U && header[3] == 0U && header[4] == 0U && header[5] == 0U &&
+        header[6] == 0U && header[7] == 0U && header[8] == 0U && header[9] == 0U;
+    std::printf("focused-cpu-raw-trace|interval=%zu|window=%zu|comparison_accepted=false|version=%llu|rows=%llu|overflow=%llu|ambiguous=%llu|clock_failure=%llu|serial_exhausted=%llu|unpaired=%llu|unfinished_draw=%llu|pending_deadlines=%llu|enabled=%llu|header_status_clear=%d\n",
+        phase, window, static_cast<unsigned long long>(header[0]),
+        static_cast<unsigned long long>(header[1]), static_cast<unsigned long long>(header[2]),
+        static_cast<unsigned long long>(header[3]), static_cast<unsigned long long>(header[4]),
+        static_cast<unsigned long long>(header[5]), static_cast<unsigned long long>(header[6]),
+        static_cast<unsigned long long>(header[7]), static_cast<unsigned long long>(header[8]),
+        static_cast<unsigned long long>(header[9]), complete);
+    const std::size_t count = header[1] <= 256U ? static_cast<std::size_t>(header[1]) : 256U;
+    for (std::size_t index = 0; index < count; ++index) {
+        const std::array<std::uint64_t, 13>& row = snapshot[index + 1U];
+        std::printf("focused-cpu-raw-trace-row|interval=%zu|window=%zu|row=%zu|comparison_accepted=false|kind=%llu|time_ns=%llu|arm=%llu|desired_ns=%llu|delay_ns=%llu|wake=%llu|poll=%llu|fired=%llu|next_ns=%llu|linked_poll=%llu|draw=%llu|pending=%llu|flags=%llu\n",
+            phase, window, index, static_cast<unsigned long long>(row[0]),
+            static_cast<unsigned long long>(row[1]), static_cast<unsigned long long>(row[2]),
+            static_cast<unsigned long long>(row[3]), static_cast<unsigned long long>(row[4]),
+            static_cast<unsigned long long>(row[5]), static_cast<unsigned long long>(row[6]),
+            static_cast<unsigned long long>(row[7]), static_cast<unsigned long long>(row[8]),
+            static_cast<unsigned long long>(row[9]), static_cast<unsigned long long>(row[10]),
+            static_cast<unsigned long long>(row[11]), static_cast<unsigned long long>(row[12]));
+    }
+}
+
 void emit_focused_observations(FocusedCpuProbe& probe) {
     bool complete{true};
     const std::chrono::duration<double> wall = probe.wall_end - probe.wall_start;
@@ -276,6 +313,7 @@ void emit_focused_observations(FocusedCpuProbe& probe) {
     emit_focused_clock(probe.phase, "process_end", probe.process_end);
     for (std::size_t index = 0; index < focused_window_count; ++index) {
         const FocusedWindowObservation& observation = probe.observations[index];
+        emit_focused_causal_trace(probe.phase, index, observation.causal);
         if (!observation.present || !observation.captured) complete = false;
         const std::array<std::uint64_t, 13>& cpu = observation.cpu;
         const NSRect& expected = probe.bounds[index];
@@ -315,6 +353,11 @@ void verify_focused_window(FocusedCpuProbe& probe, const std::size_t index,
     const FocusedWindowObservation& observation = probe.observations[index];
     focused_require(observation.present && observation.captured, "window snapshot unavailable");
     focused_require(observation.disabled, "could not disable private CPU diagnostic");
+    const std::array<std::uint64_t, 13>& trace = observation.causal[0];
+    focused_require(trace[0] == 1U && trace[1] <= 256U && trace[2] == 0U &&
+        trace[3] == 0U && trace[4] == 0U && trace[5] == 0U && trace[6] == 0U &&
+        trace[7] == 0U && trace[8] == 0U && trace[9] == 0U,
+        "causal trace incomplete, ambiguous or invalid");
     const bool primary = index == 0U;
     focused_require(observation.visible == primary && observation.occluded == !primary,
                     "visibility or occlusion changed");
@@ -339,6 +382,17 @@ void verify_focused_window(FocusedCpuProbe& probe, const std::size_t index,
                     "draw attribution count mismatch");
     const std::uint64_t collections = focused_delta(probe.before[index], after, "damage_collection_count");
     focused_require(cpu[2] == collections, "damage collection attribution count mismatch");
+    std::array<std::uint64_t, 5> trace_counts{};
+    const std::size_t trace_count = static_cast<std::size_t>(trace[1]);
+    for (std::size_t row_index = 0; row_index < trace_count; ++row_index) {
+        const std::uint64_t kind = observation.causal[row_index + 1U][0];
+        focused_require(kind >= 1U && kind <= 5U, "unknown causal trace event kind");
+        const std::size_t kind_index = static_cast<std::size_t>(kind - 1U);
+        ++trace_counts[kind_index];
+    }
+    focused_require(trace_counts[1] == wakes && trace_counts[2] == collections &&
+        trace_counts[3] == draws && trace_counts[4] == draws,
+        "causal trace event counts differ from scalar diagnostics");
     focused_require(counter(after, "native_callback_faults") == 0U &&
         focused_delta(probe.before[index], after, "display_tick_count") == 0U,
         "native fault or unexpected display-link work");
@@ -512,6 +566,7 @@ int run_focused_cpu_experiment() {
         windows.push_back(std::move(entry));
     }
     std::printf("focused-cpu-protocol|order=focused,cleared,cleared,focused|interval_seconds=10|settle_seconds=3|duration_max_seconds=10.1|caret_draws=18..19_equal_between_focused_intervals|native_wakes=draws..2*draws+1|draw_gap_ms=430..630|native_deferred_paint=true|clock_overhead_included=true|performance_threshold=none\n");
+    std::printf("focused-cpu-trace-protocol|version=1|fixture_row_capacity=256|kinds=1:arm,2:wake,3:poll,4:draw_entry,5:draw_exit|flags=1:deadline,2:next_deadline,4:early_wake,8:untimed_poll,16:ambiguous,32:unpaired,64:clock_invalid,128:inherited_arm|arm_zero=armed_before_capture|delay_ns=requested_relative_delay_not_kernel_due_time|timestamps=steady_clock_ns|raw_is_not_accepted_comparison=true\n");
     std::fflush(stdout);
     const int status = gui_forms::host::run_macos_application(std::move(windows));
     if (status != 0 || !probe.completed || probe.closed != focused_window_count || !probe.failure.empty()) return 1;

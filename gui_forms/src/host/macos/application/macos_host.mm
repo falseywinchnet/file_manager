@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <exception>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <time.h>
 #include <string>
@@ -93,6 +94,216 @@ using gui_forms::CursorKind;
 using gui_forms::render::SkiaRaster;
 
 namespace {
+// Private fixture wire image: header then 256 rows, each with 13 uint64 fields.
+// Header: version, count, overflow, ambiguity, clock failure, serial exhaustion,
+// unpaired draw, unfinished draw, pending deadlines, enabled, reserved x3.
+// Row: kind, time ns, arm, desired ns, delay ns, wake, poll, fired, next ns,
+// linked poll, draw, pending count, flags. No native pointers cross this boundary.
+using MacCausalSnapshot = std::array<std::array<std::uint64_t, 13>, 257>;
+
+enum class MacCausalKind : std::uint64_t { arm = 1, wake, poll, draw_entry, draw_exit };
+enum MacCausalFlag : std::uint64_t {
+    causal_has_deadline = 1U, causal_has_next = 2U, causal_early_wake = 4U,
+    causal_untimed_poll = 8U, causal_ambiguous = 16U, causal_unpaired = 32U,
+    causal_clock_invalid = 64U, causal_inherited_arm = 128U,
+};
+struct MacCausalRow final {
+    MacCausalKind kind{MacCausalKind::arm};
+    std::uint64_t time_ns{0};
+    std::uint64_t arm{0};
+    std::uint64_t desired_ns{0};
+    std::uint64_t delay_ns{0};
+    std::uint64_t wake{0};
+    std::uint64_t poll{0};
+    std::uint64_t fired{0};
+    std::uint64_t next_ns{0};
+    std::uint64_t linked_poll{0};
+    std::uint64_t draw{0};
+    std::uint64_t pending{0};
+    std::uint64_t flags{0};
+};
+struct MacCausalTrace final {
+    // Main-executor owned; allocated only when the private diagnostic is enabled.
+    // Overflow retains the first 256 rows and permanently invalidates pairing.
+    std::array<MacCausalRow, 256> rows{};
+    std::size_t count{0};
+    bool enabled{false};
+    bool overflow{false};
+    bool ambiguous{false};
+    bool clock_failure{false};
+    bool serial_exhausted{false};
+    bool unpaired{false};
+    bool drawing{false};
+    bool has_deadline{false};
+    std::uint64_t last_time_ns{0};
+    std::uint64_t arm_serial{0};
+    std::uint64_t wake_serial{0};
+    std::uint64_t poll_serial{0};
+    std::uint64_t draw_serial{0};
+    std::uint64_t active_wake{0};
+    std::uint64_t desired_ns{0};
+    std::uint64_t delay_ns{0};
+    std::uint64_t pending{0};
+    std::uint64_t linked_poll{0};
+    std::uint64_t drawing_pending{0};
+    std::uint64_t drawing_poll{0};
+
+    [[nodiscard]] std::uint64_t timestamp(const gui_forms::FrameTime value) noexcept {
+        // macOS FrameClock is steady_clock with signed nanosecond ticks. Enforce
+        // the unit instead of overflowing an unchecked duration conversion.
+        static_assert(gui_forms::FrameClock::period::num == 1);
+        static_assert(gui_forms::FrameClock::period::den == 1000000000);
+        static_assert(std::numeric_limits<gui_forms::FrameClock::duration::rep>::digits <= 64);
+        const gui_forms::FrameClock::duration::rep ticks = value.time_since_epoch().count();
+        if (ticks < 0) {
+            clock_failure = true;
+            return 0U;
+        }
+        const std::uint64_t result = static_cast<std::uint64_t>(ticks);
+        return result;
+    }
+    void advance(std::uint64_t& serial) noexcept {
+        if (serial == std::numeric_limits<std::uint64_t>::max()) serial_exhausted = true;
+        else ++serial;
+    }
+    void seed(const std::optional<gui_forms::FrameTime>& deadline) noexcept {
+        if (!enabled) return;
+        has_deadline = deadline.has_value();
+        if (deadline) desired_ns = timestamp(*deadline);
+    }
+    [[nodiscard]] MacCausalRow make_row(const MacCausalKind kind,
+                                       const gui_forms::FrameTime time) noexcept {
+        MacCausalRow row{};
+        row.kind = kind;
+        row.time_ns = timestamp(time);
+        row.arm = arm_serial;
+        row.desired_ns = desired_ns;
+        row.delay_ns = delay_ns;
+        row.wake = active_wake;
+        row.poll = poll_serial;
+        row.draw = draw_serial;
+        row.linked_poll = linked_poll;
+        row.pending = pending;
+        if (has_deadline) row.flags |= causal_has_deadline;
+        if (arm_serial == 0U) row.flags |= causal_inherited_arm;
+        return row;
+    }
+    void append(MacCausalRow row) noexcept {
+        if (count != 0U && row.time_ns < last_time_ns) clock_failure = true;
+        last_time_ns = row.time_ns;
+        if (clock_failure) row.flags |= causal_clock_invalid;
+        if (count == rows.size()) {
+            overflow = true;
+            return;
+        }
+        rows[count] = row;
+        ++count;
+    }
+    void record_arm(const gui_forms::FrameTime now,
+                    const std::optional<gui_forms::FrameTime>& deadline,
+                    const std::int64_t requested_delay_ns) noexcept {
+        if (!enabled) return;
+        advance(arm_serial);
+        seed(deadline);
+        if (!deadline) desired_ns = 0U;
+        if (requested_delay_ns < 0) {
+            clock_failure = true;
+            delay_ns = 0U;
+        } else delay_ns = static_cast<std::uint64_t>(requested_delay_ns);
+        const MacCausalRow row = make_row(MacCausalKind::arm, now);
+        append(row);
+    }
+    void record_wake(const gui_forms::FrameTime now) noexcept {
+        if (!enabled) return;
+        const bool nested = active_wake != 0U;
+        if (nested) ambiguous = true;
+        advance(wake_serial);
+        active_wake = wake_serial;
+        MacCausalRow row = make_row(MacCausalKind::wake, now);
+        if (nested) row.flags |= causal_ambiguous;
+        if (has_deadline && row.time_ns < desired_ns) row.flags |= causal_early_wake;
+        append(row);
+    }
+    void record_poll(const gui_forms::FrameTime now, const std::uint64_t fired,
+                     const std::optional<gui_forms::FrameTime>& next) noexcept {
+        if (!enabled) return;
+        advance(poll_serial);
+        if (fired != 0U) {
+            if (pending != 0U || fired != 1U) ambiguous = true;
+            if (fired > std::numeric_limits<std::uint64_t>::max() - pending) {
+                serial_exhausted = true;
+                pending = std::numeric_limits<std::uint64_t>::max();
+            } else pending += fired;
+            linked_poll = pending == 1U ? poll_serial : 0U;
+        }
+        MacCausalRow row = make_row(MacCausalKind::poll, now);
+        row.fired = fired;
+        if (next) {
+            row.next_ns = timestamp(*next);
+            row.flags |= causal_has_next;
+        }
+        if (active_wake == 0U) row.flags |= causal_untimed_poll;
+        if (pending > 1U) row.flags |= causal_ambiguous;
+        append(row);
+    }
+    void record_draw_entry(const gui_forms::FrameTime now) noexcept {
+        if (!enabled) return;
+        if (drawing) ambiguous = true;
+        drawing = true;
+        advance(draw_serial);
+        drawing_pending = pending;
+        drawing_poll = linked_poll;
+        MacCausalRow row = make_row(MacCausalKind::draw_entry, now);
+        if (pending == 0U) {
+            unpaired = true;
+            row.flags |= causal_unpaired;
+        }
+        if (pending > 1U) row.flags |= causal_ambiguous;
+        append(row);
+        pending = 0U;
+        linked_poll = 0U;
+    }
+    void record_draw_exit(const gui_forms::FrameTime now) noexcept {
+        if (!enabled) return;
+        MacCausalRow row = make_row(MacCausalKind::draw_exit, now);
+        row.pending = drawing_pending;
+        row.linked_poll = drawing_poll;
+        if (!drawing || drawing_pending == 0U) {
+            unpaired = true;
+            row.flags |= causal_unpaired;
+        }
+        if (drawing_pending > 1U) row.flags |= causal_ambiguous;
+        append(row);
+        drawing = false;
+    }
+    [[nodiscard]] MacCausalSnapshot snapshot() const noexcept {
+        MacCausalSnapshot output{};
+        output[0] = {1U, static_cast<std::uint64_t>(count), overflow, ambiguous,
+            clock_failure, serial_exhausted, unpaired, drawing, pending, enabled, 0U, 0U, 0U};
+        for (std::size_t index = 0; index < count; ++index) {
+            const MacCausalRow& row = rows[index];
+            output[index + 1U] = {static_cast<std::uint64_t>(row.kind), row.time_ns,
+                row.arm, row.desired_ns, row.delay_ns, row.wake, row.poll, row.fired,
+                row.next_ns, row.linked_poll, row.draw, row.pending, row.flags};
+        }
+        return output;
+    }
+};
+
+class MacCausalWakeScope final {
+public:
+    explicit MacCausalWakeScope(MacCausalTrace& trace) noexcept
+        : trace_(trace), previous_wake_(trace.active_wake) {
+        if (trace_.enabled) trace_.record_wake(gui_forms::FrameClock::now());
+    }
+    ~MacCausalWakeScope() { trace_.active_wake = previous_wake_; }
+    MacCausalWakeScope(const MacCausalWakeScope&) = delete;
+    MacCausalWakeScope& operator=(const MacCausalWakeScope&) = delete;
+private:
+    MacCausalTrace& trace_; // View-owned trace outlives this callback scope.
+    const std::uint64_t previous_wake_;
+};
+
 // Private opt-in diagnostics. Array layout is shared only with the native test:
 // draw calls/ns, collect calls/ns, clock failures, overlapping scopes, saturation,
 // extent mismatches, first/last draw wall ns, min/max draw gap ns, draw count.
@@ -594,6 +805,7 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     MacPaintPhase _cgDrawPhase;
     MacPaintPhase _cgReleasePhase;
     MacCpuAttribution _cpuAttribution;
+    std::unique_ptr<MacCausalTrace> _causalTrace;
     double _lastNativeDirtyArea;
     double _lastFrameDamageBoundsArea;
     double _lastCGDestinationArea;
@@ -641,6 +853,7 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 - (std::string)hostJSON;
 - (BOOL)setCpuAttributionEnabled:(const BOOL)enabled;
 - (std::array<std::uint64_t, 13>)cpuAttributionSnapshot;
+- (MacCausalSnapshot)cpuCausalTraceSnapshot;
 - (NSRect)accessibilityFrameForSemanticBounds:(GFRect)bounds;
 - (BOOL)performSemanticAction:(SemanticAction)action
                      stableId:(NSString*)stableId
@@ -950,6 +1163,7 @@ private:
         _cgDrawPhase = {};
         _cgReleasePhase = {};
         _cpuAttribution = {};
+        _causalTrace = nullptr;
         _lastNativeDirtyArea = 0.0;
         _lastFrameDamageBoundsArea = 0.0;
         _lastCGDestinationArea = 0.0;
@@ -1391,8 +1605,11 @@ private:
         if (!_model) {
             return;
         }
-        static_cast<void>(
-            (*_model).poll_frame_schedule(std::chrono::steady_clock::now()));
+        const gui_forms::FrameTime pollTime = std::chrono::steady_clock::now();
+        const gui_forms::FramePollResult pollResult = (*_model).poll_frame_schedule(pollTime);
+        if (_causalTrace && (*_causalTrace).enabled) {
+            (*_causalTrace).record_poll(pollTime, pollResult.deadlines_fired, pollResult.next_wake);
+        }
         const std::uint64_t semanticGeneration = (*_model).semantic_generation();
         if (semanticGeneration != _lastSemanticGeneration) {
             _lastSemanticGeneration = semanticGeneration;
@@ -1488,6 +1705,9 @@ private:
     }
     const std::optional<gui_forms::FrameTime> wake = (*_model).next_wake();
     if (!wake) {
+        if (_causalTrace && (*_causalTrace).enabled) {
+            (*_causalTrace).record_arm(gui_forms::FrameClock::now(), wake, 0);
+        }
         dispatch_source_set_timer(_wakeSource, DISPATCH_TIME_FOREVER,
                                   DISPATCH_TIME_FOREVER, 0);
         return;
@@ -1504,9 +1724,14 @@ private:
         dispatch_time(DISPATCH_TIME_NOW, static_cast<std::int64_t>(nanoseconds)),
         DISPATCH_TIME_FOREVER,
         static_cast<std::uint64_t>(std::chrono::microseconds(250).count() * 1000));
+    if (_causalTrace && (*_causalTrace).enabled) {
+        (*_causalTrace).record_arm(now, wake, static_cast<std::int64_t>(nanoseconds));
+    }
 }
 
 - (void)scheduledWake {
+    std::optional<MacCausalWakeScope> causalScope{};
+    if (_causalTrace && (*_causalTrace).enabled) causalScope.emplace(*_causalTrace);
     ++_scheduledWakeCount;
     // Objective-C exceptions do not participate in C++ exception handling.
     // A raised AppKit exception escaping a libdispatch source terminates the
@@ -1622,6 +1847,7 @@ private:
     if (_cpuAttribution.enabled) cpuScope.emplace(_cpuAttribution, 0U);
     const std::chrono::steady_clock::time_point started =
         std::chrono::steady_clock::now();
+    if (_causalTrace && (*_causalTrace).enabled) (*_causalTrace).record_draw_entry(started);
     const double scale = self.window == nil ? 1.0 : self.window.backingScaleFactor;
     const GFSize logicalSize{self.bounds.size.width, self.bounds.size.height};
     _lastNativeDirtyArea = std::max(0.0, dirtyRect.size.width) *
@@ -1745,6 +1971,9 @@ private:
             _lastCGDestinationArea, _lastCGClipBoundsArea};
         const std::uint64_t wallNs = host_now_nanoseconds();
         _cpuAttribution.record_draw(wallNs, extents, _lastCGSourceBytes);
+    }
+    if (_causalTrace && (*_causalTrace).enabled) {
+        (*_causalTrace).record_draw_exit(gui_forms::FrameClock::now());
     }
 }
 
@@ -1972,13 +2201,25 @@ private:
 
 - (BOOL)setCpuAttributionEnabled:(const BOOL)enabled {
     if (![NSThread isMainThread] || _cpuAttribution.active) return NO;
-    if (enabled == YES) _cpuAttribution = {};
+    if (enabled == YES) {
+        std::unique_ptr<MacCausalTrace> replacement = std::make_unique<MacCausalTrace>();
+        (*replacement).enabled = true;
+        if (_model) (*replacement).seed((*_model).next_wake());
+        _causalTrace = std::move(replacement);
+        _cpuAttribution = {};
+    } else if (_causalTrace) (*_causalTrace).enabled = false;
     _cpuAttribution.enabled = enabled == YES;
     return YES;
 }
 
 - (std::array<std::uint64_t, 13>)cpuAttributionSnapshot {
     return _cpuAttribution.values;
+}
+
+- (MacCausalSnapshot)cpuCausalTraceSnapshot {
+    MacCausalSnapshot result{};
+    if (_causalTrace) result = (*_causalTrace).snapshot();
+    return result;
 }
 
 - (std::string)hostJSON {
