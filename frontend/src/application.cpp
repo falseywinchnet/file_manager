@@ -751,6 +751,11 @@ void Application::install_dynamic_controls() {
 
     preview_picture_ = std::make_shared<gui_forms::PictureBox>(
         gui_forms::StableId("fm.inspector.preview.image"));
+    // The authored preview surface paints in the control plane. PictureBox
+    // inherits Panel's backplane default, which would put its image beneath
+    // that opaque parent surface during the window's ordered plane replay.
+    (*preview_picture_).set_paint_plane(gui_forms::PaintPlane::control);
+    (*preview_picture_).set_background(gui_forms::Color::rgba(0, 0, 0, 0));
     (*preview_picture_).set_requested_bounds({0, 0, 194, 112});
     (*preview_picture_).set_size_mode(gui_forms::PictureBoxSizeMode::zoom);
     (*preview_picture_).set_accessible_name("Selected image preview");

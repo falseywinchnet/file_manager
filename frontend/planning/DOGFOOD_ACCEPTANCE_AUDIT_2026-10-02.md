@@ -156,7 +156,7 @@ the committed native CI build is the clean verification authority for the
 separately committed preview/label changes. No shared development SDK was
 exported as part of this repair.
 
-## macOS application pixel regression — implementation awaiting native run
+## macOS application pixel regression — native PNG failure reproduced
 
 `tests/macos_preview_tests.mm` constructs the actual File Manager Application,
 starts the public macOS host and selects generated ordinary UTF-8 TXT, a known
@@ -191,7 +191,48 @@ constrained its requested 1340×850 window to the runner's 1024×674 content vie
 This is a harness failure, not proof that the shipped app loses fonts or that
 the owner's bug has been reproduced. The corrected test uses an app bundle with
 the same installed font resources and invokes the ordinary Properties command
-and, if needed, Show preview. That corrected native run remains pending.
+and, if needed, Show preview.
+
+**MEASURED corrected run:** native CI `36976907755`, source `eda1556`,
+successfully compiled and painted the selected TXT fixture (1,078 readable
+pixels). It then timed out at the PNG stage. The retained native screenshot
+shows a visible dark preview, loaded-image caption and no cyan image. The
+host reports no native callback faults. This reproduces a native image-preview
+failure; a valid resource ID and direct control draw-command test were
+insufficient acceptance evidence. It does not yet identify whether layout,
+retained replay or native decoding/presentation is responsible. The owner's
+multi-format report remains open.
+
+The next diagnostic source `cc2fa2b` also retains the public visual-inspection
+JSON on failure. The renderer-neutral application regression now requires
+the selected image to appear during full-window retained replay and its
+control to remain inside the preview surface. This local check passes, so
+it is a narrower control-path check rather than evidence that macOS is fixed.
+
+**OBSERVED root cause, native CI `36978072697`, source `cc2fa2b`:** the
+retained JSON shows `fm.inspector.preview.image` visible, unclipped, at
+782,312 with size 194×112 and a current image draw command. Its plane is
+`backplane`, inherited from Panel. The authored opaque preview surface is in
+the later `control` plane. Window replays the whole tree by plane, so the
+parent surface covers the image. The absence of PictureBox's white background
+in the screenshot is consistent with this ordering, not just decoder failure.
+
+The frontend now assigns its preview PictureBox to the control plane and gives
+it a transparent background so the authored dark surface remains the backing.
+It leaves the generic Panel/PictureBox contract unchanged. The regression
+primes retained chunks with the TXT selection, then checks that full-window
+replay draws the selected PNG *after* the opaque preview fill. This assertion
+fails against the previous frontend (0.97-second failing test run); a draw-count
+assertion alone had passed. Native pixel confirmation of the repair is pending.
+
+**MEASURED repaired Windows Release frontend:** all 12 tests pass in 2.83
+seconds, including the previously failing replay-order assertion. Source
+review covers the two preview configuration statements, explanatory layering
+comment, scalar-only recording-painter order state and the TXT-to-PNG replay
+fixture. The new observer adds no allocations or retained borrows; types and
+initial state are explicit, and counter updates precede publication of the
+observed order. The two changed C++ files have zero spelling candidates.
+This scope does not certify the generic painter or the rest of the application.
 
 ## Obsolete preview work retirement
 
