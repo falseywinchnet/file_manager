@@ -45,16 +45,33 @@ bool ascii_letter(std::uint8_t value) noexcept {
             value <= static_cast<std::uint8_t>('z'));
 }
 
-std::uint32_t crc32(std::span<const std::byte> bytes) noexcept {
+// PNG uses the reflected CRC-32 polynomial. The immutable 1 KiB table moves
+// eight bit steps per input byte to compile time; no mutable shared scratch or
+// platform-specific instruction is involved.
+constexpr std::array<std::uint32_t, 256> make_crc32_table() noexcept {
+    std::array<std::uint32_t, 256> table{};
+    for (std::size_t index = 0U; index < table.size(); ++index) {
+        std::uint32_t remainder = static_cast<std::uint32_t>(index);
+        for (unsigned int bit = 0U; bit < 8U; ++bit) {
+            const std::uint32_t mask = 0U - (remainder & 1U);
+            remainder = (remainder >> 1U) ^ (0xedb88320U & mask);
+        }
+        table[index] = remainder;
+    }
+    return table;
+}
+
+constexpr std::array<std::uint32_t, 256> crc32_table = make_crc32_table();
+
+std::uint32_t crc32(const std::span<const std::byte> bytes) noexcept {
     std::uint32_t crc = 0xffffffffU;
     for (const std::byte value : bytes) {
-        crc ^= std::to_integer<std::uint8_t>(value);
-        for (unsigned bit = 0; bit < 8; ++bit) {
-            const std::uint32_t mask = 0U - (crc & 1U);
-            crc = (crc >> 1U) ^ (0xedb88320U & mask);
-        }
+        const std::uint32_t byte = std::to_integer<std::uint8_t>(value);
+        const std::size_t index = static_cast<std::size_t>((crc ^ byte) & 0xffU);
+        crc = (crc >> 8U) ^ crc32_table[index];
     }
-    return crc ^ 0xffffffffU;
+    const std::uint32_t result = crc ^ 0xffffffffU;
+    return result;
 }
 
 std::uint64_t hash_bytes(std::span<const std::byte> bytes) noexcept {
