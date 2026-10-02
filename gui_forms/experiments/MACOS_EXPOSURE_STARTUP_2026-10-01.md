@@ -43,3 +43,62 @@ The optional focused-CPU workflow step now records an attempt even when another
 native test failed. Its runner reports a missing executable if compilation did
 not finish. A diagnostic result cannot turn a failed SDK job into a passing one;
 this separates measurement availability from unrelated regression acceptance.
+
+## Deferred continuation lifetime correction
+
+**OBSERVED:** run 36948765463 at `be0ed41`, Mac job 110656819770,
+compiled the exposure fixture but aborted its execution after 1.95 seconds with
+uncaught `std::bad_function_call`. The retained log is
+`.build/provider-be0ed41-evidence/macos-job.log`, lines 1358–1360. The log has no
+stack trace; it does not by itself identify the throwing call.
+
+**OBSERVED source defect:** `check_initial_frame` owned a heap `shared_ptr<State>`
+holder and passed a reference to it into `exercise`. Nested Objective-C blocks
+captured that C++ reference, not an independently owned shared pointer. The holder
+was deleted when the initial callback returned. The later restore/hide/show
+blocks therefore borrowed a dead holder even though `main` still owned `State`.
+The earlier startup review covered the initial callback but missed that its
+reference escaped into the unchanged block chain. This corrects that review's
+scope limitation; a surviving pointee does not make a destroyed owning handle a
+valid borrow.
+
+**MEASURED language-mechanism check:** local MSYS2 Clang 22.1.8 compiled a minimal
+`const State&` parameter captured by a block with
+`-x c++ -std=c++20 -fblocks -S -emit-llvm -o - -`. The emitted block stores the
+referent pointer and invokes through that pointer, with no referent copy. This
+confirms the reference-capture mechanism, not an AppKit execution result.
+**HYPOTHESIS:** the dangling handle caused the observed callback exception. Native
+rerun remains necessary to confirm that this fix resolves the CI failure.
+
+The correction replaces all four nested blocks with named `dispatch_after_f`
+stages. Each `ExposureStep` owns its own `shared_ptr<State>` and stage value;
+the callback adopts the heap context immediately, and any successor copies its
+state owner before the current context dies. Only one successor is queued.
+Window/view borrows are reacquired by the existing fixture title at each native
+stage and do not cross dispatch boundaries. A missing native window/view fails
+the fixture. The five-second actual-paint readiness deadline, 50 ms readiness
+poll, 150/250/50/100 ms transition delays, pixel comparisons and no-repaint
+assertion remain intact. No product host, CMake, font, CPU or renderer changes
+belong to this correction.
+
+**MEASURED portable ownership validation:** on Shadow Windows, GCC 16.2.0 built
+`.build/macos-exposure-context-check.cpp` with C++20 and
+`-Wall -Wextra -Werror`; its executable returned 0. The harness extracts the
+actual stage/context declarations, queue helper and dispatch callback from the
+fixture, substitutes a deterministic queue/native-stage stand-in, drops the
+original owner before dispatch, and checks all five invocations survive, one
+successor owns state between invocations, close runs once and final ownership
+expires. It does not compile Objective-C++ or validate AppKit pixels/timing.
+
+Manual source review against the complete `planning/PROGRAMMING_HOUSE_STYLE.md`
+covers the added stage/context declarations, queue helper, extracted window
+lookup, changed scheduling sites and named continuation/dispatch functions.
+Types and read-only inputs are explicit; state fields initialize before dispatch;
+shared ownership transfers/copies and native borrow extents are visible; no
+anonymous executable blocks remain in this fixture. Allocation occurs once per
+scheduled stage, outside pixel work, with at most the executing context and one
+successor live. Existing exception handling records failure and invokes the
+host-supplied close callable. No remaining violations were identified in this
+authored scope; unchanged paint/pixel helpers and unrelated legacy source are not
+certified. `git diff --check` passes. Full native compilation and execution remain
+pending coordinator CI, separately from root's font-bundle provisioning work.
