@@ -4,6 +4,8 @@
 #include <iostream>
 #include <functional>
 #include <string>
+#include <chrono>
+#include <memory>
 
 // Exercise the host's native callback ordering without adding testing APIs to
 // the public C++ surface. AppKit can request a snapshot before unocclusion.
@@ -27,7 +29,29 @@ struct State {
     std::function<void()> close;
     std::string failure;
     bool completed{};
+    std::chrono::steady_clock::time_point initial_deadline{};
+    unsigned initial_checks{0};
 };
+void exercise(const std::shared_ptr<State>& state);
+void check_initial_frame(void* const context) {
+    // The queued callback owns its state, but never retains a native view borrow.
+    const std::unique_ptr<std::shared_ptr<State>> retained(
+        static_cast<std::shared_ptr<State>*>(context));
+    const std::shared_ptr<State>& state = *retained;
+    try {
+        exercise(state);
+    } catch (const std::exception& error) {
+        (*state).failure = error.what();
+        (*state).close();
+    }
+}
+void queue_initial_check(const std::shared_ptr<State>& state) {
+    std::unique_ptr<std::shared_ptr<State>> retained =
+        std::make_unique<std::shared_ptr<State>>(state);
+    const dispatch_time_t deadline = dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC);
+    void* const context = retained.release();
+    dispatch_after_f(deadline, dispatch_get_main_queue(), context, check_initial_frame);
+}
 bool has_retained_pixels(NSView* view) {
     static NSColor* reference = nil;
     NSBitmapImageRep* bitmap = [view bitmapImageRepForCachingDisplayInRect:view.bounds];
@@ -52,8 +76,20 @@ void exercise(const std::shared_ptr<State>& state) {
             break;
         }
     }
-    if (window == nil || !has_retained_pixels(window.contentView)) {
+    ++(*state).initial_checks;
+    // host_ready publishes services before showing the window. A fixed 100 ms
+    // delay does not establish first-paint readiness on a shared native runner.
+    // Wait for actual application painting; do not force it via the snapshot.
+    const bool ready_for_snapshot = window != nil && window.isVisible &&
+        (*(*state).root).paints > 0;
+    if (!ready_for_snapshot && std::chrono::steady_clock::now() < (*state).initial_deadline) {
+        queue_initial_check(state);
+        return;
+    }
+    if (!ready_for_snapshot || !has_retained_pixels(window.contentView)) {
         (*state).failure = "initial native frame was not painted";
+        std::cerr << "Initial readiness checks=" << (*state).initial_checks
+                  << " application_paints=" << (*(*state).root).paints << '\n';
         (*state).close();
         return;
     }
@@ -94,9 +130,8 @@ void ready(const std::shared_ptr<State>& state, std::function<void()>, std::func
            std::function<void()>, std::function<gui_forms::HostClipboardTextResult()>,
            std::function<gui_forms::HostServiceStatus(std::string_view)>) {
     (*state).close = std::move(close);
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 100 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-        exercise(state);
-    });
+    (*state).initial_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    queue_initial_check(state);
 }
 }
 int main() {
