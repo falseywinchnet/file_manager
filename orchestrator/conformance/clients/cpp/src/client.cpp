@@ -1,4 +1,5 @@
 #include "fileman_orchestrator/client.hpp"
+#include "search_projection.hpp"
 
 #include <utility>
 
@@ -863,7 +864,76 @@ std::vector<AvailabilityInfo> parse_availability(const JsonValue& value) {
     return output;
 }
 
+std::optional<std::vector<std::string>> optional_string_list(
+    const JsonValue::Object& record, const std::string_view name) {
+    const JsonValue::Object::const_iterator found = record.find(name);
+    if (found == record.end() || std::holds_alternative<std::nullptr_t>((*found).second.value)) {
+        return std::nullopt;
+    }
+    const JsonValue::Array& values = array((*found).second, name);
+    std::optional<std::vector<std::string>> result{std::in_place};
+    (*result).reserve(values.size());
+    for (const JsonValue& value : values) {
+        (*result).push_back(string(value, name));
+    }
+    return result;
+}
+
 }  // namespace
+
+SearchPageInfo detail::project_search_response(
+    const std::string_view response, const std::string_view expected_id) {
+    ParsedResponse parsed = parse_search_response(response, expected_id);
+    const JsonValue::Object& result = object(parsed.result(), "search result");
+    const JsonValue::Object& response_root = object(parsed.root, "search response");
+    SearchPageInfo page{
+        string(field(response_root, "status"), "search.status"),
+        string(field(result, "source"), "search.source"),
+        boolean(field(result, "complete"), "search.complete"),
+        std::nullopt,
+        std::nullopt,
+        {},
+        {},
+        {},
+    };
+    if (const JsonValue::Object::const_iterator generation = result.find("generation"); generation != result.end()) {
+        page.generation = optional_unsigned_integer((*generation).second,
+                                                    "search.generation");
+    }
+    if (const JsonValue::Object::const_iterator cursor = result.find("cursor"); cursor != result.end() &&
+        !std::holds_alternative<std::nullptr_t>((*cursor).second.value)) {
+        const JsonValue::Object& cursor_object = object((*cursor).second, "search.cursor");
+        page.cursor = SearchCursorInfo{
+            string(field(cursor_object, "source"), "search.cursor.source"),
+            string(field(cursor_object, "value"), "search.cursor.value")};
+    }
+    page.coverage.stale_roots = optional_string_list(result, "stale_roots");
+    page.coverage.unavailable_roots = optional_string_list(result, "unavailable_roots");
+    page.coverage.unavailable_paths = optional_string_list(result, "unavailable_paths");
+    page.coverage.warnings = optional_string_list(result, "warnings");
+    const JsonValue::Object::const_iterator scan = result.find("scan_id");
+    if (scan != result.end()) {
+        page.coverage.scan_id = optional_string((*scan).second, "search.scan_id");
+    }
+    const JsonValue::Array& records = array(field(result, "results"), "search.results");
+    page.results.reserve(records.size());
+    page.names.reserve(records.size());
+    for (const JsonValue& item : records) {
+        const JsonValue::Object& record = object(item, "search result record");
+        const JsonValue::Object& metadata = object(field(record, "metadata"), "search result metadata");
+        const JsonValue::Object& object_record = object(field(record, "object"), "search result object");
+        SearchResultInfo projected{
+            string(field(metadata, "name"), "search result name"),
+            string(field(object_record, "path"), "search result path"),
+            string(field(metadata, "kind"), "search result kind"),
+            unsigned_integer(field(metadata, "size"), "search result size"),
+            boolean(field(record, "unavailable"), "search result unavailable"),
+        };
+        page.names.push_back(projected.name);
+        page.results.push_back(std::move(projected));
+    }
+    return page;
+}
 
 Client::Client(const std::intptr_t socket, SessionInfo session) noexcept
     : socket_(socket), session_(std::move(session)) {}
@@ -1172,43 +1242,8 @@ SearchPageInfo Client::search_subtree(
                         "\"max_stat_calls\":4096,\"max_wall_time_ms\":1000,"
                         "\"max_open_directories\":8,\"max_response_bytes\":131072}}";
     const std::string response = call("orchestrator.search", "ORC-FE-001", 1, 0, params, true);
-    ParsedResponse parsed = parse_search_response(response, "cpp-" + std::to_string(next_request_id_ - 1));
-    const JsonValue::Object& result = object(parsed.result(), "search result");
-    const JsonValue::Object& response_root = object(parsed.root, "search response");
-    SearchPageInfo page{
-        string(field(response_root, "status"), "search.status"),
-        string(field(result, "source"), "search.source"),
-        boolean(field(result, "complete"), "search.complete"),
-        std::nullopt,
-        std::nullopt,
-        {},
-        {},
-    };
-    if (const JsonValue::Object::const_iterator generation = result.find("generation"); generation != result.end()) {
-        page.generation = optional_unsigned_integer((*generation).second,
-                                                    "search.generation");
-    }
-    if (const JsonValue::Object::const_iterator cursor = result.find("cursor"); cursor != result.end() &&
-        !std::holds_alternative<std::nullptr_t>((*cursor).second.value)) {
-        const JsonValue::Object& cursor_object = object((*cursor).second, "search.cursor");
-        page.cursor = SearchCursorInfo{
-            string(field(cursor_object, "source"), "search.cursor.source"),
-            string(field(cursor_object, "value"), "search.cursor.value")};
-    }
-    for (const JsonValue& item : array(field(result, "results"), "search.results")) {
-        const JsonValue::Object& record = object(item, "search result record");
-        const JsonValue::Object& metadata = object(field(record, "metadata"), "search result metadata");
-        const JsonValue::Object& object_record = object(field(record, "object"), "search result object");
-        SearchResultInfo projected{
-            string(field(metadata, "name"), "search result name"),
-            string(field(object_record, "path"), "search result path"),
-            string(field(metadata, "kind"), "search result kind"),
-            unsigned_integer(field(metadata, "size"), "search result size"),
-            boolean(field(record, "unavailable"), "search result unavailable"),
-        };
-        page.names.push_back(projected.name);
-        page.results.push_back(std::move(projected));
-    }
+    SearchPageInfo page = detail::project_search_response(
+        response, "cpp-" + std::to_string(next_request_id_ - 1));
     return page;
 }
 
