@@ -85,8 +85,11 @@ The added interaction case verifies current/replacement eligibility, superseded
 ordinary and criteria jobs producing no queued replies, and shutdown revocation.
 It does not instrument the transport's connection count or inject cancellation
 mid-connection/query; those boundaries were source reviewed. Existing installed
-provider probes remain separate integration checks. Native matrices for this
-follow-up are pending; it is excluded from `v0.001-alpha.0873f9c`.
+provider probes remain separate integration checks. Both native matrices
+36994098674 and 36994102785 passed at 6009dd7. PR8 rebase-merged as
+8f84952ad8ac86fb1ad43124a9f3ac38c931a501, with matching source tree
+468cb119b5b4f609e100ff70bea28cc13392b4b8. It remains excluded from the already
+published `v0.001-alpha.0873f9c` archive.
 
 **House-style source review:** SearchCancelled declaration/definition, the
 changed SearchWork/CriteriaWork bodies, named test-probe methods and the new
@@ -94,6 +97,25 @@ interaction case. Explicit types/initialized state, owned job lifetime, atomic
 observations, synchronous operation order, failure retirement and no added
 per-result work were reviewed. The changed-scope spelling scanner reports zero
 findings in three files; that is not a certification of unrelated legacy code.
+
+## Search page publication follow-up — 2026-10-02
+
+The next source moves route/identity/metadata observation and display formatting
+to owned worker preparation. UI publication keeps supersession, deduplication,
+selection and provenance. On six alternating generated Windows comparison
+pairs, 500-result UI apply p50/p95 fell from 41.259/52.063 ms to 2.593/4.326 ms;
+100-result p50/p95 fell from 7.484/12.794 to 0.413/0.712 ms. Preparation still
+performs the filesystem work outside the UI; this is not an end-to-end speedup.
+Local 12/12 tests pass, including cancellation, native facts, path refusal and
+ownership checks. New native integration remains pending. Source review,
+workload, raw measurements, limits and the initial test-fixture correction are
+recorded in `../results/2026-10-02-search-publication/README.md`.
+
+Two bounded Engine reader approaches remain **REJECTED** because legacy exact
+queries regressed. Source is restored; reconstructible patches, hashes, compiler
+and profiler evidence and raw paired observations are retained under
+`../../engine/results/`. Passing correctness/race/vet did not admit either
+candidate. Public substring semantics, identity projection and bounds remain open.
 
 ## Authority and evidence
 

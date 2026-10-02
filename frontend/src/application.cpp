@@ -6,7 +6,6 @@
 #include "house_art.hpp"
 #include "object_order.hpp"
 #include "details_projection.hpp"
-#include "native_observation.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -391,22 +390,6 @@ std::string leaf_name(const std::filesystem::path& path) {
     return name;
 }
 
-std::string search_stable_id(const std::filesystem::path& path,
-                             const ObjectIdentity& identity) {
-    constexpr std::uint64_t offset = 14695981039346656037ULL;
-    constexpr std::uint64_t prime = 1099511628211ULL;
-    std::uint64_t hash = offset;
-    for (const unsigned char value : path_generic_utf8(path)) {
-        hash ^= value;
-        hash *= prime;
-    }
-    std::ostringstream stream{};
-    stream << "engine-result-" << std::hex << identity.device << '-'
-           << identity.inode << '-' << hash;
-    const std::string result = stream.str();
-    return result;
-}
-
 std::string breadcrumb_stable_id(const std::filesystem::path& path) {
     constexpr std::uint64_t offset = 14695981039346656037ULL;
     constexpr std::uint64_t prime = 1099511628211ULL;
@@ -420,47 +403,6 @@ std::string breadcrumb_stable_id(const std::filesystem::path& path) {
            << std::setfill('0') << hash;
     const std::string result = stream.str();
     return result;
-}
-
-EntryKind observed_entry_kind(const std::filesystem::file_type type,
-                            const std::filesystem::path& path) {
-    if (type == std::filesystem::file_type::directory) return EntryKind::folder;
-    if (type == std::filesystem::file_type::symlink) return EntryKind::symlink;
-    if (type != std::filesystem::file_type::regular) return EntryKind::other;
-    std::string extension = path_utf8(path.extension());
-    std::transform(extension.begin(), extension.end(), extension.begin(),
-                   lowercase_byte);
-    if (extension == ".png" || extension == ".jpg" || extension == ".jpeg" ||
-        extension == ".gif" || extension == ".webp") return EntryKind::image;
-    if (extension == ".zip" || extension == ".tar" || extension == ".gz" ||
-        extension == ".7z") return EntryKind::archive;
-    if (extension == ".mp3" || extension == ".wav" || extension == ".flac") {
-        return EntryKind::audio;
-    }
-    if (extension == ".cpp" || extension == ".hpp" || extension == ".c" ||
-        extension == ".h" || extension == ".go" || extension == ".rs" ||
-        extension == ".py" || extension == ".html" || extension == ".css") {
-        return EntryKind::code;
-    }
-    return EntryKind::document;
-}
-
-DirectoryEntry observed_search_entry(const std::string& stable_id,
-    const std::filesystem::path& path, const NativeObjectObservation& observed) {
-    DirectoryEntry entry{};
-    entry.stable_id = stable_id;
-    entry.path = path;
-    entry.name = path_utf8(path.filename());
-    entry.identity = observed.identity;
-    entry.metadata = observed.facts;
-    entry.kind = observed_entry_kind(entry.identity.type, path);
-    entry.directory = entry.kind == EntryKind::folder;
-    if (entry.directory) entry.secondary_text = "Folder";
-    else if (entry.metadata.logical_size) entry.secondary_text = format_bytes(*entry.metadata.logical_size);
-    else if (entry.kind == EntryKind::symlink) entry.secondary_text = "Symbolic link · not followed";
-    else entry.secondary_text = "Unavailable";
-    entry.modified_text = entry.metadata.modified ? format_modified_time(*entry.metadata.modified) : "Unavailable";
-    return entry;
 }
 
 std::string setting_title(std::string_view id) {
@@ -3854,11 +3796,12 @@ void Application::request_engine_search(const bool next_page) {
 }
 
 void Application::apply_engine_criteria(
-    fileman::orchestrator::SearchPageInfo page,
+    PreparedSearchPage prepared,
     std::vector<fileman::orchestrator::SearchExactFilter>,
     const std::uint64_t generation,
     const bool append) {
-    if (generation != search_generation_.load() || !criteria_showing_) return;
+    if (prepared.cancelled || stopping_.load() || generation != search_generation_.load() || !criteria_showing_) return;
+    fileman::orchestrator::SearchPageInfo& page = prepared.page;
     criteria_loading_ = false;
     if (page.source != "catalogue") {
         criteria_cursor_.reset();
@@ -3874,31 +3817,14 @@ void Application::apply_engine_criteria(
     }
     const std::vector<std::string> previous_selection(
         (*objects_).selected_ids().begin(), (*objects_).selected_ids().end());
-    std::size_t rejected{};
+    const std::size_t rejected = prepared.rejected;
     std::size_t duplicate{};
-    for (const fileman::orchestrator::SearchResultInfo& result : page.results) {
-        std::filesystem::path path = result.path.lexically_normal();
-        if (!path_is_within(protected_root_, path)) {
-            const std::optional<std::filesystem::path> rebased = rebase_path_from_equivalent_root(
-                protected_root_, path);
-            if (rebased) path = *rebased;
-        }
-        if (result.unavailable || !path_is_within(protected_root_, path) ||
-            path_route_has_symlink(protected_root_, path.parent_path())) {
-            ++rejected;
-            continue;
-        }
-        const NativeObjectObservation observed = observe_native_object(path);
-        if (observed.error || !observed.identity.available()) {
-            ++rejected;
-            continue;
-        }
-        const std::string stable_id = search_stable_id(path, observed.identity);
+    for (DirectoryEntry& entry : prepared.entries) {
+        const std::string stable_id = entry.stable_id;
         if (entries_.contains(stable_id)) {
             ++duplicate;
             continue;
         }
-        DirectoryEntry entry = observed_search_entry(stable_id, path, observed);
         entries_.emplace(stable_id, std::move(entry));
         search_order_.push_back(stable_id);
     }
@@ -3973,12 +3899,13 @@ void Application::apply_engine_criteria(
 }
 
 void Application::apply_engine_search(
-    fileman::orchestrator::SearchPageInfo page,
+    PreparedSearchPage prepared,
     std::string query,
     const std::uint64_t generation,
     const bool append) {
-    if (generation != search_generation_.load() ||
+    if (prepared.cancelled || stopping_.load() || generation != search_generation_.load() ||
         std::string((*search_box_).text()) != query) return;
+    fileman::orchestrator::SearchPageInfo& page = prepared.page;
     search_loading_ = false;
     search_showing_ = true;
     if (!append) {
@@ -3987,31 +3914,14 @@ void Application::apply_engine_search(
     }
     const std::vector<std::string> previous_selection(
         (*objects_).selected_ids().begin(), (*objects_).selected_ids().end());
-    std::size_t rejected{};
+    const std::size_t rejected = prepared.rejected;
     std::size_t duplicate{};
-    for (const fileman::orchestrator::SearchResultInfo& result : page.results) {
-        std::filesystem::path path = result.path.lexically_normal();
-        if (!path_is_within(protected_root_, path)) {
-            const std::optional<std::filesystem::path> rebased = rebase_path_from_equivalent_root(
-                protected_root_, path);
-            if (rebased) path = *rebased;
-        }
-        if (result.unavailable || !path_is_within(protected_root_, path) ||
-            path_route_has_symlink(protected_root_, path.parent_path())) {
-            ++rejected;
-            continue;
-        }
-        const NativeObjectObservation observed = observe_native_object(path);
-        if (observed.error || !observed.identity.available()) {
-            ++rejected;
-            continue;
-        }
-        const std::string stable_id = search_stable_id(path, observed.identity);
+    for (DirectoryEntry& entry : prepared.entries) {
+        const std::string stable_id = entry.stable_id;
         if (entries_.contains(stable_id)) {
             ++duplicate;
             continue;
         }
-        DirectoryEntry entry = observed_search_entry(stable_id, path, observed);
         entries_.emplace(stable_id, std::move(entry));
         search_order_.push_back(stable_id);
     }
@@ -4045,10 +3955,10 @@ void Application::apply_engine_search(
             entry.name,
             relative_path,
             kind_text(entry) + " · " + entry.secondary_text,
-            "No content claim. Match is from exact local name or path data.",
+            "No content claim. Provider matched local name or path data.",
             page.source == "catalogue" ? "CATALOGUE" : "LIVE",
             "LOCAL EVIDENCE",
-            {evidence_source, "Exact filesystem identity"},
+            {evidence_source, "Filesystem observation"},
             generation_detail,
             object_glyph(entry.kind),
             true,

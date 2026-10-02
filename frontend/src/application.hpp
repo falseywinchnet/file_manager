@@ -7,6 +7,7 @@
 #include "file_manager/checksum.hpp"
 #include "file_manager/platform_commands.hpp"
 #include "file_manager/preview.hpp"
+#include "search_preparation.hpp"
 #include "file_manager_sapphire.gui_tree.wf.hpp"
 #include "fileman_orchestrator/client.hpp"
 
@@ -295,12 +296,12 @@ private:
     criteria_filters();
     void request_engine_criteria(bool next_page = false);
     void apply_engine_criteria(
-        fileman::orchestrator::SearchPageInfo page,
+        PreparedSearchPage prepared,
         std::vector<fileman::orchestrator::SearchExactFilter> filters,
         std::uint64_t generation,
         bool append);
     void request_engine_search(bool next_page = false);
-    void apply_engine_search(fileman::orchestrator::SearchPageInfo page,
+    void apply_engine_search(PreparedSearchPage prepared,
                              std::string query,
                              std::uint64_t generation,
                              bool append);
