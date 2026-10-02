@@ -1454,6 +1454,47 @@ void test_details_transaction_and_identity() {
     require(offscreen_context, "offscreen semantic action must safely reveal its item");
 }
 
+void test_details_scroll_fills_available_page() {
+    const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.full-page"));
+    ObjectView& view = *owner;
+    view.set_requested_bounds({0.0, 0.0, 400.0, 300.0});
+    view.set_view_mode(ObjectViewMode::details);
+    view.set_details_model(details_test_columns(), details_test_items(3U));
+    Window window(owner, {400.0, 300.0});
+    window.flush();
+    std::vector<ObjectViewItem> reversed = details_test_items(3U);
+    std::reverse(reversed.begin(), reversed.end());
+    view.set_details_model(details_test_columns(), std::move(reversed));
+    require(view.top_row() == 0U,
+        "sorting a short folder must not strand the old first identity at the bottom of an empty page");
+    view.set_top_row(2U);
+    require(view.top_row() == 0U, "scrolling a short folder must retain the full page");
+    view.set_details_model(details_test_columns(), details_test_items(30U));
+    view.set_top_row(29U);
+    const std::size_t before_growth = view.top_row();
+    require(before_growth > 0U && before_growth < 29U, "long folders must fill their final page");
+    window.resize({400.0, 600.0});
+    window.flush();
+    require(view.top_row() < before_growth, "growing the viewport must expose earlier rows to fill it");
+    view.set_details_model(details_test_columns(), details_test_items(3U));
+    require(view.top_row() == 0U, "shrinking the model must retire an obsolete scroll offset");
+    view.set_details_row_height(28.0);
+    window.resize({400.0, 102.0});
+    window.flush();
+    window.request_focus(owner);
+    static_cast<void>(window.dispatch_key({KeyAction::down, PhysicalKey::home}));
+    static_cast<void>(window.dispatch_key({KeyAction::down, PhysicalKey::down}));
+    const bool moved = window.dispatch_key({KeyAction::down, PhysicalKey::down});
+    std::cout << "Details fractional row: handled=" << moved << " top=" << view.top_row()
+              << " selected=" << view.selected_id() << " height=" << view.committed_arranged_bounds().height << '\n';
+    require(moved && view.top_row() == 1U && view.selected_id() == "detail.2",
+        "Down must scroll the clipped final row fully into view");
+    view.set_top_row(0U);
+    const bool ended = window.dispatch_key({KeyAction::down, PhysicalKey::end});
+    require(ended && view.top_row() == 1U,
+        "End must not treat a partial final row as fully visible");
+}
+
 void test_details_keyboard_sort_with_pending_layout() {
     const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.pending-layout"));
     ObjectView& view = *owner;
@@ -1672,6 +1713,7 @@ int main() {
         test_details_mode_release_reentrancy();
         test_details_sort_retires_capture();
         test_details_keyboard_sort_with_pending_layout();
+        test_details_scroll_fills_available_page();
         test_details_header_input_resize_and_cache();
         test_details_bounded_work();
         test_details_cold_long_text_measurement_bound();

@@ -581,6 +581,8 @@ std::unique_ptr<gui_forms::Window> Application::make_window() {
     // Image-list attachment invalidates live controls and can synchronously
     // enter installed application callbacks; publish the owning window first.
     window_ = window.get();
+    subscriptions_.push_back((*window_).presentation_changed().subscribe(
+        std::bind_front(&Application::on_details_presentation_changed, this)));
     web_forms_generated_file_manager_sapphire::bind_native_resources(
         form_, *window_);
     install_house_art();
@@ -1747,6 +1749,52 @@ void Application::publish_object_items(std::vector<gui_forms::ObjectViewItem> it
     if (columns.empty()) columns = detail::default_details_columns();
     gui_forms::ObjectDetailsSort accepted{{sort_mode_}, sort_direction_};
     (*objects_).set_details_model(std::move(columns), std::move(items), std::move(accepted));
+    fit_details_columns((*objects_).committed_arranged_bounds());
+}
+
+void Application::on_details_presentation_changed(const gui_forms::PresentationSettings&) {
+    fit_details_columns((*objects_).committed_arranged_bounds());
+}
+
+void Application::fit_details_columns(const gui_forms::Rect& bounds) {
+    if (details_widths_owned_by_user_ || bounds.width <= 8.0) return;
+    const std::span<const gui_forms::ObjectDetailsColumn> columns = (*objects_).details_columns();
+    constexpr std::array<std::string_view, 4> identities{"name", "kind", "size", "modified"};
+    constexpr std::array<double, 4> minimum{120.0, 90.0, 72.0, 132.0};
+    constexpr std::array<double, 4> preferred{260.0, 120.0, 104.0, 172.0};
+    if (columns.size() != identities.size()) return;
+    for (std::size_t index = 0U; index < identities.size(); ++index) {
+        if (columns[index].id.value != identities[index]) return;
+        if (automatic_details_widths_ && columns[index].width != (*automatic_details_widths_)[index]) {
+            details_widths_owned_by_user_ = true;
+            return;
+        }
+    }
+    const double available = (bounds.width - 8.0) / (*objects_).effective_text_scale();
+    const double fraction = std::clamp((available - 414.0) / 242.0, 0.0, 1.0);
+    std::array<double, 4> widths{};
+    for (std::size_t index = 0U; index < widths.size(); ++index) {
+        widths[index] = minimum[index] + fraction * (preferred[index] - minimum[index]);
+    }
+    widths[0] = std::min(4096.0, widths[0] + std::max(0.0, available - 656.0));
+    // Width setters invalidate retained paint; they do not publish callbacks or
+    // replace columns, so the span remains valid throughout this bounded loop.
+    try {
+        for (std::size_t index = 0U; index < widths.size(); ++index) {
+            (*objects_).set_details_column_width(columns[index].id, widths[index]);
+        }
+    } catch (...) {
+        // Retained damage allocation can fail after a setter commits its width.
+        // Keep that actual automatic state so a retry does not mistake it for
+        // manual resizing. Reading these four fields and assigning the array
+        // allocate nothing and cannot replace the original exception.
+        for (std::size_t index = 0U; index < widths.size(); ++index) {
+            widths[index] = columns[index].width;
+        }
+        automatic_details_widths_ = widths;
+        throw;
+    }
+    automatic_details_widths_ = widths;
 }
 
 void Application::apply_object_sort(std::string mode, const gui_forms::ObjectSortDirection direction) {
@@ -2501,6 +2549,8 @@ void Application::install_handlers() {
         std::bind_front(&Application::on_objects_selection_changed, this)));
     subscriptions_.push_back((*objects_).sort_requested().subscribe(
         std::bind_front(&Application::on_objects_sort_requested, this)));
+    subscriptions_.push_back((*objects_).arranged_bounds_changed().subscribe(
+        std::bind_front(&Application::fit_details_columns, this)));
     subscriptions_.push_back((*objects_).item_activated().subscribe(
         std::bind_front(&Application::on_objects_item_activated, this)));
     subscriptions_.push_back((*objects_).context_requested().subscribe(

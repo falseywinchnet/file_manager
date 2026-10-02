@@ -269,6 +269,8 @@ private:
     [[nodiscard]] std::size_t columns() const noexcept;
     [[nodiscard]] double row_height() const noexcept;
     [[nodiscard]] std::size_t visible_row_count() const noexcept;
+    [[nodiscard]] std::size_t fully_visible_row_count() const noexcept;
+    [[nodiscard]] std::size_t maximum_top_row() const noexcept;
     [[nodiscard]] Rect item_bounds(std::size_t index) const noexcept;
     [[nodiscard]] std::optional<std::size_t> index_at(Point absolute) const noexcept;
     void ensure_visible(std::size_t index);

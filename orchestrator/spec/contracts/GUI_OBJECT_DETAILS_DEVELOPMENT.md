@@ -78,8 +78,11 @@ Replacement preserves surviving selected identities, primary, independent
 focus, range anchor and top-visible identity. If primary disappears, choose the
 first surviving selected item; if none survive, clear primary. Removed focus
 clears. Removed range anchor falls back to the surviving primary. A removed
-top-visible identity clamps the previous numeric top row. View-mode changes
-map the top object to its containing icon row. These are transient toolkit
+top-visible identity clamps the previous numeric top row. Preserving an identity
+does not leave avoidable blank rows at the end: replacement, view-mode changes,
+viewport growth and explicit scrolling clamp to the last full page. A partial
+bottom row remains reachable in full. View-mode changes map the top object to
+its containing icon row before that clamp. These are transient toolkit
 rules, not permission to persist per-folder state.
 
 ## Geometry and input

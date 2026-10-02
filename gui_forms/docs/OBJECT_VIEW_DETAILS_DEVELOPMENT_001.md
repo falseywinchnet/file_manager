@@ -1,5 +1,29 @@
 # ObjectView Details development seam 001
 
+## Mac screenshot acceptance corrections — 2026-10-02
+
+The native screenshot from source `17a748f` exposed a short-folder sort that
+preserved the former top identity at its new final position, leaving two of
+three rows above an otherwise empty viewport. Replacement, mode change,
+explicit scrolling and arrange now clamp to the last full page. Selection and
+focus preserve identity; the top identity yields to filling the page. Keyboard
+visibility uses fully visible rows, separately from paint's partial-row coverage.
+Focused regressions cover three-row reverse order, explicit end offset, viewport
+growth, model shrink and Down/End with a clipped final row. The initial keyboard
+fixture set selection without moving independent focus; it was corrected to
+navigate through Home/Down before asserting the final Down result.
+
+Both renderer-neutral collection and allocation-failure suites pass after this
+change (0.41 seconds, Windows GNU 16.2 Release). The 409-failure campaign still
+covers atomic model/accepted-sort publication, not the frontend's width-fitting
+loop. Source review against the complete house style covers the new count/clamp
+methods, changed call sites, const input and focused tests: no new allocation,
+callback or borrowed-state extension occurs in the clamp. The existing pending-
+layout header fix resolves geometry before retaining revision/context and is
+covered by the pending-layout regression. Existing legacy exclusions remain.
+Native acceptance of this revision remains pending; prior green CI does not
+certify a later change.
+
 ## Consumer shortcut reconciliation — 2026-10-02
 
 The integration revision uses Alt+Shift+Left/Right for column width and body

@@ -1,6 +1,9 @@
 # Details, list, and icon presentation acceptance audit
 
-Status: **OBSERVED source audit; CANDIDATE implementation sequence; no implementation or contract freeze.**
+Status: **OBSERVED pre-change audit retained below.** Subsequent frontend and
+shared-provider development, validation and remaining acceptance gates are in
+[the Details integration receipt](DETAILS_INTEGRATION_2026-10-02.md). The old
+absence findings below describe the audited baseline, not the current source.
 
 **Subsequent authorized stage (2026-10-02):** the audit below is retained as the
 pre-change evidence. A shared GUI.Forms source implementation and focused tests
