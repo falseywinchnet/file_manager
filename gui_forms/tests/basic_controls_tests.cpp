@@ -93,7 +93,7 @@ public:
         image_destinations.push_back(destination);
         image_opacities.push_back(opacity);
     }
-    Size measure_text_utf8(std::string_view text, FontSpec font) override {
+    Size measure_text_utf8(const std::string_view text, const FontSpec font) override {
         ++text_measurements;
         measured_text_bytes += text.size();
         const Size measured = Painter::measure_text_utf8(text, font);

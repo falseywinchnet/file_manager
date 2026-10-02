@@ -320,7 +320,7 @@ void Label::set_use_mnemonic(bool value) {
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
 }
 
-Size Label::measure(Size available) {
+Size Label::measure(const Size available) {
     const Rect requested = requested_bounds();
     const std::string text = display_text();
     const FontSpec font = effective_font((*this).font());
@@ -344,8 +344,9 @@ Size Label::measure(Size available) {
     const double preferred_height = requested.height > 0.0
         ? requested.height
         : static_cast<double>(lines.size()) * line_height + 4.0;
-    return {std::min(available.width, preferred_width),
-            std::min(available.height, preferred_height)};
+    const Size measured{std::min(available.width, preferred_width),
+                        std::min(available.height, preferred_height)};
+    return measured;
 }
 
 std::string Label::display_text() const {
@@ -363,13 +364,13 @@ std::string Label::display_text() const {
     return display;
 }
 
-void Label::paint_label_text(Painter& painter, std::string_view text) const {
+void Label::paint_label_text(Painter& painter, const std::string_view text) const {
     const Rect arranged = committed_arranged_bounds();
     const FontSpec font = effective_font((*this).font());
     const TextWidthResolver resolve{PainterLabelWidth{painter, font}};
     std::vector<std::string> lines = label_lines(
         text, font, std::max(0.0, arranged.width - 4.0), text_wrapping_, resolve, maximum_lines_);
-    std::vector<ResolvedTextLayout> metrics;
+    std::vector<ResolvedTextLayout> metrics{};
     metrics.reserve(lines.size());
     double line_height{};
     for (const std::string& line : lines) {
