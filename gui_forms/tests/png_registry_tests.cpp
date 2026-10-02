@@ -99,6 +99,32 @@ std::vector<std::byte> chunk(const std::array<char, 4>& type,
     return result;
 }
 
+void chunk_checksum_matches_bitwise_oracle() {
+    const std::array<std::size_t, 8> lengths{0U, 1U, 2U, 255U, 256U, 257U, 4095U, 65536U};
+    const std::vector<std::byte> original = valid_bytes();
+    std::vector<std::byte> payload(65536U);
+    for (const unsigned int seed : {0U, 73U, 255U}) {
+        for (std::size_t index = 0U; index < payload.size(); ++index) {
+            const unsigned int byte = (static_cast<unsigned int>(index) + seed) & 0xffU;
+            payload[index] = static_cast<std::byte>(byte);
+        }
+        for (const std::size_t length : lengths) {
+            // A legal unknown ancillary chunk preserves the real image payload.
+            // chunk() uses the independent bit-at-a-time checksum oracle above.
+            const std::span<const std::byte> data(payload.data(), length);
+            const std::vector<std::byte> ancillary = chunk({'t', 'e', 'S', 't'}, data);
+            std::vector<std::byte> encoded = original;
+            encoded.insert(encoded.begin() + 33, ancillary.begin(), ancillary.end());
+            const PngValidationResult accepted = validate_png(encoded);
+            require(static_cast<bool>(accepted), "table checksum must agree with bitwise chunk oracle");
+            const std::size_t checksum_byte = 33U + 8U + length;
+            encoded[checksum_byte] ^= std::byte{1};
+            require(validate_png(encoded).error == ImageResourceError::crc_mismatch,
+                    "checksum mismatch must remain rejected for every oracle chunk length");
+        }
+    }
+}
+
 void parser_contract() {
     const std::vector<std::byte> bytes = valid_bytes();
     const PngValidationResult valid = validate_png(bytes);
@@ -401,6 +427,7 @@ void scoped_window_replacement_damage() {
 } // namespace
 
 int main() {
+    chunk_checksum_matches_bitwise_oracle();
     parser_contract();
     ownership_and_quota_contract();
     deterministic_mutation_oracle();

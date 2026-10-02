@@ -36,6 +36,41 @@ Status: **ACTIVE; first source pass, not a completed whole-product audit**.
 | Distribution | Three portable archives exist. macOS arm64 baseline is ad-hoc signed, not notarized; installers/update/uninstall not complete. | Reproducible source/receipt match, native package smoke checks, install/update/uninstall, diagnostics without secret/user-content leakage. | **OPEN; portable alpha only** |
 | Full interaction/accessibility inventory | FM-R020/022 require every control and input path. Current source pass is partial. | Expand each row to cases traced to interview decisions, executable checks, native pointer/keyboard/assistive evidence, and owner verdict. | **OPEN; not exhaustively audited** |
 
+## Preview coverage and remaining acceptance cases
+
+**OBSERVED current source, not a promise of format completeness:**
+
+| Input | Current behavior | Acceptance still needed |
+|---|---|---|
+| Regular PNG | Reads at most 16 MiB encoded; GUI.Forms validates/decodes; PictureBox scales into the preview | Native corrected-layer pixels; large decoded dimensions; transparency; rotated/metadata-heavy fixtures; repeated replacement and errors |
+| UTF-8 text with an admitted extension | Reads a 64 KiB prefix; displays at most seven wrapped lines | Native representative Unicode; long unbroken lines; CRLF/BOM; truncation disclosure reachable when hidden lines exceed the visible body |
+| Empty admitted text file | Explicit empty-file message | Native empty-state legibility |
+| Malformed text, changed identity, unavailable path | Explicit refused/changed/unavailable message | Rapid selection changes and currentness under ordinary filesystem updates |
+| JPEG, HEIC, WebP, GIF, PDF, audio/video | Unsupported | A separately bounded, negotiated format/provider stage and real native fixtures |
+| UTF-16 text, extensionless text, unlisted text extensions | Not automatically recognized as supported text | Decide bounded encoding/sniffing policy; do not silently call this general text support |
+| Folder/symbolic link | Material icon; no file-content loading through the link | Folder facts/indexed allocated-size presentation and explicit link identity |
+| Indexed thumbnail | Missing | Revision-bound index projection, retrieval, visible-range scheduling and invalidation |
+
+The admitted text extensions are `.txt`, `.md`, `.csv`, `.tsv`, `.json`,
+`.xml`, `.yaml`, `.yml`, `.toml`, `.ini`, `.log`, `.c`, `.cc`, `.cpp`,
+`.h`, `.hpp`, `.m`, `.mm`, `.go`, `.rs`, `.py`, `.sh`, `.html`, `.css`,
+`.js`, and `.ts` (ASCII case-insensitive extension matching).
+
+**DECIDED boundary:** ADR-020 currently admits bounded UTF-8 and PNG built-ins.
+Its reversal path requires independent bounds and evidence for further formats.
+The older handler interview requires native/third-party providers behind a
+process boundary; ORC-PLG remains stubbed. A source-compatible Paint codec is
+research input, not automatic admission into File Manager or GUI.Forms.
+JPEG and PDF are practical next-format **CANDIDATES**; their exact implementation
+and resource/identity/cancellation contracts remain unresolved. The owner's
+report across multiple types is broader than the single PNG layering defect.
+
+The loader's trailing truncation sentence can itself be outside the seven-line
+display; that is an **OBSERVED disclosure gap** requiring a persistent status
+outside the elided body. Registry admission also precedes decoder execution,
+so a registry-success caption is not a renderer-success receipt. These remain
+open even after the native ordinary PNG fixture passes.
+
 ## Verification discipline
 
 Keep loader unit tests, assembled-application tests and native dogfood evidence
@@ -234,6 +269,17 @@ initial state are explicit, and counter updates precede publication of the
 observed order. The two changed C++ files have zero spelling candidates.
 This scope does not certify the generic painter or the rest of the application.
 
+**MEASURED native confirmation and delivery:** source `b1986ad` passed both
+three-platform native runs `36979174514` and `36979177557`. The real macOS
+application produced 1,078 readable TXT pixels, 12,544 matching PNG pixels
+and 1,291 readable unsupported-explanation pixels. PR #5 merged by rebase as
+`90ca7ee`; source and rebased main share tree
+`7b185549f332a83ab5d7032982a26b3e9cca06fa`. The exact tested archives were
+published as `v0.001-alpha.b1986ad`, with clean source/hash/receipt checks for
+all packaged files (40 Linux, 42 Mac, 44 Windows). Portable packaging,
+macOS 26 arm64/ad-hoc signing and the wider format/thumbnail/interaction gaps
+remain. The later PNG-admission optimization below is not in that release.
+
 ## Obsolete preview work retirement
 
 **OBSERVED:** a queued PreviewWork called the loader even after a newer selection
@@ -286,3 +332,28 @@ new fixture stream lifetime/failure check, bounded recording-painter predicate,
 and new layout/paint assertions. The two changed C++ files have zero spelling
 scanner candidates. This is not certification of all generated UI code or
 legacy Label transformation work.
+
+## PNG admission cost
+
+**MEASURED bottleneck:** `Application::apply_preview` calls `Window::load_png`
+on the UI thread. Its registry admission validates every chunk with a
+bit-at-a-time CRC before copying and hashing the encoded bytes. An isolated
+Windows Release source comparison on generated valid, uncompressed 1024-wide
+RGB PNGs measured 125.03–127.23 ms admission for 12,588,036 encoded bytes;
+validation alone was 109.98–112.23 ms. File I/O and native decode were excluded.
+
+The source-private CRC now uses a compile-time 256-entry (1 KiB) table with
+the same reflected polynomial. Same-source/compiler comparisons reduce that
+admission to 41.36–43.67 ms and validation to 26.67–27.73 ms. Smaller 0.75/6 MiB
+fixtures show the same direction. The largest pair was repeated in reverse
+order. This is measured admission work, not a threefold application-speed
+claim. Decoding, remaining copies/hash and the still-synchronous ~42 ms large
+admission need subsequent scheduling/ownership work.
+
+The reproducible standalone probe, generated fixture tool, exact workload,
+sample ranges and scoped house-style review are in
+`../../gui_forms/tools/png_admission_probe/README.md`. No public image API,
+resource identity, decoder policy, quota or checksum-error behavior changes.
+The existing independent bitwise test oracle plus 24 added ancillary-chunk
+cases pass in the full PNG registry suite (0.11 seconds, Windows renderer-neutral
+build). Native platform checks for this later optimization are pending.
