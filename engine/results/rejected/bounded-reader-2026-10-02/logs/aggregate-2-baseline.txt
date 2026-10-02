@@ -1,0 +1,16 @@
+=== RUN   TestImmutableGenerationDistribution
+    m2_generation_test.go:148: aggregate=sampleGenerationPath calls=20000 elapsed=42.0236ms ns_per_query=2101.2 allocated_bytes=18242760 mallocs=500024
+    m2_generation_test.go:149: aggregate=sampleGenerationName calls=2000 elapsed=90.0556ms ns_per_query=45027.8 allocated_bytes=96749392 mallocs=1060129
+    m2_generation_test.go:154: aggregate=sampleGenerationPipeline calls=2000 elapsed=115.7733ms ns_per_query=57886.7 allocated_bytes=130893952 mallocs=1140889
+    m2_generation_test.go:164: environment os=windows arch=amd64 go=go1.27.1
+    m2_generation_test.go:165: generation-build file_objects=10000 bindings=11000 reference_build=12.4994ms publish=13.5058ms manifest_probe=497.5µs recover_checked=2.499ms
+    m2_generation_test.go:166: generation-storage bytes=1642576 bytes_per_binding=149.33 reopened_heap_delta=21064 warmed_heap_delta=996904 cache_bytes=851968 cache_limit=8388608
+    m2_generation_test.go:167: generation-publication allocated_bytes=2430056 transient_heap_growth=489496 retained_heap_growth=0 mallocs=20175 live_store_bytes=1642912 write_lower_bound=1643424
+    m2_generation_test.go:168: distribution=generation-exact-path samples=20000 p50=0s p95=0s p99=0s max=1.0053ms digest=6c4437450b9c86ff
+    m2_generation_test.go:169: distribution=generation-name-first-100 samples=2000 p50=0s p95=499.8µs p99=506.1µs max=1.1138ms digest=a69b9113a32327fd
+    m2_generation_test.go:170: distribution=generation-pipeline-name-first-100 samples=2000 p50=0s p95=500.3µs p99=508.2µs max=1.0933ms digest=a69b9113a32327fd
+    m2_generation_test.go:213: generation-streaming-diff elapsed=2.9992ms added=0 updated=1 deleted=0 unchanged=10999 allocated_bytes=1562008 transient_heap_growth=1562008 retained_heap_growth=753976
+    m2_generation_test.go:257: generation-delta-candidate-one-record-update canonical_changed_object_bytes=64 elapsed=3.4959ms file_bytes=523 write_lower_bound=779 write_amplification_per_changed_object=12.17 allocated_bytes=809952 transient_heap_growth=809952 retained_heap_growth=0
+    m2_generation_test.go:298: generation-full-snapshot-one-record-update changed_field_bytes=8 canonical_changed_object_bytes=64 rebuild=12.5321ms publish=14.0715ms allocated_bytes=2455784 transient_heap_growth=1191000 retained_heap_growth=0 mallocs=20199 write_lower_bound=1643424 write_amplification_per_changed_object=25678.50 live_store_before=1642912 live_store_after=3285824
+--- PASS: TestImmutableGenerationDistribution (0.34s)
+PASS
