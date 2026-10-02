@@ -18,7 +18,7 @@ def main() -> int:
     build: Path = ROOT / '.build/native-macos-arm64'
     evidence: Path = build / 'paint-cost'
     evidence.mkdir(parents=True, exist_ok=True)
-    executable: Path = build / 'gui-forms/gui_forms_macos_idle_visibility_tests'
+    executable: Path = build / 'gui-forms/gui_forms_macos_idle_visibility_tests.app/Contents/MacOS/gui_forms_macos_idle_visibility_tests'
     command: list[str] = [str(executable), '--paint-cost-experiment']
     log_path: Path = evidence / 'experiment.log'
     status: str = 'failed'

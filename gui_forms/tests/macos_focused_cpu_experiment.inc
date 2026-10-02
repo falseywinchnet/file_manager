@@ -121,6 +121,9 @@ void begin_focused_interval(FocusedCpuProbe& probe) {
     for (std::size_t index = 0; index < focused_window_count; ++index) {
         check_focused_state(probe, index);
         NSWindow* window = focused_window(index);
+        const gui_forms::MetricsSnapshot metrics = (*probe.models[index]).metrics_snapshot();
+        focused_require(metrics.renderer_name.find("bundled fonts (optional Unicode fallback)") !=
+            std::string::npos, "bundled fonts not ready; CPU interval rejected");
         probe.before[index] = [window.contentView hostJSON];
         (*probe.models[index]).reset_activity_metrics();
         const BOOL enabled = [window.contentView setCpuAttributionEnabled:YES];

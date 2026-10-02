@@ -1,6 +1,11 @@
 #pragma once
 
 #include "gui_forms/resources.hpp"
+#if defined(GUI_FORMS_PREPARED_TEXT)
+#include "gui_forms/prepared_text.hpp"
+#include "gui_forms/control.hpp"
+#include "gui_forms/window/presentation/presentation_types.hpp"
+#endif
 
 #include <cstddef>
 #include <cstdint>
@@ -19,6 +24,20 @@ public:
     bool resize(Size logical_size, double scale);
     void begin_frame(const DamageRegion& damage);
     void end_frame();
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    // Guarded host transaction. begin expands damage when a full repaint is
+    // required; caller paints that updated region. Null receipts and exceptions
+    // must abort. end_frame only restores canvas state, never publishes pixels.
+    [[nodiscard]] PreparedTextStatus begin_prepared_frame(const Size logical_size,
+        const double scale, DamageRegion& damage);
+    [[nodiscard]] PreparedTextStatus commit_prepared_frame(const PaintReceipt receipt);
+    void abort_prepared_frame() noexcept;
+    [[nodiscard]] PaintReceipt prepared_front_receipt() const noexcept;
+    [[nodiscard]] double prepared_front_scale() const noexcept;
+    [[nodiscard]] bool prepared_front_matches(const Size logical_size, const double scale) const noexcept;
+    [[nodiscard]] PreparedTextPaintResult draw_prepared_text(const PreparedTextLayout& layout,
+        const LayoutAuthority expected, const Point baseline, const Color color) override;
+#endif
 
     [[nodiscard]] bool register_typeface(FontRole role,
                                          std::uint16_t weight,

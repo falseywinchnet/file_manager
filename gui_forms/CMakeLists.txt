@@ -647,6 +647,11 @@ if(GUI_FORMS_ENABLE_SKIA)
         target_compile_definitions(gui_forms_skia PRIVATE
             GUI_FORMS_HAS_HARFBUZZ_TEXT=1)
     endif()
+    if(TARGET gui_forms_prepared_text)
+        target_sources(gui_forms_skia PRIVATE
+            src/render/skia/raster/prepared_skia_frame.cpp)
+        target_link_libraries(gui_forms_skia PRIVATE gui_forms_prepared_text)
+    endif()
     if(APPLE)
         find_library(GUI_FORMS_COREFOUNDATION CoreFoundation REQUIRED)
         find_library(GUI_FORMS_COREGRAPHICS CoreGraphics REQUIRED)
@@ -1010,7 +1015,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     endif()
 endif()
 
-if(GUI_FORMS_BUILD_GALLERY)
+if(GUI_FORMS_BUILD_GALLERY OR (GUI_FORMS_BUILD_TESTS AND GUI_FORMS_ENABLE_MACOS_HOST))
     set(GUI_FORMS_GALLERY_FONTS
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids-Bold.ttf
@@ -1038,6 +1043,9 @@ if(GUI_FORMS_BUILD_GALLERY)
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-NotoEmoji.txt
     )
 
+endif()
+
+if(GUI_FORMS_BUILD_GALLERY)
     add_library(gui_forms_gallery_model STATIC
         src/controls/gallery_controls.cpp
         demo/gallery.cpp
@@ -1636,6 +1644,16 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_prepared_text_raster_tests PRIVATE gui_forms_prepared_text)
         add_test(NAME gui_forms_prepared_text_raster_tests
             COMMAND gui_forms_prepared_text_raster_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+        if(TARGET gui_forms_skia)
+            add_executable(gui_forms_prepared_text_skia_tests tests/prepared_text_skia_tests.cpp)
+            target_include_directories(gui_forms_prepared_text_skia_tests SYSTEM PRIVATE
+                ${GUI_FORMS_SKIA_ROOT})
+            target_link_libraries(gui_forms_prepared_text_skia_tests PRIVATE
+                gui_forms_skia gui_forms_prepared_text)
+            add_test(NAME gui_forms_prepared_text_skia_tests
+                COMMAND gui_forms_prepared_text_skia_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+            set_tests_properties(gui_forms_prepared_text_skia_tests PROPERTIES TIMEOUT 30)
+        endif()
         add_executable(gui_forms_prepared_display_tests tests/prepared_display_tests.cpp)
         target_link_libraries(gui_forms_prepared_display_tests PRIVATE gui_forms_prepared_text)
         add_test(NAME gui_forms_prepared_display_tests
@@ -2420,6 +2438,21 @@ if(GUI_FORMS_BUILD_TESTS)
             gui_forms_controls)
         add_test(NAME gui_forms_macos_multi_window_tests
                  COMMAND gui_forms_macos_multi_window_tests)
+        # The native host resolves its font pack through NSBundle, not an
+        # environment override. Exercise the same resource route as applications.
+        set_source_files_properties(
+            ${GUI_FORMS_GALLERY_FONTS} ${GUI_FORMS_GALLERY_FONT_NOTICES}
+            PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/fonts")
+        foreach(native_fixture IN ITEMS
+                gui_forms_macos_clipboard_image_tests
+                gui_forms_macos_exposure_tests
+                gui_forms_macos_idle_visibility_tests
+                gui_forms_macos_host_close_tests
+                gui_forms_macos_multi_window_tests)
+            set_target_properties(${native_fixture} PROPERTIES MACOSX_BUNDLE TRUE)
+            target_sources(${native_fixture} PRIVATE
+                ${GUI_FORMS_GALLERY_FONTS} ${GUI_FORMS_GALLERY_FONT_NOTICES})
+        endforeach()
     endif()
 
     if(TARGET gui_forms_skia)

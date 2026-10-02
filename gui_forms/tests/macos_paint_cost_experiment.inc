@@ -102,6 +102,9 @@ void begin_cost_phase(CostProbe& probe) {
     for (std::size_t index = 0; index < cost_window_count; ++index) {
         NSWindow* window = cost_window(index);
         gui_forms::Window& model = *probe.models[index];
+        const gui_forms::MetricsSnapshot metrics = model.metrics_snapshot();
+        cost_require(metrics.renderer_name.find("bundled fonts (optional Unicode fallback)") !=
+            std::string::npos, "bundled fonts not ready; paint-cost interval rejected");
         cost_require(!model.focused_control(), "surrogate must have no focused control");
         cost_require(!model.next_wake().has_value(), "surrogate acquired an autonomous deadline");
         if (index == 0U) {

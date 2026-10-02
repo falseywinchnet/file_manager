@@ -1,6 +1,9 @@
 #include "skia_raster.hpp"
 
 #include "gui_forms/live_surface.hpp"
+#if defined(GUI_FORMS_PREPARED_TEXT)
+#include "prepared_skia_frame.hpp"
+#endif
 
 #if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
 #include "../../text/harfbuzz/harfbuzz_font_engine.hpp"
@@ -138,6 +141,10 @@ public:
     };
 
     sk_sp<SkSurface> surface;
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    PreparedSkiaFrame prepared_frame{};
+    bool prepared_mode{false};
+#endif
     sk_sp<SkFontMgr> fonts{
 #if defined(__APPLE__)
         SkFontMgr_New_CoreText(nullptr)
@@ -181,7 +188,23 @@ public:
     }
 
     [[nodiscard]] SkCanvas* canvas() const noexcept {
-        return surface ? (*surface).getCanvas() : nullptr;
+        SkCanvas* result = nullptr;
+#if defined(GUI_FORMS_PREPARED_TEXT)
+        if (prepared_mode) {
+            result = prepared_frame.canvas();
+            return result;
+        }
+#endif
+        if (surface) result = (*surface).getCanvas();
+        return result;
+    }
+
+    [[nodiscard]] SkSurface* front_surface() const noexcept {
+        SkSurface* result = surface.get();
+#if defined(GUI_FORMS_PREPARED_TEXT)
+        if (prepared_mode) result = prepared_frame.front();
+#endif
+        return result;
     }
 
     [[nodiscard]] static SkFontStyle font_style(FontSpec spec) {
@@ -321,6 +344,11 @@ bool SkiaRaster::register_fallback_typeface_file(
 }
 
 bool SkiaRaster::resize(Size logical_size, double scale) {
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    // A host using transactions must not replace its coherent front via the
+    // historical resize path. Size admission belongs to begin_prepared_frame.
+    if ((*impl_).prepared_mode) return false;
+#endif
     if (!std::isfinite(scale) || scale <= 0.0 || logical_size.width <= 0.0 ||
         logical_size.height <= 0.0) {
         return false;
@@ -391,6 +419,47 @@ void SkiaRaster::end_frame() {
         (*canvas).restoreToCount(1);
     }
 }
+
+#if defined(GUI_FORMS_PREPARED_TEXT)
+PreparedTextStatus SkiaRaster::begin_prepared_frame(const Size logical_size,
+    const double scale, DamageRegion& damage) {
+    if (!(*impl_).prepared_frame.on_executor()) return PreparedTextStatus::wrong_executor;
+    const PreparedTextStatus status = (*impl_).prepared_frame.begin(logical_size, scale, damage);
+    if (status == PreparedTextStatus::success) {
+        // Select the route only after admission. Failed initial geometry and
+        // allocation preserve any ordinary surface; it has no prepared receipt.
+        (*impl_).prepared_mode = true;
+        (*impl_).surface.reset();
+        (*impl_).logical_size = logical_size;
+        (*impl_).scale = scale;
+        try { begin_frame(damage); }
+        catch (...) { (*impl_).prepared_frame.abort(); throw; }
+    }
+    return status;
+}
+PreparedTextStatus SkiaRaster::commit_prepared_frame(const PaintReceipt receipt) {
+    const PreparedTextStatus status = (*impl_).prepared_frame.commit(receipt);
+    return status;
+}
+void SkiaRaster::abort_prepared_frame() noexcept { (*impl_).prepared_frame.abort(); }
+PaintReceipt SkiaRaster::prepared_front_receipt() const noexcept {
+    const PaintReceipt result = (*impl_).prepared_frame.receipt();
+    return result;
+}
+double SkiaRaster::prepared_front_scale() const noexcept {
+    const double result = (*impl_).prepared_frame.front_scale();
+    return result;
+}
+bool SkiaRaster::prepared_front_matches(const Size logical_size, const double scale) const noexcept {
+    const bool result = (*impl_).prepared_frame.matches(logical_size, scale);
+    return result;
+}
+PreparedTextPaintResult SkiaRaster::draw_prepared_text(const PreparedTextLayout& layout,
+    const LayoutAuthority expected, const Point baseline, const Color color) {
+    const PreparedTextPaintResult result = (*impl_).prepared_frame.draw(layout, expected, baseline, color);
+    return result;
+}
+#endif
 
 bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
     const ImageRegistrySnapshot snapshot = registry.snapshot();
@@ -504,21 +573,33 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
 }
 
 const void* SkiaRaster::pixels() const noexcept {
-    SkPixmap pixmap;
-    return (*impl_).surface && (*(*impl_).surface).peekPixels(&pixmap) ? pixmap.addr() : nullptr;
+    SkPixmap pixmap{};
+    SkSurface* const surface = (*impl_).front_surface();
+    const void* result = nullptr;
+    if (surface != nullptr && (*surface).peekPixels(&pixmap)) result = pixmap.addr();
+    return result;
 }
 
 std::size_t SkiaRaster::row_bytes() const noexcept {
-    SkPixmap pixmap;
-    return (*impl_).surface && (*(*impl_).surface).peekPixels(&pixmap) ? pixmap.rowBytes() : 0;
+    SkPixmap pixmap{};
+    SkSurface* const surface = (*impl_).front_surface();
+    std::size_t result = 0;
+    if (surface != nullptr && (*surface).peekPixels(&pixmap)) result = pixmap.rowBytes();
+    return result;
 }
 
 std::uint32_t SkiaRaster::pixel_width() const noexcept {
-    return (*impl_).surface ? static_cast<std::uint32_t>((*(*impl_).surface).width()) : 0;
+    SkSurface* const surface = (*impl_).front_surface();
+    std::uint32_t result = 0;
+    if (surface != nullptr) result = static_cast<std::uint32_t>((*surface).width());
+    return result;
 }
 
 std::uint32_t SkiaRaster::pixel_height() const noexcept {
-    return (*impl_).surface ? static_cast<std::uint32_t>((*(*impl_).surface).height()) : 0;
+    SkSurface* const surface = (*impl_).front_surface();
+    std::uint32_t result = 0;
+    if (surface != nullptr) result = static_cast<std::uint32_t>((*surface).height());
+    return result;
 }
 
 std::size_t SkiaRaster::byte_size() const noexcept {
