@@ -355,7 +355,13 @@ class ImageRecordingPainter final : public gui_forms::Painter {
     void restore() override {}
     void translate(gui_forms::Point) override {}
     void clip_rect(gui_forms::Rect) override {}
-    void fill_rect(gui_forms::Rect, gui_forms::Color) override {}
+    void fill_rect(const gui_forms::Rect bounds, const gui_forms::Color color) override {
+        if (color == tracked_surface_color && bounds.width == tracked_surface_size.width &&
+            bounds.height == tracked_surface_size.height) {
+            ++tracked_operation_order;
+            tracked_surface_fill_order = tracked_operation_order;
+        }
+    }
     void stroke_rect(gui_forms::Rect, gui_forms::Color, double) override {}
     void draw_line(gui_forms::Point, gui_forms::Point, gui_forms::Color, double) override {
         ++lines;
@@ -370,7 +376,11 @@ class ImageRecordingPainter final : public gui_forms::Painter {
     }
     void draw_image(gui_forms::ImageId image, gui_forms::Rect, double) override {
         ++images;
-        if (image == tracked_image) ++tracked_image_draws;
+        if (image == tracked_image) {
+            ++tracked_image_draws;
+            ++tracked_operation_order;
+            tracked_image_order = tracked_operation_order;
+        }
     }
 
     std::size_t images{};
@@ -379,6 +389,11 @@ class ImageRecordingPainter final : public gui_forms::Painter {
     bool literal_ampersands{};
     gui_forms::ImageId tracked_image{};
     std::size_t tracked_image_draws{};
+    gui_forms::Color tracked_surface_color{};
+    gui_forms::Size tracked_surface_size{};
+    std::size_t tracked_operation_order{};
+    std::size_t tracked_surface_fill_order{};
+    std::size_t tracked_image_order{};
     gui_forms::Color text_color{};
 };
 
@@ -1231,6 +1246,10 @@ void test_selected_file_previews_reach_visible_layout() {
         "preview must paint readable light text against its authored dark surface");
     require(text_painter.literal_ampersands,
         "file text must retain literal ampersands rather than interpret keyboard mnemonics");
+    // Prime retained chunks while text is selected, as the native host does.
+    // A first paint only after PNG completion would miss stale replay state.
+    ImageRecordingPainter text_window_painter{};
+    static_cast<void>((*window).paint(text_window_painter));
     const std::string image_id = object_id(*objects, "preview.png");
     const bool image_selected = (*window).perform_semantic_action(image_id, gui_forms::SemanticAction::select);
     require(image_selected, "image must be selected through the public user action");
@@ -1251,9 +1270,14 @@ void test_selected_file_previews_reach_visible_layout() {
     require(painter.images == 1U, "selected PNG must issue an image draw");
     ImageRecordingPainter whole_window_painter{};
     whole_window_painter.tracked_image = (*picture).image();
+    whole_window_painter.tracked_surface_color = gui_forms::Color::rgba(29, 42, 55);
+    whole_window_painter.tracked_surface_size = {surface_absolute.width, surface_absolute.height};
     static_cast<void>((*window).paint(whole_window_painter));
     require(whole_window_painter.tracked_image_draws > 0U,
         "whole-window retained replay must include the selected image, not only direct control painting");
+    require(whole_window_painter.tracked_surface_fill_order > 0U &&
+        whole_window_painter.tracked_image_order > whole_window_painter.tracked_surface_fill_order,
+        "selected image must paint after its opaque preview surface rather than underneath it");
 
     // The first Mac native probe was constrained to 1024x674 by its desktop.
     // That ordinary viewport has room for content and a usable inspector.
