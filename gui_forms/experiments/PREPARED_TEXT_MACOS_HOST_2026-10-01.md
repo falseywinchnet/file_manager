@@ -9,7 +9,7 @@ revoked inherited authority. The model paints that expanded region and supplies
 the actual receipt used for commit. A live-surface update contributes damage to
 that model transaction; it does not manufacture a receipt.
 
-Null receipts and refused commits abort the candidate and reset the prospective
+Image synchronization refusal prevents admission. Null receipts and refused commits abort the candidate and reset the prospective
 presentation receipt. Exception cleanup restores the canvas and aborts the
 candidate. These paths preserve the previous front and pending work. Native
 exposure may copy the previous front without acknowledging new model content.

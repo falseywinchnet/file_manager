@@ -1871,15 +1871,20 @@ private:
     _pendingDamage.add(GFRect{dirtyRect.origin.x, dirtyRect.origin.y,
                              dirtyRect.size.width, dirtyRect.size.height});
 
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    const bool imagesReady = _raster.synchronize_images((*_model).image_resources());
+#else
     static_cast<void>(_raster.synchronize_images((*_model).image_resources()));
+#endif
     DamageRegion frameDamage = _pendingDamage;
     for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
         frameDamage.add(update.clip);
     }
     bool frameReady{true};
 #if defined(GUI_FORMS_PREPARED_TEXT)
-    const gui_forms::PreparedTextStatus admission =
-        _raster.begin_prepared_frame(logicalSize, scale, frameDamage);
+    const gui_forms::PreparedTextStatus admission = imagesReady
+        ? _raster.begin_prepared_frame(logicalSize, scale, frameDamage)
+        : gui_forms::PreparedTextStatus::resource_failure;
     frameReady = admission == gui_forms::PreparedTextStatus::success;
     if (frameReady) {
         // Admission can require a full repaint after resize or revocation.
