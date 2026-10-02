@@ -28,7 +28,7 @@ public:
     std::uint64_t prepared_paints{0};
     bool fail{false};
 protected:
-    void on_paint(Painter& painter, const Rect bounds) override {
+    void on_paint(Painter& painter, const gui_forms::Rect bounds) override {
         ++paints;
         painter.fill_rect(bounds, background);
         if (fail) throw std::runtime_error("injected prepared host callback failure");

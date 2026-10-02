@@ -110,3 +110,19 @@ not certified by this review.
 The single source hash in
 `PREPARED_TEXT_MACOS_HOST_FIXTURE_HASHES_2026-10-01.csv` freezes this checkpoint
 for coordinator review and native CI.
+
+## First native compile failure and correction
+
+**OBSERVED:** `edfacf3`, workflow run 36960787657, Mac job 110693829397,
+failed compiling this new fixture because unqualified `Rect` collided with
+Apple's global MacTypes declaration. The consequent override/conversion errors
+refer to that same parameter. The signature now spells `gui_forms::Rect`;
+its source manifest was refreshed. Native rerun remains required.
+
+The original job log is retained at
+`.build/provider-edfacf3-evidence/macos-job.log`. Windows and Linux passed that
+run; the Mac profiling steps were skipped after the compilation failure, so
+there is no profile result from it. The coordinator separately changed workflow
+conditions to attempt the dedicated profiling build even after an unrelated
+test failure, and to capture only if that dedicated build succeeds. This cannot
+turn a failed native correctness job into a passing one.
