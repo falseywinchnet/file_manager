@@ -800,3 +800,30 @@ are recorded in the integration-review section of the Stage 2 receipt. This
 closes the source-review correction above and accepts source-only development
 integration. It does not promote installed availability or native visual claims;
 macOS/Linux CI and consumer evidence remain outstanding.
+
+### Native public-API consumer checkpoint — provider `7b260cf`
+
+**MEASURED — attributed Games consumer report:** against immutable provider
+revision `7b260cf`, both native public-API text-consumer CTest targets passed on
+Windows x64, macOS arm64, Linux x64 and Linux arm64 in
+[Games CI run 36948428853](https://github.com/falseywinchnet/games/actions/runs/36948428853).
+**OBSERVED coordinator verification:** the coordinator independently checked the
+run with `gh run view`; the run and all four native-text matrix jobs reached
+terminal success: Windows 2022 x64, macOS 15 arm64, Ubuntu 24.04 x64 and Ubuntu
+24.04 arm64. The Mac consumer evidence is macOS 15, not the owner's macOS 26
+environment. This recording chat did not rerun the tests or independently inspect
+the CI jobs.
+
+The consumer also reports fixture and mask-preview artifacts from that run.
+Artifact production is attributed to the consumer; neither this record nor the
+coordinator report establishes root visual verification, mask-golden agreement
+or inspection of an actual Games help panel. The reported passes close the
+native consumer-execution gap for this bounded text-mask profile at the named
+provider revision, superseding that specific outstanding item above. They do not
+establish correctness for other profiles, inputs or revisions.
+
+Current-frame integration remains consumer work. These results do not establish
+an independently installed SDK, an installed game, full GUI integration or
+platform-wide product availability. Existing capacity, ownership, cancellation,
+source-review and installation boundaries remain unchanged. This is an evidence
+checkpoint only and assigns no source work.
