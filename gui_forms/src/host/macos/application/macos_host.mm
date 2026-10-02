@@ -1832,9 +1832,15 @@ private:
         [self drawRetainedRect:dirtyRect];
     } catch (const std::exception& error) {
         _raster.end_frame();
+#if defined(GUI_FORMS_PREPARED_TEXT)
+        _raster.abort_prepared_frame();
+#endif
         [self recordNativeCallbackFault:"draw" message:error.what()];
     } catch (...) {
         _raster.end_frame();
+#if defined(GUI_FORMS_PREPARED_TEXT)
+        _raster.abort_prepared_frame();
+#endif
         [self recordNativeCallbackFault:"draw" message:"unknown"];
     }
 }
@@ -1856,10 +1862,12 @@ private:
     _lastCGDestinationArea = 0.0;
     _lastCGClipBoundsArea = 0.0;
     _lastCGSourceBytes = 0U;
+#if !defined(GUI_FORMS_PREPARED_TEXT)
     if (_raster.resize(logicalSize, scale)) {
         _rasterHasContent = NO;
         _pendingDamage.add(GFRect{0.0, 0.0, logicalSize.width, logicalSize.height});
     }
+#endif
     _pendingDamage.add(GFRect{dirtyRect.origin.x, dirtyRect.origin.y,
                              dirtyRect.size.width, dirtyRect.size.height});
 
@@ -1868,13 +1876,25 @@ private:
     for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
         frameDamage.add(update.clip);
     }
+    bool frameReady{true};
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    const gui_forms::PreparedTextStatus admission =
+        _raster.begin_prepared_frame(logicalSize, scale, frameDamage);
+    frameReady = admission == gui_forms::PreparedTextStatus::success;
+    if (frameReady) {
+        // Admission can require a full repaint after resize or revocation.
+        // Keep that damage until this exact candidate reaches native presentation.
+        for (const GFRect rectangle : frameDamage.rectangles()) _pendingDamage.add(rectangle);
+    }
+#else
     _raster.begin_frame(frameDamage);
+#endif
     _lastFrameDamageBoundsArea = frameDamage.bounds().area();
     const std::chrono::steady_clock::time_point preparedAt =
         std::chrono::steady_clock::now();
     _rasterPreparePhase.record(started, preparedAt);
-    std::optional<PaintReceipt> receipt;
-    if (!_pendingDamage.empty()) {
+    std::optional<PaintReceipt> receipt{};
+    if (frameReady && !_pendingDamage.empty()) {
         const std::chrono::steady_clock::time_point paintStarted =
             std::chrono::steady_clock::now();
         receipt = (*_model).paint(_raster, _pendingDamage.bounds());
@@ -1884,18 +1904,41 @@ private:
     }
     const std::chrono::steady_clock::time_point finishStarted =
         std::chrono::steady_clock::now();
-    for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
-        _raster.save();
-        _raster.clip_rect(update.clip);
-        _raster.draw_live_surface(update.surface, update.destination, 1.0);
-        _raster.restore();
+    if (frameReady) {
+        for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
+            _raster.save();
+            _raster.clip_rect(update.clip);
+            _raster.draw_live_surface(update.surface, update.destination, 1.0);
+            _raster.restore();
+        }
+        _raster.end_frame();
     }
-    _raster.end_frame();
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    bool committed{false};
+    if (frameReady && receipt) {
+        const gui_forms::PreparedTextStatus publication = _raster.commit_prepared_frame(*receipt);
+        committed = publication == gui_forms::PreparedTextStatus::success;
+    }
+    if (!committed) {
+        _raster.abort_prepared_frame();
+        receipt.reset();
+    }
+#endif
     const std::chrono::steady_clock::time_point finishEnded =
         std::chrono::steady_clock::now();
     _rasterFinishPhase.record(finishStarted, finishEnded);
 
     if (receipt) _rasterHasContent = YES;
+    GFSize presentationSize = logicalSize;
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    _rasterHasContent = _raster.prepared_front_receipt() ? YES : NO;
+    if (_rasterHasContent == YES) {
+        const double frontScale = _raster.prepared_front_scale();
+        presentationSize = {
+            static_cast<double>(_raster.pixel_width()) / frontScale,
+            static_cast<double>(_raster.pixel_height()) / frontScale};
+    }
+#endif
     bool presented = false;
     const void* pixels = _raster.pixels();
     // Native exposure/snapshot callbacks can precede unocclusion. The model
@@ -1922,16 +1965,16 @@ private:
             const CGRect clipBounds = CGContextGetClipBoundingBox(context);
             _lastCGClipBoundsArea = std::max(0.0, clipBounds.size.width) *
                 std::max(0.0, clipBounds.size.height);
-            _lastCGDestinationArea = logicalSize.width * logicalSize.height;
+            _lastCGDestinationArea = presentationSize.width * presentationSize.height;
             _lastCGSourceBytes = _raster.byte_size();
             const std::chrono::steady_clock::time_point drawStarted =
                 std::chrono::steady_clock::now();
             CGContextSaveGState(context);
             CGContextSetBlendMode(context, kCGBlendModeCopy);
-            CGContextTranslateCTM(context, 0.0, logicalSize.height);
+            CGContextTranslateCTM(context, 0.0, presentationSize.height);
             CGContextScaleCTM(context, 1.0, -1.0);
             CGContextDrawImage(context,
-                               CGRectMake(0.0, 0.0, logicalSize.width, logicalSize.height),
+                               CGRectMake(0.0, 0.0, presentationSize.width, presentationSize.height),
                                image);
             CGContextRestoreGState(context);
             const std::chrono::steady_clock::time_point drawEnded =
@@ -1951,7 +1994,11 @@ private:
     const std::chrono::duration<long long, std::ratio<1, 1000000000>> elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now() - started);
     if (presented) {
+#if defined(GUI_FORMS_PREPARED_TEXT)
+        if (committed) _pendingLivePresentations.clear();
+#else
         _pendingLivePresentations.clear();
+#endif
         if (receipt &&
             (*_model).notify_presented(*receipt,
                 static_cast<std::uint64_t>(elapsed.count()))) {
