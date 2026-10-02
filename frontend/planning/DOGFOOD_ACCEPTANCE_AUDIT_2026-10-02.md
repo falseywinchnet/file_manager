@@ -216,3 +216,32 @@ existing owned generation token, and the new regression/named callback. No
 borrow crosses a queue boundary; no extra per-selection buffer is introduced.
 Spelling scanner on those three files reports zero candidates. The rest of
 `application_jobs.hpp` is not certified by this scoped review.
+
+## Ordinary-width adaptation and literal file text
+
+The initial Mac harness exposed a product usability issue even though its
+missing fonts were a test-packaging defect: the inner 900-unit automatic
+collapse threshold hid the inspector at an ordinary 1024-wide desktop despite
+space for content and a usable preview. The authored development thresholds
+now collapse the outer folder tree below 840 units, and the inner inspector
+below 600 units. With default allocations, the selected-file inspector remains
+available at 1024×674 and 800×674. These are reversible implementation values
+under DDV-007-02, not an owner-approved final breakpoint specification. Existing
+user collapse overrides and minimum control sizes remain authoritative.
+
+The assembled-application regression passes both sizes plus its existing short
+height/manual-expansion checks and the larger adaptive-layout suite. Native
+pixel evidence for this changed default is still pending. It does not establish
+every dragged pane-width combination or all screen scales.
+
+**OBSERVED:** Label defaults to mnemonic interpretation. The selected-text
+preview now explicitly disables that behavior. A paint regression requires
+literal `A&B && C&D`, preventing source code and ordinary ampersands from being
+silently changed for display. This also avoids mnemonic parsing of the bounded
+preview. The body still copies display text; no allocation-free claim is made.
+
+Source review covers the authored split thresholds, the explicit Label setting,
+new fixture stream lifetime/failure check, bounded recording-painter predicate,
+and new layout/paint assertions. The two changed C++ files have zero spelling
+scanner candidates. This is not certification of all generated UI code or
+legacy Label transformation work.
