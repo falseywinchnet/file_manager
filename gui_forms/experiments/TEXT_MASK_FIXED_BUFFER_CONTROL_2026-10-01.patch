@@ -1,0 +1,166 @@
+--- a/gui_forms/src/render/text/text_mask/text_mask_native.hpp
++++ b/gui_forms/src/render/text/text_mask/text_mask_native.hpp
+@@ -52,10 +52,6 @@
+     double y{0.0};
+     double advance{0.0};
+ };
+-using NativeGlyphBuffer = std::vector<NativeGlyph, MaskAllocator<NativeGlyph>>;
+-// Growth follows actual native glyph counts, capped at 65,536. Capacity is
+-// reused across line trials; allocation/initialization precedes glyph kernels.
+-void resize_native_glyphs(NativeGlyphBuffer& glyphs, const std::size_t count);
+ struct NativeCluster final {
+     std::size_t begin{0};
+     std::size_t end{0};
+@@ -77,7 +73,7 @@
+ // One paragraph's resolved bidi levels survive all candidate line trials.
+ // Source borrows the admitted key; fonts, ledger and work outlive this object.
+ // First-party arrays use counted allocators; native library allocations remain
+-// opaque. Caller owns the counted output, reused across trials.
++// opaque. Caller owns and bounds the supplied output glyph span.
+ class NativeParagraph final {
+ public:
+     NativeParagraph(const std::shared_ptr<MaskLedger>& ledger, NativeFonts& fonts,
+@@ -86,7 +82,7 @@
+     NativeParagraph(const NativeParagraph&) = delete;
+     NativeParagraph& operator=(const NativeParagraph&) = delete;
+     [[nodiscard]] NativeShape shape(const std::size_t begin, const std::size_t end,
+-        NativeGlyphBuffer& output);
++        const std::span<NativeGlyph> output);
+     [[nodiscard]] std::span<const std::size_t> edges() const noexcept;
+ private:
+     NativeFonts& fonts_;
+@@ -101,7 +97,7 @@
+     void append_run(const std::size_t line_begin, const std::size_t line_end,
+         const std::size_t run_begin, const std::size_t run_end,
+         const NativeCluster& cluster, const bool rtl,
+-        NativeGlyphBuffer& output, NativeShape& shape);
++        const std::span<NativeGlyph> output, NativeShape& shape);
+ };
+ 
+ struct NativeInk final {
+--- a/gui_forms/src/render/text/text_mask/text_mask_shape.cpp
++++ b/gui_forms/src/render/text/text_mask/text_mask_shape.cpp
+@@ -3,20 +3,6 @@
+ #include <cmath>
+ 
+ namespace gui_forms::detail::mask_native {
+-void resize_native_glyphs(NativeGlyphBuffer& glyphs, const std::size_t count) {
+-    constexpr std::size_t maximum_glyphs = 65536;
+-    if (count > maximum_glyphs) throw MaskLimitFailure(TextMaskLimit::shaping_payload);
+-    if (count > glyphs.capacity()) {
+-        std::size_t capacity = count;
+-        if (glyphs.capacity() != 0) {
+-            const std::size_t grown = glyphs.capacity() + std::min(glyphs.capacity(), maximum_glyphs - glyphs.capacity());
+-            capacity = std::max(count, grown);
+-        }
+-        glyphs.reserve(capacity);
+-        if (glyphs.capacity() > maximum_glyphs) throw MaskLimitFailure(TextMaskLimit::shaping_payload);
+-    }
+-    glyphs.resize(count);
+-}
+ namespace {
+ struct ScriptLocator final {
+     SBScriptLocatorRef value{SBScriptLocatorCreate()};
+@@ -122,7 +108,7 @@
+ 
+ void NativeParagraph::append_run(const std::size_t line_begin, const std::size_t line_end,
+     const std::size_t run_begin, const std::size_t run_end, const NativeCluster& cluster,
+-    const bool rtl, NativeGlyphBuffer& output, NativeShape& shape) {
++    const bool rtl, const std::span<NativeGlyph> output, NativeShape& shape) {
+     const std::string_view line = text_.substr(line_begin, line_end - line_begin);
+     work_.admit(line.size());
+     hb_buffer_reset(buffer_);
+@@ -149,8 +135,7 @@
+     if (count != position_count || (count != 0 && (infos == nullptr || positions == nullptr))) {
+         throw NativeFailure(TextMaskStatus::native_failure);
+     }
+-    if (count > 65536U - shape.glyph_count) throw MaskLimitFailure(TextMaskLimit::shaping_payload);
+-    resize_native_glyphs(output, shape.glyph_count + count);
++    if (count > output.size() - shape.glyph_count) throw MaskLimitFailure(TextMaskLimit::shaping_payload);
+     double pen = shape.advance;
+     for (unsigned index = 0; index < count; ++index) {
+         const hb_glyph_info_t& info = infos[index];
+@@ -177,10 +162,9 @@
+ }
+ 
+ NativeShape NativeParagraph::shape(const std::size_t begin, const std::size_t end,
+-    NativeGlyphBuffer& output) {
++    const std::span<NativeGlyph> output) {
+     if (begin > end || end > text_.size()) throw NativeFailure(TextMaskStatus::invalid_input);
+     NativeShape result{};
+-    output.clear();
+     result.ascent = fonts_.faces[fonts_.primary].ascent;
+     result.descent = fonts_.faces[fonts_.primary].descent;
+     if (begin == end) return result;
+--- a/gui_forms/src/render/text/text_mask/text_mask_layout.cpp
++++ b/gui_forms/src/render/text/text_mask/text_mask_layout.cpp
+@@ -24,6 +24,8 @@
+         // Fixed bounded job storage is charged as workspace while the call is
+         // live; runtime-sized arrays use measured allocator requests separately.
+         fixed_workspace_.acquire(ledger, MaskResource::workspace, sizeof(NativeMaskJob));
++        trial_.resize(65536);
++        glyphs_.resize(65536);
+         lines_.resize(256);
+         const MaskKey& input = *key_;
+         if (!input.text.empty()) text_ = std::string_view(input.text.data(), input.text.size());
+@@ -81,8 +83,8 @@
+     NativeFonts fonts_;
+     NativeWork work_{};
+     std::string_view text_{};
+-    NativeGlyphBuffer trial_;
+-    NativeGlyphBuffer glyphs_;
++    std::vector<NativeGlyph, MaskAllocator<NativeGlyph>> trial_;
++    std::vector<NativeGlyph, MaskAllocator<NativeGlyph>> glyphs_;
+     std::vector<TextMaskLine, MaskAllocator<TextMaskLine>> lines_;
+     std::vector<char, MaskAllocator<char>> breaks_;
+     std::vector<std::uint8_t, MaskAllocator<std::uint8_t>> cluster_edges_;
+@@ -92,6 +94,10 @@
+     double logical_height_{0.0};
+     bool overflow_{false};
+ 
++    [[nodiscard]] std::span<NativeGlyph> trial_span() noexcept {
++        const std::span<NativeGlyph> result(trial_.data(), trial_.size());
++        return result;
++    }
+     [[nodiscard]] std::size_t trimmed_soft_end(const std::string_view text,
+         const std::size_t begin, const std::size_t end) const noexcept {
+         if (end == text.size()) return end;
+@@ -113,7 +119,7 @@
+             const char decision = breaks_[origin + end - 1U];
+             if (end != content.size() && decision != LINEBREAK_ALLOWBREAK && decision != LINEBREAK_MUSTBREAK) continue;
+             const std::size_t visible_end = trimmed_soft_end(content, begin, end);
+-            const NativeShape shape = paragraph.shape(begin, visible_end, trial_);
++            const NativeShape shape = paragraph.shape(begin, visible_end, trial_span());
+             if (shape.advance > width) { first_overflow = end; break; }
+             best = {visible_end, end, false};
+         }
+@@ -124,7 +130,7 @@
+             const std::size_t end = edges[index];
+             if (end <= begin || cluster_edges_[origin + end] == 0) continue;
+             if (end > first_overflow) break;
+-            const NativeShape shape = paragraph.shape(begin, end, trial_);
++            const NativeShape shape = paragraph.shape(begin, end, trial_span());
+             if (shape.advance > width) {
+                 if (best.consumed_end == 0) best = {end, end, true};
+                 break;
+@@ -137,9 +143,8 @@
+     void append_line(NativeParagraph& paragraph, const std::size_t origin,
+         const std::size_t begin, const LineChoice choice) {
+         if (line_count_ == lines_.size()) throw MaskLimitFailure(TextMaskLimit::line_count);
+-        const NativeShape shape = paragraph.shape(begin, choice.text_end, trial_);
+-        if (shape.glyph_count > 65536U - glyph_count_) throw MaskLimitFailure(TextMaskLimit::shaping_payload);
+-        resize_native_glyphs(glyphs_, glyph_count_ + shape.glyph_count);
++        const NativeShape shape = paragraph.shape(begin, choice.text_end, trial_span());
++        if (shape.glyph_count > glyphs_.size() - glyph_count_) throw MaskLimitFailure(TextMaskLimit::shaping_payload);
+         if (line_count_ != 0) logical_height_ += static_cast<double>((*key_).options.gap_64) / 64.0;
+         const double baseline = logical_height_ + shape.ascent;
+         TextMaskLine& line = lines_[line_count_];
+@@ -170,7 +175,7 @@
+             append_line(paragraph, origin, 0, {content.size(), content.size(), false});
+             return;
+         }
+-        const NativeShape complete = paragraph.shape(0, content.size(), trial_);
++        const NativeShape complete = paragraph.shape(0, content.size(), trial_span());
+         cluster_edges_[origin] = 1;
+         cluster_edges_[origin + content.size()] = 1;
+         for (std::size_t index = 0; index < complete.glyph_count; ++index) {

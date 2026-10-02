@@ -345,7 +345,8 @@ void test_executor_and_default(const std::span<const std::byte> bytes) {
     require(snapshot.completed == 1, "default completion ready");
     TextMaskLease lease{};
     result = (*session).take(id, lease);
-    require(result.status == TextMaskStatus::unsupported_profile && !lease.has_value(), "unfinished native backend never claims rendered success");
+    require(result.status == TextMaskStatus::success && lease.has_value() && lease.coverage().empty() && lease.lines().size() == 1,
+        "native default backend produces valid zero-ink empty result");
 }
 
 void test_all_resource_reservations() {
@@ -453,7 +454,7 @@ int main(const int argc, char** const argv) {
         test_all_resource_reservations();
         test_service_lifetime(bytes);
         test_service_close_and_cached_wake(bytes);
-        std::cout << "text mask lifecycle: eleven groups passed (fixture backend only)\n";
+        std::cout << "text mask lifecycle: eleven groups passed (lifecycle fixtures plus native empty result)\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

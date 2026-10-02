@@ -33,6 +33,7 @@ TextMaskService::TextMaskService() {
     state_ = std::allocate_shared<detail::TextMaskServiceState>(allocator);
     (*state_).ledger = std::move(ledger);
     (*state_).executor = std::this_thread::get_id();
+    (*state_).backend = &detail::native_mask_backend();
 }
 TextMaskService::~TextMaskService() { close_service(*state_, true); }
 TextMaskBudgetSnapshot TextMaskService::budget_snapshot() const {

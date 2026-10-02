@@ -750,3 +750,53 @@ and caller-owned byte output. The coordinator reports no heap allocation found
 in the production source reviewed; this is scoped source evidence, not a process
 memory guarantee. Vendor/Unicode notices and the existing adapter accounting,
 source-offset, cluster-boundary and failure obligations remain in force.
+
+### Stage 2 native masks — final correction review pending
+
+**OBSERVED provider receipt:**
+[`TEXT_MASK_STAGE2_2026-10-01.md`](../../gui_forms/experiments/TEXT_MASK_STAGE2_2026-10-01.md)
+records the native default backend, replacing Stage 1's unsupported default.
+The development path now implements complete bounded-string logical wrapping,
+paragraph-level bidi with line-boundary treatment, contextual line shaping,
+grayscale raster and true FreeType mono expanded to binary coverage. Logical
+scale-1 advances and agreed quantization keep line selection separate from device
+scale; source consumption and cluster-safe overflow remain explicit. All native
+work stays on the session worker under the reconciled bounds. This is observed
+development implementation, not universal rendering correctness or visual parity.
+
+**MEASURED — attributed coordinator verification:** eleven source-manifest hashes
+matched, and four focused CTests passed in 13.79 seconds on Shadow Windows:
+eleven lifecycle groups, six native-component groups, four public wrapping groups
+and 19,338 UAX #14 conformance cases. The test total is correctness evidence,
+not a throughput comparison. This recording chat read the provider receipt and
+coordinator report; it did not independently rerun tests or verify those hashes.
+
+**OBSERVED outstanding review correction:** the coordinator found invariant raster
+mode/FreeType load flags reselected inside the glyph loop. The provider is making
+the bounded house-style section 3 correction to select them outside that loop.
+Final acceptance remains pending that correction and coordinator review of the
+updated source hashes and applicable validation. The provider receipt's earlier
+no-known-violation statement must be read with this later finding; passing tests
+does not close source-style review.
+
+Positive Arabic fixtures use the coordinator-approved, licensed Amiri font under
+`gui_forms/tests/fonts/amiri/PROVENANCE.md`. It is test-only, not Games font intake,
+an application fallback or an SDK asset. The receipt retains missing-coverage
+failures and the narrowly scoped tiny-label allocation-control measurements,
+including noisy/worse cold or tail observations. Those measurements support only
+the named workload and storage correction; no general performance claim follows.
+
+The source-only development option remains default OFF with no installed SDK.
+A2, its Painter/host path and budgets remain unchanged. macOS/Linux execution,
+visual mask goldens, application adoption and actual Games help-panel inspection
+remain separate evidence. No new workstream, architecture freeze or availability
+promotion is introduced by this checkpoint.
+
+**OBSERVED final coordinator acceptance:** the provider completed the bounded
+raster-configuration hoist. The coordinator reviewed the corrected file, verified
+all eleven refreshed source hashes, and independently reran both affected CTests:
+2/2 passed in 0.43 seconds. The exact authored source and coordinator build scope
+are recorded in the integration-review section of the Stage 2 receipt. This
+closes the source-review correction above and accepts source-only development
+integration. It does not promote installed availability or native visual claims;
+macOS/Linux CI and consumer evidence remain outstanding.

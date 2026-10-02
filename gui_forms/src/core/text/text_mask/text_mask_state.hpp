@@ -123,5 +123,6 @@ struct TextMaskAccess final {
     const TextMaskMetrics& metrics, const std::size_t line_count);
 [[nodiscard]] std::uint64_t next_mask_identity();
 void require_mask_executor(const std::thread::id executor);
+[[nodiscard]] MaskBackend& native_mask_backend() noexcept;
 
 } // namespace gui_forms::detail

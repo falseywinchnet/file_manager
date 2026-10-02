@@ -1,0 +1,1 @@
+workload=one-face-Cousine-16px-gray-tiny-label first_request_us=750.4 unique_samples=64 p50_us=72 p95_us=106.4 p99_us=151.8 max_us=151.8 cached_lookup_mean_us=0.8384 direct_p50_us=44.8 direct_p95_us=56.3 direct_max_us=136.7 peak_shaping_bytes=1040 peak_workspace_bytes=15443

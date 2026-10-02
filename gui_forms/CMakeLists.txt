@@ -216,13 +216,19 @@ if(GUI_FORMS_BUILD_TEXT_MASKS)
         message(FATAL_ERROR "GUI_FORMS_BUILD_TEXT_MASKS requires GUI_FORMS_ENABLE_HARFBUZZ_TEXT")
     endif()
     find_package(Threads REQUIRED)
+    include(cmake/TextMaskLineBreak.cmake)
     add_library(gui_forms_text_masks STATIC
         src/core/text/text_mask/text_mask_budget.cpp
         src/core/text/text_mask/text_mask_storage.cpp
         src/core/text/text_mask/text_mask_queue.cpp
-        src/core/text/text_mask/text_mask_service.cpp)
+        src/core/text/text_mask/text_mask_service.cpp
+        src/render/text/text_mask/text_mask_fonts.cpp
+        src/render/text/text_mask/text_mask_shape.cpp
+        src/render/text/text_mask/text_mask_raster.cpp
+        src/render/text/text_mask/text_mask_layout.cpp)
     target_link_libraries(gui_forms_text_masks
-        PUBLIC gui_forms_core PRIVATE Threads::Threads)
+        PUBLIC gui_forms_core
+        PRIVATE Threads::Threads freetype harfbuzz gui_forms_bidi gui_forms_linebreak)
     target_compile_features(gui_forms_text_masks PUBLIC cxx_std_20)
     set_target_properties(gui_forms_text_masks PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
@@ -1600,6 +1606,21 @@ endif()
 if(GUI_FORMS_BUILD_TESTS)
     enable_testing()
     if(TARGET gui_forms_text_masks)
+        add_executable(gui_forms_text_mask_cost_probe EXCLUDE_FROM_ALL tests/text_mask_cost_probe.cpp)
+        target_link_libraries(gui_forms_text_mask_cost_probe PRIVATE gui_forms_text_masks)
+        add_executable(gui_forms_text_mask_native_tests tests/text_mask_native_tests.cpp)
+        target_link_libraries(gui_forms_text_mask_native_tests PRIVATE
+            gui_forms_text_masks freetype harfbuzz gui_forms_bidi)
+        add_test(NAME gui_forms_text_mask_native_tests
+            COMMAND gui_forms_text_mask_native_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/fonts/amiri/Amiri-Regular.ttf")
+        set_tests_properties(gui_forms_text_mask_native_tests PROPERTIES TIMEOUT 30)
+        add_executable(gui_forms_text_mask_wrapping_tests tests/text_mask_wrapping_tests.cpp)
+        target_link_libraries(gui_forms_text_mask_wrapping_tests PRIVATE gui_forms_text_masks)
+        add_test(NAME gui_forms_text_mask_wrapping_tests
+            COMMAND gui_forms_text_mask_wrapping_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/fonts/amiri/Amiri-Regular.ttf")
+        set_tests_properties(gui_forms_text_mask_wrapping_tests PROPERTIES TIMEOUT 30)
         add_executable(gui_forms_text_mask_lifecycle_tests tests/text_mask_lifecycle_tests.cpp)
         target_link_libraries(gui_forms_text_mask_lifecycle_tests PRIVATE gui_forms_text_masks)
         add_test(NAME gui_forms_text_mask_lifecycle_tests

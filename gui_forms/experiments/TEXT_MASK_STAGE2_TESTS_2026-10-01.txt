@@ -1,0 +1,73 @@
+Start testing: Oct 01 17:27 Pacific Daylight Time
+----------------------------------------------------------
+3/71 Testing: gui_forms_text_mask_wrapping_tests
+3/71 Test: gui_forms_text_mask_wrapping_tests
+Command: "C:/Users/Shadow/file_manager/gui_forms/.build/text-mask-stage1/gui_forms_text_mask_wrapping_tests.exe" "C:/Users/Shadow/file_manager/gui_forms/assets/fonts" "C:/Users/Shadow/file_manager/gui_forms/tests/fonts/amiri/Amiri-Regular.ttf"
+Directory: C:/Users/Shadow/file_manager/gui_forms/.build/text-mask-stage1
+"gui_forms_text_mask_wrapping_tests" start time: Oct 01 17:27 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+text mask public wrapping: four groups passed
+<end of output>
+Test time =   0.44 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_text_mask_wrapping_tests" end time: Oct 01 17:27 Pacific Daylight Time
+"gui_forms_text_mask_wrapping_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/71 Testing: gui_forms_text_mask_native_tests
+2/71 Test: gui_forms_text_mask_native_tests
+Command: "C:/Users/Shadow/file_manager/gui_forms/.build/text-mask-stage1/gui_forms_text_mask_native_tests.exe" "C:/Users/Shadow/file_manager/gui_forms/assets/fonts" "C:/Users/Shadow/file_manager/gui_forms/tests/fonts/amiri/Amiri-Regular.ttf"
+Directory: C:/Users/Shadow/file_manager/gui_forms/.build/text-mask-stage1
+"gui_forms_text_mask_native_tests" start time: Oct 01 17:27 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+native group: shape and scale
+Fixture coverage: a=68 acute=690 alef=2294 arabic-beh=0
+native group: raster profiles
+native group: failures and work bounds
+text mask native components: six groups passed
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_text_mask_native_tests" end time: Oct 01 17:27 Pacific Daylight Time
+"gui_forms_text_mask_native_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+1/71 Testing: gui_forms_linebreak_conformance
+1/71 Test: gui_forms_linebreak_conformance
+Command: "C:/Users/Shadow/file_manager/gui_forms/.build/text-mask-stage1/gui_forms_linebreak_conformance_tests.exe" "line"
+Directory: C:/Users/Shadow/file_manager/gui_forms/third_party/libunibreak/src
+"gui_forms_linebreak_conformance" start time: Oct 01 17:27 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+LineBreakTest.txt: Passed 19338 out of 19338 (100%)
+Testing takes 14 ms
+
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_linebreak_conformance" end time: Oct 01 17:27 Pacific Daylight Time
+"gui_forms_linebreak_conformance" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/71 Testing: gui_forms_text_mask_lifecycle_tests
+4/71 Test: gui_forms_text_mask_lifecycle_tests
+Command: "C:/Users/Shadow/file_manager/gui_forms/.build/text-mask-stage1/gui_forms_text_mask_lifecycle_tests.exe" "C:/Users/Shadow/file_manager/gui_forms/assets/fonts"
+Directory: C:/Users/Shadow/file_manager/gui_forms/.build/text-mask-stage1
+"gui_forms_text_mask_lifecycle_tests" start time: Oct 01 17:27 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+text mask lifecycle: eleven groups passed (fixture backend only)
+<end of output>
+Test time =  11.48 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_text_mask_lifecycle_tests" end time: Oct 01 17:27 Pacific Daylight Time
+"gui_forms_text_mask_lifecycle_tests" time elapsed: 00:00:11
+----------------------------------------------------------
+
+End testing: Oct 01 17:27 Pacific Daylight Time
