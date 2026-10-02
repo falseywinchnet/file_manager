@@ -10,6 +10,15 @@ on:
         type: boolean
         required: false
         default: false
+      mac_cpu_profile_template:
+        description: Explicit profiler for a separately recorded attempt
+        type: choice
+        required: false
+        default: auto
+        options:
+          - auto
+          - CPU Profiler
+          - Time Profiler
 permissions:
   contents: read
 concurrency:
@@ -206,7 +215,14 @@ jobs:
         if: always() && runner.os == 'macOS' && github.event_name == 'workflow_dispatch' && inputs.mac_cpu_profile && steps.mac-profile-build.outcome == 'success'
         timeout-minutes: 20
         continue-on-error: true
-        run: python3 -B tools/run_macos_cpu_profile.py
+        env:
+          MAC_CPU_PROFILE_TEMPLATE: ${{ inputs.mac_cpu_profile_template }}
+        run: |
+          if [ "$MAC_CPU_PROFILE_TEMPLATE" = auto ] || [ -z "$MAC_CPU_PROFILE_TEMPLATE" ]; then
+            python3 -B tools/run_macos_cpu_profile.py
+          else
+            python3 -B tools/run_macos_cpu_profile.py --template "$MAC_CPU_PROFILE_TEMPLATE"
+          fi
       - name: Preserve optional Mac CPU profiles and matching symbols
         if: always() && runner.os == 'macOS' && github.event_name == 'workflow_dispatch' && inputs.mac_cpu_profile
         uses: actions/upload-artifact@v4

@@ -162,3 +162,23 @@ and text-mask development options off, then checks executable/dSYM UUID equality
 and preserves both with recursive trace evidence. Native profiling remains
 unverified. Workflow configuration is opt-in through `mac_cpu_profile`; ordinary
 push builds do not run the long holds.
+
+## First native capture attempt
+
+**OBSERVED:** run 36962126162 at `c67d53f` passed native correctness jobs on
+Windows, macOS and Linux. Its optional profiler artifact
+`mac-cpu-profile-36962126162` separately records an incomplete attempt at
+`attempt-5224ce792b13449a9f5a79c7e4a86006`. Both CPU Profiler captures exited 2;
+the recorder reported that this device does not support CPU hardware counters.
+Template discovery alone had not established that capability. The unprofiled
+focused workload completed, while the unprofiled cleared workload lasted
+131.998525 seconds and failed the unchanged 120–130 second duration gate.
+There is no accepted comparison or usable executing-stack attribution.
+
+The coordinator downloaded the complete artifact under
+`.build/provider-c67d53f-profile/`. Installed-template output explicitly lists
+`Time Profiler`. A separate workflow input now permits choosing that exact
+template for another attempt; it does not replace or relabel the failed CPU
+Profiler captures. The existing runner validates the selected name against
+installed templates. Time Profiler capture and useful span/sample mapping remain
+unverified until that separate run. No duration gate or product behavior changed.
