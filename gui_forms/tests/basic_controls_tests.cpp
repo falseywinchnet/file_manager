@@ -93,6 +93,12 @@ public:
         image_destinations.push_back(destination);
         image_opacities.push_back(opacity);
     }
+    Size measure_text_utf8(std::string_view text, FontSpec font) override {
+        ++text_measurements;
+        measured_text_bytes += text.size();
+        const Size measured = Painter::measure_text_utf8(text, font);
+        return measured;
+    }
 
     std::uint64_t saves{};
     std::uint64_t restores{};
@@ -104,6 +110,8 @@ public:
     std::uint64_t rounded_strokes{};
     std::uint64_t gradients{};
     std::uint64_t lines{};
+    std::size_t text_measurements{};
+    std::size_t measured_text_bytes{};
     Rect last_fill_bounds{};
     Color last_fill_color{};
     Rect last_rounded_stroke_bounds{};
@@ -964,6 +972,55 @@ void test_label_wrapping_reuses_live_text_without_retaining_paragraph_storage() 
             "scratch reuse must preserve explicit empty paragraphs and normalized word spacing");
 }
 
+void test_label_line_limit_bounds_hidden_wrapping_work() {
+    std::string source{};
+    source.reserve(65536U);
+    for (std::size_t index = 0U; index < 4096U; ++index) source.append("one two three x ");
+    const std::shared_ptr<Label> label = make_control<Label>(StableId("label.preview-cost"), source);
+    (*label).set_requested_bounds({0.0, 0.0, 190.0, 108.0});
+    (*label).set_font({FontRole::content, 13.0, 400, false});
+    (*label).set_text_wrapping(TextWrapping::word);
+    (*label).set_maximum_lines(7U);
+    Window window(label, {190.0, 108.0});
+    window.perform_layout();
+    RecordingPainter painter{};
+    (*label).on_paint(painter, {0.0, 0.0, 190.0, 108.0});
+    std::cout << "label preview cost: bytes=" << source.size()
+              << " drawn_lines=" << painter.texts.size()
+              << " width_queries=" << painter.text_measurements
+              << " queried_bytes=" << painter.measured_text_bytes << '\n';
+    require(painter.texts.size() == 7U, "line-limited preview must paint seven lines");
+    require(painter.text_measurements < 200U && painter.measured_text_bytes < 4096U,
+        "seven-line preview must stop measuring hidden words after its visible prefix");
+}
+
+void test_label_line_limit_preserves_unlimited_prefix() {
+    const std::array<std::string_view, 8> inputs{
+        "", "\n\nlast\n", "  ab\t cd  \n\n  ef  ", "ab abcdef abcdef z",
+        "画布工具可以使用键盘调整坐标并绘制连续线条",
+        "a\xCC\x81" "bcdef a\xCC\x81" "bcdef",
+        "\xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x9A\x80" "abcd end",
+        "one\r\ntwo\r\nthree"};
+    const std::array<double, 3> widths{0.0, 30.0, 120.0};
+    const std::array<TextWrapping, 2> modes{TextWrapping::no_wrap, TextWrapping::word};
+    const FontSpec font{};
+    const TextWidthResolver resolver{LabelGraphemeWidth{}};
+    for (const TextWrapping mode : modes) {
+        for (const double width : widths) {
+            for (const std::string_view input : inputs) {
+                const std::vector<std::string> complete = label_lines(input, font, width, mode, resolver);
+                for (std::size_t limit = 1U; limit <= complete.size() + 1U; ++limit) {
+                    std::vector<std::string> expected = complete;
+                    expected.resize(std::min(limit, complete.size()));
+                    const std::vector<std::string> bounded = label_lines(input, font, width, mode, resolver, limit);
+                    require(bounded == expected,
+                        "line limit must preserve the exact unlimited prefix including graphemes and empty paragraphs");
+                }
+            }
+        }
+    }
+}
+
 void test_owner_decoration_is_retained_and_owner_relative() {
     std::shared_ptr<gui_forms::Button> button = make_control<Button>(
         StableId("decoration.owner"), "Owner");
@@ -1547,6 +1604,8 @@ int main() {
         test_fixed_label_text_is_paint_only();
         test_label_multiline_wrapping_and_alignment();
         test_label_wrapping_reuses_live_text_without_retaining_paragraph_storage();
+        test_label_line_limit_bounds_hidden_wrapping_work();
+        test_label_line_limit_preserves_unlimited_prefix();
         test_owner_decoration_is_retained_and_owner_relative();
         test_basic_control_layout_customization_is_bounded_and_atomic();
         test_label_inherits_theme_typography_until_explicitly_overridden();
