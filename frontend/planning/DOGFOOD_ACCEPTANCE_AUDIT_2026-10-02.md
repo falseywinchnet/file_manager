@@ -109,3 +109,46 @@ limits/downsampling, useful format coverage, deferred/background work budgets,
 thumbnail/index contracts and the rest of the initial register. A visible
 sibling chat, `Audit File Manager Details against interviews`, owns only
 `DETAILS_ACCEPTANCE_AUDIT_2026-10-02.md` in its current audit stage.
+
+## Second repair: avoid wrapping hidden preview lines
+
+**MEASURED defect:** `Label::measure` and `Label::paint_label_text` previously
+called `label_lines` on the entire text, then resized the completed line vector
+to `maximum_lines`. In a Windows Release renderer-neutral probe with 65,536
+ASCII bytes (`one two three x ` repeated 4,096 times), 190×108 logical bounds,
+13-unit font and seven visible lines, one paint issued **32,774** width queries
+covering **335,998** bytes before drawing seven lines. The new work-budget
+assertion failed on the old implementation.
+
+**Implemented:** the source-private wrapping helper accepts the existing
+Label line limit, stops after producing the exact requested prefix, and retains
+zero as unlimited. Both measure and paint use it. Named local resolver objects
+replace the two anonymous captured callbacks in the touched Label functions;
+their control/painter borrows last only for the synchronous wrapping call.
+
+**MEASURED result, same probe:** **92** width queries covering **1,028** bytes,
+still seven drawn lines. This is a work-count reduction, not a measured native
+latency speedup. Basic-controls tests pass, including a differential corpus
+comparing limited output to the exact unlimited prefix across empty text,
+blank/trailing lines, tabs/whitespace, long words, CJK, combining marks, joined
+emoji, CRLF, no-wrap/word-wrap, three widths and every relevant line limit.
+
+**Scope/review:** changes are confined to
+`gui_forms/src/controls/basic/basic_control_rendering.hpp/.cpp`,
+`gui_forms/src/controls/label/label.cpp`, and
+`gui_forms/tests/basic_controls_tests.cpp`. Source review covers the changed
+wrapping traversal, publication/early-return points, named borrowed resolvers
+and added fixtures. No per-character allocation was added; existing line
+scratch remains reusable inside each paragraph, and returned lines own their
+strings. Limit selection happens before traversal. Scanner reports zero
+spelling candidates in these four files. Remaining legacy costs include a full
+display-string copy, finding paragraph/word ends, and constructing grapheme
+metadata for a single oversized unbroken word. No claim of constant work for
+all Unicode inputs or complete legacy house-style compliance is made.
+
+Related Windows Release GUI.Forms checks passed **4/4** (basic controls,
+collection controls, application contract and menu controls), 0.30 seconds.
+That local development build includes the preserved title/menu sibling patch;
+the committed native CI build is the clean verification authority for the
+separately committed preview/label changes. No shared development SDK was
+exported as part of this repair.

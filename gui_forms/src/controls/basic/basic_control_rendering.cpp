@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 
@@ -115,16 +116,19 @@ Rect aligned_rect(Rect bounds, Size size,
 }
 
 std::vector<std::string> label_lines(std::string_view text, FontSpec font,
-                                     double width, TextWrapping wrapping) {
+                                     double width, TextWrapping wrapping,
+                                     std::size_t maximum_lines) {
     const TextWidthResolver resolve_width{EstimatedWidth{font}};
-    std::vector<std::string> lines = label_lines(text, font, width, wrapping, resolve_width);
+    std::vector<std::string> lines = label_lines(text, font, width, wrapping, resolve_width, maximum_lines);
     return lines;
 }
 
 std::vector<std::string> label_lines(
     std::string_view text, FontSpec font, double width, TextWrapping wrapping,
-    const TextWidthResolver& resolve_width) {
+    const TextWidthResolver& resolve_width, const std::size_t maximum_lines) {
     std::vector<std::string> lines{};
+    const std::size_t line_limit = maximum_lines == 0U
+        ? std::numeric_limits<std::size_t>::max() : maximum_lines;
     const bool wrap_paragraphs = wrapping != TextWrapping::no_wrap && !(width <= 4.0);
     std::size_t paragraph_start{};
     while (paragraph_start <= text.size()) {
@@ -135,6 +139,7 @@ std::vector<std::string> label_lines(
             text.substr(paragraph_start, paragraph_end - paragraph_start);
         if (!wrap_paragraphs || paragraph.empty()) {
             lines.emplace_back(paragraph);
+            if (lines.size() >= line_limit) return lines;
         } else {
             // Build and measure in reusable line storage. Its capacity grows
             // only for a larger candidate, not for whitespace or paragraph size.
@@ -171,6 +176,7 @@ std::vector<std::string> label_lines(
                             line.resize(previous_length);
                             if (line.back() == ' ') { line.pop_back(); }
                             lines.push_back(line);
+                            if (lines.size() >= line_limit) return lines;
                             line.assign(cluster);
                         }
                     }
@@ -185,12 +191,14 @@ std::vector<std::string> label_lines(
                 if (previous_length != 0U && resolve_width(line) > width) {
                     line.resize(previous_length);
                     lines.push_back(line);
+                    if (lines.size() >= line_limit) return lines;
                     line.assign(word);
                 }
                 cursor = word_end;
             }
             if (!line.empty()) {
                 lines.push_back(line);
+                if (lines.size() >= line_limit) return lines;
             } else if (paragraph.empty()) {
                 lines.emplace_back();
             }

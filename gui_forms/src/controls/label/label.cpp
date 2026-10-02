@@ -13,6 +13,26 @@
 #include <vector>
 
 namespace gui_forms {
+namespace {
+// These resolvers borrow their host only for the synchronous label_lines call.
+struct LabelWidth final {
+    const Label& label;
+    FontSpec font{};
+    double operator()(const std::string_view value) const {
+        const ResolvedTextLayout layout = label.resolve_text_layout_utf8(value, font);
+        return layout.logical_size.width;
+    }
+};
+
+struct PainterLabelWidth final {
+    Painter& painter;
+    FontSpec font{};
+    double operator()(const std::string_view value) const {
+        const ResolvedTextLayout layout = painter.resolve_text_layout_utf8(value, font);
+        return layout.logical_size.width;
+    }
+};
+} // namespace
 
 Label::Label(StableId stable_id, std::string text)
     : Control(std::move(stable_id)), text_(std::move(text)) {
@@ -306,14 +326,9 @@ Size Label::measure(Size available) {
     const FontSpec font = effective_font((*this).font());
     const double wrap_width = requested.width > 0.0
         ? requested.width : available.width;
-    const auto resolve = [this, font](std::string_view value) {
-        return resolve_text_layout_utf8(value, font).logical_size.width;
-    };
+    const TextWidthResolver resolve{LabelWidth{*this, font}};
     std::vector<std::string> lines = label_lines(
-        text, font, std::max(0.0, wrap_width - 4.0), text_wrapping_, resolve);
-    if (maximum_lines_ != 0U && lines.size() > maximum_lines_) {
-        lines.resize(maximum_lines_);
-    }
+        text, font, std::max(0.0, wrap_width - 4.0), text_wrapping_, resolve, maximum_lines_);
     double content_width{};
     double line_height{};
     for (const std::string& line : lines) {
@@ -351,14 +366,9 @@ std::string Label::display_text() const {
 void Label::paint_label_text(Painter& painter, std::string_view text) const {
     const Rect arranged = committed_arranged_bounds();
     const FontSpec font = effective_font((*this).font());
-    const auto resolve = [&painter, font](std::string_view value) {
-        return painter.resolve_text_layout_utf8(value, font).logical_size.width;
-    };
+    const TextWidthResolver resolve{PainterLabelWidth{painter, font}};
     std::vector<std::string> lines = label_lines(
-        text, font, std::max(0.0, arranged.width - 4.0), text_wrapping_, resolve);
-    if (maximum_lines_ != 0U && lines.size() > maximum_lines_) {
-        lines.resize(maximum_lines_);
-    }
+        text, font, std::max(0.0, arranged.width - 4.0), text_wrapping_, resolve, maximum_lines_);
     std::vector<ResolvedTextLayout> metrics;
     metrics.reserve(lines.size());
     double line_height{};

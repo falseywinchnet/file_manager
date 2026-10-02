@@ -26,12 +26,16 @@ BindingValue picture_box_size_mode_value(PictureBoxSizeMode mode);
     TextImageRelation relation) noexcept;
 [[nodiscard]] Rect aligned_rect(Rect bounds, Size size,
                                 ContentAlignment alignment) noexcept;
+// Zero admits all lines. A positive limit returns the exact unlimited prefix
+// and stops resolving widths once that many complete lines are available.
+// The resolver is borrowed synchronously and is never retained.
 [[nodiscard]] std::vector<std::string> label_lines(
-    std::string_view text, FontSpec font, double width, TextWrapping wrapping);
+    std::string_view text, FontSpec font, double width, TextWrapping wrapping,
+    std::size_t maximum_lines = 0U);
 using TextWidthResolver = std::function<double(std::string_view)>;
 [[nodiscard]] std::vector<std::string> label_lines(
     std::string_view text, FontSpec font, double width, TextWrapping wrapping,
-    const TextWidthResolver& resolve_width);
+    const TextWidthResolver& resolve_width, std::size_t maximum_lines = 0U);
 void paint_relief(Painter& painter, Rect bounds,
                   const BasicControlStyle& style, bool pressed);
 void fill_radio_disc(Painter& painter, double left, double top, Color color,
