@@ -722,3 +722,88 @@ unsupported until its actual compatibility and frame behavior are established.
 Source/fixture review and native integration evidence remain pending; no installed
 backend capability or SDK availability is claimed. This work is separate from
 the P1 candidate and does not select a print backend.
+
+## D2 prepared visible-window reconciliation — candidate 001
+
+Status: **CANDIDATE canonical development draft; records only. No new ADR,
+executable assignment, registry availability, public ABI or SDK export.**
+
+The next concrete target is recorded in
+[GUI_PREPARED_WINDOW_DEVELOPMENT.md](../spec/contracts/GUI_PREPARED_WINDOW_DEVELOPMENT.md).
+It proposes a bounded multiparagraph visible window as one batch generation
+under one authority. Exporting the existing paragraph-only facade would not
+supply the usable paged-view prerequisite. D1/A2 implementation evidence remains
+separate from this proposed extension, and the planning-only Text Editor gates
+remain unchanged.
+
+**OBSERVED source and provider D2 review:** the current service permits only one
+unjoined session. That session owns its worker, and font banks must belong to
+the same service ledger. Valid `desire` advances the session's one authority;
+preparing each paragraph separately cannot keep all earlier rows current.
+The worker calls its wake target under the session mutex. Ordinary posted UI
+callbacks can refuse at the 4096-entry limit. The new contract identifies the
+source files inspected; these observations do not establish a new implementation.
+
+**CANDIDATE reconciliation:** an explicitly application-owned projection
+controller shares its exclusive session and immutable batch only between
+mirrors of the same projection/layout identity. Independent viewports, fields
+or dialogs need explicitly separate services under the current model. They
+must not revoke the main projection. No hidden per-control worker, multi-session
+service or cross-ledger font sharing is admitted by calling a service shared.
+
+The batch includes complete paragraph descriptors, exact consumed separator
+extents, blank-row metrics and certified empty EOF. All rows share the existing
+16 KiB prepared display, 65,536-byte source/context, 8 MiB payload, 16 MiB
+first-party workspace and three-generation/24 MiB retained bounds. Limits are
+combined, never multiplied by row count. One active batch, one occupied
+replacement and retired command/frame owners participate in those counts;
+cancellation is not retirement. Full D1 token plus projection/configuration
+identity travels with requests, mappings and results. Projection change requires
+a new D1 token; no label reverse parsing or synthetic source offsets are allowed.
+
+**OBSERVED consumer reply relayed by the coordinator:** SwiftEdit recommends
+512 visible-plus-overscan row descriptors as a development candidate under the
+same aggregate limits. Viewport-derived excess must refuse explicitly, without
+silent truncation. Empty file, consecutive blank lines, CR/LF/CRLF and trailing
+separator need exact coverage, row baseline/height and a zero-length EOF source
+anchor. Separators are consumed as metadata, not injected glyphs. That EOF
+anchor is source-extent evidence; certified visual caret/hit geometry remains
+future work. The 16 KiB long-paragraph refusal is an open product requirement,
+not an accepted owner line/document limit.
+
+**CANDIDATE completion law:** require an owner-supplied lifetime-bound host wake
+and UI drain path that remains reliable when the ordinary callback queue is
+full. The worker-side wake only signals; it neither inspects session state under
+the worker lock nor executes UI work. UI drain owns adoption/rejection and
+coherent invalidation/notification outside paint. Detach, close, lost-wake races,
+failed replacement and full-queue behavior need explicit fixtures. Existing
+noninterruptible shaping and executor-owned join have no new latency guarantee.
+
+Current readiness means a fully admitted paint-ready batch, not native
+presentation. Previous coverage metadata cannot authorize revoked glyphs;
+recorded/staged work is not a presented frame. Actual native receipts remain
+the presentation evidence. Pending, previous and unavailable states must not
+appear as editable current geometry. Source selection/copy remains consumer-owned.
+
+The consumer identifies plain-source visual batches as a useful intermediate.
+CSV cells/formula displays and Markdown-derived synthetic/noneditable content
+need explicit projection mappings, not display-equals-source arithmetic.
+Wrapping, tabs, long-line continuation, exact global scroll extent, visual
+caret/bidi affinity, pointer/multiple selection, editing and P1 printing remain
+open. Screen batch success does not close those requirements.
+
+Provider agreement remains pending for concrete batch/descriptor records,
+aggregate allocation accounting and host readiness connection/drain ownership.
+Consumer feedback above supplies concrete constraints, not unilateral public
+record acceptance. Final descriptor/anchor encoding and supported separator
+profile still require matched provider/consumer reconciliation. No executable
+work is assigned by this note; the coordinator retains implementation ownership
+coordination and availability decisions.
+
+Records-only manual review against `planning/PROGRAMMING_HOUSE_STYLE.md` covered
+the complete new contract and this addition: units/types, named operations,
+retained and borrowed ownership, lock/executor order, validation and conversion
+rules, explicit failure states, repeated-work storage and retained-budget
+accounting. No implementation or inherited source is certified. Functional and
+native tests remain future implementation evidence; no Rust build/test rerun is
+claimed for these two Markdown edits.
