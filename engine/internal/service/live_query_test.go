@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"filemanager/engine/api"
@@ -159,6 +160,16 @@ func TestLiveQueryDoesNotTraverseDirectorySymlink(t *testing.T) {
 	canonicalSource, err := filepath.EvalSymlinks(source)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// Windows intentionally refuses reparse-point identity until its no-follow
+	// adapter is admitted. Still require explicit unavailable state, no target
+	// result, and exactly one visited entry: the link must never be traversed.
+	if runtime.GOOS == "windows" {
+		if !page.Complete || len(page.Results) != 0 || len(page.UnavailablePaths) != 1 ||
+			page.UnavailablePaths[0] != "needle-link" || page.Work.VisitedEntries != 1 || len(page.Warnings) < 2 {
+			t.Fatalf("Windows symlink refusal did not preserve traversal boundary: %+v", page)
+		}
+		return
 	}
 	if !page.Complete || len(page.Results) != 1 || page.Results[0].Metadata.Kind != api.ObjectSymlink || page.Results[0].Object.Path != filepath.Join(canonicalSource, "needle-link") {
 		t.Fatalf("symlink live results = %+v", page)
