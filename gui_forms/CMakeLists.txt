@@ -2463,6 +2463,18 @@ if(GUI_FORMS_BUILD_TESTS)
             target_sources(${native_fixture} PRIVATE
                 ${GUI_FORMS_GALLERY_FONTS} ${GUI_FORMS_GALLERY_FONT_NOTICES})
         endforeach()
+        if(TARGET gui_forms_prepared_text)
+            add_executable(gui_forms_macos_prepared_text_host_tests MACOSX_BUNDLE
+                tests/macos_prepared_text_host_tests.mm
+                ${GUI_FORMS_GALLERY_FONTS} ${GUI_FORMS_GALLERY_FONT_NOTICES})
+            target_compile_options(gui_forms_macos_prepared_text_host_tests PRIVATE -fobjc-arc)
+            target_link_libraries(gui_forms_macos_prepared_text_host_tests PRIVATE
+                gui_forms_host_macos gui_forms_prepared_text)
+            add_test(NAME gui_forms_macos_prepared_text_host_tests
+                COMMAND gui_forms_macos_prepared_text_host_tests
+                    "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+            set_tests_properties(gui_forms_macos_prepared_text_host_tests PROPERTIES TIMEOUT 90)
+        endif()
     endif()
 
     if(TARGET gui_forms_skia)
