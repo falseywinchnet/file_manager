@@ -8,13 +8,16 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <unistd.h>
 

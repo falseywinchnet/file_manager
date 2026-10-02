@@ -109,6 +109,11 @@ PreviewResult load_preview(const std::filesystem::path& protected_root,
                            const std::filesystem::path& selected_path,
                            const ObjectIdentity& expected_identity,
                            const CancellationCheck& cancelled) {
+    if (cancelled && cancelled()) {
+        const PreviewResult failure_result = terminal(PreviewKind::unavailable, "cancelled",
+            "preview cancelled", selected_path);
+        return failure_result;
+    }
     std::filesystem::path root{};
     try {
         root = canonical_existing_directory(protected_root);

@@ -38,6 +38,8 @@ void write(const std::filesystem::path& path, const std::string_view bytes) {
     output.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
 }
 
+bool already_cancelled() { return true; }
+
 } // namespace
 
 int main() {
@@ -45,6 +47,12 @@ int main() {
         const std::filesystem::path root = std::filesystem::temp_directory_path() /
             ("file-manager-preview-" + std::to_string(::getpid()));
         const FixtureDirectory fixture(root);
+        const std::filesystem::path absent_root = root / "never-created";
+        const file_manager::PreviewResult cancelled = file_manager::load_preview(
+            absent_root, absent_root / "obsolete.txt", {}, already_cancelled);
+        require(cancelled.code == "cancelled" && cancelled.text_utf8.empty() &&
+                    cancelled.png_bytes.empty(),
+                "already-cancelled preview must retire before resolving an unavailable root");
         const std::filesystem::path text = root / "notes Ω.md";
         write(text, "# Hello\n\nUTF-8 Ω\tline\n");
         file_manager::PreviewResult result = file_manager::load_preview(
