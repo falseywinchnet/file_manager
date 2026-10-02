@@ -758,6 +758,7 @@ void Application::install_dynamic_controls() {
     preview_text_ = std::make_shared<gui_forms::Label>(
         gui_forms::StableId("fm.inspector.preview.text"));
     (*preview_text_).set_font({gui_forms::FontRole::content, 13.0, 400, false});
+    (*preview_text_).set_foreground(gui_forms::Color::rgba(219, 232, 239));
     (*preview_text_).set_requested_bounds({0, 0, 190, 108});
     (*preview_text_).set_text_style_role(gui_forms::TextStyleRole::monospace);
     (*preview_text_).set_text_wrapping(gui_forms::TextWrapping::word);
@@ -790,7 +791,7 @@ void Application::install_dynamic_controls() {
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface).add_child(
         form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph);
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview).set_minimum_size(
-        {0, 224});
+        {0, 260});
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface).set_minimum_size(
         {0, 174});
 
@@ -849,10 +850,10 @@ void Application::install_dynamic_controls() {
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview).set_dock(
         gui_forms::DockStyle::top);
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview).set_requested_bounds(
-        {0, 0, 288, 224});
+        {0, 0, 288, 260});
     (*property_list_).set_dock(gui_forms::DockStyle::fill);
     (*property_list_).set_header_content(
-        form_.file_manager_app_shell_workspace_selection_inspector_facts_preview, 224.0);
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_preview, 260.0);
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts).add_child(
         property_list_);
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts).set_flex_grow(
@@ -1993,13 +1994,26 @@ void Application::focus_active_object_surface() {
 void Application::update_adaptive_preview() {
     const bool selected = !(*objects_).selected_ids().empty();
     const double height = (*form_.file_manager_app_shell).committed_arranged_bounds().height;
-    const bool expanded = selected && (height == 0.0 || height >= 560.0);
+    const bool automatic_expansion = height == 0.0 || height >= 560.0;
+    const bool expanded = selected && preview_expanded_override_.value_or(automatic_expansion);
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface).set_visible(expanded);
-    const double preview_height = expanded ? 224.0 : 54.0;
+    gui_forms::Button& toggle = *form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_toggle;
+    toggle.set_enabled(selected);
+    toggle.set_text(expanded ? "Hide preview" : "Show preview");
+    toggle.set_accessible_name(expanded ? "Hide selected file preview" : "Show selected file preview");
+    const double preview_height = expanded ? 260.0 : 81.0;
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview).set_minimum_size({0.0, preview_height});
     gui_forms::Rect requested = (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview).requested_bounds();
     requested.height = preview_height;
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview).set_requested_bounds(requested);
+    if (property_list_) (*property_list_).set_header_height(preview_height);
+}
+
+void Application::toggle_preview() {
+    if ((*objects_).selected_ids().empty()) return;
+    const bool expanded = (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface).visible();
+    preview_expanded_override_ = !expanded;
+    update_adaptive_preview();
 }
 
 void Application::update_adaptive_layout(const gui_forms::Rect bounds) {
@@ -2318,6 +2332,8 @@ void Application::install_handlers() {
     bind_button_action(form_.file_manager_app_shell_workspace_selection_content_heading_more_results,
           std::bind_front(&Application::request_more_results, this));
     bind_button_action(criteria_add_button_, std::bind_front(&Application::add_criteria_module, this));
+    bind_button_action(form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_toggle,
+        std::bind_front(&Application::toggle_preview, this));
     bind_button_action(form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_open,
           CommandExecution{command_open_, "fm.button.file.open"});
     bind_button_action(form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_checksum,
@@ -4028,6 +4044,7 @@ void Application::apply_preview(PreviewResult result, std::string stable_id,
     }
     reset_preview();
     if (result.kind == PreviewKind::text) {
+        if (result.text_utf8.empty()) result.text_utf8 = "Empty text file";
         (*preview_text_).set_text(std::move(result.text_utf8));
         (*preview_text_).set_visible(true);
         (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph).set_visible(false);
@@ -4046,17 +4063,16 @@ void Application::apply_preview(PreviewResult result, std::string stable_id,
                 "Image · bounded PNG preview");
             return;
         }
-        result.code = "png-decode-failed";
-        result.message = "GUI.Forms rejected the encoded PNG";
+        result.code = "png-resource-rejected";
+        const std::string_view reason = gui_forms::image_resource_error_name(loaded.error);
+        result.message = "This PNG could not be displayed. Reason: ";
+        result.message.append(reason);
     }
-    (*preview_house_icon_).set_image_key(
-        std::string(house_art::object_key((*selected).kind)));
-    (*preview_house_icon_).set_accessible_name(
-        kind_text(*selected) + " material icon");
-    (*preview_house_icon_).set_visible(true);
+    (*preview_text_).set_text(result.message);
+    (*preview_text_).set_visible(true);
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph).set_visible(false);
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind).set_text(
-        kind_text(*selected) + " · " + result.message);
+        kind_text(*selected) + " · preview unavailable");
 }
 
 void Application::update_selection(const std::string_view stable_id) {

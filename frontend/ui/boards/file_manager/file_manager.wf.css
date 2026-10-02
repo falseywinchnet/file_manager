@@ -498,6 +498,12 @@ button {
   box-shadow: inset 0 0 0 2px #edf4f8;
 }
 
+.preview-toggle {
+  height: 26px;
+  min-height: 26px;
+  font-size: 12px;
+}
+
 .preview-glyph {
   color: #9db0bf;
   font-size: 18px;

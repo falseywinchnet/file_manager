@@ -7,6 +7,7 @@
 #include <cerrno>
 #include <cstring>
 #include <cctype>
+#include <optional>
 
 namespace file_manager {
 namespace {
@@ -38,7 +39,10 @@ bool text_extension(std::string extension) {
     return supported;
 }
 
-bool valid_utf8(const std::string_view value) noexcept {
+// Return the complete UTF-8 prefix. Only a code point cut by our read limit
+// may be omitted; incomplete data at the actual end of a file is malformed.
+std::optional<std::size_t> utf8_preview_extent(const std::string_view value,
+                                             const bool truncated) noexcept {
     std::size_t index{};
     while (index < value.size()) {
         const unsigned char first = static_cast<unsigned char>(value[index]);
@@ -58,12 +62,20 @@ bool valid_utf8(const std::string_view value) noexcept {
             continuation = 3U;
             codepoint = first & 0x07U;
         } else {
-            return false;
+            return std::nullopt;
         }
-        if (index + continuation >= value.size()) return false;
+        if (index + continuation >= value.size()) {
+            if (!truncated) return std::nullopt;
+            const std::size_t remaining = value.size() - index - 1U;
+            for (std::size_t offset = 1U; offset <= remaining; ++offset) {
+                const unsigned char byte = static_cast<unsigned char>(value[index + offset]);
+                if ((byte & 0xc0U) != 0x80U) return std::nullopt;
+            }
+            return index;
+        }
         for (std::size_t offset = 1U; offset <= continuation; ++offset) {
             const unsigned char byte = static_cast<unsigned char>(value[index + offset]);
-            if ((byte & 0xc0U) != 0x80U) return false;
+            if ((byte & 0xc0U) != 0x80U) return std::nullopt;
             codepoint = (codepoint << 6U) | (byte & 0x3fU);
         }
         if ((continuation == 1U && codepoint < 0x80U) ||
@@ -71,11 +83,12 @@ bool valid_utf8(const std::string_view value) noexcept {
             (continuation == 3U && codepoint < 0x10000U) ||
             codepoint > 0x10ffffU ||
             (codepoint >= 0xd800U && codepoint <= 0xdfffU)) {
-            return false;
+            return std::nullopt;
         }
         index += continuation + 1U;
     }
-    return true;
+    const std::size_t extent = value.size();
+    return extent;
 }
 
 std::string readable_text(std::string value, const bool truncated) {
@@ -136,7 +149,7 @@ PreviewResult load_preview(const std::filesystem::path& protected_root,
     const bool text = text_extension(lowered);
     if (!png && !text) {
         const PreviewResult failure_result = terminal(PreviewKind::unsupported, "format-unavailable",
-                        "no first-party preview is admitted for this format",
+                        "Preview is not available for this file type. Supported now: PNG images and UTF-8 text files.",
                         path);
         return failure_result;
     }
@@ -217,17 +230,23 @@ PreviewResult load_preview(const std::filesystem::path& protected_root,
         result.message = "bounded PNG preview";
         result.png_bytes = std::move(bytes);
     } else {
-        std::string value(reinterpret_cast<const char*>(bytes.data()), bytes.size());
-        if (value.find('\0') != std::string::npos || !valid_utf8(value)) {
+        std::string value{};
+        if (!bytes.empty()) {
+            value.assign(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+        }
+        const bool truncated = total > maximum_text_preview_bytes;
+        const std::optional<std::size_t> extent = utf8_preview_extent(value, truncated);
+        if (value.find('\0') != std::string::npos || !extent) {
             const PreviewResult failure_result = terminal(PreviewKind::unsupported, "not-utf8-text",
                             "text preview requires valid UTF-8 without NUL bytes",
                             path);
         return failure_result;
         }
+        value.resize(*extent);
         result.kind = PreviewKind::text;
         result.message = "bounded UTF-8 text preview";
         result.text_utf8 = readable_text(
-            std::move(value), total > maximum_text_preview_bytes);
+            std::move(value), truncated);
     }
     return result;
 }

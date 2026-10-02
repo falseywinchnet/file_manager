@@ -2,6 +2,7 @@
 #include "file_manager/preview.hpp"
 
 #include <cstdlib>
+#include <array>
 #include <stdexcept>
 #include <filesystem>
 #include <fstream>
@@ -52,6 +53,31 @@ int main() {
                     result.text_utf8.find("UTF-8 Ω") != std::string::npos &&
                     result.text_utf8.find('\t') == std::string::npos,
                 "UTF-8 text must produce a bounded readable preview");
+
+        const std::filesystem::path bounded_text = root / "bounded.txt";
+        const std::array<std::string_view, 3> codepoints{"\xc2\xa2", "\xe2\x82\xac", "\xf0\x9f\x8c\x8d"};
+        for (const std::string_view codepoint : codepoints) {
+            for (std::size_t retained = 1U; retained < codepoint.size(); ++retained) {
+                const std::size_t prefix_size = file_manager::maximum_text_preview_bytes - retained;
+                const std::string prefix(prefix_size, 'a');
+                std::string input = prefix;
+                input.append(codepoint);
+                input.append("after bound");
+                write(bounded_text, input);
+                result = file_manager::load_preview(root, bounded_text, file_manager::observe_identity(bounded_text));
+                const std::string expected = prefix + "\n\n… preview limited to 64 KiB";
+                require(result.kind == file_manager::PreviewKind::text && result.text_utf8 == expected,
+                    "read limit inside a UTF-8 code point must retain the complete readable prefix");
+            }
+        }
+        write(bounded_text, "incomplete \xe2\x82");
+        result = file_manager::load_preview(root, bounded_text, file_manager::observe_identity(bounded_text));
+        require(result.kind == file_manager::PreviewKind::unsupported,
+            "an incomplete code point at real EOF must remain malformed");
+        write(bounded_text, "");
+        result = file_manager::load_preview(root, bounded_text, file_manager::observe_identity(bounded_text));
+        require(result.kind == file_manager::PreviewKind::text && result.text_utf8.empty(),
+            "an empty text file must produce a valid empty preview");
 
         const std::filesystem::path png = root / "image.png";
         const std::string png_signature("\x89PNG\r\n\x1a\n", 8);
