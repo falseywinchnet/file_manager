@@ -17,3 +17,7 @@ not a host-font lookup, application default/fallback replacement, installed SDK
 asset or adoption of Games' fonts. Its presence alone proves no shaping result;
 the provider must check coverage and exercise contextual behavior. No font bytes
 were modified, subset or renamed internally.
+
+The upstream license retains its original whitespace; Git's whitespace checker
+reports its trailing space/blank line. Those vendor bytes are intentionally
+preserved, and the local attributes disable newline conversion for its hash.
