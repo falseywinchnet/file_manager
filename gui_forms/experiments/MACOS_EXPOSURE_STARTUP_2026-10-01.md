@@ -38,3 +38,8 @@ code are not newly certified. No product host or renderer source changes.
 `git diff --check` passes. Objective-C++ compilation and native execution of this
 correction remain pending CI; the Windows coordinator cannot claim a local Mac
 test pass. The original failed run remains evidence.
+
+The optional focused-CPU workflow step now records an attempt even when another
+native test failed. Its runner reports a missing executable if compilation did
+not finish. A diagnostic result cannot turn a failed SDK job into a passing one;
+this separates measurement availability from unrelated regression acceptance.
