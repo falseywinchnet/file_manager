@@ -107,8 +107,11 @@ GUI.Forms source and generated Web.Forms output require their own review.
 **Remaining:** native macOS reproduction, renderer pixel acceptance, large-image
 limits/downsampling, useful format coverage, deferred/background work budgets,
 thumbnail/index contracts and the rest of the initial register. A visible
-sibling chat, `Audit File Manager Details against interviews`, owns only
-`DETAILS_ACCEPTANCE_AUDIT_2026-10-02.md` in its current audit stage.
+sibling chat, `Audit File Manager Details against interviews`, completed its
+audit and now owns the bounded ObjectView Details development model/control
+and collection tests. Frontend integration and canonical contract reconciliation
+remain with the parent. See `DETAILS_ACCEPTANCE_AUDIT_2026-10-02.md` and
+`../../gui_forms/docs/OBJECT_VIEW_DETAILS_DEVELOPMENT_001.md`.
 
 ## Second repair: avoid wrapping hidden preview lines
 
@@ -152,3 +155,29 @@ That local development build includes the preserved title/menu sibling patch;
 the committed native CI build is the clean verification authority for the
 separately committed preview/label changes. No shared development SDK was
 exported as part of this repair.
+
+## macOS application pixel regression — implementation awaiting native run
+
+`tests/macos_preview_tests.mm` constructs the actual File Manager Application,
+starts the public macOS host and selects generated ordinary UTF-8 TXT, a known
+opaque cyan PNG and an unsupported binary-extension file through public
+semantic selection. Each stage waits for its real asynchronous completion and
+samples the preview control's window-space region in an AppKit bitmap snapshot.
+TXT and unsupported explanation require light text pixels; PNG requires its
+known cyan pixels. A timeout retains a native snapshot in CI diagnostics.
+
+This closes a test-coverage gap only after it passes on macOS. Snapshot display
+can force painting: this test does not establish ordinary pointer delivery,
+selection latency, smooth animation, format completeness or acceptance on the
+owner's machine. Source-only review is not a native execution result.
+
+The new test, Apple-only CMake target and diagnostic artifact rule were reviewed
+for explicit types, named main-queue continuations, retained state ownership,
+window borrow lifetime, shutdown, bounded pixel traversal and generated-fixture
+cleanup. Main stops the worker before destroying the fixture; the fixture
+removes only a newly acquired directory. The color probe allocates an AppKit
+snapshot per attempt under an autorelease pool and scans only a bounded preview
+region; it is deliberately a correctness test, not a timing harness. Scanner
+reports zero candidates in the new Objective-C++ file. Windows CMake
+reconfiguration and the unaffected frontend tests pass **12/12**, 2.70 seconds.
+Native Mac compile/execution remain **pending** at this checkpoint.

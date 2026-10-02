@@ -278,4 +278,5 @@ jobs:
             .build/native-${{ matrix.platform }}/source-state-*.json
             .build/native-${{ matrix.platform }}/paint-cost/*
             .build/native-${{ matrix.platform }}/focused-cpu/*
+            .build/native-${{ matrix.platform }}/frontend/native-preview-failure.png
           if-no-files-found: ignore
