@@ -1292,6 +1292,78 @@ void test_details_sort_retires_capture() {
     }
 }
 
+struct DetailsCommitObserverFailure final {};
+
+struct DetailsCommitObserver final {
+    const ObjectView& view;
+    bool& called;
+    void operator()(const ObjectSelectionChange&) const {
+        called = true;
+        require(view.items().front().stable_id == "detail.7" &&
+            view.details_sort().column.value == "replacement-name" &&
+            view.details_sort().direction == ObjectSortDirection::descending &&
+            view.selected_ids().front() == "detail.6",
+            "postcommit listener must see reordered rows and their accepted indicator together");
+        throw DetailsCommitObserverFailure{};
+    }
+};
+
+void test_details_model_with_accepted_sort() {
+    const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.accepted.commit"));
+    ObjectView& view = *owner;
+    view.set_requested_bounds({0.0, 0.0, 230.0, 190.0});
+    view.set_view_mode(ObjectViewMode::details);
+    view.set_details_model(details_test_columns(), details_test_items(8U), {{"name"}, ObjectSortDirection::ascending});
+    view.set_selected_ids({"detail.2", "detail.6"}, "detail.6");
+    Window window(owner, {230.0, 190.0});
+    window.flush();
+    const bool focused = window.request_focus(owner);
+    require(focused, "atomic sort fixture must focus");
+    view.set_top_row(2U);
+    const std::array<ObjectDetailsSort, 4U> invalid_states{{
+        {{"missing"}, ObjectSortDirection::ascending},
+        {{"state"}, ObjectSortDirection::ascending},
+        {{"name"}, static_cast<ObjectSortDirection>(255)},
+        {{}, static_cast<ObjectSortDirection>(255)},
+    }};
+    for (const ObjectDetailsSort& invalid : invalid_states) {
+        bool rejected = false;
+        try { view.set_details_model(details_test_columns(), details_test_items(3U), invalid); }
+        catch (const std::invalid_argument&) { rejected = true; }
+        require(rejected && view.items().size() == 8U && view.items().front().stable_id == "detail.0" &&
+            view.details_sort().column.value == "name" && view.details_sort().direction == ObjectSortDirection::ascending &&
+            view.selected_id() == "detail.6" && view.selected_ids().size() == 2U &&
+            view.focused_id() == "detail.6" && view.selection_anchor_id() == "detail.6" && view.top_row() == 2U,
+            "invalid accepted state must preserve old model, indicator, selection, focus, anchor and top");
+    }
+    std::vector<ObjectDetailsColumn> columns = details_test_columns();
+    columns[0U].id.value = "replacement-name";
+    std::vector<ObjectViewItem> items = details_test_items(8U);
+    for (ObjectViewItem& item : items) {
+        for (ObjectDetailsCell& cell : item.cells) {
+            if (cell.column.value == "name") cell.column.value = "replacement-name";
+        }
+    }
+    std::reverse(items.begin(), items.end());
+    bool called = false;
+    SubscriptionToken observer = view.selection_changed().subscribe(DetailsCommitObserver{view, called});
+    bool threw = false;
+    try {
+        view.set_details_model(std::move(columns), std::move(items), {{"replacement-name"}, ObjectSortDirection::descending});
+    } catch (const DetailsCommitObserverFailure&) { threw = true; }
+    require(threw && called && view.items().front().stable_id == "detail.7" &&
+        view.details_sort().column.value == "replacement-name" &&
+        view.details_sort().direction == ObjectSortDirection::descending,
+        "throwing listener cannot leave the new model with the old accepted indicator");
+    observer.disconnect();
+    view.set_details_model(details_test_columns(), details_test_items(8U), {{"fact"}, ObjectSortDirection::descending});
+    view.set_details_model(details_test_columns(), details_test_items(8U));
+    require(view.details_sort().column.value == "fact" && view.details_sort().direction == ObjectSortDirection::descending,
+        "two-argument replacement retains surviving accepted sort");
+    view.set_details_model(details_test_columns(), details_test_items(8U), {});
+    require(view.details_sort().column.value.empty(), "explicit empty accepted sort clears indicator");
+}
+
 void test_details_transaction_and_identity() {
     const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.transaction"));
     ObjectView& view = *owner;
@@ -1382,6 +1454,23 @@ void test_details_transaction_and_identity() {
     require(offscreen_context, "offscreen semantic action must safely reveal its item");
 }
 
+void test_details_keyboard_sort_with_pending_layout() {
+    const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.pending-layout"));
+    ObjectView& view = *owner;
+    view.set_requested_bounds({0.0, 0.0, 230.0, 190.0});
+    view.set_view_mode(ObjectViewMode::details);
+    view.set_details_model(details_test_columns(), details_test_items(8U));
+    Window window(owner, {230.0, 190.0});
+    std::vector<ObjectDetailsSort> requests{};
+    SubscriptionToken subscription = view.sort_requested().subscribe(DetailsSortRecorder{requests});
+    window.request_focus(owner);
+    const bool focused = window.dispatch_key({KeyAction::down, PhysicalKey::f6});
+    view.invalidate(Dirty::measure | Dirty::arrange);
+    const bool handled = window.dispatch_key({KeyAction::down, PhysicalKey::enter});
+    require(focused && handled && requests.size() == 1U && requests.front().column == view.details_columns().front().id,
+            "pending layout must resolve before keyboard sort captures its context revision");
+}
+
 void test_details_header_input_resize_and_cache() {
     const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.input"));
     ObjectView& view = *owner;
@@ -1409,9 +1498,14 @@ void test_details_header_input_resize_and_cache() {
     const bool last_header = window.dispatch_key({KeyAction::down, PhysicalKey::end});
     require(last_header && view.horizontal_offset() > 0.0, "keyboard End must reveal the last header horizontally");
     const double old_width = view.details_columns()[2U].width;
-    const bool resized = window.dispatch_key({KeyAction::down, PhysicalKey::right, Modifier::alt});
+    const double previous_offset = view.horizontal_offset();
+    const bool history_chord = window.dispatch_key({KeyAction::down, PhysicalKey::right, Modifier::alt});
+    require(!history_chord && view.horizontal_offset() == previous_offset &&
+            view.details_columns()[2U].width == old_width,
+            "Alt history chord must remain available to the consumer");
+    const bool resized = window.dispatch_key({KeyAction::down, PhysicalKey::right, Modifier::alt | Modifier::shift});
     require(resized && view.details_columns()[2U].width == old_width + 8.0,
-        "keyboard Alt+Right must adjust the focused column");
+        "keyboard Alt+Shift+Right must adjust the focused column");
     const bool unsortable = window.dispatch_key({KeyAction::down, PhysicalKey::enter});
     require(unsortable && requests.size() == 2U, "unsortable headers must not fabricate requests");
     const bool body = window.dispatch_key({KeyAction::down, PhysicalKey::escape});
@@ -1573,9 +1667,11 @@ int main() {
         test_object_virtualization_view_preservation_and_input();
         test_object_multiselection_pointer_keyboard_and_semantics();
         test_details_transaction_and_identity();
+        test_details_model_with_accepted_sort();
         test_details_header_entry_reentrancy();
         test_details_mode_release_reentrancy();
         test_details_sort_retires_capture();
+        test_details_keyboard_sort_with_pending_layout();
         test_details_header_input_resize_and_cache();
         test_details_bounded_work();
         test_details_cold_long_text_measurement_bound();

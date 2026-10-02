@@ -6,9 +6,10 @@ File Manager requests retained factual columns through the reconciled
 [Details development contract](../../orchestrator/spec/contracts/GUI_OBJECT_DETAILS_DEVELOPMENT.md).
 The application owns metadata observations, availability, display labels,
 column policy and sorting; the provider owns collection mechanics. The reviewed
-provider candidate is not yet wired into File Manager. Existing history uses
-Alt+Left/Right, so proposed provider width/pan bindings require reconciliation
-before integration. Native conformance and independent matching-SDK consumption
+provider candidate is being wired into File Manager. Existing history uses
+Alt+Left/Right; the reconciled development width/pan chord is Alt+Shift+Left/Right,
+and plain Alt chords pass through the Details control. Enter routes to the
+focused header before the application object-opening command. Native conformance and independent matching-SDK consumption
 remain pending; this record does not advertise a delivered capability.
 
 Status: **round 010 settings/service/installed-Engine reconciliation recorded;

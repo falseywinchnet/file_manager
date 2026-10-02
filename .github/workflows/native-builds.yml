@@ -280,4 +280,5 @@ jobs:
             .build/native-${{ matrix.platform }}/focused-cpu/*
             .build/native-${{ matrix.platform }}/frontend/native-preview-failure.png
             .build/native-${{ matrix.platform }}/frontend/native-preview-failure.json
+            .build/native-${{ matrix.platform }}/frontend/native-details.png
           if-no-files-found: ignore

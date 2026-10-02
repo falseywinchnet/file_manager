@@ -3,6 +3,7 @@
 #include <cstring>
 #include <array>
 #include <limits>
+#include <utility>
 
 #if defined(_WIN32)
 #include <winioctl.h>
@@ -14,6 +15,95 @@
 #endif
 
 namespace file_manager {
+
+std::optional<ObservedFileTime> decode_native_time(
+    const std::int64_t seconds, const std::int64_t nanoseconds) noexcept {
+    if (nanoseconds < 0 || nanoseconds >= 1'000'000'000) return {};
+    const ObservedFileTime result{seconds, static_cast<std::uint32_t>(nanoseconds)};
+    return result;
+}
+
+ObservedFileTime decode_windows_file_time(const std::uint64_t ticks) noexcept {
+    constexpr std::uint64_t ticks_per_second = 10'000'000U;
+    constexpr std::int64_t epoch_seconds = 11'644'473'600LL;
+    const std::uint64_t quotient = ticks / ticks_per_second;
+    static_assert(std::numeric_limits<std::uint64_t>::max() / ticks_per_second <
+                  static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()));
+    const std::int64_t seconds = static_cast<std::int64_t>(quotient) - epoch_seconds;
+    const std::uint64_t remainder = ticks % ticks_per_second;
+    const std::uint32_t nanoseconds = static_cast<std::uint32_t>(remainder * 100U);
+    const ObservedFileTime result{seconds, nanoseconds};
+    return result;
+}
+
+#if !defined(_WIN32)
+NativeObjectObservation observation_from_stat(
+    const struct stat& observed, const NativeIdentityProjection projection) noexcept {
+    NativeObjectObservation result{};
+    ObjectIdentity& identity = result.identity;
+    identity.device = static_cast<std::uint64_t>(observed.st_dev);
+    identity.inode = static_cast<std::uint64_t>(observed.st_ino);
+    identity.size = static_cast<std::uint64_t>(observed.st_size);
+#if defined(__APPLE__)
+    const timespec modified = observed.st_mtimespec;
+#else
+    const timespec modified = observed.st_mtim;
+#endif
+    identity.modified_nanoseconds = static_cast<std::uint64_t>(modified.tv_sec) *
+        1'000'000'000ULL + static_cast<std::uint64_t>(modified.tv_nsec);
+    identity.type = std::filesystem::file_type::unknown;
+    if (S_ISREG(observed.st_mode)) identity.type = std::filesystem::file_type::regular;
+    else if (S_ISDIR(observed.st_mode)) identity.type = std::filesystem::file_type::directory;
+    else if (projection == NativeIdentityProjection::path) {
+        if (S_ISLNK(observed.st_mode)) identity.type = std::filesystem::file_type::symlink;
+        else if (S_ISBLK(observed.st_mode)) identity.type = std::filesystem::file_type::block;
+        else if (S_ISCHR(observed.st_mode)) identity.type = std::filesystem::file_type::character;
+        else if (S_ISFIFO(observed.st_mode)) identity.type = std::filesystem::file_type::fifo;
+        else if (S_ISSOCK(observed.st_mode)) identity.type = std::filesystem::file_type::socket;
+    }
+    if (!identity.available()) {
+        result.error = std::make_error_code(std::errc::operation_not_supported);
+        return result;
+    }
+    if (S_ISREG(observed.st_mode) && std::in_range<std::uint64_t>(observed.st_size)) {
+        result.facts.logical_size = static_cast<std::uint64_t>(observed.st_size);
+    }
+    if (std::in_range<std::int64_t>(modified.tv_sec) && std::in_range<std::int64_t>(modified.tv_nsec)) {
+        result.facts.modified = decode_native_time(static_cast<std::int64_t>(modified.tv_sec),
+                                                  static_cast<std::int64_t>(modified.tv_nsec));
+    }
+    return result;
+}
+#endif
+
+NativeObjectObservation observe_native_object(const std::filesystem::path& path) {
+#if defined(_WIN32)
+    const HANDLE handle = CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+        OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) {
+        const DWORD error = GetLastError();
+        NativeObjectObservation failure{};
+        failure.error = std::error_code(static_cast<int>(error), std::system_category());
+        return failure;
+    }
+    // Fixed-record decoding is nonthrowing; close precedes any display allocation.
+    const NativeObjectObservation result = observation_from_handle(handle);
+    CloseHandle(handle);
+#else
+    struct stat observed{};
+    const int status = ::lstat(path.c_str(), &observed);
+    if (status != 0) {
+        const int error = errno;
+        NativeObjectObservation failure{};
+        failure.error = std::error_code(error, std::generic_category());
+        return failure;
+    }
+    const NativeObjectObservation result = observation_from_stat(observed, NativeIdentityProjection::path);
+#endif
+    return result;
+}
+
 namespace {
 
 std::optional<std::filesystem::path> resolve_native_target(
@@ -151,33 +241,62 @@ std::filesystem::path parse_windows_symlink_target(
     return result;
 }
 
-ObjectIdentity identity_from_handle(const HANDLE handle) {
-    BY_HANDLE_FILE_INFORMATION basic{};
-    FILE_ID_INFO identifier{};
-    if (!GetFileInformationByHandle(handle, &basic) ||
-        !GetFileInformationByHandleEx(handle, FileIdInfo, &identifier,
-                                     sizeof(identifier))) return {};
-    ObjectIdentity result{};
-    result.device = identifier.VolumeSerialNumber;
-    std::memcpy(&result.inode, identifier.FileId.Identifier, sizeof(result.inode));
-    std::memcpy(&result.inode_high, identifier.FileId.Identifier + 8,
-                sizeof(result.inode_high));
-    result.size = (static_cast<std::uint64_t>(basic.nFileSizeHigh) << 32U) |
-                  basic.nFileSizeLow;
+NativeObjectObservation observation_from_windows_information(
+    const BY_HANDLE_FILE_INFORMATION& basic, const std::uint64_t volume,
+    const std::span<const unsigned char, 16U> identifier) noexcept {
+    NativeObjectObservation result{};
+    ObjectIdentity& identity = result.identity;
+    identity.device = volume;
+    std::memcpy(&identity.inode, identifier.data(), sizeof(identity.inode));
+    std::memcpy(&identity.inode_high, identifier.data() + 8U, sizeof(identity.inode_high));
+    identity.size = (static_cast<std::uint64_t>(basic.nFileSizeHigh) << 32U) | basic.nFileSizeLow;
     const std::uint64_t ticks =
         (static_cast<std::uint64_t>(basic.ftLastWriteTime.dwHighDateTime) << 32U) |
         basic.ftLastWriteTime.dwLowDateTime;
-    // Convert the Windows 1601 epoch to Unix nanoseconds before multiplication.
+    // Preserve the existing modulo-2^64 revision fingerprint exactly.
     constexpr std::uint64_t epoch_ticks = 116444736000000000ULL;
-    result.modified_nanoseconds = (ticks - epoch_ticks) * 100U;
+    identity.modified_nanoseconds = (ticks - epoch_ticks) * 100U;
     if ((basic.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) {
-        result.type = std::filesystem::file_type::symlink;
+        identity.type = std::filesystem::file_type::symlink;
     } else if ((basic.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
-        result.type = std::filesystem::file_type::directory;
+        identity.type = std::filesystem::file_type::directory;
     } else {
-        result.type = std::filesystem::file_type::regular;
+        identity.type = std::filesystem::file_type::regular;
     }
+    if (!identity.available()) {
+        result.error = std::make_error_code(std::errc::operation_not_supported);
+        return result;
+    }
+    if (identity.type == std::filesystem::file_type::regular) result.facts.logical_size = identity.size;
+    result.facts.modified = decode_windows_file_time(ticks);
     return result;
+}
+
+NativeObjectObservation observation_from_handle(const HANDLE handle) noexcept {
+    BY_HANDLE_FILE_INFORMATION basic{};
+    FILE_ID_INFO identifier{};
+    const BOOL basic_read = GetFileInformationByHandle(handle, &basic);
+    if (!basic_read) {
+        const DWORD error = GetLastError();
+        NativeObjectObservation failure{};
+        failure.error = std::error_code(static_cast<int>(error), std::system_category());
+        return failure;
+    }
+    const BOOL id_read = GetFileInformationByHandleEx(handle, FileIdInfo, &identifier, sizeof(identifier));
+    if (!id_read) {
+        const DWORD error = GetLastError();
+        NativeObjectObservation failure{};
+        failure.error = std::error_code(static_cast<int>(error), std::system_category());
+        return failure;
+    }
+    const std::span<const unsigned char, 16U> id_bytes(identifier.FileId.Identifier);
+    const NativeObjectObservation result = observation_from_windows_information(basic, identifier.VolumeSerialNumber, id_bytes);
+    return result;
+}
+
+ObjectIdentity identity_from_handle(const HANDLE handle) {
+    const NativeObjectObservation observed = observation_from_handle(handle);
+    return observed.identity;
 }
 #endif
 
@@ -253,31 +372,27 @@ bool NativeReadFile::available() const noexcept {
     return result;
 }
 
-ObjectIdentity NativeReadFile::identity() const {
+NativeObjectObservation NativeReadFile::observation() const {
 #if defined(_WIN32)
-    const ObjectIdentity result = identity_from_handle(handle_);
-    return result;
+    const NativeObjectObservation result = observation_from_handle(handle_);
 #else
     struct stat observed{};
-    if (::fstat(handle_, &observed) != 0) return {};
-    ObjectIdentity result{};
-    result.device = static_cast<std::uint64_t>(observed.st_dev);
-    result.inode = static_cast<std::uint64_t>(observed.st_ino);
-    result.size = static_cast<std::uint64_t>(observed.st_size);
-#if defined(__APPLE__)
-    result.modified_nanoseconds = static_cast<std::uint64_t>(observed.st_mtimespec.tv_sec) *
-        1'000'000'000ULL + static_cast<std::uint64_t>(observed.st_mtimespec.tv_nsec);
-#else
-    result.modified_nanoseconds = static_cast<std::uint64_t>(observed.st_mtim.tv_sec) *
-        1'000'000'000ULL + static_cast<std::uint64_t>(observed.st_mtim.tv_nsec);
+    const int status = ::fstat(handle_, &observed);
+    if (status != 0) {
+        const int error = errno;
+        NativeObjectObservation failure{};
+        failure.error = std::error_code(error, std::generic_category());
+        return failure;
+    }
+    const NativeObjectObservation result = observation_from_stat(observed, NativeIdentityProjection::read_descriptor);
 #endif
-    if (S_ISREG(observed.st_mode)) result.type = std::filesystem::file_type::regular;
-    else if (S_ISDIR(observed.st_mode)) result.type = std::filesystem::file_type::directory;
-    else result.type = std::filesystem::file_type::unknown;
     return result;
-#endif
 }
 
+ObjectIdentity NativeReadFile::identity() const {
+    const NativeObjectObservation observed = observation();
+    return observed.identity;
+}
 std::ptrdiff_t NativeReadFile::read(std::byte* const destination, const std::size_t count) {
 #if defined(_WIN32)
     if (count > std::numeric_limits<DWORD>::max()) {

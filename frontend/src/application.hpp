@@ -223,7 +223,10 @@ private:
     void close_path_suggestion_popup(bool restore_focus = false);
     void accept_path_suggestion(std::size_t index);
     void accept_active_path_suggestion();
-    void rebuild_object_order();
+    void apply_object_sort(std::string mode, gui_forms::ObjectSortDirection direction);
+    void sort_object_items(std::vector<gui_forms::ObjectViewItem>& items) const;
+    void publish_object_items(std::vector<gui_forms::ObjectViewItem> items);
+    void on_objects_sort_requested(const gui_forms::ObjectDetailsSort& request);
     void set_view_mode(gui_forms::ObjectViewMode mode);
     void set_sort_mode(std::string mode);
     void show_properties();
@@ -530,6 +533,7 @@ private:
     std::function<void(const std::filesystem::path&)> show_open_picker_{};
     std::function<void()> show_about_window_{};
     std::string sort_mode_{"name"};
+    gui_forms::ObjectSortDirection sort_direction_{gui_forms::ObjectSortDirection::ascending};
 };
 
 } // namespace file_manager

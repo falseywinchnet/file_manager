@@ -1,5 +1,21 @@
 # ObjectView Details development seam 001
 
+## Consumer shortcut reconciliation — 2026-10-02
+
+The integration revision uses Alt+Shift+Left/Right for column width and body
+horizontal pan. Plain Alt chords pass through the new Details control so
+File Manager retains Back/Forward even when a header is focused. Earlier
+Alt+Left/Right proposals below are superseded by this revision. File Manager
+routes Enter after the focused control, allowing header sort before file open.
+The renderer-neutral header regression checks that plain Alt+Right changes
+neither width nor horizontal offset and remains unhandled, then checks the
+distinct resizing chord. Native keyboard behavior remains to be verified.
+
+Source review of this revision covers the explicit modifier comparison,
+early pass-through and named test observations under the complete house style.
+No new callback storage or borrowed state is introduced. Collection and
+allocation-failure targets pass locally (2/2, 0.44 seconds).
+
 Status: authorized source development, not frozen ABI, SDK availability or native table accessibility acceptance.
 
 ## Model and ownership
@@ -132,3 +148,25 @@ ctest --test-dir gui_forms/.build/object-details-stage1 -R '^gui_forms_(object_d
 **Source review against `planning/PROGRAMMING_HOUSE_STYLE.md`:** reviewed the new sort-entry ownership, context checks and release-before-notification order, the named release/sort observer fixtures, and the allocation snapshot adjustment. In `paint_details`, visible-column indexing, header-cache calls and body-cache slot assignment now use separate increment statements; none embeds a slot/count update in indexing or a function argument. This corrects operation-order issues missed by the earlier review. The review remains confined to the new Details paths and named test changes; declared legacy exclusions remain in force.
 
 **MEASURED final checks:** both scoped renderer-neutral targets pass after correction with at most two build jobs. Allocation counts remain 63/64 for replacement, 28/28 for selected-ID publication, 92 for select-all and 11 for clear: 286 injected failures total, 219 exact old states and 67 complete published states. Visible-work counts remain 6 rows/12 cells/14 preparations for both 1,000 and 100,000 selected rows. Cold long-cell counts remain 21 queries with 131,152/131,144 submitted bytes for the two metric fixtures. No frontend, native-host, SDK export or Git operation was part of this follow-up; independent-consumer/native gates remain open.
+## Atomic model and accepted-sort publication, 2026-10-02
+
+**OBSERVED:** the public three-argument `set_details_model(columns, items, accepted_sort)` overload validates the explicit direction and nonempty column identity against the incoming columns, including their sortable flag, before changing control state. An empty identity clears the indicator; an invalid direction still rejects. The shared private replacement helper prepares owned model, selection and sort values, then publishes them before invalidation or synchronous notifications. The two-argument overload retains its prior behavior: preserve the accepted sort when its column survives and remains sortable, otherwise clear it. The control does not sort the supplied rows; the consumer supplies their actual order and matching accepted indicator.
+
+**MEASURED:** both `gui_forms_collection_controls_tests` and `gui_forms_object_details_failure_tests` pass in `.build/object-details-stage1` on Shadow Windows with MinGW GNU C++ 16.2.0, Release, renderer-neutral configuration and two build jobs. Focused coverage rejects missing/unsortable IDs and invalid directions (including an empty ID), preserving model, indicator, selection, focus, anchor and top. A throwing selection observer sees reversed replacement rows and the replacement-column descending indicator together. Separate assertions cover two-argument retention and explicit clearing.
+
+The allocation campaign now includes the explicit-sort overload both without and with an active resize. Current counts supersede the historical operation counts above for this source state:
+
+| Operation | Active resize | Injected failures | Exact old state | Complete published state |
+|---|---|---:|---:|---:|
+| Two-argument replacement | No | 62 | 52 | 10 |
+| Two-argument replacement | Yes | 63 | 52 | 11 |
+| Explicit-sort replacement | No | 62 | 52 | 10 |
+| Explicit-sort replacement | Yes | 63 | 52 | 11 |
+| Selected-ID publication | No | 28 | 18 | 10 |
+| Selected-ID publication | Yes | 28 | 18 | 10 |
+| Select all | No | 92 | 72 | 20 |
+| Clear selection | No | 11 | 5 | 6 |
+
+All 409 injected failures match complete old or published snapshots (321 old, 88 published). Snapshot coverage includes the accepted indicator. Fixture input strings are prepared before injection. The existing eight throwing/reentrant observer cases also pass. Visible-work and cold-text measurements remain 6/12/14 at both row counts and 21 queries submitting 131,152/131,144 bytes. This is bounded exception-state evidence, not universal allocation safety or native-host verification.
+
+**Source review:** reviewed the added public/private declarations, both forwarding overloads, shared replacement preparation and commit order, named `DetailsCommitObserver` and focused test, plus the added failure-campaign operation/input/dispatch against the complete `planning/PROGRAMMING_HOUSE_STYLE.md`. Types and conversions are explicit; callback borrows end at disconnection before their local state is destroyed; accepted-sort ownership moves into prepared state; all rejection precedes commit; no new per-row allocation or traversal was introduced by the sort validation. No remaining house-style violation was identified in this added scope. Previously recorded legacy exclusions remain. Concurrent root-owned keyboard/context changes are outside this follow-up's source-review claim. Application recovery, canonical contract integration, SDK export, native verification and final acceptance remain with their owners.

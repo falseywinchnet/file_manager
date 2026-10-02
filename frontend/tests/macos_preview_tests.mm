@@ -21,6 +21,15 @@
 #include <utility>
 #include <unistd.h>
 
+namespace file_manager {
+class ApplicationInteractionProbe final {
+public:
+    static void show_details(Application& application) {
+        application.set_view_mode(gui_forms::ObjectViewMode::details);
+    }
+};
+}
+
 namespace {
 
 // Owned generated data only. A failed directory acquisition never authorizes
@@ -81,7 +90,7 @@ private:
     bool acquired_{};
 };
 
-enum class PreviewStage { listing, text, image, unsupported, finished };
+enum class PreviewStage { listing, text, image, unsupported, details, finished };
 
 struct PreviewState final {
     std::shared_ptr<file_manager::Application> application{};
@@ -146,8 +155,10 @@ bool select_file(PreviewState& state, const std::string_view name) {
 // AppKit snapshot evidence includes clipping, the native Skia decoder and
 // backing-scale presentation. It can force display; it is not paint-latency or
 // ordinary pointer-delivery evidence. Sample only the selected preview bounds.
+enum class PixelMatch { light_text, image, dark_text };
+
 std::size_t matching_pixels(NSView* const view, const gui_forms::Rect bounds,
-                            const bool image) {
+                            const PixelMatch target) {
     if (view == nil || bounds.empty() || view.bounds.size.width <= 0.0 ||
         view.bounds.size.height <= 0.0) return 0U;
     NSBitmapImageRep* const bitmap = [view bitmapImageRepForCachingDisplayInRect:view.bounds];
@@ -170,11 +181,15 @@ std::size_t matching_pixels(NSView* const view, const gui_forms::Rect bounds,
         for (NSInteger x = left; x < right; ++x) {
             NSColor* const color = [[bitmap colorAtX:x y:y] colorUsingColorSpace:NSColorSpace.sRGBColorSpace];
             if (color == nil || color.alphaComponent < 0.95) continue;
-            const bool matched = image
-                ? color.redComponent < 0.15 && color.greenComponent > 0.75 &&
-                    color.blueComponent > 0.65 && color.blueComponent < 0.9
-                : color.redComponent > 0.65 && color.greenComponent > 0.7 &&
-                    color.blueComponent > 0.75;
+            bool matched{};
+            if (target == PixelMatch::image) {
+                matched = color.redComponent < 0.15 && color.greenComponent > 0.75 &&
+                    color.blueComponent > 0.65 && color.blueComponent < 0.9;
+            } else if (target == PixelMatch::dark_text) {
+                matched = color.redComponent < 0.2 && color.greenComponent < 0.25 && color.blueComponent < 0.3;
+            } else {
+                matched = color.redComponent > 0.65 && color.greenComponent > 0.7 && color.blueComponent > 0.75;
+            }
             if (matched) ++matches;
         }
     }
@@ -194,6 +209,39 @@ void queue_step(const std::shared_ptr<PreviewState>& state) {
 void exercise(PreviewState& state) {
     NSWindow* const native = preview_window();
     if (native == nil || !native.isVisible) return;
+    if (state.stage == PreviewStage::details) {
+        const std::shared_ptr<gui_forms::ObjectView> objects =
+            std::dynamic_pointer_cast<gui_forms::ObjectView>((*state.model).find("fm.objects.current-folder"));
+        if (!objects || !(*objects).effectively_visible()) return;
+        const gui_forms::Rect bounds = (*objects).absolute_bounds();
+        const double scale = (*objects).effective_text_scale();
+        const gui_forms::Rect name_header{bounds.x + 10.0, bounds.y + 3.0,
+            50.0 * scale, (*objects).details_row_height() * scale - 2.0};
+        const std::size_t pixels = matching_pixels(native.contentView, name_header, PixelMatch::dark_text);
+        if (pixels < 15U) return;
+        const std::string selected((*objects).selected_id());
+        (*state.model).request_focus(objects);
+        const bool focused = (*state.model).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::f6});
+        const bool sorted = (*state.model).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::enter});
+        if (!focused || !sorted || (*objects).details_sort().column.value != "name" ||
+            (*objects).details_sort().direction != gui_forms::ObjectSortDirection::descending ||
+            (*objects).selected_id() != selected) {
+            throw std::runtime_error("native Details header route failed to sort while preserving selection");
+        }
+        NSView* const view = native.contentView;
+        NSBitmapImageRep* const bitmap = [view bitmapImageRepForCachingDisplayInRect:view.bounds];
+        if (bitmap == nil) throw std::runtime_error("native Details snapshot unavailable");
+        [view cacheDisplayInRect:view.bounds toBitmapImageRep:bitmap];
+        NSData* const encoded = [bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+        const BOOL saved = [encoded writeToFile:@"native-details.png" atomically:YES];
+        if (saved != YES) throw std::runtime_error("cannot save native Details evidence");
+        std::cout << "macOS Details: name_header_pixels=" << pixels
+                  << " columns=" << (*objects).details_columns().size()
+                  << " synthetic_header_sort=passed selection=preserved\n";
+        state.stage = PreviewStage::finished;
+        state.close();
+        return;
+    }
     if (state.stage == PreviewStage::listing) {
         if (select_file(state, "native-preview.txt")) {
             // AppKit constrains the window to the runner's desktop (1024-wide
@@ -224,7 +272,7 @@ void exercise(PreviewState& state) {
     if (state.stage == PreviewStage::image) {
         if (!(*picture).effectively_visible() || !(*picture).has_valid_image()) return;
         const gui_forms::Rect bounds = (*picture).rectangle_to_window((*picture).image_bounds());
-        const std::size_t pixels = matching_pixels(native.contentView, bounds, true);
+        const std::size_t pixels = matching_pixels(native.contentView, bounds, PixelMatch::image);
         if (pixels < 100U) return;
         std::cout << "macOS PNG preview: matching_pixels=" << pixels << '\n';
         if (!select_file(state, "native-preview.bin")) throw std::runtime_error("cannot select unsupported fixture");
@@ -236,13 +284,13 @@ void exercise(PreviewState& state) {
         ? (*text).text().find("Preview is not available") != std::string::npos
         : (*text).text().starts_with("NATIVE PREVIEW CHECK");
     if (!content_ready || !(*text).effectively_visible() || (*picture).visible()) return;
-    const std::size_t pixels = matching_pixels(native.contentView, (*text).absolute_bounds(), false);
+    const std::size_t pixels = matching_pixels(native.contentView, (*text).absolute_bounds(), PixelMatch::light_text);
     if (pixels < 25U) return;
     std::cout << "macOS " << (unsupported ? "unsupported explanation" : "TXT preview")
               << ": readable_pixels=" << pixels << '\n';
     if (unsupported) {
-        state.stage = PreviewStage::finished;
-        state.close();
+        file_manager::ApplicationInteractionProbe::show_details(*state.application);
+        state.stage = PreviewStage::details;
     } else {
         if (!select_file(state, "native-preview.png")) throw std::runtime_error("cannot select PNG fixture");
         state.stage = PreviewStage::image;
