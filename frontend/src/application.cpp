@@ -762,6 +762,7 @@ void Application::install_dynamic_controls() {
     (*preview_text_).set_requested_bounds({0, 0, 190, 108});
     (*preview_text_).set_text_style_role(gui_forms::TextStyleRole::monospace);
     (*preview_text_).set_text_wrapping(gui_forms::TextWrapping::word);
+    (*preview_text_).set_use_mnemonic(false);
     (*preview_text_).set_maximum_lines(7);
     (*preview_text_).set_vertical_alignment(gui_forms::VerticalAlignment::near);
     (*preview_text_).set_accessible_name("Selected text preview");

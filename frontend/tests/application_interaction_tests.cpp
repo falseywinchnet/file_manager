@@ -365,6 +365,7 @@ class ImageRecordingPainter final : public gui_forms::Painter {
         if (!text.empty()) {
             ++text_runs;
             text_color = color;
+            if (text.find("A&B && C&D") != std::string_view::npos) literal_ampersands = true;
         }
     }
     void draw_image(gui_forms::ImageId, gui_forms::Rect, double) override {
@@ -374,6 +375,7 @@ class ImageRecordingPainter final : public gui_forms::Painter {
     std::size_t images{};
     std::size_t lines{};
     std::size_t text_runs{};
+    bool literal_ampersands{};
     gui_forms::Color text_color{};
 };
 
@@ -1188,6 +1190,10 @@ void test_application_controls_navigate_real_directories() {
 
 void test_selected_file_previews_reach_visible_layout() {
     TemporaryTree fixture{};
+    std::ofstream literal_text(fixture.root() / "root.txt", std::ios::binary | std::ios::trunc);
+    literal_text << "root\nA&B && C&D\n";
+    literal_text.close();
+    require(literal_text.good(), "literal preview fixture must be written completely");
     const std::filesystem::path source = std::filesystem::path(__FILE__).parent_path().parent_path() /
         "ui/boards/file_manager/assets/house/view@2x.png";
     const bool copied = std::filesystem::copy_file(source, fixture.root() / "preview.png");
@@ -1220,6 +1226,8 @@ void test_selected_file_previews_reach_visible_layout() {
     require(text_painter.text_runs > 0U && text_painter.text_color.red >= 200U &&
         text_painter.text_color.green >= 200U && text_painter.text_color.blue >= 200U,
         "preview must paint readable light text against its authored dark surface");
+    require(text_painter.literal_ampersands,
+        "file text must retain literal ampersands rather than interpret keyboard mnemonics");
     const std::string image_id = object_id(*objects, "preview.png");
     const bool image_selected = (*window).perform_semantic_action(image_id, gui_forms::SemanticAction::select);
     require(image_selected, "image must be selected through the public user action");
@@ -1232,6 +1240,17 @@ void test_selected_file_previews_reach_visible_layout() {
     const gui_forms::Rect picture_bounds = (*picture).committed_arranged_bounds();
     (*picture).on_paint(painter, {0.0, 0.0, picture_bounds.width, picture_bounds.height});
     require(painter.images == 1U, "selected PNG must issue an image draw");
+
+    // The first Mac native probe was constrained to 1024x674 by its desktop.
+    // That ordinary viewport has room for content and a usable inspector.
+    (*window).resize({1024.0, 674.0});
+    (*window).perform_layout();
+    require((*picture).effectively_visible() && (*picture).image_bounds().width >= 100.0,
+        "ordinary 1024-wide browsing must keep the selected preview available by default");
+    (*window).resize({800.0, 674.0});
+    (*window).perform_layout();
+    require((*picture).effectively_visible(),
+        "narrowing should retire the folder tree before the selected-file inspector");
 
     constexpr std::string_view toggle_id = "file-manager-app.shell.workspace.selection.inspector.facts.preview.toggle";
     const std::shared_ptr<gui_forms::Button> toggle = std::dynamic_pointer_cast<gui_forms::Button>(
