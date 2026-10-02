@@ -7,6 +7,24 @@ benchmarks, service operations or Git commands. Measurements below are attribute
 to retained receipts, not reproduced here. No candidate structure, new public
 capability or currentness claim is accepted by this document.
 
+## Subsequent implementation evidence
+
+The investigation below retains its original source observations. Private
+checked-generation substring-reference correctness/paired evidence is now
+recorded in `../../engine/results/SUBSTRING_REFERENCE_EXPERIMENT_2026-10-02.md`;
+it enables no production search route. The next bounded-reader candidate is
+under separate review, including regression controls for legacy exact queries.
+
+The frontend follow-up adds generation/shutdown checks to SearchWork and
+CriteriaWork before connection and at synchronous service-call boundaries.
+Already obsolete queued work retires before connection; obsolete replies retire
+before UI enqueue. The existing UI generation guard remains. This corrects
+the missing admission checks observed below but supplies no in-flight transport
+cancellation. Local build/12-suite evidence, exact source-review scope and
+remaining native verification are recorded in
+`DOGFOOD_ACCEPTANCE_AUDIT_2026-10-02.md`. The source audit and public-contract
+choices below otherwise remain open.
+
 ## Product boundary and next outcome
 
 **GIVEN:** ordinary search starts below the navigated folder; indexing is opt-in
