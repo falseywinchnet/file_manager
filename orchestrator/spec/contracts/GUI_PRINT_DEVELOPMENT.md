@@ -232,6 +232,72 @@ architecture. No executable API sketch is introduced. Any later C++ sketch and
 authored implementation must follow the complete house style, with exact source
 review recorded independently of functional tests.
 
+## SwiftEdit consumer reply — 2026-10-01, reconciliation pending
+
+**OBSERVED consumer response:** SwiftEdit's
+`C:/Users/Shadow/notepad/docs/PRINT_CONTRACT_REVIEW.md` (consumer commit
+`5d0fca0`), reviewed in full, accepts
+the candidate ownership boundary, immutable preview/print logical plan, zoom
+invariance, single native Print intent, named executors, bounded outstanding
+work, stale-result refusal, replacement-failure preservation, nonblocking
+retirement and truthful dialog/spool outcomes. This is attributed consumer
+acceptance with the counters below, not provider agreement or final selection.
+The original numerical table and initial service defaults remain candidates.
+
+SwiftEdit proposes that the initial mode reflect the explicitly active source or
+rendered view, with that choice exposed in the owned UI. A plain service default
+must not override explicit rendered-view intent. Whole document remains its
+proposed selection default. Discontiguous selections would copy ordered source
+ranges under one stamp and give consumer-chosen separators explicit synthetic
+projection extents with no source-byte extent; unrelated endpoints must not form
+an invented word. Exact selection presentation remains consumer policy to record.
+
+The consumer requests an explicit typed-tab or equivalent geometry-aware tab
+policy boundary. Tab stops must use declared consumer policy and provider font/
+layout geometry; substituting a fixed count of spaces before geometry resolves
+is insufficient. Its projection preserves CRLF as one logical break, standalone
+CR/LF, empty/trailing lines and literal marker text. Invalid-byte/control labels
+retain exact source extents distinct from projected positions. These counters
+require provider reconciliation before the projection contract freezes.
+
+**OBSERVED consumer feasibility report, not independently verified here:**
+`SessionCopy` can collect owned exact bytes with document identity/revision checks
+before each 64 KiB step, without worker calls into a live Session. Publication
+waits for complete collection; intervening edits refuse/cancel the snapshot.
+The completed stamped copy can outlive edits or close. Initial whole-copy reserve
+is currently synchronous, so no hard latency claim follows. The existing GUI
+Document/TextBox path still needs a capture adapter until Session migration.
+Source and projection capacity must be reported separately. The paged read handle
+does not guarantee immutability: `snapshot_unavailable` remains appropriate until
+a validated snapshot/copy strategy exists. This is an implementation gap, not an
+accepted product exclusion of large-document printing.
+
+Paragraph/style content is a useful interim profile, but does not complete print
+support for Markdown/CSV views containing tables, tasks, code blocks or other
+supported blocks. SwiftEdit accepts typed unsupported-content refusal in an
+interim profile and requests separate tracking of these missing block types;
+neither omission nor silent source fallback completes rendered printing.
+
+Pending provider replies are the typed-tab/selection projection boundary, exact
+rendered block subset, supported numerical bounds and accounting (including the
+64 KiB versus existing 16 KiB contextual reuse gap), immutable page-plan/native
+ticket fidelity, and nonblocking native owner/callback retirement. SwiftEdit
+regards one copy, no automatic decorations and monochrome source as reasonable
+initial defaults; 12-point monospace and 36-point margins remain candidates.
+No bounds establish responsiveness, cancellation latency or full long-line
+support; named limit failure must preserve the previous preview and source.
+
+SwiftEdit identifies Apple silicon/macOS 26 as the immediate owner dogfood target;
+this is an attributed priority, not native availability or backend selection.
+Windows/Linux retain independent evidence requirements. Its integration gate is
+an independently installed matching SDK with capability/limit queries. It asks
+to reuse `Prepare-DocumentView-Fixtures.py` source cases and freeze font bytes,
+geometry and projection version before defining print oracles, then verify fake
+spool outcomes and native ownership/settings/range/cancellation separately.
+Physical test pages require a coordinated fixture destination. The reply adds no
+source adapter, preview, print job or installed service, and does not assign new
+provider work while the separately assigned prepared-paint adapter is pending.
+
 ## Fixture obligations before promotion
 
 Use a deterministic page oracle with frozen font bytes, source/projection IDs,

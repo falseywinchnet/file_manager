@@ -680,6 +680,34 @@ resource failure, page identity/zoom invariance, native owner lifetime and exact
 spool outcomes. This closes a concrete contract round under existing direction;
 it adds no owner permission gate, executable source or API/SDK freeze.
 
+### P1 consumer reply — acceptance with counters, provider reply pending
+
+**OBSERVED:** SwiftEdit supplied
+`C:/Users/Shadow/notepad/docs/PRINT_CONTRACT_REVIEW.md`; the exact review was read
+in full. Its acceptance and counters are recorded in the P1 contract's
+"SwiftEdit consumer reply" section. Consumer acceptance covers ownership, the
+same immutable preview/print plan, one native Print intent, nonblocking
+retirement and truthful spool outcomes. It is not unilateral final selection,
+provider acceptance or installed availability.
+
+The consumer counters the initial mode with the explicitly active source/rendered
+view; requests synthetic projection extents for discontiguous-selection
+separators and a declared geometry-aware tab policy; and treats the initial
+paragraph profile as incomplete for supported Markdown/CSV blocks. Its reported
+`SessionCopy` route can own stamped editable bytes, but initial reserve remains
+synchronous and the legacy GUI capture adapter remains missing. Paged handles
+are not immutable snapshots; `snapshot_unavailable` marks an implementation gap,
+not an accepted large-document product limit. Numerical bounds remain candidates,
+including the explicit proposed 64 KiB/current 16 KiB paragraph reuse gap.
+
+Provider reconciliation remains open for projection/tab semantics, rendered block
+coverage, capacities and accounting, native ticket/page-plan fidelity and close
+protocol. SwiftEdit identifies Apple silicon/macOS 26 as the immediate dogfood
+target and requires matching installed SDK and separate native evidence before
+availability claims. Physical print fixtures need a coordinated destination.
+This records the consumer reply without starting host/source work or interrupting
+the separate prepared-paint adapter assignment.
+
 ## Separate prepared-paint assignment — private Skia adapter
 
 **OBSERVED coordinator direction:** the GUI.Forms provider is assigned private
