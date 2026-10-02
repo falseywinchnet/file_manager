@@ -135,6 +135,7 @@ set_target_properties(file_manager_document_picker_view PROPERTIES
     EXPORT_NAME DocumentPickerView)
 
 set(FILEMAN_ORCHESTRATOR_BUILD_PROBE OFF CACHE BOOL "" FORCE)
+set(FILEMAN_ORCHESTRATOR_BUILD_SEARCH_CHECKS ${FILE_MANAGER_BUILD_TESTS} CACHE BOOL "" FORCE)
 add_subdirectory(
     "${CMAKE_CURRENT_SOURCE_DIR}/../orchestrator/conformance/clients/cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/orchestrator-cpp-client")

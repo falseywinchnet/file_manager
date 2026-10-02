@@ -72,6 +72,41 @@ DirectoryEntry observed_search_entry(const std::filesystem::path& path,
 
 } // namespace
 
+void SearchCoverageSummary::observe(const fileman::orchestrator::SearchPageInfo& page,
+                                    const std::size_t rejected, const bool append) {
+    if (!append) *this = SearchCoverageSummary{};
+    const fileman::orchestrator::SearchCoverageInfo& coverage = page.coverage;
+    if (coverage.stale_roots && !(*coverage.stale_roots).empty()) stale = true;
+    if (coverage.unavailable_roots && !(*coverage.unavailable_roots).empty()) unavailable = true;
+    if (coverage.unavailable_paths && !(*coverage.unavailable_paths).empty()) unavailable = true;
+    if (coverage.warnings && !(*coverage.warnings).empty()) warnings = true;
+    if (!coverage.warnings) unreported = true;
+    if (page.source == "catalogue") {
+        if (!coverage.stale_roots || !coverage.unavailable_roots) unreported = true;
+    } else if (page.source == "live_filesystem") {
+        if (!coverage.unavailable_paths) unreported = true;
+    } else {
+        unreported = true;
+    }
+    if (rejected != 0U) omitted = true;
+}
+
+std::string SearchCoverageSummary::describe(const fileman::orchestrator::SearchPageInfo& page) const {
+    std::string description{};
+    if (page.source == "catalogue") description += " · cached matches; current identity and criteria not rechecked";
+    if (page.terminal == "partial") description += " · partial provider page";
+    if (!page.complete) {
+        if (page.cursor) description += " · more results available";
+        else description += " · search incomplete; no continuation supplied";
+    }
+    if (stale) description += " · stale catalogue reported";
+    if (unavailable) description += " · locations unavailable";
+    if (warnings) description += " · provider warnings reported";
+    if (unreported) description += " · coverage unreported";
+    if (omitted) description += " · some returned paths could not be displayed";
+    return description;
+}
+
 PreparedSearchPage prepare_search_page(const std::filesystem::path& canonical_root,
     fileman::orchestrator::SearchPageInfo page, const CancellationCheck& cancelled) {
     PreparedSearchPage cancelled_result{};

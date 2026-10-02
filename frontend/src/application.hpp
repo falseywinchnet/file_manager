@@ -422,6 +422,7 @@ private:
     std::optional<fileman::orchestrator::SearchCursorInfo> search_cursor_{};
     std::optional<fileman::orchestrator::SearchCursorInfo> criteria_cursor_{};
     std::vector<std::string> search_order_{};
+    SearchCoverageSummary search_coverage_{};
     std::uint64_t next_host_request_id_{1};
 
     NativeForm form_{};

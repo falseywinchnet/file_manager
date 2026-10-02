@@ -3818,6 +3818,8 @@ void Application::apply_engine_criteria(
     const std::vector<std::string> previous_selection(
         (*objects_).selected_ids().begin(), (*objects_).selected_ids().end());
     const std::size_t rejected = prepared.rejected;
+    search_coverage_.observe(page, rejected, append);
+    const std::string coverage_notice = search_coverage_.describe(page);
     std::size_t duplicate{};
     for (DirectoryEntry& entry : prepared.entries) {
         const std::string stable_id = entry.stable_id;
@@ -3879,7 +3881,7 @@ void Application::apply_engine_criteria(
         provenance += " · generation unreported";
     }
     provenance += " · exact intrinsic metadata filters";
-    if (!page.complete) provenance += " · more results available";
+    provenance += coverage_notice;
     if (append) provenance += " · appended page";
     if (rejected != 0U) {
         provenance += " · " + std::to_string(rejected) +
@@ -3890,7 +3892,7 @@ void Application::apply_engine_criteria(
         provenance += " · " + std::to_string(duplicate) +
             (duplicate == 1U ? " duplicate skipped" : " duplicates skipped");
     }
-    set_status(entries_.empty() ? "No objects meet every criterion"
+    set_status(entries_.empty() ? "No objects in returned criteria results"
                                 : std::to_string(entries_.size()) +
                                       (entries_.size() == 1U
                                            ? " criteria object"
@@ -3915,6 +3917,8 @@ void Application::apply_engine_search(
     const std::vector<std::string> previous_selection(
         (*objects_).selected_ids().begin(), (*objects_).selected_ids().end());
     const std::size_t rejected = prepared.rejected;
+    search_coverage_.observe(page, rejected, append);
+    const std::string coverage_notice = search_coverage_.describe(page);
     std::size_t duplicate{};
     for (DirectoryEntry& entry : prepared.entries) {
         const std::string stable_id = entry.stable_id;
@@ -4002,7 +4006,7 @@ void Application::apply_engine_search(
     if (page.generation) {
         provenance += " · generation " + std::to_string(*page.generation);
     }
-    if (!page.complete) provenance += " · more results available";
+    provenance += coverage_notice;
     if (append) provenance += " · appended page";
     if (rejected != 0) {
         provenance += " · " + std::to_string(rejected) +
@@ -4012,7 +4016,7 @@ void Application::apply_engine_search(
         provenance += " · " + std::to_string(duplicate) +
             " duplicate" + (duplicate == 1 ? " skipped" : "s skipped");
     }
-    set_status(entries_.empty() ? "No matches" :
+    set_status(entries_.empty() ? "No matches in returned results" :
                    std::to_string(entries_.size()) +
                        (entries_.size() == 1 ? " match" : " matches"),
                std::move(provenance));

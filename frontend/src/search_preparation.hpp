@@ -15,6 +15,21 @@ struct PreparedSearchPage final {
     bool cancelled{};
 };
 
+// UI-owned coverage for the accumulated result set. Gaps from earlier pages
+// survive append; a replacement query resets them. No provider strings or
+// response-buffer borrows are retained here.
+struct SearchCoverageSummary final {
+    bool stale{};
+    bool unavailable{};
+    bool warnings{};
+    bool unreported{};
+    bool omitted{};
+
+    void observe(const fileman::orchestrator::SearchPageInfo& page,
+                 std::size_t rejected, bool append);
+    [[nodiscard]] std::string describe(const fileman::orchestrator::SearchPageInfo& page) const;
+};
+
 // Root and cancellation target are borrowed only during this synchronous call.
 // No GUI object is accessed. Cancellation publishes an empty cancelled value.
 // A native filesystem call already in progress finishes before the next check.

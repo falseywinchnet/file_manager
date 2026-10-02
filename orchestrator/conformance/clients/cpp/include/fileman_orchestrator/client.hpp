@@ -210,6 +210,17 @@ struct SearchExactFilter {
     std::string value{};
 };
 
+// Provider observations, not a freshness guarantee. Missing/null lists remain
+// unreported; an explicitly empty list means the provider reported no entries.
+// These owned values may outlive the connection and its response buffer.
+struct SearchCoverageInfo {
+    std::optional<std::vector<std::string>> stale_roots{};
+    std::optional<std::vector<std::string>> unavailable_roots{};
+    std::optional<std::vector<std::string>> unavailable_paths{};
+    std::optional<std::vector<std::string>> warnings{};
+    std::optional<std::string> scan_id{};
+};
+
 struct SearchPageInfo {
     std::string terminal{};
     std::string source{};
@@ -218,6 +229,7 @@ struct SearchPageInfo {
     std::optional<SearchCursorInfo> cursor{};
     std::vector<SearchResultInfo> results{};
     std::vector<std::string> names{};
+    SearchCoverageInfo coverage{};
 };
 
 using SettingValue = std::variant<bool, std::uint64_t, std::string>;
