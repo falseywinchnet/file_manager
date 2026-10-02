@@ -414,13 +414,18 @@ if(FILE_MANAGER_BUILD_TESTS)
 
     if(APPLE)
         enable_language(OBJCXX)
-        add_executable(file_manager_macos_preview_tests tests/macos_preview_tests.mm)
+        add_executable(file_manager_macos_preview_tests MACOSX_BUNDLE tests/macos_preview_tests.mm)
         set_target_properties(file_manager_macos_preview_tests PROPERTIES
             OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON OBJCXX_EXTENSIONS OFF)
         target_compile_options(file_manager_macos_preview_tests PRIVATE
             -fobjc-arc -Wall -Wextra -Werror)
         target_link_libraries(file_manager_macos_preview_tests PRIVATE
             file_manager_application "-framework AppKit")
+        add_custom_command(TARGET file_manager_macos_preview_tests POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${GUIForms_FONT_DIR}"
+                "$<TARGET_BUNDLE_DIR:file_manager_macos_preview_tests>/Contents/Resources/fonts"
+            VERBATIM)
         add_test(NAME file_manager_macos_preview_tests COMMAND file_manager_macos_preview_tests)
         set_tests_properties(file_manager_macos_preview_tests PROPERTIES TIMEOUT 45 RUN_SERIAL TRUE)
         add_test(NAME file_manager_dogfood_launcher_tests

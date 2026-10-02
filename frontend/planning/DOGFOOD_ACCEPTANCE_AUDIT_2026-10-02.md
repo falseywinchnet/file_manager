@@ -182,6 +182,17 @@ reports zero candidates in the new Objective-C++ file. Windows CMake
 reconfiguration and the unaffected frontend tests pass **12/12**, 2.70 seconds.
 Native Mac compile/execution remain **pending** at this checkpoint.
 
+**REJECTED initial harness run:** native CI `36975685152`, source `e123fd8`,
+compiled successfully but timed out waiting for text pixels. Its retained
+snapshot showed no application text and an automatically collapsed inspector;
+host metrics reported an incomplete bundled font pack. The test executable had
+been unbundled, while the native host resolves fonts from NSBundle. AppKit also
+constrained its requested 1340×850 window to the runner's 1024×674 content view.
+This is a harness failure, not proof that the shipped app loses fonts or that
+the owner's bug has been reproduced. The corrected test uses an app bundle with
+the same installed font resources and invokes the ordinary Properties command
+and, if needed, Show preview. That corrected native run remains pending.
+
 ## Obsolete preview work retirement
 
 **OBSERVED:** a queued PreviewWork called the loader even after a newer selection

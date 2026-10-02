@@ -190,7 +190,25 @@ void exercise(PreviewState& state) {
     NSWindow* const native = preview_window();
     if (native == nil || !native.isVisible) return;
     if (state.stage == PreviewStage::listing) {
-        if (select_file(state, "native-preview.txt")) state.stage = PreviewStage::text;
+        if (select_file(state, "native-preview.txt")) {
+            // AppKit constrains the window to the runner's desktop (1024-wide
+            // in the first recorded run). Exercise the ordinary reveal action
+            // instead of assuming the requested wide-window inspector survives.
+            const bool revealed = (*state.model).perform_semantic_action(
+                "file-manager-app.shell.commands.arrange-group.actions.settings",
+                gui_forms::SemanticAction::press);
+            if (!revealed) throw std::runtime_error("Properties command could not reveal preview pane");
+            const gui_forms::Control::Ptr surface = (*state.model).find(
+                "file-manager-app.shell.workspace.selection.inspector.facts.preview.surface");
+            if (!surface) throw std::runtime_error("preview surface is absent");
+            if (!(*surface).visible()) {
+                const bool expanded = (*state.model).perform_semantic_action(
+                    "file-manager-app.shell.workspace.selection.inspector.facts.preview.toggle",
+                    gui_forms::SemanticAction::press);
+                if (!expanded) throw std::runtime_error("Show preview command could not expand preview");
+            }
+            state.stage = PreviewStage::text;
+        }
         return;
     }
     const std::shared_ptr<gui_forms::Label> text =
