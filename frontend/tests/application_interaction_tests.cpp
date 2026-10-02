@@ -368,14 +368,17 @@ class ImageRecordingPainter final : public gui_forms::Painter {
             if (text.find("A&B && C&D") != std::string_view::npos) literal_ampersands = true;
         }
     }
-    void draw_image(gui_forms::ImageId, gui_forms::Rect, double) override {
+    void draw_image(gui_forms::ImageId image, gui_forms::Rect, double) override {
         ++images;
+        if (image == tracked_image) ++tracked_image_draws;
     }
 
     std::size_t images{};
     std::size_t lines{};
     std::size_t text_runs{};
     bool literal_ampersands{};
+    gui_forms::ImageId tracked_image{};
+    std::size_t tracked_image_draws{};
     gui_forms::Color text_color{};
 };
 
@@ -1234,12 +1237,23 @@ void test_selected_file_previews_reach_visible_layout() {
     require_eventually(*application, ImagePreviewReady{*picture}, "selected PNG must enter the application image registry");
     (*window).perform_layout();
     const gui_forms::Rect image_bounds = (*picture).image_bounds();
+    const gui_forms::Control::Ptr preview_surface = (*window).find(
+        "file-manager-app.shell.workspace.selection.inspector.facts.preview.surface");
+    const gui_forms::Rect picture_absolute = (*picture).absolute_bounds();
+    const gui_forms::Rect surface_absolute = (*preview_surface).absolute_bounds();
+    require(surface_absolute.contains(picture_absolute),
+        "selected image control must remain inside its preview clip");
     require((*picture).effectively_visible() && image_bounds.width > 0.0 && image_bounds.height > 0.0,
         "selected PNG must have visible image geometry");
     ImageRecordingPainter painter{};
     const gui_forms::Rect picture_bounds = (*picture).committed_arranged_bounds();
     (*picture).on_paint(painter, {0.0, 0.0, picture_bounds.width, picture_bounds.height});
     require(painter.images == 1U, "selected PNG must issue an image draw");
+    ImageRecordingPainter whole_window_painter{};
+    whole_window_painter.tracked_image = (*picture).image();
+    static_cast<void>((*window).paint(whole_window_painter));
+    require(whole_window_painter.tracked_image_draws > 0U,
+        "whole-window retained replay must include the selected image, not only direct control painting");
 
     // The first Mac native probe was constrained to 1024x674 by its desktop.
     // That ordinary viewport has room for content and a usable inspector.

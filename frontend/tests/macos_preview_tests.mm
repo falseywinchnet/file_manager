@@ -110,7 +110,7 @@ NSWindow* preview_window() {
     return result;
 }
 
-void save_failure_snapshot() {
+void save_failure_snapshot(gui_forms::Window& model) {
     NSWindow* const native = preview_window();
     NSView* const view = native.contentView;
     if (view == nil) return;
@@ -120,6 +120,11 @@ void save_failure_snapshot() {
     NSData* const encoded = [bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
     const BOOL saved = [encoded writeToFile:@"native-preview-failure.png" atomically:YES];
     std::cerr << "Native preview failure snapshot saved=" << (saved == YES) << '\n';
+    const gui_forms::VisualInspectionSnapshot inspection = model.visual_inspection_snapshot();
+    std::ofstream diagnostics("native-preview-failure.json", std::ios::binary);
+    diagnostics << inspection.to_json();
+    diagnostics.close();
+    std::cerr << "Retained preview diagnostics saved=" << diagnostics.good() << '\n';
 }
 
 bool select_file(PreviewState& state, const std::string_view name) {
@@ -261,7 +266,7 @@ void run_step(void* const context) {
             queue_step(owner);
         } catch (const std::exception& error) {
             state.failure = error.what();
-            save_failure_snapshot();
+            save_failure_snapshot(*state.model);
             state.close();
         }
     }
