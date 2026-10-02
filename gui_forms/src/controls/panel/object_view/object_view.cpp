@@ -393,8 +393,6 @@ void ObjectView::replace_details_model(std::vector<ObjectDetailsColumn> next_col
             next_indices.find(items_[old_top_index].stable_id);
         if (top != next_indices.end()) next_top = (*top).second / columns();
     }
-    const std::size_t last_row = items.empty() ? 0U : (items.size() - 1U) / columns();
-    next_top = std::min(next_top, last_row);
     ObjectDetailsSort next_sort{};
     if (accepted_sort) {
         next_sort = std::move(*accepted_sort);
@@ -430,7 +428,7 @@ void ObjectView::replace_details_model(std::vector<ObjectDetailsColumn> next_col
     focused_id_.swap(next_focus);
     selection_anchor_id_.swap(next_anchor);
     details_sort_ = std::move(next_sort);
-    top_row_ = next_top;
+    top_row_ = std::min(next_top, maximum_top_row());
     focused_column_ = next_focused_column;
     if (details_columns_.empty()) header_focused_ = false;
     clamp_horizontal_offset();
@@ -462,7 +460,7 @@ void ObjectView::set_view_mode(const ObjectViewMode mode) {
     const Control::Ptr lifetime = weak_from_this().lock();
     const std::size_t top_index = top_row_ * columns();
     view_mode_ = mode;
-    top_row_ = top_index / columns();
+    top_row_ = std::min(top_index / columns(), maximum_top_row());
     header_focused_ = false;
     clear_details_cache();
     invalidate(Dirty::measure | Dirty::paint | Dirty::hit_test | Dirty::semantics);
@@ -578,7 +576,7 @@ void ObjectView::apply_selection(std::vector<std::string> ids,
         const std::optional<std::size_t> focus_index = item_index(next_focus);
         if (focus_index) {
             const std::size_t row = *focus_index / columns();
-            const std::size_t count = visible_row_count();
+            const std::size_t count = fully_visible_row_count();
             if (row < next_top) next_top = row;
             else if (row >= next_top + count) next_top = row - count + 1U;
         }
@@ -652,14 +650,15 @@ void ObjectView::set_show_secondary_text(bool show) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
-void ObjectView::set_top_row(std::size_t row) {
+void ObjectView::set_top_row(const std::size_t row) {
     require_mutable();
     const std::size_t rows = items_.empty() ? 0U : (items_.size() + columns() - 1U) / columns();
     if (rows == 0U) {
         if (row != 0U) throw std::out_of_range("empty ObjectView top row must be zero");
     } else if (row >= rows) throw std::out_of_range("ObjectView top row is outside the model");
-    if (top_row_ == row) return;
-    top_row_ = row;
+    const std::size_t next_top = std::min(row, maximum_top_row());
+    if (top_row_ == next_top) return;
+    top_row_ = next_top;
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
@@ -751,6 +750,24 @@ std::size_t ObjectView::visible_row_count() const noexcept {
     return result;
 }
 
+std::size_t ObjectView::fully_visible_row_count() const noexcept {
+    double height = local_bounds().height;
+    if (height <= 4.0) height = requested_bounds().height;
+    const double available = std::max(0.0, height - 4.0 - header_height());
+    // A partially visible final row must remain reachable in its entirety.
+    const std::size_t result = std::max<std::size_t>(1U,
+        static_cast<std::size_t>(std::floor(available / row_height())));
+    return result;
+}
+
+std::size_t ObjectView::maximum_top_row() const noexcept {
+    const std::size_t column_count = columns();
+    const std::size_t rows = items_.empty() ? 0U : (items_.size() - 1U) / column_count + 1U;
+    const std::size_t full_rows = fully_visible_row_count();
+    const std::size_t result = rows > full_rows ? rows - full_rows : 0U;
+    return result;
+}
+
 Rect ObjectView::item_bounds(const std::size_t index) const noexcept {
     const std::size_t column_count = columns();
     const std::size_t row = index / column_count;
@@ -789,7 +806,7 @@ std::string_view ObjectView::item_id_at(const Point absolute) const noexcept {
 
 void ObjectView::ensure_visible(std::size_t index) {
     const std::size_t row = index / columns();
-    const std::size_t count = visible_row_count();
+    const std::size_t count = fully_visible_row_count();
     if (row < top_row_) top_row_ = row;
     else if (row >= top_row_ + count) top_row_ = row - count + 1U;
 }
@@ -838,8 +855,7 @@ void ObjectView::arrange(const Rect final_bounds) {
     const std::size_t top_index = top_row_ * columns();
     Panel::arrange(final_bounds);
     const std::size_t column_count = columns();
-    const std::size_t last_row = items_.empty() ? 0U : (items_.size() - 1U) / column_count;
-    top_row_ = std::min(top_index / column_count, last_row);
+    top_row_ = std::min(top_index / column_count, maximum_top_row());
     clamp_horizontal_offset();
     // Window metric-provider replacement invalidates measure/layout even when
     // authored font fields are unchanged. Do not retain elision across it.

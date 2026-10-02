@@ -16,6 +16,7 @@
 #endif
 
 #include <atomic>
+#include <array>
 #include <condition_variable>
 #include <cstdint>
 #include <filesystem>
@@ -227,6 +228,8 @@ private:
     void sort_object_items(std::vector<gui_forms::ObjectViewItem>& items) const;
     void publish_object_items(std::vector<gui_forms::ObjectViewItem> items);
     void on_objects_sort_requested(const gui_forms::ObjectDetailsSort& request);
+    void fit_details_columns(const gui_forms::Rect& bounds);
+    void on_details_presentation_changed(const gui_forms::PresentationSettings& settings);
     void set_view_mode(gui_forms::ObjectViewMode mode);
     void set_sort_mode(std::string mode);
     void show_properties();
@@ -534,6 +537,8 @@ private:
     std::function<void()> show_about_window_{};
     std::string sort_mode_{"name"};
     gui_forms::ObjectSortDirection sort_direction_{gui_forms::ObjectSortDirection::ascending};
+    std::optional<std::array<double, 4>> automatic_details_widths_{};
+    bool details_widths_owned_by_user_{false};
 };
 
 } // namespace file_manager

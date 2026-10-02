@@ -1245,8 +1245,38 @@ void test_details_headers_sort_without_opening_objects() {
                 "Details header labels must describe their factual cells");
     }
     const std::string document_id = object_id(*objects, "Documents");
+    (*window).resize({1024.0, 674.0});
+    (*window).perform_layout();
+    double total_width = 0.0;
+    for (const gui_forms::ObjectDetailsColumn& column : (*objects).details_columns()) {
+        total_width += column.width;
+    }
+    require(total_width * (*objects).effective_text_scale() <= (*objects).committed_arranged_bounds().width - 7.9,
+        "all four initial Details columns must fit the ordinary Mac desktop viewport");
+    const double unscaled_name_width = (*objects).details_columns().front().width;
+    gui_forms::PresentationSettings presentation = (*window).presentation_settings();
+    presentation.text_scale = 1.1;
+    (*window).set_presentation_settings(presentation);
+    (*window).perform_layout();
+    require((*objects).details_columns().front().width < unscaled_name_width,
+        "text scale changes must refit automatic logical widths even without a pane resize");
+    presentation.text_scale = 1.0;
+    (*window).set_presentation_settings(presentation);
+    (*window).perform_layout();
     (*objects).set_selected_id(document_id);
     (*objects).set_details_column_width({"name"}, 310.0);
+    (*window).resize({1100.0, 674.0});
+    (*window).perform_layout();
+    require((*objects).details_columns().front().width == 310.0,
+        "automatic fitting must stop after the user resizes a column");
+    presentation.text_scale = 1.1;
+    (*window).set_presentation_settings(presentation);
+    (*window).perform_layout();
+    require((*objects).details_columns().front().width == 310.0,
+        "text scaling must preserve manually owned column widths");
+    presentation.text_scale = 1.0;
+    (*window).set_presentation_settings(presentation);
+    (*window).perform_layout();
     (*window).request_focus(objects);
     const std::filesystem::path previous_location =
         file_manager::ApplicationInteractionProbe::location(*application);

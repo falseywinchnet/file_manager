@@ -223,6 +223,14 @@ void exercise(PreviewState& state) {
         (*state.model).request_focus(objects);
         const bool focused = (*state.model).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::f6});
         const bool sorted = (*state.model).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::enter});
+        double columns_width = 0.0;
+        for (const gui_forms::ObjectDetailsColumn& column : (*objects).details_columns()) {
+            columns_width += column.width;
+        }
+        if (columns_width * scale > bounds.width - 7.9 || (*objects).top_row() != 0U ||
+            (*objects).items().size() != 3U) {
+            throw std::runtime_error("native Details must fit every default header and retain all three fixture rows after sorting");
+        }
         if (!focused || !sorted || (*objects).details_sort().column.value != "name" ||
             (*objects).details_sort().direction != gui_forms::ObjectSortDirection::descending ||
             (*objects).selected_id() != selected) {

@@ -7,9 +7,12 @@ remain pending. The earlier preview release does not include this work.
 ## Implemented consumer policy
 
 **CANDIDATE defaults:** Name, Type, Size, Date modified. The interviews require
-factual sortable headers but do not settle their initial order. Widths are
-260/120/104/172 logical units with bounded resizing, retained across directory
-changes during the session. Column selection, persistent widths/order and
+factual sortable headers but do not settle their initial order. Preferred widths
+are 260/120/104/172 logical units, interpolated toward 120/90/72/132 minima to
+fit the current pane. Extra width goes to Name. Text-scale changes refit logical
+widths; panes below the minimum total retain horizontal access. A manual resize
+stops automatic fitting for the session, preserving user widths across later
+resizes and directory changes. Column selection, persistent widths/order and
 native table/header accessibility remain separate unfinished work.
 
 The same retained model serves local directories and exact Criteria results;
@@ -107,8 +110,42 @@ function declaration now live in private `native_observation.hpp`; GUI code
 does not import the adapter's Windows headers. This new value-only header and
 the include changes are part of the reviewed source scope.
 
-Pending: native macOS/Linux metadata branches,
-native header pixel/synthetic-route evidence, matching package verification,
-physical input/scrolling feel and accessibility refinement. A Mac harness now
-preserves a generated-fixture Details screenshot for visual review; snapshot
-rendering can force display and does not measure compositor latency.
+**MEASURED:** source `17a748f` passed both three-platform native workflows
+36985684151 and 36985688166, including macOS/Linux metadata branches. The Mac
+header probe found 24 dark Name-header pixels and passed synthetic sort with
+selection retained; the earlier TXT/PNG/unsupported preview pixel checks also
+passed. These are source-specific results, not acceptance of subsequent edits.
+
+**REJECTED visual result:** the saved 1024x674 Mac screenshot showed only the
+last of three fixture rows after sorting and clipped almost all of Date
+modified. Model/pixel checks had not caught either ergonomic defect. The new
+viewport regression clamps replacement, mode change, explicit scrolling and
+viewport growth to the last full page, preserving the former top identity
+only where that does not leave avoidable empty rows. A partial final row stays
+reachable in full. Automatic column fitting above addresses the clipped header.
+The Mac harness now requires all three rows to remain at top zero and all four
+column widths to fit before preserving the screenshot.
+
+House-style review additionally covers the bounded four-column fitting loop,
+named layout/presentation callbacks, their owned width history, the nonallocating
+top-offset clamp, and focused viewport/native regressions. Committed geometry
+avoids a layout flush inside the fitting callback; borrowed columns survive the
+width setters, which publish no callbacks and do not replace the model. No
+general layout/scrollbar or untouched legacy-control compliance claim is made.
+
+Source review also found that damage allocation can throw after a width setter
+commits. The fitting catch records the four actually committed widths without
+allocation before rethrowing; a later attempt therefore does not confuse an
+interrupted automatic update with manual ownership. This recovery has source
+review, not a frontend allocation-injection result. Text-scale changes and
+manual-width preservation across both resize and scale have interaction tests.
+
+**MEASURED local follow-up:** the final matching Windows consumer passes 12/12
+tests in 2.96 seconds. Independent sibling source review found no remaining
+actionable issue in the added callbacks/state, fitting recovery, row-count and
+clamp helpers or focused regressions. This is bounded source/local evidence;
+it does not replace the pending native screenshot and package checks.
+
+Pending: native acceptance of these visual corrections, matching package
+verification, physical input/scrolling feel and accessibility refinement.
+Snapshot rendering can force display and does not measure compositor latency.
