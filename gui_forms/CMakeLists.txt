@@ -1996,6 +1996,13 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_collection_controls_tests
              COMMAND gui_forms_collection_controls_tests)
 
+    add_executable(gui_forms_object_details_failure_tests
+        tests/object_details_failure_tests.cpp)
+    target_link_libraries(gui_forms_object_details_failure_tests PRIVATE
+        gui_forms_controls)
+    add_test(NAME gui_forms_object_details_failure_tests
+             COMMAND gui_forms_object_details_failure_tests)
+
     add_executable(gui_forms_menu_controls_tests
         tests/menu_controls_tests.cpp)
     target_link_libraries(gui_forms_menu_controls_tests PRIVATE

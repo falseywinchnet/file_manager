@@ -5,6 +5,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <cmath>
 #include <cstddef>
@@ -15,6 +16,36 @@
 namespace gui_forms {
 
 namespace {
+
+void account_object_text(const std::string_view text, std::size_t& total) {
+    if (text.size() > ObjectView::maximum_details_text_bytes - total) {
+        throw std::invalid_argument("ObjectView aggregate model text exceeds 64 MiB development guard");
+    }
+    total += text.size();
+}
+
+void validate_object_text_budget(const std::vector<ObjectDetailsColumn>& columns,
+                                const std::vector<ObjectViewItem>& items) {
+    std::size_t total = 0U;
+    for (const ObjectDetailsColumn& column : columns) {
+        account_object_text(column.id.value, total);
+        account_object_text(column.label, total);
+    }
+    for (const ObjectViewItem& item : items) {
+        if (item.cells.size() != columns.size()) {
+            throw std::invalid_argument("ObjectView requires one cell per column");
+        }
+        account_object_text(item.stable_id, total);
+        account_object_text(item.name, total);
+        account_object_text(item.secondary_text, total);
+        account_object_text(item.description, total);
+        account_object_text(item.image_key, total);
+        for (const ObjectDetailsCell& cell : item.cells) {
+            account_object_text(cell.column.value, total);
+            account_object_text(cell.text, total);
+        }
+    }
+}
 
 struct IconLabelLayout final {
     std::vector<std::string> lines;
@@ -248,67 +279,164 @@ ObjectView::ObjectView(StableId stable_id) : Panel(std::move(stable_id)) {
 }
 
 void ObjectView::set_items(std::vector<ObjectViewItem> items) {
+    set_details_model(details_columns_, std::move(items));
+}
+
+void ObjectView::set_details_model(std::vector<ObjectDetailsColumn> next_columns,
+                                  std::vector<ObjectViewItem> items) {
     require_mutable();
-    std::unordered_set<std::string> identities;
-    for (const ObjectViewItem& item : items) {
+    if (next_columns.size() > 64U || items.size() > 1'000'000U) {
+        throw std::invalid_argument("ObjectView model exceeds development bounds");
+    }
+    // This nonallocating pass runs before identity-index allocation or moving
+    // cells. By-value input storage already belongs to this invocation.
+    validate_object_text_budget(next_columns, items);
+    std::unordered_map<std::string, std::size_t> column_indices{};
+    for (std::size_t index = 0U; index < next_columns.size(); ++index) {
+        const ObjectDetailsColumn& column = next_columns[index];
+        validate_identity_text(column.id.value, column.label);
+        if (column.id.value.size() > 256U || column.label.size() > 65536U ||
+            !std::isfinite(column.width) || !std::isfinite(column.minimum_width) ||
+            !std::isfinite(column.maximum_width) || column.minimum_width < 40.0 ||
+            column.maximum_width > 4096.0 || column.width < column.minimum_width ||
+            column.width > column.maximum_width ||
+            (column.alignment != ObjectColumnAlignment::left &&
+             column.alignment != ObjectColumnAlignment::right)) {
+            throw std::invalid_argument("ObjectView column identity, width or alignment is invalid");
+        }
+        const std::pair<std::unordered_map<std::string, std::size_t>::iterator, bool> inserted =
+            column_indices.emplace(column.id.value, index);
+        if (!inserted.second) throw std::invalid_argument("ObjectView duplicate column identity");
+    }
+    ItemIndices next_indices{};
+    next_indices.reserve(items.size());
+    std::vector<ObjectDetailsCell> normalized_cells(next_columns.size());
+    for (std::size_t index = 0U; index < items.size(); ++index) {
+        ObjectViewItem& item = items[index];
         validate_identity_text(item.stable_id, item.name);
-        if (!validate_utf8(item.secondary_text).valid() ||
+        if (item.stable_id.size() > 65536U || item.name.size() > 65536U ||
+            item.secondary_text.size() > 65536U || item.description.size() > 65536U ||
+            !validate_utf8(item.secondary_text).valid() ||
             !validate_utf8(item.description).valid() ||
             item.image_key.size() > 256U ||
             (!item.image_key.empty() && !validate_utf8(item.image_key).valid()) ||
-            !identities.insert(item.stable_id).second) {
+            item.cells.size() != next_columns.size()) {
             throw std::invalid_argument("ObjectView requires unique IDs and valid UTF-8");
         }
+        const std::pair<ItemIndices::iterator, bool> inserted = next_indices.emplace(item.stable_id, index);
+        if (!inserted.second) throw std::invalid_argument("ObjectView duplicate item identity");
+        std::array<bool, 64U> seen{};
+        for (ObjectDetailsCell& cell : item.cells) {
+            const std::unordered_map<std::string, std::size_t>::const_iterator found =
+                column_indices.find(cell.column.value);
+            if (found == column_indices.end() || cell.text.size() > 65536U ||
+                !validate_utf8(cell.text).valid() ||
+                (cell.availability != ObjectCellAvailability::available && cell.text.empty()) ||
+                (cell.availability != ObjectCellAvailability::available &&
+                 cell.availability != ObjectCellAvailability::unavailable &&
+                 cell.availability != ObjectCellAvailability::not_applicable)) {
+                throw std::invalid_argument("ObjectView cell identity, text or availability is invalid");
+            }
+            const std::size_t position = (*found).second;
+            if (seen[position]) throw std::invalid_argument("ObjectView duplicate cell identity");
+            seen[position] = true;
+            normalized_cells[position] = std::move(cell);
+        }
+        item.cells.swap(normalized_cells);
     }
-    const std::vector<std::string> retained_selection = selected_ids_;
-    const std::string retained_primary = selected_id_;
-    const std::string retained_focus = focused_id_;
-    const std::string retained_anchor = selection_anchor_id_;
-    items_ = std::move(items);
-    selected_ids_.clear();
-    for (const ObjectViewItem& item : items_) {
-        if (std::find(retained_selection.begin(), retained_selection.end(),
-                      item.stable_id) != retained_selection.end()) {
-            selected_ids_.push_back(item.stable_id);
+    const std::unordered_set<std::string> prior_selection(selected_ids_.begin(), selected_ids_.end());
+    std::vector<std::string> next_selection{};
+    next_selection.reserve(selected_ids_.size());
+    for (const ObjectViewItem& item : items) {
+        if (prior_selection.contains(item.stable_id)) {
+            next_selection.push_back(item.stable_id);
         }
     }
-    selected_id_ = std::find(selected_ids_.begin(), selected_ids_.end(),
-                             retained_primary) != selected_ids_.end()
-        ? retained_primary
-        : selected_ids_.empty() ? std::string{} : selected_ids_.front();
-    focused_id_ = item_index(retained_focus) ? retained_focus : std::string{};
-    selection_anchor_id_ = item_index(retained_anchor) ? retained_anchor
-                                                       : selected_id_;
-    top_row_ = std::min(top_row_, items_.empty() ? 0U :
-        (items_.size() - 1U) / columns());
+    SelectionIds next_selected_lookup(next_selection.begin(), next_selection.end());
+    std::string next_primary{};
+    if (next_indices.contains(selected_id_)) next_primary = selected_id_;
+    else if (!next_selection.empty()) next_primary = next_selection.front();
+    std::string next_focus{};
+    if (next_indices.contains(focused_id_)) next_focus = focused_id_;
+    std::string next_anchor = next_primary;
+    if (next_indices.contains(selection_anchor_id_)) next_anchor = selection_anchor_id_;
+    std::size_t next_top = top_row_;
+    const std::size_t old_top_index = top_row_ * columns();
+    if (old_top_index < items_.size()) {
+        const ItemIndices::const_iterator top =
+            next_indices.find(items_[old_top_index].stable_id);
+        if (top != next_indices.end()) next_top = (*top).second / columns();
+    }
+    const std::size_t last_row = items.empty() ? 0U : (items.size() - 1U) / columns();
+    next_top = std::min(next_top, last_row);
+    ObjectDetailsSort next_sort = details_sort_;
+    const std::unordered_map<std::string, std::size_t>::const_iterator sorted_column = column_indices.find(next_sort.column.value);
+    if (sorted_column == column_indices.end() || !next_columns[(*sorted_column).second].sortable) next_sort = {};
+    std::size_t next_focused_column = 0U;
+    if (focused_column_ < details_columns_.size()) {
+        const std::unordered_map<std::string, std::size_t>::const_iterator focused_column =
+            column_indices.find(details_columns_[focused_column_].id.value);
+        if (focused_column != column_indices.end()) next_focused_column = (*focused_column).second;
+    }
+    ObjectSelectionChange change{};
+    change.previous_id = selected_id_;
+    change.current_id = next_primary;
+    change.previous_ids = selected_ids_;
+    change.current_ids = next_selection;
+    const bool selection_changed = selected_id_ != next_primary || selected_ids_ != next_selection;
+    // All allocating preparation has succeeded. Publish complete owned values
+    // before invalidation or synchronous notifications can observe this object.
+    const bool release_resize_capture = resizing_column_ && has_pointer_capture();
+    pressed_column_.reset();
+    resizing_column_.reset();
+    items_.swap(items);
+    item_indices_.swap(next_indices);
+    details_columns_.swap(next_columns);
+    selected_ids_.swap(next_selection);
+    selected_lookup_.swap(next_selected_lookup);
+    selected_id_.swap(next_primary);
+    focused_id_.swap(next_focus);
+    selection_anchor_id_.swap(next_anchor);
+    details_sort_ = std::move(next_sort);
+    top_row_ = next_top;
+    focused_column_ = next_focused_column;
+    if (details_columns_.empty()) header_focused_ = false;
+    clamp_horizontal_offset();
+    clear_details_cache();
     hovered_index_.reset();
     pressed_index_.reset();
     invalidate(Dirty::measure | Dirty::paint | Dirty::hit_test | Dirty::semantics);
-    if (retained_selection != selected_ids_ || retained_primary != selected_id_) {
-        ObjectSelectionChange change;
-        change.previous_id = retained_primary;
-        change.current_id = selected_id_;
-        change.previous_ids = retained_selection;
-        change.current_ids = selected_ids_;
-        publish_change(selection_changed_, change);
-    }
+    // Capture notification is externally observable. Retire the old press and
+    // publish all new state before it can reenter. Keep this control alive and
+    // suppress a stale selection publication if that callback replaces it.
+    const Control::Ptr lifetime = weak_from_this().lock();
+    if (release_resize_capture && window()) (*window()).release_pointer();
+    if (selection_changed && is_alive() && selected_id_ == change.current_id &&
+        selected_ids_ == change.current_ids) publish_change(selection_changed_, change);
 }
 
-std::optional<std::size_t> ObjectView::item_index(std::string_view id) const noexcept {
-    for (std::size_t index = 0U; index < items_.size(); ++index) {
-        if (items_[index].stable_id == id) return index;
-    }
+std::optional<std::size_t> ObjectView::item_index(const std::string_view id) const noexcept {
+    const ItemIndices::const_iterator found = item_indices_.find(id);
+    if (found != item_indices_.end()) return (*found).second;
     return {};
 }
 
-void ObjectView::set_view_mode(ObjectViewMode mode) {
+void ObjectView::set_view_mode(const ObjectViewMode mode) {
     require_mutable();
+    if (mode != ObjectViewMode::icons && mode != ObjectViewMode::details) {
+        throw std::invalid_argument("ObjectView mode is invalid");
+    }
     if (view_mode_ == mode) return;
-    const std::optional<std::size_t> selected = item_index(selected_id_);
+    const Control::Ptr lifetime = weak_from_this().lock();
+    const std::size_t top_index = top_row_ * columns();
     view_mode_ = mode;
-    top_row_ = 0U;
-    if (selected) ensure_visible(*selected);
+    top_row_ = top_index / columns();
+    header_focused_ = false;
+    clear_details_cache();
     invalidate(Dirty::measure | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+    // Publish the mode before capture-release observers run. They may dispose,
+    // detach, or replace mode/model; no outer setter work follows notification.
+    cancel_header_interaction();
 }
 
 void ObjectView::set_selected_id(std::string_view id) {
@@ -323,14 +451,19 @@ void ObjectView::set_selected_id(std::string_view id) {
 }
 
 void ObjectView::set_selected_ids(std::vector<std::string> ids,
-                                  std::string_view primary_id) {
+                                  const std::string_view primary_id) {
     require_mutable();
     if (selection_mode_ == ObjectSelectionMode::single && ids.size() > 1U) {
         throw std::invalid_argument(
             "ObjectView single-selection mode accepts at most one selected ID");
     }
-    apply_selection(std::move(ids), std::string(primary_id),
-                    std::string(primary_id), false);
+    std::string primary(primary_id);
+    std::string anchor(primary_id);
+    if (primary.empty()) {
+        if (std::find(ids.begin(), ids.end(), selected_id_) != ids.end()) primary = selected_id_;
+        if (!ids.empty() && item_index(selection_anchor_id_)) anchor = selection_anchor_id_;
+    }
+    apply_selection(std::move(ids), std::move(primary), std::move(anchor), false);
 }
 
 void ObjectView::clear_selection() {
@@ -354,7 +487,6 @@ void ObjectView::select_all() {
     }
     const std::string primary = ids.empty() ? std::string{} : ids.front();
     apply_selection(std::move(ids), primary, primary, true);
-    if (const std::optional<std::size_t> index = item_index(primary)) ensure_visible(*index);
 }
 
 void ObjectView::set_selection_mode(ObjectSelectionMode mode) {
@@ -369,16 +501,16 @@ void ObjectView::set_selection_mode(ObjectSelectionMode mode) {
     invalidate(Dirty::semantics);
 }
 
-bool ObjectView::is_selected(std::string_view id) const noexcept {
-    return std::find(selected_ids_.begin(), selected_ids_.end(), id) !=
-           selected_ids_.end();
+bool ObjectView::is_selected(const std::string_view id) const noexcept {
+    const bool result = selected_lookup_.contains(id);
+    return result;
 }
 
 void ObjectView::apply_selection(std::vector<std::string> ids,
                                  std::string primary,
                                  std::string anchor,
-                                 bool move_focus) {
-    std::unordered_set<std::string> requested;
+                                 const bool move_focus) {
+    SelectionIds requested{};
     for (const std::string& id : ids) {
         if (!validate_utf8(id).valid() || !item_index(id)) {
             throw std::out_of_range("ObjectView selected ID is not in the model");
@@ -389,7 +521,7 @@ void ObjectView::apply_selection(std::vector<std::string> ids,
         throw std::invalid_argument(
             "ObjectView single-selection mode accepts at most one selected ID");
     }
-    std::vector<std::string> normalized;
+    std::vector<std::string> normalized{};
     normalized.reserve(requested.size());
     for (const ObjectViewItem& item : items_) {
         if (requested.contains(item.stable_id)) normalized.push_back(item.stable_id);
@@ -407,21 +539,35 @@ void ObjectView::apply_selection(std::vector<std::string> ids,
         throw std::out_of_range("ObjectView selection anchor is not in the model");
     }
     const bool changed = selected_ids_ != normalized || selected_id_ != primary;
-    const std::vector<std::string> previous_ids = selected_ids_;
-    const std::string previous_id = selected_id_;
-    selected_ids_ = std::move(normalized);
-    selected_id_ = std::move(primary);
-    selection_anchor_id_ = std::move(anchor);
-    if (move_focus) focused_id_ = selected_id_;
+    std::string next_focus = focused_id_;
+    if (move_focus) next_focus = primary;
+    std::size_t next_top = top_row_;
+    if (move_focus) {
+        const std::optional<std::size_t> focus_index = item_index(next_focus);
+        if (focus_index) {
+            const std::size_t row = *focus_index / columns();
+            const std::size_t count = visible_row_count();
+            if (row < next_top) next_top = row;
+            else if (row >= next_top + count) next_top = row - count + 1U;
+        }
+    }
+    ObjectSelectionChange change{};
+    if (changed) {
+        change.previous_id = selected_id_;
+        change.current_id = primary;
+        change.previous_ids = selected_ids_;
+        change.current_ids = normalized;
+    }
+    selected_ids_.swap(normalized);
+    selected_lookup_.swap(requested);
+    selected_id_.swap(primary);
+    selection_anchor_id_.swap(anchor);
+    focused_id_.swap(next_focus);
+    top_row_ = next_top;
     if (!changed) {
         if (move_focus) invalidate(Dirty::paint | Dirty::semantics);
         return;
     }
-    ObjectSelectionChange change;
-    change.previous_id = previous_id;
-    change.current_id = selected_id_;
-    change.previous_ids = previous_ids;
-    change.current_ids = selected_ids_;
     invalidate(Dirty::paint | Dirty::semantics);
     publish_change(selection_changed_, change);
 }
@@ -552,40 +698,45 @@ std::size_t ObjectView::columns() const noexcept {
     double width = local_bounds().width;
     if (width <= 4.0) width = requested_bounds().width;
     const double scaled_width = icon_cell_size_.width * effective_text_scale();
-    return std::max<std::size_t>(1U, static_cast<std::size_t>(
-        std::floor(std::max(0.0, width - 8.0) / scaled_width)));
+    const double available = std::max(0.0, width - 8.0);
+    const std::size_t count = static_cast<std::size_t>(std::floor(available / scaled_width));
+    const std::size_t result = std::max<std::size_t>(1U, count);
+    return result;
 }
 
 double ObjectView::row_height() const noexcept {
-    return (view_mode_ == ObjectViewMode::icons ? icon_cell_size_.height
-                                                : details_row_height_) *
-        effective_text_scale();
+    const double base = view_mode_ == ObjectViewMode::icons ? icon_cell_size_.height : details_row_height_;
+    const double result = base * effective_text_scale();
+    return result;
 }
 
 std::size_t ObjectView::visible_row_count() const noexcept {
     double height = local_bounds().height;
     if (height <= 4.0) height = requested_bounds().height;
-    return std::max<std::size_t>(1U, static_cast<std::size_t>(
-        std::ceil(std::max(0.0, height - 4.0) / row_height())));
+    const double available = std::max(0.0, height - 4.0 - header_height());
+    const std::size_t count = static_cast<std::size_t>(std::ceil(available / row_height()));
+    const std::size_t result = std::max<std::size_t>(1U, count);
+    return result;
 }
 
-Rect ObjectView::item_bounds(std::size_t index) const noexcept {
+Rect ObjectView::item_bounds(const std::size_t index) const noexcept {
     const std::size_t column_count = columns();
     const std::size_t row = index / column_count;
     const std::size_t column = index % column_count;
     const double available_width = std::max(0.0, local_bounds().width - 8.0);
     const double cell_width = view_mode_ == ObjectViewMode::icons
         ? available_width / static_cast<double>(column_count) : available_width;
-    return {4.0 + static_cast<double>(column) * cell_width,
-            2.0 + static_cast<double>(row - top_row_) * row_height(),
-            cell_width, row_height()};
+    const double row_difference = static_cast<double>(row) - static_cast<double>(top_row_);
+    const Rect result{4.0 + static_cast<double>(column) * cell_width,
+            2.0 + header_height() + row_difference * row_height(), cell_width, row_height()};
+    return result;
 }
 
-std::optional<std::size_t> ObjectView::index_at(Point absolute) const noexcept {
+std::optional<std::size_t> ObjectView::index_at(const Point absolute) const noexcept {
     const Rect bounds = absolute_bounds();
     if (!bounds.contains(absolute)) return {};
     const double local_x = absolute.x - bounds.x - 4.0;
-    const double local_y = absolute.y - bounds.y - 2.0;
+    const double local_y = absolute.y - bounds.y - 2.0 - header_height();
     if (local_x < 0.0 || local_y < 0.0) return {};
     const std::size_t column_count = columns();
     const double cell_width = std::max(1.0, (bounds.width - 8.0) / column_count);
@@ -593,13 +744,15 @@ std::optional<std::size_t> ObjectView::index_at(Point absolute) const noexcept {
         : std::min(column_count - 1U, static_cast<std::size_t>(local_x / cell_width));
     const std::size_t row = top_row_ + static_cast<std::size_t>(local_y / row_height());
     const std::size_t index = row * column_count + column;
-    return index < items_.size() ? std::optional<std::size_t>{index}
-                                 : std::optional<std::size_t>{};
+    if (index < items_.size()) return index;
+    return {};
 }
 
 std::string_view ObjectView::item_id_at(const Point absolute) const noexcept {
-    const auto index = index_at(absolute);
-    return index ? std::string_view(items_[*index].stable_id) : std::string_view{};
+    const std::optional<std::size_t> index = index_at(absolute);
+    if (!index) return {};
+    const std::string_view result = items_[*index].stable_id;
+    return result;
 }
 
 void ObjectView::ensure_visible(std::size_t index) {
@@ -649,9 +802,16 @@ void ObjectView::select_index(std::size_t index, bool activate,
     if (activate && is_alive()) item_activated_.emit(target);
 }
 
-void ObjectView::arrange(Rect final_bounds) {
+void ObjectView::arrange(const Rect final_bounds) {
+    const std::size_t top_index = top_row_ * columns();
     Panel::arrange(final_bounds);
-    if (const std::optional<std::size_t> focused = item_index(focused_id_)) ensure_visible(*focused);
+    const std::size_t column_count = columns();
+    const std::size_t last_row = items_.empty() ? 0U : (items_.size() - 1U) / column_count;
+    top_row_ = std::min(top_index / column_count, last_row);
+    clamp_horizontal_offset();
+    // Window metric-provider replacement invalidates measure/layout even when
+    // authored font fields are unchanged. Do not retain elision across it.
+    clear_details_cache();
 }
 
 void ObjectView::paint_glyph(Painter& painter, Rect b, ObjectGlyph glyph,
@@ -695,6 +855,10 @@ void ObjectView::paint_glyph(Painter& painter, Rect b, ObjectGlyph glyph,
 
 void ObjectView::on_paint(Painter& painter, Rect damage) {
     Panel::on_paint(painter, damage);
+    if (has_details_columns()) {
+        paint_details(painter);
+        return;
+    }
     const Rect bounds = local_bounds();
     const FontSpec font = effective_font(font_);
     painter.save();
@@ -827,6 +991,7 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
 
 void ObjectView::on_pointer(PointerEvent& event) {
     if (!eligible_for_input()) return;
+    if (has_details_columns() && details_pointer(event)) return;
     if (event.action == PointerAction::move) {
         const std::optional<std::size_t> next = index_at(event.position);
         if (next != hovered_index_) { hovered_index_ = next; invalidate(Dirty::paint); }
@@ -897,6 +1062,8 @@ void ObjectView::on_pointer(PointerEvent& event) {
 }
 
 void ObjectView::on_key(KeyEvent& event) {
+    if (focused_ && enabled() && event.action == KeyAction::down &&
+        has_details_columns() && details_key(event)) return;
     if (!focused_ || !enabled() || event.action != KeyAction::down || items_.empty()) return;
     std::optional<std::size_t> current = item_index(focused_id_);
     if (!current) current = item_index(selected_id_);
@@ -963,6 +1130,7 @@ void ObjectView::type_select(std::string_view text) {
 }
 
 void ObjectView::on_text_input(TextInputEvent& event) {
+    if (header_focused_ && has_details_columns()) return;
     if (!focused_ || !enabled() || event.composing || event.text_utf8.empty() ||
         !validate_utf8(event.text_utf8).valid()) return;
     type_select(event.text_utf8);
@@ -970,6 +1138,7 @@ void ObjectView::on_text_input(TextInputEvent& event) {
 }
 
 void ObjectView::on_focus_changed(bool focused) {
+    if (!focused) cancel_header_interaction();
     focused_ = focused;
     if (focused_ && focused_id_.empty() && !items_.empty()) {
         focused_id_ = selected_id_.empty() ? items_.front().stable_id : selected_id_;
@@ -978,7 +1147,7 @@ void ObjectView::on_focus_changed(bool focused) {
 }
 
 SemanticDescriptor ObjectView::semantic_descriptor() const {
-    SemanticDescriptor descriptor;
+    SemanticDescriptor descriptor{};
     descriptor.role = SemanticRole::list;
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
@@ -990,7 +1159,7 @@ SemanticDescriptor ObjectView::semantic_descriptor() const {
 }
 
 std::vector<SemanticNode> ObjectView::semantic_virtual_children() const {
-    std::vector<SemanticNode> nodes;
+    std::vector<SemanticNode> nodes{};
     const std::size_t first = top_row_ * columns();
     const std::size_t end = std::min(items_.size(),
         (top_row_ + visible_row_count()) * columns());
@@ -999,19 +1168,27 @@ std::vector<SemanticNode> ObjectView::semantic_virtual_children() const {
     for (std::size_t index = first; index < end; ++index) {
         const ObjectViewItem& item = items_[index];
         const Rect local = item_bounds(index);
-        SemanticNode node;
+        SemanticNode node{};
         node.stable_id = item.stable_id;
         node.runtime_id = virtual_runtime_id(node.stable_id);
         node.role = SemanticRole::list_item;
         node.name = item.name;
         node.value = item.secondary_text;
         node.description = item.description;
+        if (has_details_columns()) {
+            for (std::size_t column = 0U; column < details_columns_.size(); ++column) {
+                if (!node.description.empty()) node.description.append("; ");
+                node.description.append(details_columns_[column].label);
+                node.description.append(": ");
+                node.description.append(item.cells[column].text);
+            }
+        }
         node.bounds = {absolute.x + local.x, absolute.y + local.y,
                        local.width, local.height};
         node.states = SemanticState::visible | SemanticState::focusable;
         if (effectively_enabled() && item.enabled) node.states |= SemanticState::enabled;
         if (is_selected(item.stable_id)) node.states |= SemanticState::selected;
-        if (focused_ && item.stable_id == focused_id_) node.states |= SemanticState::focused;
+        if (focused_ && !header_focused_ && item.stable_id == focused_id_) node.states |= SemanticState::focused;
         node.actions = {SemanticAction::focus, SemanticAction::select,
                         SemanticAction::press, SemanticAction::show_menu};
         nodes.push_back(std::move(node));
@@ -1044,5 +1221,427 @@ bool ObjectView::on_semantic_child_action(std::string_view id,
     return true;
 }
 
+
+bool ObjectView::has_details_columns() const noexcept {
+    const bool result = view_mode_ == ObjectViewMode::details && !details_columns_.empty();
+    return result;
+}
+
+double ObjectView::header_height() const noexcept {
+    if (!has_details_columns()) return 0.0;
+    const double result = details_row_height_ * effective_text_scale();
+    return result;
+}
+
+double ObjectView::total_column_width() const noexcept {
+    double result = 0.0;
+    for (const ObjectDetailsColumn& column : details_columns_) result += column.width;
+    return result;
+}
+
+std::optional<std::size_t> ObjectView::column_index(const ObjectColumnId& id) const noexcept {
+    for (std::size_t index = 0U; index < details_columns_.size(); ++index) {
+        if (details_columns_[index].id == id) return index;
+    }
+    return {};
+}
+
+Rect ObjectView::column_bounds(const std::size_t column) const noexcept {
+    const double scale = effective_text_scale();
+    double x = 4.0 - horizontal_offset_ * scale;
+    for (std::size_t index = 0U; index < column; ++index) x += details_columns_[index].width * scale;
+    const Rect result{x, 2.0, details_columns_[column].width * scale, header_height()};
+    return result;
+}
+
+void ObjectView::clamp_horizontal_offset() noexcept {
+    const double available = std::max(0.0, local_bounds().width - 8.0) / effective_text_scale();
+    const double maximum = std::max(0.0, total_column_width() - available);
+    horizontal_offset_ = std::clamp(horizontal_offset_, 0.0, maximum);
+}
+
+void ObjectView::set_horizontal_offset(const double offset) {
+    require_mutable();
+    if (!std::isfinite(offset) || offset < 0.0) throw std::invalid_argument("ObjectView horizontal offset is invalid");
+    horizontal_offset_ = offset;
+    clamp_horizontal_offset();
+    invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
+void ObjectView::clear_details_cache() noexcept {
+    // Conservatively retire input snapshots on model, column, or layout changes.
+    ++details_revision_;
+    for (DetailsTextCache& entry : details_cache_) entry.valid = false;
+}
+
+void ObjectView::set_details_column_width(const ObjectColumnId& id, const double width) {
+    require_mutable();
+    const std::optional<std::size_t> index = column_index(id);
+    if (!index) throw std::invalid_argument("ObjectView width names an unknown column");
+    ObjectDetailsColumn& column = details_columns_[*index];
+    if (!std::isfinite(width) || width < column.minimum_width || width > column.maximum_width) {
+        throw std::invalid_argument("ObjectView width is outside column bounds");
+    }
+    if (column.width == width) return;
+    column.width = width;
+    clamp_horizontal_offset();
+    clear_details_cache();
+    invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
+void ObjectView::set_details_sort(ObjectDetailsSort state) {
+    require_mutable();
+    const std::optional<std::size_t> index = column_index(state.column);
+    if ((!state.column.value.empty() && (!index || !details_columns_[*index].sortable)) ||
+        (state.direction != ObjectSortDirection::ascending && state.direction != ObjectSortDirection::descending)) {
+        throw std::invalid_argument("ObjectView accepted sort state is invalid");
+    }
+    details_sort_ = std::move(state);
+    clear_details_cache();
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
+void ObjectView::request_header_sort(const std::size_t column) {
+    if (column >= details_columns_.size() || !details_columns_[column].sortable) return;
+    ObjectDetailsSort request{};
+    request.column = details_columns_[column].id;
+    if (request.column == details_sort_.column && details_sort_.direction == ObjectSortDirection::ascending) {
+        request.direction = ObjectSortDirection::descending;
+    }
+    const Control::Ptr lifetime = shared_from_this();
+    const DetailsPointerContext context{window(), details_revision_, absolute_bounds(),
+        effective_text_scale(), horizontal_offset_, header_height()};
+    // Retire the old gesture before either release or sort observers run.
+    // The request owns its identity across release; changed context cancels it.
+    cancel_header_interaction();
+    if (!details_pointer_context_valid(context) || !header_focused_ ||
+        focused_column_ != column || pressed_column_ || resizing_column_ || has_pointer_capture()) return;
+    sort_requested_.emit(request);
+}
+
+void ObjectView::cancel_header_interaction() {
+    pressed_column_.reset();
+    const bool release = resizing_column_ && has_pointer_capture();
+    resizing_column_.reset();
+    if (release && window()) (*window()).release_pointer();
+}
+
+void ObjectView::reveal_header() {
+    if (focused_column_ >= details_columns_.size()) return;
+    const Rect column = column_bounds(focused_column_);
+    const double scale = effective_text_scale();
+    const double right = local_bounds().width - 4.0;
+    if (column.x < 4.0) horizontal_offset_ += (column.x - 4.0) / scale;
+    else if (column.x + column.width > right) horizontal_offset_ += (column.x + column.width - right) / scale;
+    clamp_horizontal_offset();
+    invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
+bool ObjectView::details_pointer_context_valid(const DetailsPointerContext& context) const {
+    if (!is_alive() || window() != context.attached || !has_details_columns() ||
+        !effectively_enabled() || !effectively_visible() || details_revision_ != context.revision) return false;
+    if (context.attached && (*context.attached).focused_control().get() != this) return false;
+    const Rect bounds = absolute_bounds();
+    const bool valid = bounds.x == context.bounds.x && bounds.y == context.bounds.y &&
+        bounds.width == context.bounds.width && bounds.height == context.bounds.height &&
+        effective_text_scale() == context.scale && horizontal_offset_ == context.offset &&
+        header_height() == context.header;
+    return valid;
+}
+
+bool ObjectView::details_pointer(PointerEvent& event) {
+    const Control::Ptr lifetime = shared_from_this();
+    const Rect absolute = absolute_bounds();
+    const Point local{event.position.x - absolute.x, event.position.y - absolute.y};
+    if (resizing_column_ && window() && !has_pointer_capture()) {
+        // The host or another control may revoke capture without a final up.
+        // A later pointer move must not resume that retired width gesture.
+        resizing_column_.reset();
+        pressed_column_.reset();
+    }
+    if (resizing_column_) {
+        if (event.action == PointerAction::move) {
+            const ObjectDetailsColumn& column = details_columns_[*resizing_column_];
+            const double delta = (local.x - resize_start_x_) / effective_text_scale();
+            const double width = std::clamp(resize_start_width_ + delta, column.minimum_width, column.maximum_width);
+            set_details_column_width(column.id, width);
+        } else if (event.action == PointerAction::up) {
+            cancel_header_interaction();
+        }
+        event.handled = true;
+        return true;
+    }
+    if (event.action == PointerAction::wheel &&
+        (event.wheel_delta.x != 0.0 || has_modifier(event.modifiers, Modifier::shift))) {
+        const double delta = event.wheel_delta.x != 0.0 ? event.wheel_delta.x : event.wheel_delta.y;
+        const double next = std::max(0.0, horizontal_offset_ - delta * 32.0);
+        set_horizontal_offset(next);
+        event.handled = true;
+        return true;
+    }
+    const bool in_header = local.y >= 2.0 && local.y < 2.0 + header_height() &&
+        local.x >= 4.0 && local.x < absolute.width - 4.0;
+    if (!in_header) {
+        if (event.action == PointerAction::up && pressed_column_) {
+            pressed_column_.reset();
+            event.handled = true;
+            return true;
+        }
+        if (event.action == PointerAction::down) {
+            header_focused_ = false;
+            pressed_column_.reset();
+        }
+        return false;
+    }
+    hovered_index_.reset();
+    std::optional<std::size_t> hit{};
+    bool edge = false;
+    for (std::size_t index = 0U; index < details_columns_.size(); ++index) {
+        const Rect bounds = column_bounds(index);
+        if (std::abs(local.x - bounds.x - bounds.width) <= 4.0) {
+            hit = index;
+            edge = true;
+            break;
+        }
+        if (bounds.contains(local)) hit = index;
+    }
+    if (event.action == PointerAction::down && event.button == PointerButton::primary) {
+        const DetailsPointerContext context{window(), details_revision_, absolute,
+            effective_text_scale(), horizontal_offset_, header_height()};
+        event.handled = true;
+        if (context.attached) {
+            const bool accepted = (*context.attached).request_focus(lifetime);
+            if (!accepted) return true;
+        }
+        if (!details_pointer_context_valid(context)) return true;
+        pressed_index_.reset();
+        pressed_button_ = PointerButton::none;
+        header_focused_ = true;
+        if (hit) {
+            focused_column_ = *hit;
+            if (edge) {
+                resizing_column_ = hit;
+                resize_start_x_ = local.x;
+                resize_start_width_ = details_columns_[*hit].width;
+                if (context.attached) {
+                    (*context.attached).capture_pointer(lifetime, event.pointer_id);
+                    if (!details_pointer_context_valid(context) || !has_pointer_capture() ||
+                        resizing_column_ != hit) {
+                        // Capture publication may replace/dispose this control or
+                        // transfer capture again. Release only capture we still own.
+                        const bool release = has_pointer_capture();
+                        resizing_column_.reset();
+                        pressed_column_.reset();
+                        if (release && window()) (*window()).release_pointer();
+                        return true;
+                    }
+                }
+            } else pressed_column_ = hit;
+        }
+        invalidate(Dirty::paint | Dirty::semantics);
+    } else if (event.action == PointerAction::up && event.button == PointerButton::primary) {
+        const bool activate = hit && pressed_column_ == hit;
+        pressed_column_.reset();
+        event.handled = true;
+        if (activate) request_header_sort(*hit);
+        return true;
+    }
+    event.handled = true;
+    return true;
+}
+
+bool ObjectView::details_key(KeyEvent& event) {
+    if (event.physical_key == PhysicalKey::escape && resizing_column_) {
+        const ObjectDetailsColumn& column = details_columns_[*resizing_column_];
+        set_details_column_width(column.id, resize_start_width_);
+        cancel_header_interaction();
+        event.handled = true;
+        return true;
+    }
+    if (event.physical_key == PhysicalKey::f6) {
+        header_focused_ = !header_focused_;
+        if (header_focused_) reveal_header();
+        invalidate(Dirty::paint | Dirty::semantics);
+        event.handled = true;
+        return true;
+    }
+    const bool left = event.physical_key == PhysicalKey::left;
+    const bool right = event.physical_key == PhysicalKey::right;
+    if (!header_focused_) {
+        if (has_modifier(event.modifiers, Modifier::alt) && (left || right)) {
+            const double next = std::max(0.0, horizontal_offset_ + (left ? -32.0 : 32.0));
+            set_horizontal_offset(next);
+            event.handled = true;
+            return true;
+        }
+        return false;
+    }
+    if (event.physical_key == PhysicalKey::enter || event.physical_key == PhysicalKey::space) {
+        event.handled = true;
+        request_header_sort(focused_column_);
+        return true;
+    }
+    if (has_modifier(event.modifiers, Modifier::alt) && (left || right)) {
+        const ObjectDetailsColumn& column = details_columns_[focused_column_];
+        const double width = std::clamp(column.width + (left ? -8.0 : 8.0), column.minimum_width, column.maximum_width);
+        set_details_column_width(column.id, width);
+    } else if (left && focused_column_ > 0U) --focused_column_;
+    else if (right && focused_column_ + 1U < details_columns_.size()) ++focused_column_;
+    else if (event.physical_key == PhysicalKey::home) focused_column_ = 0U;
+    else if (event.physical_key == PhysicalKey::end) focused_column_ = details_columns_.size() - 1U;
+    else if (event.physical_key == PhysicalKey::escape || event.physical_key == PhysicalKey::down) header_focused_ = false;
+    else if (event.physical_key == PhysicalKey::tab) {
+        header_focused_ = false;
+        invalidate(Dirty::paint | Dirty::semantics);
+        return false;
+    }
+    reveal_header();
+    event.handled = true;
+    return true;
+}
+
+const std::string& ObjectView::details_text(Painter& painter,
+    const std::size_t slot, const std::size_t item, const std::size_t column, const bool header,
+    const std::string_view text, const double width, const FontSpec font) {
+    DetailsTextCache& cached = details_cache_[slot];
+    if (cached.valid && cached.item == item && cached.column == column &&
+        cached.header == header && cached.width == width) return cached.text;
+    cached.valid = false;
+    cached.item = item;
+    cached.column = column;
+    cached.header = header;
+    cached.width = width;
+    cached.text.assign(text);
+    ++details_paint_work_.text_preparations;
+    if (width <= 0.0) cached.text.clear();
+    else if (painter.measure_text_utf8(text, font).width > width) {
+        constexpr std::string_view ellipsis = "…";
+        if (painter.measure_text_utf8(ellipsis, font).width > width) cached.text.clear();
+        else {
+            const TextStore store(text);
+            std::size_t lower = 0U;
+            std::size_t upper = store.grapheme_count().value();
+            // Reuse the destination string in a bounded interval search. Each
+            // accepted lower endpoint was measured to fit. Nonmonotonic shaping
+            // can make this nonmaximal, but cannot authorize an unmeasured fit.
+            // Every candidate ends at a grapheme boundary, never a UTF-8 cut.
+            while (lower < upper) {
+                const std::size_t middle = lower + (upper - lower + 1U) / 2U;
+                const std::size_t end = store.utf8_offset(GraphemeIndex(middle)).value();
+                cached.text.assign(text.substr(0U, end));
+                cached.text.append(ellipsis);
+                if (painter.measure_text_utf8(cached.text, font).width <= width) lower = middle;
+                else upper = middle - 1U;
+            }
+            const std::size_t end = store.utf8_offset(GraphemeIndex(lower)).value();
+            cached.text.assign(text.substr(0U, end));
+            cached.text.append(ellipsis);
+        }
+    }
+    const Size measured = painter.measure_text_utf8(cached.text, font);
+    cached.measured_width = measured.width;
+    cached.valid = true;
+    return cached.text;
+}
+
+void ObjectView::paint_details(Painter& painter) {
+    details_paint_work_ = {};
+    clamp_horizontal_offset();
+    const FontSpec font = effective_font(font_);
+    if (details_cache_font_ != font) {
+        clear_details_cache();
+        details_cache_font_ = font;
+    }
+    const Rect bounds = local_bounds();
+    const double header = header_height();
+    const double viewport_right = std::max(4.0, bounds.width - 4.0);
+    const std::size_t first = std::min(top_row_, items_.size());
+    const std::size_t end = std::min(items_.size(), first + visible_row_count() + 1U);
+    std::array<Rect, 64U> geometry{};
+    std::array<std::size_t, 64U> visible_columns{};
+    std::size_t visible_count = 0U;
+    double x = 4.0 - horizontal_offset_ * effective_text_scale();
+    for (std::size_t index = 0U; index < details_columns_.size(); ++index) {
+        const double width = details_columns_[index].width * effective_text_scale();
+        geometry[index] = {x, 2.0, width, header};
+        if (x < viewport_right && x + width > 4.0) {
+            visible_columns[visible_count] = index;
+            ++visible_count;
+        }
+        x += width;
+    }
+    const std::size_t required = (end - first + 1U) * visible_count;
+    if (details_cache_.size() < required) details_cache_.resize(required);
+    std::size_t cache_slot = 0U;
+    painter.save();
+    painter.clip_rect({4.0, 2.0, std::max(0.0, bounds.width - 8.0), std::max(0.0, bounds.height - 4.0)});
+    painter.fill_rect({4.0, 2.0, viewport_right - 4.0, header}, style().face);
+    for (std::size_t visible = 0U; visible < visible_count; ++visible) {
+        const std::size_t index = visible_columns[visible];
+        const ObjectDetailsColumn& column = details_columns_[index];
+        const Rect cell = geometry[index];
+        const bool sorted = column.id == details_sort_.column;
+        const double reserved = sorted ? 22.0 : 12.0;
+        const std::string& label = details_text(painter, cache_slot, 0U, index, true,
+            column.label, std::max(0.0, cell.width - reserved), font);
+        ++cache_slot;
+        painter.save();
+        painter.clip_rect(cell);
+        painter.draw_text_utf8({cell.x + 6.0, cell.y + cell.height * .5 + font.size * .35}, label, font, style().text);
+        painter.draw_line({cell.x + cell.width - 1.0, cell.y + 3.0},
+            {cell.x + cell.width - 1.0, cell.y + cell.height - 3.0}, style().border, 1.0);
+        if (sorted) {
+            const double center = cell.x + cell.width - 10.0;
+            const double y = cell.y + cell.height * .5;
+            const double direction = details_sort_.direction == ObjectSortDirection::ascending ? -3.0 : 3.0;
+            painter.draw_line({center - 3.0, y - direction}, {center, y + direction}, style().text, 1.0);
+            painter.draw_line({center, y + direction}, {center + 3.0, y - direction}, style().text, 1.0);
+        }
+        if (focused_ && header_focused_ && focused_column_ == index) paint_focus(painter, cell, style().text);
+        painter.restore();
+    }
+    painter.draw_line({4.0, 2.0 + header}, {viewport_right, 2.0 + header}, style().border, 1.0);
+    painter.clip_rect({4.0, 2.0 + header, viewport_right - 4.0, std::max(0.0, bounds.height - header - 4.0)});
+    for (std::size_t item_index_value = first; item_index_value < end; ++item_index_value) {
+        const ObjectViewItem& item = items_[item_index_value];
+        const Rect row = item_bounds(item_index_value);
+        if (row.y >= bounds.height - 2.0) break;
+        ++details_paint_work_.rows;
+        const bool selected = is_selected(item.stable_id);
+        if (selected) {
+            painter.fill_rect(row, focused_ ? style().accent_light : with_alpha(style().accent_light, 190));
+            painter.stroke_rect({row.x + .5, row.y + .5, std::max(0.0, row.width - 1.0), row.height - 1.0}, style().accent, 1.0);
+        } else if (hovered_index_ == item_index_value) painter.fill_rect(row, style().face_light);
+        for (std::size_t visible = 0U; visible < visible_count; ++visible) {
+            const std::size_t index = visible_columns[visible];
+            const ObjectDetailsColumn& column = details_columns_[index];
+            const ObjectDetailsCell& value = item.cells[index];
+            const Rect cell{geometry[index].x, row.y, geometry[index].width, row.height};
+            const double left_padding = index == 0U ? 34.0 : 6.0;
+            const double text_width = std::max(0.0, cell.width - left_padding - 6.0);
+            const std::size_t text_slot = cache_slot;
+            ++cache_slot;
+            const std::string& text = details_text(painter, text_slot, item_index_value, index, false, value.text, text_width, font);
+            ++details_paint_work_.cells;
+            painter.save();
+            painter.clip_rect(cell);
+            if (index == 0U) {
+                const Rect icon{cell.x + 4.0, cell.y + 3.0, 24.0, std::max(18.0, cell.height - 6.0)};
+                if (!paint_item_image(painter, item, item_index_value, selected, icon)) paint_glyph(painter, icon, item.glyph, item.enabled);
+            }
+            double origin = cell.x + left_padding;
+            if (column.alignment == ObjectColumnAlignment::right) {
+                origin = std::max(origin, cell.x + cell.width - 6.0 - details_cache_[text_slot].measured_width);
+            }
+            const Color color = item.enabled && value.availability == ObjectCellAvailability::available ? style().text : style().disabled_text;
+            painter.draw_text_utf8({origin, cell.y + cell.height * .5 + font.size * .35}, text, font, color);
+            painter.restore();
+        }
+        if (focused_ && !header_focused_ && item.stable_id == focused_id_ && window() && (*window()).focus_cue_visible()) {
+            paint_focus(painter, row, style().text);
+        }
+    }
+    painter.restore();
+}
 
 } // namespace gui_forms

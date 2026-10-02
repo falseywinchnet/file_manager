@@ -140,6 +140,47 @@ void test_context_menu_command_snapshot_keyboard_nesting_and_restore() {
     SubscriptionToken opened = menu.open_changed().subscribe(
         test_support::IncrementCounter<std::size_t, bool>(open_changes));
 
+    menu.show(owner, {100.0, 100.0}, MenuOpenMode::pointer);
+    const Control::Ptr original_panel = window.focused_control();
+    const std::size_t original_open_changes = open_changes;
+    bool invalid_mode_refused = false;
+    try {
+        menu.show(owner, {140.0, 140.0}, static_cast<MenuOpenMode>(255));
+    } catch (const std::invalid_argument&) {
+        invalid_mode_refused = true;
+    }
+    require(invalid_mode_refused && menu.is_open() &&
+            window.focused_control() == original_panel && open_changes == original_open_changes,
+            "invalid context opening mode must preserve the existing popup and focus");
+    require(window.focused_control() == window.find("object.context.popup.panel.0"),
+            "pointer opening must not focus a command");
+    const SemanticSnapshot pointer_snapshot = window.semantic_snapshot();
+    const SemanticNode* pointer_panel = find_semantic(pointer_snapshot.roots, "object.context.popup.panel.0");
+    require(pointer_panel && has_semantic_state((*pointer_panel).states, SemanticState::focused),
+            "pointer-opened menu focus must remain accessible");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::down}) &&
+            window.focused_control() == window.find("object.context.popup.row.open"),
+            "Down after pointer opening must select the first enabled command");
+    menu.close();
+    require(window.focused_control() == owner, "pointer menu close must restore invoker");
+    menu.show(owner, {100.0, 100.0}, MenuOpenMode::pointer);
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::up}) &&
+            window.focused_control() == window.find("object.context.popup.row.view"),
+            "Up after pointer opening must select the last enabled command");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::right}) &&
+            window.focused_control() == window.find("object.context.popup.row.view.icons"),
+            "keyboard entry from pointer opening must retain submenu navigation");
+    menu.close();
+    ContextMenu disabled_menu("disabled.context");
+    disabled_menu.set_items({{"disabled", MenuItemKind::command, remove}});
+    disabled_menu.show(owner, {100.0, 100.0}, MenuOpenMode::pointer);
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::down}) &&
+            window.focused_control() == window.find("disabled.context.popup.panel.0"),
+            "all-disabled menu must retain container focus");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::escape}) &&
+            !disabled_menu.is_open() && window.focused_control() == owner,
+            "all-disabled menu must close and restore focus on Escape");
+    open_changes = 0U;
     menu.show(owner, {395.0, 295.0});
     require(menu.is_open() && window.focus_scope_depth() == 1U,
             "opening a context menu must create one contained focus scope");
@@ -378,6 +419,27 @@ void test_menu_strip_retained_switching_commands_and_semantics() {
             "MenuStrip must retain one selected command category independently of popup state");
     Window window(root, {420.0, 240.0});
 
+    require((*strip).open(0U, MenuOpenMode::pointer) &&
+            window.focused_control() == window.find("menustrip.menu.popup.panel.0"),
+            "pointer menu strip opening must not select a command");
+    const Control::Ptr original_strip_panel = window.focused_control();
+    for (const std::size_t invalid_index : {std::size_t{0}, std::size_t{1}}) {
+        bool invalid_mode_refused = false;
+        try {
+            static_cast<void>((*strip).open(invalid_index, static_cast<MenuOpenMode>(255)));
+        } catch (const std::invalid_argument&) {
+            invalid_mode_refused = true;
+        }
+        require(invalid_mode_refused && window.focused_control() == original_strip_panel,
+                "invalid mode must not reuse or replace an existing menu-strip popup");
+    }
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::right}) &&
+            window.focused_control() == window.find("menustrip.menu.popup.row.view.icons"),
+            "keyboard switching after pointer opening must select the new menu first row");
+    (*strip).close();
+    require((*strip).open(0U), "fixture must restore initial menu position");
+    (*strip).close();
+
     const std::vector<SemanticNode> selected_closed =
         (*strip).semantic_virtual_children();
     require(!has_semantic_state(selected_closed[0].states,
@@ -455,11 +517,15 @@ void test_menu_strip_retained_switching_commands_and_semantics() {
     require(operation_check_64, "pointer activation must open the top-level item under its geometry");
     const bool operation_check_65 = (*strip).active_index() == 1U;
     require(operation_check_65, "pointer activation must open the top-level item under its geometry");
+    require(window.focused_control() == window.find("menustrip.menu.popup.panel.0"),
+            "pointer dispatch must leave menu rows unselected");
     const bool operation_check_66 = window.dispatch_pointer({PointerAction::move, PointerButton::none,
                                      {12.0, 12.0}});
     require(operation_check_66, "moving across the open menu bar must switch menus without click-through");
     const bool operation_check_67 = (*strip).active_index() == 0U;
     require(operation_check_67, "moving across the open menu bar must switch menus without click-through");
+    require(window.focused_control() == window.find("menustrip.menu.popup.panel.0"),
+            "pointer switching must leave the new menu rows unselected");
     (*strip).close();
 
     (*strip).set_items({

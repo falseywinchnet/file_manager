@@ -12,6 +12,7 @@ struct ApplicationWindowState final {
     std::function<void()> show{};
     std::function<void()> hide{};
     std::function<void()> toggle_full_screen{};
+    std::function<HostServiceStatus(std::string_view)> set_title{};
 };
 struct ApplicationHandleAccess final {
     [[nodiscard]] static ApplicationWindowHandle make(

@@ -105,4 +105,18 @@ ApplicationResult Application::validate(const std::vector<ApplicationWindow>& wi
     if (primary_count != 1U) return {ApplicationError::invalid_argument};
     return {};
 }
+HostServiceStatus ApplicationWindowHandle::set_title(const std::string_view title) const {
+    const std::shared_ptr<detail::ApplicationWindowState> state = state_.lock();
+    if (!state) return {HostServiceError::after_shutdown};
+    if ((*state).thread != std::this_thread::get_id()) return {HostServiceError::wrong_thread};
+    if ((*state).closed) return {HostServiceError::after_shutdown};
+    if (!(*state).ready) return {HostServiceError::backend_failure};
+    if (!valid_text(title, 65536U, true)) return {HostServiceError::invalid_argument};
+    if (!(*state).set_title) return {HostServiceError::unsupported};
+    try {
+        const std::function<HostServiceStatus(std::string_view)> action = (*state).set_title;
+        const HostServiceStatus result = action(title);
+        return result;
+    } catch (...) { return {HostServiceError::backend_failure}; }
+}
 } // namespace gui_forms

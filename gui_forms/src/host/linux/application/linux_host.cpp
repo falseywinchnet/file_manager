@@ -1,4 +1,6 @@
 #include "linux_host_internal.hpp"
+#include "gui_forms/text/types/text_types.hpp"
+#include <thread>
 #include <X11/XKBlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
@@ -20,6 +22,28 @@
 
 namespace gui_forms::host::linux_detail {
 namespace {
+struct WindowTitle final {
+  std::weak_ptr<NativeWindow> owner{};
+  const std::thread::id thread{std::this_thread::get_id()};
+  HostServiceStatus operator()(const std::string_view text) const {
+    if (thread != std::this_thread::get_id()) return {HostServiceError::wrong_thread};
+    const std::shared_ptr<NativeWindow> window = owner.lock();
+    if (!window || (*window).closed) return {HostServiceError::after_shutdown};
+    try {
+      if (text.size() > 65536U || text.find('\0') != std::string_view::npos ||
+          !validate_utf8(text).valid()) return {HostServiceError::invalid_argument};
+      const std::string title(text);
+      NativeWindow& native = *window;
+      if (native.accessibility) (*native.accessibility).set_title(title);
+      XStoreName(native.runtime.display, native.xid, title.c_str());
+      XChangeProperty(native.runtime.display, native.xid, native.runtime.atom("_NET_WM_NAME"),
+          native.runtime.atom("UTF8_STRING"), 8, PropModeReplace,
+          reinterpret_cast<const unsigned char*>(title.data()), static_cast<int>(title.size()));
+      XFlush(native.runtime.display);
+      return {};
+    } catch (...) { return {HostServiceError::backend_failure}; }
+  }
+};
 #if defined(GUI_FORMS_PREPARED_TEXT)
 struct PreparedPresentationImage final {
   XImage* value{};
@@ -562,6 +586,8 @@ void NativeWindow::ready() {
   if (entry.options.full_screen_ready)
     entry.options.full_screen_ready(WindowAction{
         weak_from_this(), runtime.actions, ActionKind::fullscreen});
+  if (entry.options.title_ready)
+    entry.options.title_ready(WindowTitle{weak_from_this()});
   if (entry.options.visibility_ready)
     entry.options.visibility_ready(show, hide);
 }

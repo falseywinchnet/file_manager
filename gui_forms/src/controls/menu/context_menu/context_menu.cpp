@@ -78,6 +78,7 @@ struct ContextMenu::Impl final {
     public:
         MenuPanel(StableId id, Impl& impl, std::size_t depth)
             : Panel(std::move(id)), impl_(impl), depth_(depth) {
+            set_focusable(true);
             set_paint_plane(PaintPlane::overlay);
             set_background(Color::rgba(250, 253, 255));
             set_border_style(BorderStyle::line);
@@ -99,6 +100,22 @@ struct ContextMenu::Impl final {
                 impl_.scroll(depth_, event.wheel_delta.y > 0.0 ? -3 : 3);
                 event.handled = true;
             }
+        }
+
+        void on_key(KeyEvent& event) override {
+            if (event.phase != EventPhase::target || event.action != KeyAction::down) return;
+            if (event.physical_key == PhysicalKey::down || event.physical_key == PhysicalKey::home) {
+                impl_.focus_edge(depth_, false);
+            } else if (event.physical_key == PhysicalKey::up || event.physical_key == PhysicalKey::end) {
+                impl_.focus_edge(depth_, true);
+            } else if (event.physical_key == PhysicalKey::left || event.physical_key == PhysicalKey::right) {
+                static_cast<void>(impl_.navigate_root(event.physical_key == PhysicalKey::left ? -1 : 1));
+            } else if (event.physical_key == PhysicalKey::escape) {
+                impl_.close();
+            } else {
+                return;
+            }
+            event.handled = true;
         }
 
         [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
@@ -338,7 +355,7 @@ struct ContextMenu::Impl final {
     };
 
     void show(const Control::Ptr& invoker, Point position,
-              const std::vector<MenuItemSpec>& specs) {
+              const std::vector<MenuItemSpec>& specs, const MenuOpenMode mode) {
         close();
         if (!invoker || !(*invoker).attached_window()) {
             throw std::logic_error("ContextMenu requires an attached owner control");
@@ -359,7 +376,8 @@ struct ContextMenu::Impl final {
             popup_revocation = (*closed).subscribe(
                 owner, Delegate<>::bind<Impl, &Impl::on_popup_revoked>(*this));
         }
-        Control::Ptr preferred = first_focusable(0U);
+        Control::Ptr preferred = mode == MenuOpenMode::pointer ? panels[0U].panel : first_focusable(0U);
+        if (!preferred) preferred = panels[0U].panel;
         focus_scope = (*window).begin_focus_scope(layer, preferred);
         open = true;
         owner.open_changed_.emit(true);
@@ -717,12 +735,14 @@ void ContextMenu::set_preferred_width(double width) {
     preferred_width_ = width;
 }
 
-void ContextMenu::show(const Control::Ptr& owner, Point window_position) {
+void ContextMenu::show(const Control::Ptr& owner, const Point window_position, const MenuOpenMode mode) {
     if (!is_alive()) throw std::logic_error("disposed ContextMenu cannot open");
+    if (mode != MenuOpenMode::keyboard && mode != MenuOpenMode::pointer)
+        throw std::invalid_argument("ContextMenu opening mode is invalid");
     if (!std::isfinite(window_position.x) || !std::isfinite(window_position.y)) {
         throw std::invalid_argument("ContextMenu position must be finite");
     }
-    (*impl_).show(owner, window_position, items_);
+    (*impl_).show(owner, window_position, items_, mode);
 }
 
 void ContextMenu::close() noexcept {

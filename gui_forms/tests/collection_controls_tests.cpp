@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <initializer_list>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -32,6 +33,15 @@ bool icon_label_inside_cell(const Point point) {
 
 class ImageRecordingPainter final : public Painter {
 public:
+    Size measure_text_utf8(const std::string_view text, const FontSpec font) override {
+        ++measurement_queries;
+        measurement_bytes += text.size();
+        Size result = Painter::measure_text_utf8(text, font);
+        // Deliberately nonmonotonic fixture: some shorter ellipsis candidates
+        // are wider than longer ones. Fit is required; maximality is not.
+        if (nonmonotonic_widths && text.ends_with("…") && text.size() % 7U == 0U) result.width = 90.0;
+        return result;
+    }
     void save() override {}
     void restore() override {}
     void translate(Point) override {}
@@ -77,6 +87,9 @@ public:
     std::vector<Point> text_origins{};
     std::vector<std::pair<Point, Point>> lines{};
     std::vector<char> paint_order{};
+    std::size_t measurement_queries{};
+    std::size_t measurement_bytes{};
+    bool nonmonotonic_widths{};
 };
 
 void require(bool condition, const char* message) {
@@ -1018,6 +1031,535 @@ void test_correspondence_background_pointer_contract() {
     require(operation_check_93, "secondary correspondence background click must clear selection and emit one exact empty-target context request");
 }
 
+std::vector<ObjectDetailsColumn> details_test_columns() {
+    std::vector<ObjectDetailsColumn> result{};
+    result.push_back({.id = {"name"}, .label = "Object name", .width = 150.0});
+    result.push_back({.id = {"fact"}, .label = "Observed fact", .width = 120.0,
+                      .alignment = ObjectColumnAlignment::right});
+    result.push_back({.id = {"state"}, .label = "Availability", .width = 100.0, .sortable = false});
+    return result;
+}
+
+std::vector<ObjectViewItem> details_test_items(std::size_t count) {
+    std::vector<ObjectViewItem> result{};
+    result.reserve(count);
+    for (std::size_t index = 0U; index < count; ++index) {
+        const std::string number = std::to_string(index);
+        ObjectViewItem item{};
+        item.stable_id = "detail." + number;
+        item.name = "Object " + number;
+        // Intentionally not positional: publication must normalize by ID.
+        item.cells.push_back({{"state"}, "Unavailable", ObjectCellAvailability::unavailable});
+        item.cells.push_back({{"name"}, "Unicode é 👩‍💻 long factual object " + number});
+        item.cells.push_back({{"fact"}, number});
+        result.push_back(std::move(item));
+    }
+    return result;
+}
+
+struct DetailsSortRecorder final {
+    std::vector<ObjectDetailsSort>& requests;
+    void operator()(const ObjectDetailsSort& request) const { requests.push_back(request); }
+};
+
+struct DetailsReplacingSortHandler final {
+    ObjectView& view;
+    std::string& observed_column;
+    void operator()(const ObjectDetailsSort& request) const {
+        view.set_details_model({}, {});
+        observed_column = request.column.value;
+    }
+};
+
+enum class DetailsInvalidModelCase : std::uint8_t {
+    duplicate_row, unknown_cell, invalid_availability, invalid_alignment,
+    duplicate_column, invalid_width, invalid_label, missing_disclosure,
+};
+
+enum class DetailsEntryMutation : std::uint8_t {
+    replace, replace_same_shape, dispose, detach, resize, revoke, transfer,
+};
+
+struct DetailsEntryMutator final {
+    ObjectView& view;
+    Panel& parent;
+    Window& window;
+    DetailsEntryMutation mutation;
+    bool& invoked;
+
+    void apply() const {
+        if (invoked) return;
+        invoked = true;
+        if (mutation == DetailsEntryMutation::replace) view.set_details_model({}, {});
+        else if (mutation == DetailsEntryMutation::replace_same_shape) {
+            view.set_details_model(details_test_columns(), details_test_items(2U));
+        }
+        else if (mutation == DetailsEntryMutation::dispose) view.dispose();
+        else if (mutation == DetailsEntryMutation::detach) {
+            const Control::Ptr removed = parent.remove_child(view.runtime_id());
+        } else if (mutation == DetailsEntryMutation::resize) {
+            view.set_details_column_width({"name"}, 180.0);
+        } else if (mutation == DetailsEntryMutation::transfer) {
+            window.capture_pointer(parent.shared_from_this(), 1U);
+        } else window.release_pointer();
+    }
+
+    void operator()(const bool focused) const {
+        if (focused) apply();
+    }
+
+    void operator()(const PointerCaptureChange& change) const {
+        if (change.captured && change.control_id == view.runtime_id()) apply();
+    }
+};
+
+void test_details_header_entry_reentrancy() {
+    const std::array<DetailsEntryMutation, 7U> mutations{
+        DetailsEntryMutation::replace, DetailsEntryMutation::replace_same_shape,
+        DetailsEntryMutation::dispose, DetailsEntryMutation::detach,
+        DetailsEntryMutation::resize, DetailsEntryMutation::revoke, DetailsEntryMutation::transfer};
+    for (const bool capture_callback : {false, true}) {
+        for (const DetailsEntryMutation mutation : mutations) {
+            if (!capture_callback && (mutation == DetailsEntryMutation::revoke ||
+                mutation == DetailsEntryMutation::transfer)) continue;
+            const std::shared_ptr<Panel> root = make_control<Panel>(StableId("details.entry.root"));
+            const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.entry"));
+            ObjectView& view = *owner;
+            view.set_requested_bounds({0.0, 0.0, 230.0, 190.0});
+            view.set_view_mode(ObjectViewMode::details);
+            view.set_details_model(details_test_columns(), details_test_items(2U));
+            (*root).add_child(owner);
+            Window window(root, {230.0, 190.0});
+            window.flush();
+            bool invoked = false;
+            SubscriptionToken subscription{};
+            const DetailsEntryMutator mutator{view, *root, window, mutation, invoked};
+            if (capture_callback) {
+                window.capture_pointer(root, 1U);
+                subscription = window.pointer_capture_changed().subscribe(mutator);
+            } else subscription = view.focus_observed().subscribe(mutator);
+            PointerEvent down{PointerAction::down, PointerButton::primary, {154.0, 15.0}};
+            // Direct delivery isolates ObjectView's own callback boundaries.
+            view.on_pointer(down);
+            require(invoked && down.handled && !view.has_pointer_capture(),
+                "focus/capture mutation must retire the header-edge press without stale capture");
+            if (mutation == DetailsEntryMutation::transfer) {
+                require((*root).has_pointer_capture(), "retired gesture must preserve another owner's capture");
+            }
+            if (mutation == DetailsEntryMutation::resize || mutation == DetailsEntryMutation::revoke ||
+                mutation == DetailsEntryMutation::replace_same_shape || mutation == DetailsEntryMutation::transfer) {
+                PointerEvent move{PointerAction::move, PointerButton::none, {204.0, 15.0}};
+                view.on_pointer(move);
+                const double expected = mutation == DetailsEntryMutation::resize ? 180.0 : 150.0;
+                require(view.details_columns()[0U].width == expected,
+                    "retired callback gesture must not resume a resize on pointer move");
+            }
+        }
+    }
+}
+
+enum class DetailsModeMutation : std::uint8_t { dispose, detach, mode, model };
+
+struct DetailsModeReleaseMutator final {
+    ObjectView& view;
+    Panel& parent;
+    DetailsModeMutation mutation;
+    bool& invoked;
+    bool& saw_committed_mode;
+
+    void operator()(const PointerCaptureChange& change) const {
+        if (change.captured || invoked) return;
+        invoked = true;
+        saw_committed_mode = view.view_mode() == ObjectViewMode::icons && !view.has_pointer_capture();
+        if (mutation == DetailsModeMutation::dispose) view.dispose();
+        else if (mutation == DetailsModeMutation::detach) {
+            const Control::Ptr removed = parent.remove_child(view.runtime_id());
+        } else if (mutation == DetailsModeMutation::mode) {
+            view.set_view_mode(ObjectViewMode::details);
+        } else {
+            view.set_details_model(details_test_columns(), details_test_items(3U));
+            view.set_top_row(1U);
+        }
+    }
+};
+
+void test_details_mode_release_reentrancy() {
+    bool all_passed = true;
+    for (const DetailsModeMutation mutation : {DetailsModeMutation::dispose,
+        DetailsModeMutation::detach, DetailsModeMutation::mode, DetailsModeMutation::model}) {
+        const std::shared_ptr<Panel> root = make_control<Panel>(StableId("details.mode.root"));
+        const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.mode"));
+        ObjectView& view = *owner;
+        view.set_requested_bounds({0.0, 0.0, 230.0, 190.0});
+        view.set_view_mode(ObjectViewMode::details);
+        view.set_details_model(details_test_columns(), details_test_items(20U));
+        (*root).add_child(owner);
+        Window window(root, {230.0, 190.0});
+        window.flush();
+        view.set_top_row(5U);
+        PointerEvent down{PointerAction::down, PointerButton::primary, {154.0, 15.0}};
+        view.on_pointer(down);
+        require(view.has_pointer_capture(), "mode fixture must start with resize capture");
+        bool invoked = false;
+        bool saw_committed_mode = false;
+        SubscriptionToken observer = window.pointer_capture_changed().subscribe(
+            DetailsModeReleaseMutator{view, *root, mutation, invoked, saw_committed_mode});
+        bool threw = false;
+        try { view.set_view_mode(ObjectViewMode::icons); }
+        catch (const std::logic_error&) { threw = true; }
+        const ObjectViewMode expected_mode = mutation == DetailsModeMutation::mode ?
+            ObjectViewMode::details : ObjectViewMode::icons;
+        bool passed = invoked && saw_committed_mode && !threw &&
+            view.view_mode() == expected_mode && !view.has_pointer_capture();
+        if (mutation == DetailsModeMutation::model) {
+            passed = passed && view.items().size() == 3U && view.top_row() == 1U;
+        }
+        if (mutation == DetailsModeMutation::dispose) passed = passed && !view.is_alive();
+        if (mutation == DetailsModeMutation::detach) passed = passed && view.attached_window() == nullptr;
+        if (!passed) {
+            std::cerr << "Details mode release mutation=" << static_cast<unsigned int>(mutation)
+                      << " committed=" << saw_committed_mode << " threw=" << threw << '\n';
+            all_passed = false;
+        }
+    }
+    require(all_passed, "mode setter must publish before capture callbacks and preserve nested changes");
+}
+
+enum class DetailsSortReleaseMutation : std::uint8_t { none, dispose, detach, model, mode };
+
+struct DetailsSortReleaseObserver final {
+    ObjectView& view;
+    Panel& parent;
+    DetailsSortReleaseMutation mutation;
+    bool& released;
+
+    void operator()(const PointerCaptureChange& change) const {
+        if (change.captured || released) return;
+        released = true;
+        if (mutation == DetailsSortReleaseMutation::dispose) view.dispose();
+        else if (mutation == DetailsSortReleaseMutation::detach) {
+            const Control::Ptr removed = parent.remove_child(view.runtime_id());
+        } else if (mutation == DetailsSortReleaseMutation::model) {
+            view.set_details_model(details_test_columns(), details_test_items(2U));
+        } else if (mutation == DetailsSortReleaseMutation::mode) view.set_view_mode(ObjectViewMode::icons);
+    }
+};
+
+struct DetailsRetiredSortObserver final {
+    ObjectView& view;
+    bool& released;
+    std::size_t& calls;
+
+    void operator()(const ObjectDetailsSort& request) const {
+        require(released && !view.has_pointer_capture() && request.column.value == "name",
+            "sort must own its identity and follow resize capture retirement");
+        ++calls;
+    }
+};
+
+void test_details_sort_retires_capture() {
+    for (const DetailsSortReleaseMutation mutation : {DetailsSortReleaseMutation::none,
+        DetailsSortReleaseMutation::dispose, DetailsSortReleaseMutation::detach,
+        DetailsSortReleaseMutation::model, DetailsSortReleaseMutation::mode}) {
+        const std::shared_ptr<Panel> root = make_control<Panel>(StableId("details.sort.release.root"));
+        const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.sort.release"));
+        ObjectView& view = *owner;
+        view.set_requested_bounds({0.0, 0.0, 230.0, 190.0});
+        view.set_view_mode(ObjectViewMode::details);
+        view.set_details_model(details_test_columns(), details_test_items(8U));
+        (*root).add_child(owner);
+        Window window(root, {230.0, 190.0});
+        window.flush();
+        PointerEvent down{PointerAction::down, PointerButton::primary, {154.0, 15.0}};
+        view.on_pointer(down);
+        require(view.has_pointer_capture(), "sort fixture requires active header resize");
+        bool released = false;
+        std::size_t calls = 0U;
+        SubscriptionToken capture_observer = window.pointer_capture_changed().subscribe(
+            DetailsSortReleaseObserver{view, *root, mutation, released});
+        SubscriptionToken sort_observer = view.sort_requested().subscribe(
+            DetailsRetiredSortObserver{view, released, calls});
+        KeyEvent enter{KeyAction::down, PhysicalKey::enter};
+        view.on_key(enter);
+        const std::size_t expected_calls = mutation == DetailsSortReleaseMutation::none ? 1U : 0U;
+        require(enter.handled && released && !view.has_pointer_capture() && calls == expected_calls,
+            "Enter during resize must retire capture and suppress a sort whose release context changed");
+        if (mutation == DetailsSortReleaseMutation::none || mutation == DetailsSortReleaseMutation::model) {
+            PointerEvent move{PointerAction::move, PointerButton::none, {204.0, 15.0}};
+            view.on_pointer(move);
+            require(view.details_columns()[0U].width == 150.0, "sort retirement must prevent resumed resize");
+        }
+    }
+}
+
+void test_details_transaction_and_identity() {
+    const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.transaction"));
+    ObjectView& view = *owner;
+    view.set_requested_bounds({0.0, 0.0, 280.0, 190.0});
+    view.set_view_mode(ObjectViewMode::details);
+    view.set_details_model(details_test_columns(), details_test_items(20U));
+    Window window(owner, {280.0, 190.0});
+    view.set_selected_ids({"detail.3", "detail.7"}, "detail.7");
+    const bool focused = window.request_focus(owner);
+    require(focused, "Details fixture must accept focus");
+    const bool moved = window.dispatch_key({KeyAction::down, PhysicalKey::down, Modifier::control});
+    require(moved && view.focused_id() == "detail.8", "Details must support independent focus");
+    view.set_top_row(5U);
+    std::vector<ObjectViewItem> reversed = details_test_items(20U);
+    std::reverse(reversed.begin(), reversed.end());
+    view.set_items(std::move(reversed));
+    window.flush();
+    require(view.selected_id() == "detail.7" && view.selection_anchor_id() == "detail.7" &&
+        view.focused_id() == "detail.8" && view.items()[view.top_row()].stable_id == "detail.5",
+        "replacement must preserve independent primary, anchor, focus and top-visible identity");
+    require(view.items().front().cells.front().column.value == "name",
+        "ID-keyed cells must normalize independently of input order");
+    view.set_selected_ids({"detail.3", "detail.7"});
+    require(view.selected_id() == "detail.7" && view.selection_anchor_id() == "detail.7",
+        "a caller republishing selection without explicit primary must preserve surviving primary and anchor");
+    std::vector<ObjectViewItem> malformed = details_test_items(2U);
+    malformed[1U].cells[0U].column.value = "name";
+    bool rejected = false;
+    try { view.set_items(std::move(malformed)); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    require(rejected && view.items().size() == 20U && view.selected_id() == "detail.7" &&
+        view.items()[view.top_row()].stable_id == "detail.5", "duplicate cell replacement must leave old state intact");
+    std::vector<ObjectDetailsColumn> invalid_columns = details_test_columns();
+    invalid_columns[1U].width = std::numeric_limits<double>::quiet_NaN();
+    rejected = false;
+    try { view.set_details_model(std::move(invalid_columns), details_test_items(1U)); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    require(rejected && view.details_columns()[1U].width == 120.0 && view.items().size() == 20U,
+        "nonfinite widths must fail before model publication");
+    malformed = details_test_items(1U);
+    malformed[0U].cells[1U].text = std::string(1U, static_cast<char>(0xFF));
+    rejected = false;
+    try { view.set_items(std::move(malformed)); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    require(rejected && view.items().size() == 20U, "malformed UTF-8 cells must leave model intact");
+    malformed = details_test_items(1U);
+    malformed[0U].cells.pop_back();
+    rejected = false;
+    try { view.set_items(std::move(malformed)); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    require(rejected && view.items().size() == 20U, "missing cells must fail complete replacement");
+    std::vector<ObjectViewItem> excessive = details_test_items(1024U);
+    for (ObjectViewItem& item : excessive) item.cells[1U].text.assign(65536U, 'x');
+    rejected = false;
+    try { view.set_items(std::move(excessive)); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    require(rejected && view.items().size() == 20U && view.selected_id() == "detail.7" &&
+        view.items()[view.top_row()].stable_id == "detail.5",
+        "aggregate text above the development guard must preserve the complete prior model");
+    // Each independent invalid input must fail before any retained publication.
+    const std::array<DetailsInvalidModelCase, 8U> invalid_cases{
+        DetailsInvalidModelCase::duplicate_row, DetailsInvalidModelCase::unknown_cell,
+        DetailsInvalidModelCase::invalid_availability, DetailsInvalidModelCase::invalid_alignment,
+        DetailsInvalidModelCase::duplicate_column, DetailsInvalidModelCase::invalid_width,
+        DetailsInvalidModelCase::invalid_label, DetailsInvalidModelCase::missing_disclosure};
+    for (const DetailsInvalidModelCase invalid_case : invalid_cases) {
+        std::vector<ObjectDetailsColumn> bad_columns = details_test_columns();
+        std::vector<ObjectViewItem> bad_items = details_test_items(2U);
+        if (invalid_case == DetailsInvalidModelCase::duplicate_row) bad_items[1U].stable_id = bad_items[0U].stable_id;
+        else if (invalid_case == DetailsInvalidModelCase::unknown_cell) bad_items[0U].cells[0U].column.value = "unknown";
+        else if (invalid_case == DetailsInvalidModelCase::invalid_availability) bad_items[0U].cells[0U].availability = static_cast<ObjectCellAvailability>(255U);
+        else if (invalid_case == DetailsInvalidModelCase::invalid_alignment) bad_columns[0U].alignment = static_cast<ObjectColumnAlignment>(255U);
+        else if (invalid_case == DetailsInvalidModelCase::duplicate_column) bad_columns[1U].id = bad_columns[0U].id;
+        else if (invalid_case == DetailsInvalidModelCase::invalid_width) bad_columns[0U].width = 0.0;
+        else if (invalid_case == DetailsInvalidModelCase::invalid_label) bad_columns[0U].label = std::string(1U, static_cast<char>(0xFF));
+        else bad_items[0U].cells[0U].text.clear();
+        rejected = false;
+        try { view.set_details_model(std::move(bad_columns), std::move(bad_items)); }
+        catch (const std::invalid_argument&) { rejected = true; }
+        require(rejected && view.items().size() == 20U && view.selected_id() == "detail.7" &&
+            view.items()[view.top_row()].stable_id == "detail.5", "invalid Details model must preserve previous state");
+    }
+    view.set_view_mode(ObjectViewMode::icons);
+    view.set_view_mode(ObjectViewMode::details);
+    require(view.selected_id() == "detail.7" && view.focused_id() == "detail.8" &&
+        view.selection_anchor_id() == "detail.7", "mode changes must preserve independent selection state");
+    const bool offscreen_context = view.on_semantic_child_action("detail.19", SemanticAction::show_menu, {});
+    require(offscreen_context, "offscreen semantic action must safely reveal its item");
+}
+
+void test_details_header_input_resize_and_cache() {
+    const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.input"));
+    ObjectView& view = *owner;
+    view.set_requested_bounds({0.0, 0.0, 230.0, 190.0});
+    view.set_view_mode(ObjectViewMode::details);
+    view.set_details_model(details_test_columns(), details_test_items(8U));
+    Window window(owner, {230.0, 190.0});
+    std::vector<ObjectDetailsSort> requests{};
+    SubscriptionToken subscription = view.sort_requested().subscribe(DetailsSortRecorder{requests});
+    view.set_selected_id("detail.2");
+    pointer_click(window, {40.0, 15.0}, PointerButton::primary);
+    require(requests.size() == 1U && requests[0U].column.value == "name" &&
+        view.details_sort().column.value.empty() && view.selected_id() == "detail.2",
+        "header sort request must not change accepted order state or body selection");
+    view.set_details_sort(requests.front());
+    pointer_click(window, {40.0, 15.0}, PointerButton::primary);
+    require(requests.size() == 2U && requests.back().direction == ObjectSortDirection::descending,
+        "accepted ascending state must request descending on next activation");
+    require(view.item_id_at({40.0, 15.0}).empty(), "header coordinates must not resolve to an item");
+    const bool pressed = window.dispatch_pointer({PointerAction::down, PointerButton::primary, {154.0, 15.0}});
+    const bool dragged = window.dispatch_pointer({PointerAction::move, PointerButton::none, {194.0, 15.0}});
+    const bool released = window.dispatch_pointer({PointerAction::up, PointerButton::primary, {194.0, 15.0}});
+    require(pressed && dragged && released && view.details_columns()[0U].width == 190.0 && requests.size() == 2U,
+        "header edge drag must resize without sorting or selecting rows");
+    const bool last_header = window.dispatch_key({KeyAction::down, PhysicalKey::end});
+    require(last_header && view.horizontal_offset() > 0.0, "keyboard End must reveal the last header horizontally");
+    const double old_width = view.details_columns()[2U].width;
+    const bool resized = window.dispatch_key({KeyAction::down, PhysicalKey::right, Modifier::alt});
+    require(resized && view.details_columns()[2U].width == old_width + 8.0,
+        "keyboard Alt+Right must adjust the focused column");
+    const bool unsortable = window.dispatch_key({KeyAction::down, PhysicalKey::enter});
+    require(unsortable && requests.size() == 2U, "unsortable headers must not fabricate requests");
+    const bool body = window.dispatch_key({KeyAction::down, PhysicalKey::escape});
+    require(body, "Escape must leave header focus");
+    view.set_horizontal_offset(0.0);
+    pointer_click(window, {60.0, 44.0}, PointerButton::primary);
+    require(view.selected_id() == "detail.0" && requests.size() == 2U,
+        "body hit geometry must subtract fixed header height");
+    ImageRecordingPainter first{};
+    window.paint(first, {0.0, 0.0, 230.0, 190.0});
+    require(view.details_paint_work().text_preparations > 0U, "first Details paint must prepare visible labels");
+    bool saw_header = false;
+    bool saw_ellipsis = false;
+    for (const std::string& text : first.texts) {
+        require(validate_utf8(text).valid(), "Details elision must preserve UTF-8");
+        if (text == "Object name") saw_header = true;
+        if (text.ends_with("…")) {
+            saw_ellipsis = true;
+            if (text.starts_with("Unicode")) {
+                const std::string& source = view.items()[0U].cells[0U].text;
+                const TextStore store(source);
+                const std::size_t prefix_bytes = text.size() - std::string_view("…").size();
+                bool boundary = false;
+                for (std::size_t cluster = 0U; cluster <= store.grapheme_count().value(); ++cluster) {
+                    if (store.utf8_offset(GraphemeIndex(cluster)).value() == prefix_bytes) boundary = true;
+                }
+                require(boundary, "Details elision must preserve combining and ZWJ grapheme boundaries");
+            }
+        }
+    }
+    require(saw_header && saw_ellipsis, "Details must paint actual headers and elide long factual text");
+    ImageRecordingPainter second{};
+    view.invalidate(Dirty::paint);
+    window.paint(second, {0.0, 0.0, 230.0, 190.0});
+    require(view.details_paint_work().text_preparations == 0U, "unchanged Details repaint must reuse visible text cache");
+    view.set_horizontal_offset(1000000.0);
+    require(view.horizontal_offset() <= 196.0, "horizontal offset must clamp to actual content extent");
+    view.set_horizontal_offset(0.0);
+    const bool cancel_press = window.dispatch_pointer({PointerAction::down, PointerButton::primary, {194.0, 15.0}});
+    const bool cancel_drag = window.dispatch_pointer({PointerAction::move, PointerButton::none, {214.0, 15.0}});
+    const bool cancelled = window.dispatch_key({KeyAction::down, PhysicalKey::escape});
+    require(cancel_press && cancel_drag && cancelled && view.details_columns()[0U].width == 190.0 &&
+        !view.has_pointer_capture(), "Escape must restore pre-gesture width and release capture");
+    const bool revoked_press = window.dispatch_pointer({PointerAction::down, PointerButton::primary, {194.0, 15.0}});
+    window.release_pointer();
+    const bool revoked_move = window.dispatch_pointer({PointerAction::move, PointerButton::none, {214.0, 15.0}});
+    require(revoked_press && revoked_move && view.details_columns()[0U].width == 190.0,
+        "revoked capture must not resume resizing on a later move");
+    const bool resize_again = window.dispatch_pointer({PointerAction::down, PointerButton::primary, {194.0, 15.0}});
+    require(resize_again && view.has_pointer_capture(), "column resize must acquire capture");
+    view.set_details_model(details_test_columns(), {});
+    require(!view.has_pointer_capture() && view.items().empty(), "replacement during resize must revoke old capture");
+    pointer_click(window, {40.0, 15.0}, PointerButton::primary);
+    require(requests.size() == 3U, "empty table must retain usable header requests");
+    std::string reentrant_column{};
+    SubscriptionToken replacement = view.sort_requested().subscribe(
+        DetailsReplacingSortHandler{view, reentrant_column});
+    pointer_click(window, {40.0, 15.0}, PointerButton::primary);
+    require(reentrant_column == "name" && view.details_columns().empty(),
+        "sort event must own its request across synchronous model replacement");
+    subscription.disconnect();
+    replacement.disconnect();
+    view.set_details_model(details_test_columns(), {});
+    pointer_click(window, {40.0, 15.0}, PointerButton::primary);
+    require(requests.size() == 4U && view.details_columns().size() == 3U,
+        "revoked sort listeners must not receive later header activation");
+}
+
+void test_details_bounded_work() {
+    const std::array<std::size_t, 2U> counts{1000U, 100000U};
+    ObjectDetailsPaintWork baseline{};
+    for (const std::size_t count : counts) {
+        const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.scale"));
+        ObjectView& view = *owner;
+        view.set_requested_bounds({0.0, 0.0, 230.0, 190.0});
+        view.set_view_mode(ObjectViewMode::details);
+        view.set_details_model(details_test_columns(), details_test_items(count));
+        Window window(owner, {230.0, 190.0});
+        view.select_all();
+        view.set_top_row(count / 2U);
+        ImageRecordingPainter painter{};
+        window.paint(painter, {0.0, 0.0, 230.0, 190.0});
+        const ObjectDetailsPaintWork work = view.details_paint_work();
+        require(work.rows <= 6U && work.cells <= 12U && work.text_preparations <= 14U &&
+            view.children().empty(), "Details paint realization must depend on viewport, not 1k/100k row count");
+        if (count == 1000U) baseline = work;
+        else require(work.rows == baseline.rows && work.cells == baseline.cells,
+            "1k and 100k fixture viewport work must match");
+        require(view.selected_ids().size() == count, "bounded paint fixture must include a large selection set");
+        view.set_top_row(count / 2U + 1U);
+        ImageRecordingPainter scrolled{};
+        window.paint(scrolled, {0.0, 0.0, 230.0, 190.0});
+        require(view.details_paint_work().rows == work.rows && view.details_paint_work().cells == work.cells,
+            "scrolling a large selected model must retain bounded visible work");
+        std::cout << "Details fixture rows=" << count << " visited_rows=" << work.rows
+                  << " cells=" << work.cells << " prepared=" << work.text_preparations << '\n';
+    }
+}
+
+void test_details_cold_long_text_measurement_bound() {
+    const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.cold"));
+    ObjectView& view = *owner;
+    view.set_requested_bounds({0.0, 0.0, 140.0, 110.0});
+    std::vector<ObjectDetailsColumn> columns{};
+    columns.push_back({.id = {"payload"}, .label = "Payload", .width = 80.0});
+    ObjectViewItem item{};
+    item.stable_id = "long";
+    item.name = "Long";
+    item.cells.push_back({{"payload"}, std::string(65536U, 'x')});
+    std::vector<ObjectViewItem> items{};
+    items.push_back(std::move(item));
+    view.set_details_model(std::move(columns), std::move(items));
+    view.set_view_mode(ObjectViewMode::details);
+    Window window(owner, {140.0, 110.0});
+    const std::array<bool, 2U> measurement_profiles{false, true};
+    for (const bool nonmonotonic : measurement_profiles) {
+        view.set_view_mode(ObjectViewMode::icons);
+        view.set_view_mode(ObjectViewMode::details);
+        window.flush();
+        ImageRecordingPainter cold{};
+        cold.nonmonotonic_widths = nonmonotonic;
+        // Direct renderer-neutral paint measures the control's cold work, not
+        // Window's retained display-list replay or a warmed text-layout cache.
+        view.on_paint(cold, {0.0, 0.0, 140.0, 110.0});
+        const std::size_t queries = cold.measurement_queries;
+        const std::size_t bytes = cold.measurement_bytes;
+        require(queries <= 24U && bytes <= 200000U,
+            "cold 64KiB narrow cell must bound both measurement calls and submitted bytes");
+        bool saw_payload = false;
+        for (std::size_t index = 0U; index < cold.texts.size(); ++index) {
+            const std::string& text = cold.texts[index];
+            if (!text.starts_with("x")) continue;
+            saw_payload = true;
+            const Size measured = cold.measure_text_utf8(text, cold.fonts[index]);
+            require(text.ends_with("…") && measured.width <= 40.0,
+                "exact returned ellipsis text must fit even with nonmonotonic prefix measurements");
+        }
+        require(saw_payload, "cold bounded test must actually paint the long cell");
+        ImageRecordingPainter warm{};
+        warm.nonmonotonic_widths = nonmonotonic;
+        view.on_paint(warm, {0.0, 0.0, 140.0, 110.0});
+        require(warm.measurement_queries == 0U && view.details_paint_work().text_preparations == 0U,
+            "unchanged explicit Details text must reuse measurement and elision");
+        std::cout << "Details cold bytes=65536 nonmonotonic=" << nonmonotonic
+                  << " queries=" << queries << " measured_bytes=" << bytes << '\n';
+    }
+}
+
 } // namespace
 
 int main() {
@@ -1030,6 +1572,13 @@ int main() {
         test_object_label_wrapping_focus_and_full_name_inspection();
         test_object_virtualization_view_preservation_and_input();
         test_object_multiselection_pointer_keyboard_and_semantics();
+        test_details_transaction_and_identity();
+        test_details_header_entry_reentrancy();
+        test_details_mode_release_reentrancy();
+        test_details_sort_retires_capture();
+        test_details_header_input_resize_and_cache();
+        test_details_bounded_work();
+        test_details_cold_long_text_measurement_bound();
         test_shared_command_binding();
         test_correspondence_virtualization_and_anchor_stability();
         test_correspondence_keyboard_pin_semantics_and_activation();

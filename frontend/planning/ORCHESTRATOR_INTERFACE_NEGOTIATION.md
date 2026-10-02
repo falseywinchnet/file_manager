@@ -1,5 +1,16 @@
 # Orchestrator ↔ File Manager interface negotiation
 
+## Details consumer development request — 2026-10-02
+
+File Manager requests retained factual columns through the reconciled
+[Details development contract](../../orchestrator/spec/contracts/GUI_OBJECT_DETAILS_DEVELOPMENT.md).
+The application owns metadata observations, availability, display labels,
+column policy and sorting; the provider owns collection mechanics. The reviewed
+provider candidate is not yet wired into File Manager. Existing history uses
+Alt+Left/Right, so proposed provider width/pan bindings require reconciliation
+before integration. Native conformance and independent matching-SDK consumption
+remain pending; this record does not advertise a delivered capability.
+
 Status: **round 010 settings/service/installed-Engine reconciliation recorded;
 live Core 1.0, the named GUI.Forms FM0 consumption manifest, and owner start
 direction are satisfied; Frontend 001/F1 is active while later-provider rounds

@@ -11,6 +11,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include "gui_forms/platform/windows_host.hpp"
 #endif
 
 namespace {
@@ -23,6 +24,48 @@ std::unique_ptr<Window> make_window() {
     std::unique_ptr<Window> window = std::make_unique<Window>(root, Size{360.0, 240.0});
     return window;
 }
+#if defined(_WIN32)
+struct DirectTitleThread final {
+    const std::function<HostServiceStatus(std::string_view)>* update{};
+    HostServiceStatus* result{};
+    void operator()() const { *result = (*update)("Wrong thread"); }
+};
+struct DirectTitleReady final {
+    std::function<HostServiceStatus(std::string_view)>* retained{};
+    void operator()(std::function<HostServiceStatus(std::string_view)> update) const {
+        *retained = std::move(update);
+        const std::function<HostServiceStatus(std::string_view)>& title = *retained;
+        require(title("Direct Unicode \xe6\x97\xa5").accepted(), "direct native title update failed");
+        require(title(std::string_view("a\0b", 3)).error == HostServiceError::invalid_argument,
+                "direct title callback accepted embedded NUL");
+        require(title("\xff").error == HostServiceError::invalid_argument,
+                "direct title callback accepted malformed UTF-8");
+        require(title(std::string(65537, 'x')).error == HostServiceError::invalid_argument,
+                "direct title callback accepted excess source bytes");
+        require(FindWindowW(L"GUIForms.Window.v1", L"Direct Unicode \u65e5") != nullptr,
+                "rejected direct title updates changed native title");
+        HostServiceStatus wrong_thread{};
+        std::thread worker(DirectTitleThread{retained, &wrong_thread});
+        worker.join();
+        require(wrong_thread.error == HostServiceError::wrong_thread,
+                "direct title callback did not reject the wrong thread");
+        require(title(std::string(65536, 'x')).accepted(), "direct title exact limit rejected");
+        require(title("").accepted(), "direct title empty value rejected");
+    }
+};
+void check_direct_title_lifetime() {
+    std::function<HostServiceStatus(std::string_view)> retained{};
+    host::WindowsHostOptions options{};
+    options.title = "Direct title lifetime fixture";
+    options.print_metrics_on_close = false;
+    options.close_after_launch_for_testing = true;
+    options.title_ready = DirectTitleReady{&retained};
+    const int result = host::run_windows(make_window(), std::move(options));
+    require(result == 0 && static_cast<bool>(retained), "direct title fixture did not run");
+    require(retained("Expired").error == HostServiceError::after_shutdown,
+            "direct title callback outlived native host authority");
+}
+#endif
 struct Probe final {
     ApplicationWindowHandle handle{};
     unsigned ready{};
@@ -41,6 +84,12 @@ struct Ready final {
         (*probe).handle = handle;
         ++(*probe).ready;
         (*probe).attached_services = window.host_services() != nullptr;
+        require(handle.set_title("Updated \xe6\x97\xa5 \xf0\x9f\x98\x80").accepted(), "native Unicode title update refused");
+#if defined(_WIN32)
+        require(FindWindowW(L"GUIForms.Window.v1", L"Updated \u65e5 \U0001f600") != nullptr,
+            "native Unicode title not applied");
+#endif
+        require(handle.set_title("GUI.Forms portable application contract").accepted(), "native title restore refused");
         const HostServiceStatus hidden = handle.hide();
         (*probe).primary_hide_rejected = hidden.error == HostServiceError::invalid_argument;
         std::unique_ptr<Window> recursive_window = make_window();
@@ -181,6 +230,7 @@ void check_character_normalization() {
 }
 int main() {
 #if defined(_WIN32)
+    check_direct_title_lifetime();
     check_character_normalization();
     Probe system_close{};
     system_close.system_close = true;

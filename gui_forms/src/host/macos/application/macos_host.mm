@@ -4,6 +4,7 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #include "macos_host.hpp"
+#include "gui_forms/text/types/text_types.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
 #include "../../../render/skia/raster/skia_raster.hpp"
 
@@ -843,6 +844,7 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
                           message:(const char*)message;
 - (void)drawRetainedRect:(NSRect)dirtyRect;
 - (void)prepareForShutdown;
+- (BOOL)acceptsTitleUpdate;
 - (HostDialogResult)showHostDialog:(const HostDialogRequest&)request;
 - (HostClipboardTextResult)readHostClipboard;
 - (HostServiceStatus)writeHostClipboard:(std::string_view)text;
@@ -1761,6 +1763,14 @@ private:
     std::fflush(stderr);
 }
 
+- (BOOL)acceptsTitleUpdate {
+    if (_hostSession == nullptr) return NO;
+    const gui_forms::HostLifecyclePhase phase = (*_hostSession).snapshot().phase;
+    const bool live = phase == gui_forms::HostLifecyclePhase::attached ||
+                      phase == gui_forms::HostLifecyclePhase::close_authorized;
+    const BOOL result = live ? YES : NO;
+    return result;
+}
 - (void)prepareForShutdown {
     [self stopDisplayLink];
     if (_wakeSource != nil) {
@@ -2521,6 +2531,34 @@ private:
     NSWindow* window_;
 };
 
+class RequestNativeTitle final {
+public:
+    RequestNativeTitle(NSWindow* const window, GUIFormsView* const view) noexcept
+        : window_(window), view_(view) {}
+    HostServiceStatus operator()(const std::string_view title) const {
+        if (![NSThread isMainThread]) return {HostServiceError::wrong_thread};
+        try {
+            @try {
+                NSWindow* const window = window_;
+                GUIFormsView* const view = view_;
+                if (window == nil || view == nil || ![view acceptsTitleUpdate])
+                    return {HostServiceError::after_shutdown};
+                if (title.size() > 65536U || title.find('\0') != std::string_view::npos ||
+                    !validate_utf8(title).valid()) return {HostServiceError::invalid_argument};
+                NSString* const text = native_string(title);
+                if (text == nil) return {HostServiceError::backend_failure};
+                [window setTitle:text];
+                return {};
+            } @catch (NSException* failure) {
+                static_cast<void>(failure);
+                return {HostServiceError::backend_failure};
+            }
+        } catch (...) { return {HostServiceError::backend_failure}; }
+    }
+private:
+    __weak NSWindow* window_;
+    __weak GUIFormsView* view_;
+};
 class RequestNativeFullScreen final {
 public:
     explicit RequestNativeFullScreen(NSWindow* window) noexcept : window_(window) {}
@@ -2704,6 +2742,7 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
                 WriteNativeClipboard(view));
         }
         if (options.full_screen_ready) options.full_screen_ready(RequestNativeFullScreen(nativeWindow));
+        if (options.title_ready) options.title_ready(RequestNativeTitle(nativeWindow, view));
         if (options.visibility_ready) {
             options.visibility_ready(RequestNativeShow(nativeWindow),
                                      RequestNativeHide(nativeWindow));
@@ -2913,6 +2952,7 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
                     WriteNativeClipboard(view));
             }
             if (entry.options.full_screen_ready) entry.options.full_screen_ready(RequestNativeFullScreen(nativeWindow));
+            if (entry.options.title_ready) entry.options.title_ready(RequestNativeTitle(nativeWindow, view));
             if (entry.options.visibility_ready) {
                 entry.options.visibility_ready(
                     RequestNativeShow(nativeWindow),
