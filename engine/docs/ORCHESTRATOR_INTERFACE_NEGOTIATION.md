@@ -853,3 +853,84 @@ pinned and vendored for offline builds. Dependency admission is bounded to
 Windows overlapped pipe lifecycle/security bindings, with deadline/cancellation,
 ACL rejection, authority separation, native live/indexed lifecycle and race
 checks; replacing these adapters does not change Engine semantic contracts.
+
+## Candidate provider request/reply 009 — catalogue substring reference
+
+Date: 2026-10-02. **CANDIDATE; parent-authorized semantic/fixture preparation
+only. Source implementation is unopened.** This is a source-informed provider
+counterproposal for review, not an accepted provider commitment or canonical
+reconciliation. Earlier replies and exact-query meanings remain intact.
+
+Full proposal:
+[`ENGINE_CATALOGUE_SUBSTRING_001.md`](../../orchestrator/proposals/ENGINE_CATALOGUE_SUBSTRING_001.md).
+Its scope derives from `INDEXED_NAME_PATH_SEARCH_001.md` and
+`../../frontend/planning/SEARCH_NEXT_STAGE_AUDIT_2026-10-02.md`.
+
+**OBSERVED:** current `api.Query` has text/scope/limit/cursor/filters/channels/
+order but no predicate selector, scan budget, required-generation or freshness
+field. Exact `QueryIndex` rejects residual text. The Orchestrator adapter plans
+new ordinary text unsupported, preserving the reconciled live predicate and
+ADR-008 fallback law. A catalogue is not an advertised substring accelerator.
+
+**CANDIDATE provider position:** preserve root-relative Go-lower slash-path
+substring semantics, including ancestor-only and separator-spanning hits; do
+not trim or slash-normalize query text or reinterpret exact `filters.name`.
+Request a capability-gated additive `engine.query` projection with a versioned
+predicate selector, per-page row/read-byte/time/response-byte budget and optional
+plan work disclosure. Proposed names and laboratory ceilings are explicit in
+the proposal and remain unassigned/unmeasured until root reconciliation.
+
+The first implementation candidate is a bounded sequential exhaustive reference
+over one checked generation, with stored-record verification and path order.
+No `CandidateAll` million-row materialization, persistent substring index,
+foreground construction, alternate ranking, combined text/metadata predicate,
+or multi-root durable expansion is included. Zero-hit pages may continue;
+exhausted zero-match is authoritative for the checked generation/policy.
+One/two-character queries retain exact semantics under the same work bounds.
+
+**CANDIDATE lifecycle:** stateless instance/generation/configuration/query-bound
+Engine cursors, with no retained reader lease between requests. Abandonment
+therefore retains no query state; changed generation/restart returns stale and
+requires an explicit fresh request. Source never changes during continuation.
+Orchestrator must distinguish newly issued substring cursors from legacy
+text-as-exact-name catalogue continuations. The preferred proposal wraps provider
+tokens inside the existing opaque Orchestrator cursor value; an explicit outer
+predicate field is the alternative. Do not decode Engine-private cursor data
+in the frontend or silently migrate old tokens.
+
+**OBSERVED disagreements requiring reconciliation:**
+
+- The semantic contract describes cancellation/time terminals, but Engine
+  transport maps both ended contexts to resource-budget failure today. Private
+  context cancellation can be tested; public admission needs distinct agreed
+  mapping or an explicitly unclosed gate. No cancel method is presumed.
+- Current query has no strict-current selector. The bounded reference proposes
+  cached checked-generation semantics with existing stale provenance; a Partial
+  stale response is not a fallback trigger. Root must accept that scope or
+  negotiate a freshness field before integration.
+- Evidence `exact_path` can carry predicate calibration/anchor, but the root
+  must approve whether exact substring evaluation fits that existing kind or
+  requires an additive kind. No whole-path-equality claim is intended.
+- C++ `SearchResultInfo` drops stored object identity/incarnation and most match
+  evidence; page projection drops stale-root warnings. Fresh frontend pathname
+  observation therefore does not prove identity with the generation's matched
+  binding. The criteria application callback also discards its filters. Parent
+  explicitly requires this to remain an indexed-search acceptance gap. The
+  proposal requests typed preservation of existing wire identity, generation,
+  metadata, evidence and currentness, retained query context, and separate fresh
+  observation/changed-predicate status. Engine Windows 64-bit key/incarnation
+  and frontend FILE_ID_128 observations are not assumed interchangeable.
+
+**CANDIDATE next checkpoint:** root reconciles capability/revision/field/error
+names; cached scope/evidence; cursor ownership and old-token behavior; numerical
+ceilings and bounded reader accounting; cancellation; and the typed consumer
+identity/provenance gate. Golden/hostile fixtures then cover the examples in
+the proposal, including no-match/short text, bounded empty pages, stale/restart,
+capability absence, cancelled work, corruption, replaced pathname and changed
+criteria facts. Only a subsequent direction opens source implementation.
+
+No runtime, tests, registry, build or Git changes accompany this round. No index
+is selected, existing source is not certified, and no speed/currentness/platform
+promotion is claimed. The complete `planning/PROGRAMMING_HOUSE_STYLE.md` governs
+any later implementation, tests and tooling with an exact source-review scope;
+this round authored only prose and fixture-shaped JSON.

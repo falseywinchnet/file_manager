@@ -2,6 +2,29 @@
 
 Status: **ACTIVE; first source pass, not a completed whole-product audit**.
 
+## Current checkpoint — 2026-10-02
+
+The initial register and first-repair narrative below retain baseline evidence.
+Preview release `v0.001-alpha.b1986ad` is published for Windows, macOS arm64 and
+Linux after native CI and independent archive-content/checksum verification.
+Its real Mac application probe renders UTF-8 text, a decoded PNG and the
+unsupported-format explanation. This repairs the covered failure; it does not
+extend formats or deliver thumbnails. The release remains a portable alpha.
+
+Source development now includes four factual Details columns, sortable headers,
+atomic row/indicator publication, and a measured reduction in PNG validation
+cost. Source `17a748f` passed both native workflows, but visual review rejected
+its clipped Date modified column and short-folder sort viewport. Corrections
+and their exact local/native acceptance status are tracked in
+`DETAILS_INTEGRATION_2026-10-02.md`. They are not yet part of the published
+preview release. Physical-input smoothness remains unverified.
+
+The search audit `SEARCH_NEXT_STAGE_AUDIT_2026-10-02.md` and Orchestrator
+proposal `ENGINE_CATALOGUE_SUBSTRING_001.md` are **CANDIDATE** next-stage
+records. Ordinary text currently uses live traversal, not catalogue substring
+acceleration. Their contracts, identity projection and bounded reference
+remain work to implement and verify. No new persistent index is selected.
+
 ## Authority and evidence
 
 - **GIVEN:** owner reports macOS previews fail across multiple file types,
