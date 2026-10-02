@@ -335,6 +335,14 @@ legacy Label transformation work.
 
 ## PNG admission cost
 
+The provider checkpoint `aaca5d0bbbeb5f6454185996dfa6d8f1798a32c9` passed all
+three native builds in Actions run 36982408043. Its matching provider/picker
+SDK archives are published at release `sdk-aaca5d0` and their archive hashes
+and both installed-file fingerprints were independently verified after download.
+This provider checkpoint is distinct from the File Manager preview repair
+release `v0.001-alpha.b1986ad` and does not contain the later frontend Details
+integration or its pending-layout/atomic-sort corrections.
+
 **MEASURED bottleneck:** `Application::apply_preview` calls `Window::load_png`
 on the UI thread. Its registry admission validates every chunk with a
 bit-at-a-time CRC before copying and hashing the encoded bytes. An isolated

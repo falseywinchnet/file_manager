@@ -63,6 +63,17 @@ Event/SubscriptionToken ordering and revocation law. Header press/resize state
 is retired before dispatching a sort request; disposed owners do not receive
 later callbacks.
 
+The reconciled explicit-sort replacement overload accepts incoming columns,
+rows and their accepted sort together. Validate the sort identity/direction
+against incoming sortable columns before commit, then publish order and
+indicator before callbacks. The existing two-argument replacement retains a
+surviving accepted sort. Neither form performs domain sorting. Application
+intent recovery must distinguish a precommit refusal from a callback exception
+after this complete publication; it must not restore an old indicator onto a
+new row order. The revised bounded allocation campaign records 409 failures
+with complete old/new states, including this overload; native acceptance for
+the revised source remains separate from the earlier SDK checkpoint.
+
 Replacement preserves surviving selected identities, primary, independent
 focus, range anchor and top-visible identity. If primary disappears, choose the
 first surviving selected item; if none survive, clear primary. Removed focus
@@ -82,8 +93,8 @@ header even when the total width exceeds the viewport.
 The provider proposes: pointer click for sort; right-edge drag for width with
 pointer capture; horizontal or Shift+vertical wheel for horizontal movement;
 F6 to enter/leave header focus; Left/Right and Home/End for header navigation;
-Enter/Space for sort; Alt+Left/Right for bounded width changes; Escape to
-cancel/leave header interaction. Body Alt+Left/Right proposes horizontal pan.
+Enter/Space for sort; Alt+Shift+Left/Right for bounded width changes; Escape to
+cancel/leave header interaction. Body Alt+Shift+Left/Right proposes horizontal pan.
 These bindings are **CANDIDATE consumer integration choices** until checked
 against File Manager's existing shortcuts and native keyboard behavior. Their
 existence does not establish screen-reader access to columns.
@@ -154,8 +165,10 @@ checks, and bounded visible work for 1k/100k rows. Review corrections retired
 capture before sort publication, moved viewport commit before selection events,
 and revalidated interaction state across focus/capture callbacks. These local
 results do not establish native latency or accessibility. File Manager already
-uses Alt+Left/Right for history; its consumer must resolve that conflict before
-enabling the proposed toolkit width/pan bindings.
+uses Alt+Left/Right for history. Integration review therefore revised the new
+width/pan binding to Alt+Shift+Left/Right; plain Alt chords pass through
+the Details control to the application. File Manager's Enter command runs
+after the focused control, allowing a header to sort before object activation.
 
 This is a C++ source development projection under ORC-GUI-001. Added item fields
 and control state change C++ layout: provider, frontend and picker consumers

@@ -48,6 +48,18 @@ struct ObjectIdentity final {
     }
 };
 
+// Signed floor-seconds plus a nonnegative subsecond fraction. This is observed
+// metadata, not the legacy unsigned identity/revision fingerprint.
+struct ObservedFileTime final {
+    std::int64_t unix_seconds{};
+    std::uint32_t nanoseconds{}; // Less than 1,000,000,000.
+};
+
+struct FileMetadataFacts final {
+    std::optional<std::uint64_t> logical_size{}; // Regular-file bytes only.
+    std::optional<ObservedFileTime> modified{};
+};
+
 struct DirectoryEntry final {
     std::string stable_id{};
     std::filesystem::path path{};
@@ -57,6 +69,7 @@ struct DirectoryEntry final {
     ObjectIdentity identity{};
     EntryKind kind{EntryKind::other};
     bool directory{};
+    FileMetadataFacts metadata{};
 };
 
 struct DirectorySnapshot final {
@@ -107,5 +120,6 @@ rebase_path_from_equivalent_root(
     bool show_hidden = false);
 [[nodiscard]] std::string format_bytes(std::uintmax_t bytes);
 [[nodiscard]] std::string format_modified_time(std::filesystem::file_time_type time);
+[[nodiscard]] std::string format_modified_time(const ObservedFileTime& time);
 
 } // namespace file_manager

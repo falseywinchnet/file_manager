@@ -119,6 +119,11 @@ public:
     // this control and expire at replacement/disposal or column mutation.
     void set_details_model(std::vector<ObjectDetailsColumn> columns,
                            std::vector<ObjectViewItem> items);
+    // Publishes the caller's actual row order and accepted indicator together.
+    // Invalid explicit sort rejects before commit; empty ID clears the indicator.
+    void set_details_model(std::vector<ObjectDetailsColumn> columns,
+                           std::vector<ObjectViewItem> items,
+                           ObjectDetailsSort accepted_sort);
     [[nodiscard]] std::span<const ObjectDetailsColumn> details_columns() const noexcept {
         return details_columns_;
     }
@@ -197,6 +202,9 @@ protected:
     void on_attached_to_window() override;
 
 private:
+    void replace_details_model(std::vector<ObjectDetailsColumn> columns,
+                               std::vector<ObjectViewItem> items,
+                               std::optional<ObjectDetailsSort> accepted_sort);
     struct ItemIdHash final {
         using is_transparent = void;
         [[nodiscard]] std::size_t operator()(const std::string_view id) const noexcept {

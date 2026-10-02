@@ -284,6 +284,18 @@ void ObjectView::set_items(std::vector<ObjectViewItem> items) {
 
 void ObjectView::set_details_model(std::vector<ObjectDetailsColumn> next_columns,
                                   std::vector<ObjectViewItem> items) {
+    replace_details_model(std::move(next_columns), std::move(items), std::nullopt);
+}
+
+void ObjectView::set_details_model(std::vector<ObjectDetailsColumn> next_columns,
+                                  std::vector<ObjectViewItem> items,
+                                  ObjectDetailsSort accepted_sort) {
+    replace_details_model(std::move(next_columns), std::move(items), std::move(accepted_sort));
+}
+
+void ObjectView::replace_details_model(std::vector<ObjectDetailsColumn> next_columns,
+                                      std::vector<ObjectViewItem> items,
+                                      std::optional<ObjectDetailsSort> accepted_sort) {
     require_mutable();
     if (next_columns.size() > 64U || items.size() > 1'000'000U) {
         throw std::invalid_argument("ObjectView model exceeds development bounds");
@@ -307,6 +319,20 @@ void ObjectView::set_details_model(std::vector<ObjectDetailsColumn> next_columns
         const std::pair<std::unordered_map<std::string, std::size_t>::iterator, bool> inserted =
             column_indices.emplace(column.id.value, index);
         if (!inserted.second) throw std::invalid_argument("ObjectView duplicate column identity");
+    }
+    if (accepted_sort) {
+        const ObjectDetailsSort& requested = *accepted_sort;
+        if (requested.direction != ObjectSortDirection::ascending &&
+            requested.direction != ObjectSortDirection::descending) {
+            throw std::invalid_argument("ObjectView accepted sort direction is invalid");
+        }
+        if (!requested.column.value.empty()) {
+            const std::unordered_map<std::string, std::size_t>::const_iterator sorted =
+                column_indices.find(requested.column.value);
+            if (sorted == column_indices.end() || !next_columns[(*sorted).second].sortable) {
+                throw std::invalid_argument("ObjectView accepted sort names an unavailable column");
+            }
+        }
     }
     ItemIndices next_indices{};
     next_indices.reserve(items.size());
@@ -369,9 +395,15 @@ void ObjectView::set_details_model(std::vector<ObjectDetailsColumn> next_columns
     }
     const std::size_t last_row = items.empty() ? 0U : (items.size() - 1U) / columns();
     next_top = std::min(next_top, last_row);
-    ObjectDetailsSort next_sort = details_sort_;
-    const std::unordered_map<std::string, std::size_t>::const_iterator sorted_column = column_indices.find(next_sort.column.value);
-    if (sorted_column == column_indices.end() || !next_columns[(*sorted_column).second].sortable) next_sort = {};
+    ObjectDetailsSort next_sort{};
+    if (accepted_sort) {
+        next_sort = std::move(*accepted_sort);
+    } else {
+        next_sort = details_sort_;
+        const std::unordered_map<std::string, std::size_t>::const_iterator sorted_column =
+            column_indices.find(next_sort.column.value);
+        if (sorted_column == column_indices.end() || !next_columns[(*sorted_column).second].sortable) next_sort = {};
+    }
     std::size_t next_focused_column = 0U;
     if (focused_column_ < details_columns_.size()) {
         const std::unordered_map<std::string, std::size_t>::const_iterator focused_column =
@@ -1062,6 +1094,7 @@ void ObjectView::on_pointer(PointerEvent& event) {
 }
 
 void ObjectView::on_key(KeyEvent& event) {
+    if (has_details_columns() && event.modifiers == Modifier::alt) return;
     if (focused_ && enabled() && event.action == KeyAction::down &&
         has_details_columns() && details_key(event)) return;
     if (!focused_ || !enabled() || event.action != KeyAction::down || items_.empty()) return;
@@ -1302,14 +1335,18 @@ void ObjectView::set_details_sort(ObjectDetailsSort state) {
 }
 
 void ObjectView::request_header_sort(const std::size_t column) {
+    const Control::Ptr lifetime = shared_from_this();
+    // Geometry lookup may flush pending layout and invalidate the text cache.
+    // Resolve it before snapshotting the revision or reading accepted sort.
+    const Rect bounds = absolute_bounds();
+    if (!is_alive() || !has_details_columns() || !header_focused_ || focused_column_ != column) return;
     if (column >= details_columns_.size() || !details_columns_[column].sortable) return;
     ObjectDetailsSort request{};
     request.column = details_columns_[column].id;
     if (request.column == details_sort_.column && details_sort_.direction == ObjectSortDirection::ascending) {
         request.direction = ObjectSortDirection::descending;
     }
-    const Control::Ptr lifetime = shared_from_this();
-    const DetailsPointerContext context{window(), details_revision_, absolute_bounds(),
+    const DetailsPointerContext context{window(), details_revision_, bounds,
         effective_text_scale(), horizontal_offset_, header_height()};
     // Retire the old gesture before either release or sort observers run.
     // The request owns its identity across release; changed context cancels it.
@@ -1338,10 +1375,11 @@ void ObjectView::reveal_header() {
 }
 
 bool ObjectView::details_pointer_context_valid(const DetailsPointerContext& context) const {
+    if (!is_alive()) return false;
+    const Rect bounds = absolute_bounds();
     if (!is_alive() || window() != context.attached || !has_details_columns() ||
         !effectively_enabled() || !effectively_visible() || details_revision_ != context.revision) return false;
     if (context.attached && (*context.attached).focused_control().get() != this) return false;
-    const Rect bounds = absolute_bounds();
     const bool valid = bounds.x == context.bounds.x && bounds.y == context.bounds.y &&
         bounds.width == context.bounds.width && bounds.height == context.bounds.height &&
         effective_text_scale() == context.scale && horizontal_offset_ == context.offset &&
@@ -1451,6 +1489,7 @@ bool ObjectView::details_pointer(PointerEvent& event) {
 }
 
 bool ObjectView::details_key(KeyEvent& event) {
+    const bool adjust_column = event.modifiers == (Modifier::alt | Modifier::shift);
     if (event.physical_key == PhysicalKey::escape && resizing_column_) {
         const ObjectDetailsColumn& column = details_columns_[*resizing_column_];
         set_details_column_width(column.id, resize_start_width_);
@@ -1468,7 +1507,7 @@ bool ObjectView::details_key(KeyEvent& event) {
     const bool left = event.physical_key == PhysicalKey::left;
     const bool right = event.physical_key == PhysicalKey::right;
     if (!header_focused_) {
-        if (has_modifier(event.modifiers, Modifier::alt) && (left || right)) {
+        if (adjust_column && (left || right)) {
             const double next = std::max(0.0, horizontal_offset_ + (left ? -32.0 : 32.0));
             set_horizontal_offset(next);
             event.handled = true;
@@ -1481,7 +1520,7 @@ bool ObjectView::details_key(KeyEvent& event) {
         request_header_sort(focused_column_);
         return true;
     }
-    if (has_modifier(event.modifiers, Modifier::alt) && (left || right)) {
+    if (adjust_column && (left || right)) {
         const ObjectDetailsColumn& column = details_columns_[focused_column_];
         const double width = std::clamp(column.width + (left ? -8.0 : 8.0), column.minimum_width, column.maximum_width);
         set_details_column_width(column.id, width);

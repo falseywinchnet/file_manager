@@ -12,6 +12,7 @@
 #include <sstream>
 #include <span>
 #include <stdexcept>
+#include <utility>
 #include <sys/stat.h>
 
 namespace file_manager {
@@ -51,20 +52,6 @@ std::string stable_id_for(const std::filesystem::path& path,
     return result;
 }
 
-#if !defined(_WIN32)
-std::filesystem::file_type file_type_from_mode(const mode_t mode) {
-    if (S_ISREG(mode)) return std::filesystem::file_type::regular;
-    if (S_ISDIR(mode)) return std::filesystem::file_type::directory;
-    if (S_ISLNK(mode)) return std::filesystem::file_type::symlink;
-    if (S_ISBLK(mode)) return std::filesystem::file_type::block;
-    if (S_ISCHR(mode)) return std::filesystem::file_type::character;
-    if (S_ISFIFO(mode)) return std::filesystem::file_type::fifo;
-    if (S_ISSOCK(mode)) return std::filesystem::file_type::socket;
-    return std::filesystem::file_type::unknown;
-}
-
-#endif
-
 bool has_symlink_component(const std::filesystem::path& root,
                            const std::filesystem::path& candidate) {
     std::filesystem::path cursor = root;
@@ -91,11 +78,14 @@ bool contains_extension(const std::span<const std::string_view> values,
     return found;
 }
 
-EntryKind kind_for(const std::filesystem::directory_entry& entry,
-                   const std::filesystem::file_status status) {
-    if (std::filesystem::is_symlink(status)) return EntryKind::symlink;
-    if (std::filesystem::is_directory(status)) return EntryKind::folder;
-    const std::string extension = ascii_lower(path_utf8(entry.path().extension()));
+EntryKind kind_for(const std::filesystem::path& path,
+                   const std::filesystem::file_type type) {
+    if (type == std::filesystem::file_type::symlink) return EntryKind::symlink;
+    if (type == std::filesystem::file_type::directory) return EntryKind::folder;
+    if (type != std::filesystem::file_type::regular) return EntryKind::other;
+    const std::filesystem::path suffix = path.extension();
+    const std::string suffix_text = path_utf8(suffix);
+    const std::string extension = ascii_lower(suffix_text);
     static constexpr std::array<std::string_view, 7> image_extensions{
         ".png", ".jpg", ".jpeg", ".gif", ".webp", ".tiff", ".heic"};
     static constexpr std::array<std::string_view, 6> archive_extensions{
@@ -109,16 +99,7 @@ EntryKind kind_for(const std::filesystem::directory_entry& entry,
     if (contains_extension(archive_extensions, extension)) return EntryKind::archive;
     if (contains_extension(audio_extensions, extension)) return EntryKind::audio;
     if (contains_extension(code_extensions, extension)) return EntryKind::code;
-    if (std::filesystem::is_regular_file(status)) return EntryKind::document;
-    return EntryKind::other;
-}
-
-std::string modified_text(const std::filesystem::directory_entry& entry) {
-    std::error_code error{};
-    const std::filesystem::file_time_type time = entry.last_write_time(error);
-    if (error) return "Unavailable";
-    const std::string result = format_modified_time(time);
-    return result;
+    return EntryKind::document;
 }
 
 } // namespace
@@ -225,35 +206,9 @@ std::optional<NavigationTarget> resolve_navigation_target(
 }
 
 ObjectIdentity observe_identity(const std::filesystem::path& path) {
-#if defined(_WIN32)
-    const HANDLE handle = CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES,
-        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
-        OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS,
-        nullptr);
-    if (handle == INVALID_HANDLE_VALUE) return {};
-    const ObjectIdentity result = identity_from_handle(handle);
-    CloseHandle(handle);
-    return result;
-#else
-    struct stat observed {};
-    if (::lstat(path.c_str(), &observed) != 0) return {};
-    const std::uint64_t modified_nanoseconds =
-#if defined(__APPLE__)
-        static_cast<std::uint64_t>(observed.st_mtimespec.tv_sec) * 1'000'000'000ULL +
-        static_cast<std::uint64_t>(observed.st_mtimespec.tv_nsec);
-#else
-        static_cast<std::uint64_t>(observed.st_mtim.tv_sec) * 1'000'000'000ULL +
-        static_cast<std::uint64_t>(observed.st_mtim.tv_nsec);
-#endif
-    const ObjectIdentity result{static_cast<std::uint64_t>(observed.st_dev),
-            static_cast<std::uint64_t>(observed.st_ino),
-            static_cast<std::uint64_t>(observed.st_size),
-            modified_nanoseconds,
-            file_type_from_mode(observed.st_mode)};
-    return result;
-#endif
+    const NativeObjectObservation observed = observe_native_object(path);
+    return observed.identity;
 }
-
 bool object_is_hidden(const std::filesystem::path& path,
                       const std::string_view name) {
     if (!name.empty() && name.front() == '.') return true;
@@ -332,33 +287,31 @@ DirectorySnapshot read_directory(const std::filesystem::path& root,
             if (!needle.empty() && ascii_lower(name).find(needle) == std::string::npos) {
                 continue;
             }
-            const std::filesystem::file_status status = entry.symlink_status(error);
-            if (error) {
-                error.clear();
-                continue;
-            }
             DirectoryEntry item{};
             item.path = entry.path();
-            item.identity = observe_identity(item.path);
+            const NativeObjectObservation observed = observe_native_object(item.path);
+            if (!observed.error && observed.identity.available()) {
+                item.identity = observed.identity;
+                item.metadata = observed.facts;
+            }
             item.stable_id = stable_id_for(item.path, item.identity);
             item.name = name;
-            item.kind = kind_for(entry, status);
-            if (item.identity.type == std::filesystem::file_type::symlink) {
-                item.kind = EntryKind::symlink;
-            }
+            item.kind = kind_for(item.path, item.identity.type);
             item.directory = item.kind == EntryKind::folder;
-            if (item.directory) {
+            if (!item.identity.available()) {
+                item.secondary_text = "Unavailable";
+            } else if (item.directory) {
                 item.secondary_text = "Folder";
-            } else if (std::filesystem::is_regular_file(status)) {
-                const std::uintmax_t size = entry.file_size(error);
-                item.secondary_text = error ? "File" : format_bytes(size);
-                error.clear();
+            } else if (item.identity.type == std::filesystem::file_type::regular) {
+                item.secondary_text = item.metadata.logical_size ?
+                    format_bytes(*item.metadata.logical_size) : "Unavailable";
             } else if (item.kind == EntryKind::symlink) {
                 item.secondary_text = "Symbolic link · not followed";
             } else {
                 item.secondary_text = "Filesystem object";
             }
-            item.modified_text = modified_text(entry);
+            item.modified_text = item.metadata.modified ?
+                format_modified_time(*item.metadata.modified) : "Unavailable";
             result.entries.push_back(std::move(item));
         }
         std::sort(result.entries.begin(), result.entries.end(), detail::DirectoryNameOrder{});
@@ -366,6 +319,25 @@ DirectorySnapshot read_directory(const std::filesystem::path& root,
         result.error = error.what();
     }
     return result;
+}
+
+std::string format_modified_time(const ObservedFileTime& time) {
+    if (time.nanoseconds >= 1'000'000'000U || !std::in_range<std::time_t>(time.unix_seconds)) {
+        return "Unavailable";
+    }
+    const std::time_t seconds = static_cast<std::time_t>(time.unix_seconds);
+    std::tm local{};
+#if defined(_WIN32)
+    const errno_t status = localtime_s(&local, &seconds);
+    if (status != 0) return "Unavailable";
+#else
+    const std::tm* const result = localtime_r(&seconds, &local);
+    if (result == nullptr) return "Unavailable";
+#endif
+    char text[32]{};
+    const std::size_t written = std::strftime(text, sizeof(text), "%Y-%m-%d %H:%M", &local);
+    if (written == 0U) return "Unavailable";
+    return text;
 }
 
 std::string format_modified_time(const std::filesystem::file_time_type time) {

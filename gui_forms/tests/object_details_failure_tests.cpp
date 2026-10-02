@@ -240,16 +240,20 @@ std::string snapshot(ObjectView& view) {
     return result;
 }
 
-enum class Operation : std::uint8_t { replace, selection, select_all, clear };
+enum class Operation : std::uint8_t { replace, selection, select_all, clear, replace_with_sort };
 
 struct Input final {
     std::vector<ObjectDetailsColumn> columns{make_columns(true)};
     std::vector<ObjectViewItem> items{make_items(true)};
     std::vector<std::string> selection{row_id(1U), row_id(7U)};
     std::string primary{row_id(7U)};
+    ObjectDetailsSort accepted_sort{{"failure.fixture.column.new"}, ObjectSortDirection::ascending};
 
     void apply(ObjectView& view, const Operation operation) {
         if (operation == Operation::replace) view.set_details_model(std::move(columns), std::move(items));
+        else if (operation == Operation::replace_with_sort) {
+            view.set_details_model(std::move(columns), std::move(items), std::move(accepted_sort));
+        }
         else if (operation == Operation::selection) view.set_selected_ids(std::move(selection), primary);
         else if (operation == Operation::select_all) view.select_all();
         else view.clear_selection();
@@ -387,6 +391,8 @@ int main() {
     try {
         campaign(Operation::replace, false);
         campaign(Operation::replace, true);
+        campaign(Operation::replace_with_sort, false);
+        campaign(Operation::replace_with_sort, true);
         campaign(Operation::selection, false);
         campaign(Operation::selection, true);
         campaign(Operation::select_all, false);

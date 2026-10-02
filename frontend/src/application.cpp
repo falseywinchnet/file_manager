@@ -5,6 +5,8 @@
 #include "fileman_orchestrator/client.hpp"
 #include "house_art.hpp"
 #include "object_order.hpp"
+#include "details_projection.hpp"
+#include "native_observation.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -375,6 +377,14 @@ std::string kind_text(const DirectoryEntry& entry) {
     return "Filesystem object";
 }
 
+std::string_view sort_title(const std::string_view mode) {
+    if (mode == "name") return "Name";
+    if (mode == "kind") return "Type";
+    if (mode == "size") return "Size";
+    if (mode == "modified") return "Date modified";
+    throw std::invalid_argument("Unknown object sort column");
+}
+
 std::string leaf_name(const std::filesystem::path& path) {
     std::string name = path_utf8(path.filename());
     if (name.empty()) name = path_utf8(path);
@@ -412,10 +422,11 @@ std::string breadcrumb_stable_id(const std::filesystem::path& path) {
     return result;
 }
 
-EntryKind engine_entry_kind(std::string_view kind,
+EntryKind observed_entry_kind(const std::filesystem::file_type type,
                             const std::filesystem::path& path) {
-    if (kind == "directory") return EntryKind::folder;
-    if (kind == "symlink") return EntryKind::symlink;
+    if (type == std::filesystem::file_type::directory) return EntryKind::folder;
+    if (type == std::filesystem::file_type::symlink) return EntryKind::symlink;
+    if (type != std::filesystem::file_type::regular) return EntryKind::other;
     std::string extension = path_utf8(path.extension());
     std::transform(extension.begin(), extension.end(), extension.begin(),
                    lowercase_byte);
@@ -431,8 +442,25 @@ EntryKind engine_entry_kind(std::string_view kind,
         extension == ".py" || extension == ".html" || extension == ".css") {
         return EntryKind::code;
     }
-    const EntryKind result = kind == "file" ? EntryKind::document : EntryKind::other;
-    return result;
+    return EntryKind::document;
+}
+
+DirectoryEntry observed_search_entry(const std::string& stable_id,
+    const std::filesystem::path& path, const NativeObjectObservation& observed) {
+    DirectoryEntry entry{};
+    entry.stable_id = stable_id;
+    entry.path = path;
+    entry.name = path_utf8(path.filename());
+    entry.identity = observed.identity;
+    entry.metadata = observed.facts;
+    entry.kind = observed_entry_kind(entry.identity.type, path);
+    entry.directory = entry.kind == EntryKind::folder;
+    if (entry.directory) entry.secondary_text = "Folder";
+    else if (entry.metadata.logical_size) entry.secondary_text = format_bytes(*entry.metadata.logical_size);
+    else if (entry.kind == EntryKind::symlink) entry.secondary_text = "Symbolic link · not followed";
+    else entry.secondary_text = "Unavailable";
+    entry.modified_text = entry.metadata.modified ? format_modified_time(*entry.metadata.modified) : "Unavailable";
+    return entry;
 }
 
 std::string setting_title(std::string_view id) {
@@ -1137,7 +1165,7 @@ void Application::install_command_surfaces() {
         "sort.name", "Name", "Sort objects by name",
         std::bind_front(&Application::set_sort_mode, this, std::string("name")));
     command_sort_kind_ = make_command(
-        "sort.kind", "Kind", "Sort objects by observed kind",
+        "sort.kind", "Type", "Sort objects by observed kind",
         std::bind_front(&Application::set_sort_mode, this, std::string("kind")));
     command_sort_size_ = make_command(
         "sort.size", "Size", "Sort objects by observed byte size",
@@ -1393,7 +1421,7 @@ void Application::install_accelerators() {
 
     bind_command_accelerator(command_choose_open_, {gui_forms::PhysicalKey::o, primary}, true);
     bind_command_accelerator(command_open_, {gui_forms::PhysicalKey::enter,
-                         gui_forms::Modifier::none}, true,
+                         gui_forms::Modifier::none}, false,
          std::bind_front(&Application::focused_is_object_surface, this));
     bind_command_accelerator(command_paste_, {gui_forms::PhysicalKey::v, primary}, false,
          std::bind_front(&Application::focused_is_not_text_editor, this));
@@ -1692,30 +1720,80 @@ void Application::set_view_mode(const gui_forms::ObjectViewMode mode) {
                    : "current local folder · retained presentation state");
 }
 
-void Application::rebuild_object_order() {
-    const std::vector<std::string> selected(
-        (*objects_).selected_ids().begin(), (*objects_).selected_ids().end());
+void Application::sort_object_items(std::vector<gui_forms::ObjectViewItem>& items) const {
+    const bool descending = sort_direction_ == gui_forms::ObjectSortDirection::descending;
+    if (sort_mode_ == "kind") {
+        std::stable_sort(items.begin(), items.end(), detail::ObjectOrder<detail::ObjectSort::kind>{entries_, descending});
+    } else if (sort_mode_ == "size") {
+        std::stable_sort(items.begin(), items.end(), detail::ObjectOrder<detail::ObjectSort::size>{entries_, descending});
+    } else if (sort_mode_ == "modified") {
+        std::stable_sort(items.begin(), items.end(), detail::ObjectOrder<detail::ObjectSort::modified>{entries_, descending});
+    } else {
+        std::stable_sort(items.begin(), items.end(), detail::ObjectOrder<detail::ObjectSort::name>{entries_, descending});
+    }
+}
+
+void Application::publish_object_items(std::vector<gui_forms::ObjectViewItem> items) {
+    for (gui_forms::ObjectViewItem& item : items) {
+        const EntryMap::const_iterator found = entries_.find(item.stable_id);
+        if (found == entries_.end()) throw std::logic_error("Object row has no observation");
+        const DirectoryEntry& entry = (*found).second;
+        const std::string type_text = kind_text(entry);
+        item.cells = detail::details_cells(entry, item.name, type_text);
+    }
+    sort_object_items(items);
+    std::vector<gui_forms::ObjectDetailsColumn> columns(
+        (*objects_).details_columns().begin(), (*objects_).details_columns().end());
+    if (columns.empty()) columns = detail::default_details_columns();
+    gui_forms::ObjectDetailsSort accepted{{sort_mode_}, sort_direction_};
+    (*objects_).set_details_model(std::move(columns), std::move(items), std::move(accepted));
+}
+
+void Application::apply_object_sort(std::string mode, const gui_forms::ObjectSortDirection direction) {
     std::vector<gui_forms::ObjectViewItem> items(
         (*objects_).items().begin(), (*objects_).items().end());
-    if (sort_mode_ == "kind") {
-        std::stable_sort(items.begin(), items.end(), detail::ObjectOrder<detail::ObjectSort::kind>{entries_});
-    } else if (sort_mode_ == "size") {
-        std::stable_sort(items.begin(), items.end(), detail::ObjectOrder<detail::ObjectSort::size>{entries_});
-    } else if (sort_mode_ == "modified") {
-        std::stable_sort(items.begin(), items.end(), detail::ObjectOrder<detail::ObjectSort::modified>{entries_});
-    } else {
-        std::stable_sort(items.begin(), items.end(), detail::ObjectOrder<detail::ObjectSort::name>{entries_});
+    std::vector<gui_forms::ObjectDetailsColumn> columns(
+        (*objects_).details_columns().begin(), (*objects_).details_columns().end());
+    if (columns.empty()) columns = detail::default_details_columns();
+    const gui_forms::ObjectSortDirection previous_direction = sort_direction_;
+    // Swap retains the old intent without allocating during failure recovery.
+    sort_mode_.swap(mode);
+    sort_direction_ = direction;
+    try {
+        sort_object_items(items);
+        gui_forms::ObjectDetailsSort accepted{{sort_mode_}, sort_direction_};
+        (*objects_).set_details_model(std::move(columns), std::move(items), std::move(accepted));
+    } catch (...) {
+        // Publication can throw after commit. The provider commits its order
+        // and indicator together, so retain new intent only if it was accepted.
+        const gui_forms::ObjectDetailsSort& accepted = (*objects_).details_sort();
+        if (accepted.column.value != sort_mode_ || accepted.direction != sort_direction_) {
+            sort_mode_.swap(mode);
+            sort_direction_ = previous_direction;
+        }
+        throw;
     }
-    (*objects_).set_items(std::move(items));
-    if (!selected.empty()) (*objects_).set_selected_ids(selected);
+}
+
+void Application::on_objects_sort_requested(const gui_forms::ObjectDetailsSort& request) {
+    if (request.column.value != "name" && request.column.value != "kind" &&
+        request.column.value != "size" && request.column.value != "modified") return;
+    if (request.direction != gui_forms::ObjectSortDirection::ascending &&
+        request.direction != gui_forms::ObjectSortDirection::descending) return;
+    apply_object_sort(request.column.value, request.direction);
+    const std::string title(sort_title(sort_mode_));
+    (*form_.file_manager_app_shell_commands_arrange_group_actions_refresh).set_text("Sort: " + title);
+    update_command_state();
+    set_status("Sorted by " + title, sort_direction_ == gui_forms::ObjectSortDirection::ascending
+        ? "ascending · folders first · unavailable values last"
+        : "descending · folders first · unavailable values last");
 }
 
 void Application::set_sort_mode(std::string mode) {
-    sort_mode_ = std::move(mode);
-    rebuild_object_order();
-    std::string title = sort_mode_;
-    title.front() = static_cast<char>(
-        std::toupper(static_cast<unsigned char>(title.front())));
+    const std::string title(sort_title(mode));
+    const gui_forms::ObjectSortDirection direction = mode == "modified" ? gui_forms::ObjectSortDirection::descending
+                                                                       : gui_forms::ObjectSortDirection::ascending;
+    apply_object_sort(std::move(mode), direction);
     (*form_.file_manager_app_shell_commands_arrange_group_actions_refresh).set_text(
         "Sort: " + title);
     update_command_state();
@@ -2421,6 +2499,8 @@ void Application::install_handlers() {
         std::bind_front(&Application::cancel_rename, this)));
     subscriptions_.push_back((*objects_).selection_changed().subscribe(
         std::bind_front(&Application::on_objects_selection_changed, this)));
+    subscriptions_.push_back((*objects_).sort_requested().subscribe(
+        std::bind_front(&Application::on_objects_sort_requested, this)));
     subscriptions_.push_back((*objects_).item_activated().subscribe(
         std::bind_front(&Application::on_objects_item_activated, this)));
     subscriptions_.push_back((*objects_).context_requested().subscribe(
@@ -3287,8 +3367,7 @@ void Application::apply_directory(DirectorySnapshot snapshot,
                          kind_text(entry), object_glyph(entry.kind), true,
                          std::string(house_art::object_key(entry.kind))});
     }
-    (*objects_).set_items(std::move(items));
-    rebuild_object_order();
+    publish_object_items(std::move(items));
     std::vector<std::string> retained_selection{};
     for (const std::string& stable_id : previous_selection) {
         if (entries_.contains(stable_id)) retained_selection.push_back(stable_id);
@@ -3759,22 +3838,18 @@ void Application::apply_engine_criteria(
             ++rejected;
             continue;
         }
-        const ObjectIdentity identity = observe_identity(path);
-        if (!identity.available()) {
+        const NativeObjectObservation observed = observe_native_object(path);
+        if (observed.error || !observed.identity.available()) {
             ++rejected;
             continue;
         }
-        const EntryKind kind = engine_entry_kind(result.kind, path);
-        const bool directory = kind == EntryKind::folder;
-        const std::string stable_id = search_stable_id(path, identity);
+        const std::string stable_id = search_stable_id(path, observed.identity);
         if (entries_.contains(stable_id)) {
             ++duplicate;
             continue;
         }
-        entries_.emplace(stable_id, DirectoryEntry{
-            stable_id, path, result.name,
-            directory ? "Folder" : format_bytes(result.size),
-            "Catalogue observation", identity, kind, directory});
+        DirectoryEntry entry = observed_search_entry(stable_id, path, observed);
+        entries_.emplace(stable_id, std::move(entry));
         search_order_.push_back(stable_id);
     }
     std::vector<gui_forms::ObjectViewItem> items{};
@@ -3794,8 +3869,7 @@ void Application::apply_engine_criteria(
                          object_glyph(entry.kind), true,
                          std::string(house_art::object_key(entry.kind))});
     }
-    (*objects_).set_items(std::move(items));
-    rebuild_object_order();
+    publish_object_items(std::move(items));
     (*correspondence_).set_items({});
     (*correspondence_).set_visible(false);
     (*objects_).set_visible(true);
@@ -3877,28 +3951,17 @@ void Application::apply_engine_search(
             ++rejected;
             continue;
         }
-        ObjectIdentity identity = observe_identity(path);
-        if (!identity.available()) {
+        const NativeObjectObservation observed = observe_native_object(path);
+        if (observed.error || !observed.identity.available()) {
             ++rejected;
             continue;
         }
-        const EntryKind kind = engine_entry_kind(result.kind, path);
-        const bool directory = kind == EntryKind::folder;
-        const std::string stable_id = search_stable_id(path, identity);
+        const std::string stable_id = search_stable_id(path, observed.identity);
         if (entries_.contains(stable_id)) {
             ++duplicate;
             continue;
         }
-        DirectoryEntry entry{
-            stable_id,
-            path,
-            result.name,
-            directory ? "Folder" : format_bytes(result.size),
-            page.source == "catalogue" ? "Indexed observation" : "Live filesystem observation",
-            identity,
-            kind,
-            directory,
-        };
+        DirectoryEntry entry = observed_search_entry(stable_id, path, observed);
         entries_.emplace(stable_id, std::move(entry));
         search_order_.push_back(stable_id);
     }
@@ -3945,8 +4008,7 @@ void Application::apply_engine_search(
         };
         correspondence_items.push_back(std::move(correspondence));
     }
-    (*objects_).set_items(std::move(items));
-    rebuild_object_order();
+    publish_object_items(std::move(items));
     (*correspondence_).set_items(std::move(correspondence_items));
     (*objects_).set_visible(false);
     (*correspondence_).set_visible(true);

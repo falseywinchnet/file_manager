@@ -141,6 +141,15 @@ class ApplicationInteractionProbe final {
     static std::uint64_t applied_generation(const Application& application) {
         return application.applied_generation_;
     }
+    static void apply_sort(Application& application, std::string mode,
+                           const gui_forms::ObjectSortDirection direction) {
+        application.apply_object_sort(std::move(mode), direction);
+    }
+    static bool sort_is(const Application& application, const std::string_view mode,
+                         const gui_forms::ObjectSortDirection direction) {
+        const bool matches = application.sort_mode_ == mode && application.sort_direction_ == direction;
+        return matches;
+    }
 };
 
 } // namespace file_manager
@@ -1206,6 +1215,141 @@ void test_application_controls_navigate_real_directories() {
     (*application).stop();
 }
 
+void test_details_headers_sort_without_opening_objects() {
+    TemporaryTree fixture{};
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(fixture.root(), std::nullopt, false, std::string{});
+    ApplicationStopGuard stop_guard(*application);
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
+    (*application).bind_host(host_noop, host_noop);
+    const std::shared_ptr<gui_forms::ObjectView> objects =
+        std::dynamic_pointer_cast<gui_forms::ObjectView>((*window).find("fm.objects.current-folder"));
+    require(objects != nullptr, "Details fixture needs the real object control");
+    struct DetailsReady final {
+        const gui_forms::ObjectView& objects;
+        bool operator()() const {
+            const bool ready = has_object_named(objects, "root.txt") && has_object_named(objects, "Documents");
+            return ready;
+        }
+    };
+    require_eventually(*application, DetailsReady{*objects}, "Details fixture must enumerate");
+    const std::shared_ptr<gui_forms::Command> details =
+        file_manager::ApplicationInteractionProbe::command(*application, "view.details");
+    require(details != nullptr, "Details command must be available");
+    const bool changed_view = (*details).execute("test.details.headers");
+    require(changed_view && (*objects).details_columns().size() == 4U,
+            "Details must publish four real headers");
+    const std::array<std::string_view, 4> labels{"Name", "Type", "Size", "Date modified"};
+    for (std::size_t index = 0U; index < labels.size(); ++index) {
+        require((*objects).details_columns()[index].label == labels[index],
+                "Details header labels must describe their factual cells");
+    }
+    const std::string document_id = object_id(*objects, "Documents");
+    (*objects).set_selected_id(document_id);
+    (*objects).set_details_column_width({"name"}, 310.0);
+    (*window).request_focus(objects);
+    const std::filesystem::path previous_location =
+        file_manager::ApplicationInteractionProbe::location(*application);
+    const bool focused_header = (*window).dispatch_key(
+        {gui_forms::KeyAction::down, gui_forms::PhysicalKey::f6});
+    const bool sorted = (*window).dispatch_key(
+        {gui_forms::KeyAction::down, gui_forms::PhysicalKey::enter});
+    require(focused_header && sorted && (*objects).details_sort().column.value == "name" &&
+                (*objects).details_sort().direction == gui_forms::ObjectSortDirection::descending &&
+                (*objects).selected_id() == document_id &&
+                (*objects).details_columns().front().width == 310.0 &&
+                file_manager::ApplicationInteractionProbe::location(*application) == previous_location,
+            "header Enter must sort and preserve selection/width without opening the selected folder: focus=" +
+                std::to_string(focused_header) + " sorted=" + std::to_string(sorted) +
+                " column=" + (*objects).details_sort().column.value +
+                " direction=" + std::to_string(static_cast<int>((*objects).details_sort().direction)) +
+                " selected=" + std::string((*objects).selected_id()) + " expected=" + document_id +
+                " width=" + std::to_string((*objects).details_columns().front().width) +
+                " location=" + file_manager::path_utf8(file_manager::ApplicationInteractionProbe::location(*application)));
+    const bool next_header = (*window).dispatch_key(
+        {gui_forms::KeyAction::down, gui_forms::PhysicalKey::right});
+    const bool sorted_type = (*window).dispatch_key(
+        {gui_forms::KeyAction::down, gui_forms::PhysicalKey::enter});
+    require(next_header && sorted_type && (*objects).details_sort().column.value == "kind" &&
+                (*objects).details_sort().direction == gui_forms::ObjectSortDirection::ascending,
+            "first type-header request must publish accepted ascending order");
+    const std::uintmax_t expected_size = std::filesystem::file_size(fixture.root() / "root.txt");
+    for (const gui_forms::ObjectViewItem& item : (*objects).items()) {
+        require(item.cells.size() == 4U, "every Details row needs all declared cells");
+        if (item.name == "root.txt") {
+            require(item.cells[2U].availability == gui_forms::ObjectCellAvailability::available &&
+                        item.cells[2U].text == file_manager::format_bytes(expected_size),
+                    "regular-file Size must come from its actual observation");
+        } else if (item.name == "Documents") {
+            require(item.cells[2U].availability == gui_forms::ObjectCellAvailability::not_applicable,
+                    "folder inode size must not appear as indexed contents size");
+        }
+    }
+    const std::array<std::string_view, 2> remaining_headers{"size", "modified"};
+    for (const std::string_view header : remaining_headers) {
+        const bool advanced = (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::right});
+        const bool ascending = (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::enter});
+        require(advanced && ascending && (*objects).details_sort().column.value == header &&
+                    (*objects).details_sort().direction == gui_forms::ObjectSortDirection::ascending,
+                "new factual header must accept ascending order");
+        const bool descending = (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::enter});
+        require(descending && (*objects).details_sort().column.value == header &&
+                    (*objects).details_sort().direction == gui_forms::ObjectSortDirection::descending,
+                "second factual header activation must accept descending order");
+    }
+    file_manager::ApplicationInteractionProbe::apply_sort(*application, "name", gui_forms::ObjectSortDirection::ascending);
+    const std::string pictures_id = object_id(*objects, "Pictures");
+    (*objects).set_selected_ids({document_id, pictures_id}, document_id);
+    struct ThrowAfterSelectionCommit final {
+        void operator()(const gui_forms::ObjectSelectionChange&) const {
+            throw std::runtime_error("fixture postcommit selection failure");
+        }
+    };
+    bool publication_threw{};
+    {
+        gui_forms::SubscriptionToken failure = (*objects).selection_changed().subscribe(ThrowAfterSelectionCommit{});
+        try {
+            file_manager::ApplicationInteractionProbe::apply_sort(*application, "name",
+                gui_forms::ObjectSortDirection::descending);
+        } catch (const std::runtime_error& error) {
+            publication_threw = std::string_view(error.what()) == "fixture postcommit selection failure";
+        }
+    }
+    require(publication_threw && (*objects).items().front().name == "Pictures" &&
+                (*objects).details_sort().column.value == "name" &&
+                (*objects).details_sort().direction == gui_forms::ObjectSortDirection::descending &&
+                file_manager::ApplicationInteractionProbe::sort_is(*application, "name",
+                    gui_forms::ObjectSortDirection::descending),
+            "postcommit failure must leave actual order, accepted indicator and application intent in agreement");
+    (*objects).set_selected_id(document_id);
+    const bool body = (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::escape});
+    const bool opened = (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::enter});
+    require(body && opened, "body Enter must still activate the selected folder");
+    struct OpenedFolder final {
+        const file_manager::Application& application;
+        const std::filesystem::path& root;
+        bool operator()() const {
+            const bool ready = file_manager::ApplicationInteractionProbe::location(application) == root / "Documents";
+            return ready;
+        }
+    };
+    const std::filesystem::path root = fixture.root();
+    require_eventually(*application, OpenedFolder{*application, root}, "body activation must navigate");
+    require((*objects).details_columns().front().width == 310.0,
+            "directory replacement must preserve the session's resized columns");
+    const gui_forms::ObjectDetailsSort before_rejection = (*objects).details_sort();
+    bool rejected{};
+    try {
+        file_manager::ApplicationInteractionProbe::apply_sort(*application, "invalid-column",
+            gui_forms::ObjectSortDirection::descending);
+    } catch (const std::invalid_argument&) { rejected = true; }
+    require(rejected && file_manager::ApplicationInteractionProbe::sort_is(*application,
+                before_rejection.column.value, before_rejection.direction) &&
+                (*objects).details_sort().column == before_rejection.column &&
+                (*objects).details_sort().direction == before_rejection.direction,
+            "rejected publication must restore application sort intent and old indicator");
+}
+
 void test_selected_file_previews_reach_visible_layout() {
     TemporaryTree fixture{};
     std::ofstream literal_text(fixture.root() / "root.txt", std::ios::binary | std::ios::trunc);
@@ -1620,7 +1764,7 @@ void test_application_command_surfaces_and_house_mark() {
             "fm.shelf.sort.popup.row.kind", gui_forms::SemanticAction::press);
         require(semantic_action_handled, diagnostic);
     }
-    require((*sort_button).text() == "Sort: Kind",
+    require((*sort_button).text() == "Sort: Type",
             "Sort command must publish its current retained state");
 
     {
@@ -1705,7 +1849,7 @@ void test_application_command_surfaces_and_house_mark() {
                 (*selection_caption).effectively_visible() &&
                 (*arrange_caption).effectively_visible() && (*more).visible() &&
                 (*more).layout_collapsed() && !(*more).effectively_visible() &&
-                (*sort_button).text() == "Sort: Kind" &&
+                (*sort_button).text() == "Sort: Type" &&
                 (*selection_group).committed_arranged_bounds().width >= 176.0 &&
                 (*arrange_group).committed_arranged_bounds().width >= 306.0 &&
                 (*move_copy_button).committed_arranged_bounds().height == 48.0 &&
@@ -2273,7 +2417,7 @@ void test_application_command_truth_across_files_search_and_settings() {
     require_eventually(*application, ObjectNamed{*objects, "inside.txt"},
                        "Enter Open must navigate to the real Documents folder");
     if (command_trace.empty() || command_trace.back().command_id != "file.open" ||
-        command_trace.back().source_id != "fm.accelerator.file.open") {
+        command_trace.back().source_id != "fm.objects.activation") {
         throw std::runtime_error(
             "Enter canonical Open trace mismatch: count=" + std::to_string(command_trace.size()) +
             " last-command=" +
@@ -2787,8 +2931,8 @@ void test_criteria_virtual_folder_is_retained_exact_and_catalogue_only() {
 
     file_manager::ApplicationInteractionProbe::show_criteria_results(
         *application, "catalogue", 42U,
-        {{"root.txt", tree_fixture.root() / "root.txt", "file", 5U, false},
-         {"Documents", tree_fixture.root() / "Documents", "directory", 0U, false}});
+        {{"stale-name.txt", tree_fixture.root() / "root.txt", "directory", 999U, false},
+         {"Documents", tree_fixture.root() / "Documents", "file", 999U, false}});
     (*window).perform_layout();
     require(has_object_named(*objects, "root.txt") && has_object_named(*objects, "Documents") &&
                 (*objects).visible() &&
@@ -2798,6 +2942,20 @@ void test_criteria_virtual_folder_is_retained_exact_and_catalogue_only() {
                     (*console).committed_arranged_bounds().height,
             "catalogue Criteria results must remain ordinary selectable objects below a visible "
             "generation-labelled rack");
+    const std::uintmax_t factual_size = std::filesystem::file_size(tree_fixture.root() / "root.txt");
+    for (const gui_forms::ObjectViewItem& item : (*objects).items()) {
+        require(item.cells.size() == 4U, "criteria must publish the same factual Details columns");
+        if (item.name == "root.txt") {
+            require(item.cells[1U].text == "Document" &&
+                        item.cells[2U].text == file_manager::format_bytes(factual_size) &&
+                        item.cells[3U].availability == gui_forms::ObjectCellAvailability::available,
+                    "catalogue hints must not replace current observed name, type, size or time");
+        } else if (item.name == "Documents") {
+            require(item.cells[1U].text == "Folder" &&
+                        item.cells[2U].availability == gui_forms::ObjectCellAvailability::not_applicable,
+                    "current directory type must override a stale catalogue file hint");
+        }
+    }
 
     file_manager::ApplicationInteractionProbe::show_criteria_results(
         *application, "live", std::nullopt,
@@ -3745,6 +3903,7 @@ int main() {
     try {
         test_stop_during_ui_drain_revokes_remaining_callbacks();
         test_application_controls_navigate_real_directories();
+        test_details_headers_sort_without_opening_objects();
         test_selected_file_previews_reach_visible_layout();
         test_application_command_surfaces_and_house_mark();
         test_application_command_truth_across_files_search_and_settings();
