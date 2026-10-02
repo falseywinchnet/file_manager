@@ -115,16 +115,16 @@ Rect aligned_rect(Rect bounds, Size size,
     return {x, y, width, height};
 }
 
-std::vector<std::string> label_lines(std::string_view text, FontSpec font,
-                                     double width, TextWrapping wrapping,
-                                     std::size_t maximum_lines) {
+std::vector<std::string> label_lines(const std::string_view text, const FontSpec font,
+                                     const double width, const TextWrapping wrapping,
+                                     const std::size_t maximum_lines) {
     const TextWidthResolver resolve_width{EstimatedWidth{font}};
     std::vector<std::string> lines = label_lines(text, font, width, wrapping, resolve_width, maximum_lines);
     return lines;
 }
 
 std::vector<std::string> label_lines(
-    std::string_view text, FontSpec font, double width, TextWrapping wrapping,
+    const std::string_view text, const FontSpec font, const double width, const TextWrapping wrapping,
     const TextWidthResolver& resolve_width, const std::size_t maximum_lines) {
     std::vector<std::string> lines{};
     const std::size_t line_limit = maximum_lines == 0U
