@@ -1,5 +1,12 @@
 # Private third-party dependencies
 
+The source-only logical text-mask profile uses libunibreak 8.0, pinned to
+`28a2756b864c343f438cd22537d49d394d4666a5` by `fetch_linebreak.sh`. Its private
+line-break subset implements Unicode 17 UAX #14. It is excluded from normal OFF
+builds and SDK exports. See
+[`LIBUNIBREAK_INTAKE_2026-10-01.md`](LIBUNIBREAK_INTAKE_2026-10-01.md) for the
+local conformance reproduction, caller-buffer boundary and license requirements.
+
 Unicode grapheme property tables and conformance cases are pinned, generated,
 and attributed under [`unicode/`](unicode/README.md). Unlike Skia, these are
 checked-in generated data so renderer-free builds stay offline.

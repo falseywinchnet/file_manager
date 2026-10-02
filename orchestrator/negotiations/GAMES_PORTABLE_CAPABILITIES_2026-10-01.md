@@ -699,3 +699,54 @@ The coordinator reports ON installation refused before copying files and an OFF
 SDK installed without text-mask headers. The coordinator owns CMake, CI, install
 review and integration receipt. These are development isolation checks, not
 installed text-mask availability, native renderer evidence or a new approval gate.
+
+### Stage 2 line-break dependency intake — candidate pending reproduction
+
+**OBSERVED coordinator report:** Stage 1 was pushed at `4d24f43`. Stage 2 has no
+admitted UAX #14 line-break provider. The coordinator is auditing libunibreak 8.0
+in `.build/libunibreak-8.0-intake`, pinned to tag `libunibreak_8_0` and reported
+immutable commit `28a2756b864c343f438cd22537d49d394d4666a5`.
+
+**OBSERVED upstream claim:** the official
+[libunibreak 8.0 release](https://github.com/adah1972/libunibreak/releases/tag/libunibreak_8_0)
+states Unicode 17.0 line breaking under UAX #14 revision 55 and passage of all
+Unicode conformance tests without skips. This chat read that release; upstream
+claims are not locally reproduced conformance evidence. The coordinator reports
+checking the vendor `LICENCE` zlib notice. Retain that notice and all applicable
+Unicode data/test licenses with the pinned intake; this record does not claim
+an independent license-file audit by this chat.
+
+**CANDIDATE:** use the pinned dependency privately for bounded line-break
+opportunities in `logical_wrapped_mask_v1`. The provider still owns wrapping,
+source-offset mapping, paragraph/line shaping, cluster-safe fallback, typed
+refusal and the existing input/workspace/work limits. A line-break opportunity
+does not authorize splitting a grapheme/shaping cluster or truncating output.
+No public API, A2 behavior or budget changes follow from dependency intake.
+Source-only investigation does not admit installed availability or freeze an ADR.
+
+Alternatives considered are a first-party UAX #14 implementation (not chosen
+for this intake because of its maintenance cost), older library versions
+(Unicode-version mismatch), and existing whitespace wrapping (not UAX #14
+conformance). These are comparison reasons, not measured performance results or
+blanket rejection of future alternatives.
+
+Before accepted development integration, retain concrete evidence of the exact
+source pin and relevant source/data hashes, vendor/Unicode notices, local build
+and conformance reproduction with named data/version/environment and failures
+or skips, and the private bounded adapter's source/offset/allocation behavior.
+Review authored adapter/tooling changes against
+`planning/PROGRAMMING_HOUSE_STYLE.md`; do not rewrite or certify vendor source
+as first-party style. Integration must preserve the agreed finite accounting
+and cancellation boundaries. The coordinator owns intake/reproduction and the
+integration verdict; upstream claims alone do not close that evidence requirement.
+
+**MEASURED — attributed coordinator reproduction:** GCC 16.2 upstream tests
+passed 19,338/19,338 line-break cases, 1,944 word-break cases and 766 grapheme-break
+cases with no skips. This chat did not rerun those tests. The coordinator accepts
+the pinned library for bounded private development use, superseding the pending
+reproduction status of the intake above without freezing an ADR or publishing
+an SDK. The line-break adapter uses strict language mode (`lang = "-strict"`)
+and caller-owned byte output. The coordinator reports no heap allocation found
+in the production source reviewed; this is scoped source evidence, not a process
+memory guarantee. Vendor/Unicode notices and the existing adapter accounting,
+source-offset, cluster-boundary and failure obligations remain in force.
