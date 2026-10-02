@@ -73,9 +73,9 @@ int main() {
                 input.append("after bound");
                 write(bounded_text, input);
                 result = file_manager::load_preview(root, bounded_text, file_manager::observe_identity(bounded_text));
-                const std::string expected = prefix + "\n\n… preview limited to 64 KiB";
-                require(result.kind == file_manager::PreviewKind::text && result.text_utf8 == expected,
-                    "read limit inside a UTF-8 code point must retain the complete readable prefix");
+                require(result.kind == file_manager::PreviewKind::text && result.text_utf8 == prefix &&
+                            result.text_truncated,
+                    "bounded UTF-8 must preserve only file text and report truncation separately");
             }
         }
         write(bounded_text, "incomplete \xe2\x82");
@@ -84,8 +84,13 @@ int main() {
             "an incomplete code point at real EOF must remain malformed");
         write(bounded_text, "");
         result = file_manager::load_preview(root, bounded_text, file_manager::observe_identity(bounded_text));
-        require(result.kind == file_manager::PreviewKind::text && result.text_utf8.empty(),
+        require(result.kind == file_manager::PreviewKind::text && result.text_utf8.empty() && !result.text_truncated,
             "an empty text file must produce a valid empty preview");
+        write(bounded_text, std::string(file_manager::maximum_text_preview_bytes, 'a'));
+        result = file_manager::load_preview(root, bounded_text, file_manager::observe_identity(bounded_text));
+        require(result.kind == file_manager::PreviewKind::text && !result.text_truncated &&
+                    result.text_utf8.size() == file_manager::maximum_text_preview_bytes,
+            "text exactly at the read limit must not claim omitted input bytes");
 
         const std::filesystem::path png = root / "image.png";
         const std::string png_signature("\x89PNG\r\n\x1a\n", 8);

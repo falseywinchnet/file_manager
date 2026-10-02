@@ -1384,6 +1384,8 @@ void test_selected_file_previews_reach_visible_layout() {
     TemporaryTree fixture{};
     std::ofstream literal_text(fixture.root() / "root.txt", std::ios::binary | std::ios::trunc);
     literal_text << "root\nA&B && C&D\n";
+    literal_text << "\n\n\n\n\n\n\n\n";
+    literal_text << std::string(file_manager::maximum_text_preview_bytes, 'x');
     literal_text.close();
     require(literal_text.good(), "literal preview fixture must be written completely");
     const std::filesystem::path source = std::filesystem::path(__FILE__).parent_path().parent_path() /
@@ -1420,6 +1422,14 @@ void test_selected_file_previews_reach_visible_layout() {
         "preview must paint readable light text against its authored dark surface");
     require(text_painter.literal_ampersands,
         "file text must retain literal ampersands rather than interpret keyboard mnemonics");
+    const std::shared_ptr<gui_forms::Label> coverage = std::dynamic_pointer_cast<gui_forms::Label>(
+        (*window).find("file-manager-app.shell.workspace.selection.inspector.facts.preview.kind"));
+    require(coverage && (*coverage).text() == "Text excerpt · 64 KiB limit" &&
+                (*coverage).effectively_visible() &&
+                (*coverage).absolute_bounds().y >= (*text).absolute_bounds().bottom(),
+        "byte-limit disclosure must remain visible outside the elided preview body");
+    require((*text).text().find("preview limited") == std::string::npos,
+        "preview body must not mix synthetic truncation messages with file contents");
     // Prime retained chunks while text is selected, as the native host does.
     // A first paint only after PNG completion would miss stale replay state.
     ImageRecordingPainter text_window_painter{};
@@ -1428,6 +1438,8 @@ void test_selected_file_previews_reach_visible_layout() {
     const bool image_selected = (*window).perform_semantic_action(image_id, gui_forms::SemanticAction::select);
     require(image_selected, "image must be selected through the public user action");
     require_eventually(*application, ImagePreviewReady{*picture}, "selected PNG must enter the application image registry");
+    require((*coverage).text() == "Image · bounded PNG preview",
+        "changing selection must retire the previous text coverage notice");
     (*window).perform_layout();
     const gui_forms::Rect image_bounds = (*picture).image_bounds();
     const gui_forms::Control::Ptr preview_surface = (*window).find(

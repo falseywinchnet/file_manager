@@ -1,8 +1,15 @@
 # Details integration development receipt
 
-Status: matching local consumer validation passed (12/12); source development.
-Native acceptance and a downloadable application containing these changes
-remain pending. The earlier preview release does not include this work.
+Status: **published portable dogfood checkpoint**
+[`v0.001-alpha.6e74434`](https://github.com/falseywinchnet/file_manager/releases/tag/v0.001-alpha.6e74434).
+Both complete native workflows 36989014139 and 36989019470 pass on Windows,
+macOS and Linux. Source `6e74434792081df124efd374cb0679ddaa380515` was rebase-
+merged by PR #6 as `47e24cd70109075ee327abcdeaa50a5bdba1cc30`; both have tree
+`aba13e40b6a8a4fc10a1d065f39732a905792b25`. Independently downloaded archives
+passed source, sidecar and 40/42/44 Linux/Mac/Windows file-hash checks; uploaded
+archive digests match. The final Mac screenshot visibly shows all three fixture
+rows and all four headers. Earlier pending entries below retain stage history;
+physical-input smoothness, accessibility and full daily-use acceptance stay open.
 
 ## Implemented consumer policy
 

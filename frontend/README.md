@@ -80,9 +80,15 @@ AutoRun disabled and the selected directory supplied as the process working
 directory, without inserting a path into shell command text. Open/terminal
 launch-plan tests do not establish native handler or terminal workflow acceptance.
 
-Windows Orchestrator IPC is still unavailable and remains visibly degraded;
-browsing does not substitute a successful bootstrap. Read-only remains the
-default and the existing protected mutation profile remains explicit opt-in.
+Windows has an explicit-process authenticated named-pipe route for Orchestrator
+and Engine, including the packaged `launch_windows_search.ps1` launcher. Bundling
+those components does not activate a service or admit an indexing root; ordinary
+launch still reports actual negotiated availability. See the
+[Windows Engine deployment profile](../engine/docs/WINDOWS_LOCAL_DEPLOYMENT.md)
+and [Orchestrator projection](../orchestrator/spec/WINDOWS_LOCAL_PROJECTION.md).
+Read-only remains the default and the protected mutation profile is explicit
+opt-in. Installed service management, settings and platform promotion retain
+their documented gates.
 The authored Web.Forms controls and retained GUI.Forms composition are preserved;
 Windows currently uses its standard native outer frame. Native visual and
 accessibility parity, removable-drive handling, and daily mutation promotion

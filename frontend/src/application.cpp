@@ -2112,7 +2112,7 @@ void Application::update_command_state() {
     (*search_box_).set_enabled(files_active && engine_search_available());
     (*search_box_).set_placeholder_text(engine_search_available()
         ? "Search this subtree"
-        : "Search unavailable · root not indexed");
+        : "Search not configured here");
 }
 
 void Application::focus_active_object_surface() {
@@ -4162,12 +4162,19 @@ void Application::apply_preview(PreviewResult result, std::string stable_id,
     }
     reset_preview();
     if (result.kind == PreviewKind::text) {
-        if (result.text_utf8.empty()) result.text_utf8 = "Empty text file";
+        const bool empty_text = result.text_utf8.empty();
+        std::string coverage{"Text excerpt · UTF-8"};
+        if (empty_text) {
+            result.text_utf8 = "Empty text file";
+            coverage = "Empty UTF-8 text file";
+        } else if (result.text_truncated) {
+            coverage = "Text excerpt · 64 KiB limit";
+        }
         (*preview_text_).set_text(std::move(result.text_utf8));
         (*preview_text_).set_visible(true);
         (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph).set_visible(false);
         (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind).set_text(
-            kind_text(*selected) + " · bounded UTF-8 preview");
+            std::move(coverage));
         return;
     }
     if (result.kind == PreviewKind::png && window_) {

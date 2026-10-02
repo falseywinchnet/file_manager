@@ -27,6 +27,9 @@ struct PreviewResult final {
     ObjectIdentity identity{};
     std::string text_utf8{};
     std::vector<std::byte> png_bytes{};
+    // Text input exceeded the byte budget. Display wrapping may show a smaller
+    // excerpt even when the complete input was admitted.
+    bool text_truncated{false};
 };
 
 inline constexpr std::size_t maximum_text_preview_bytes = 64U * 1024U;
