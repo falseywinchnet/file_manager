@@ -241,8 +241,13 @@ private:
 
 #include "macos_paint_cost_experiment.inc"
 #include "macos_focused_cpu_experiment.inc"
+#include "macos_cpu_profile_workload.inc"
 
 int main(const int argc, char** const argv) {
+    if (argc == 3 && std::strcmp(argv[1], "--cpu-profile-hold") == 0) {
+        const int result = run_cpu_profile_workload(argv[2]);
+        return result;
+    }
     if (argc == 2 && std::strcmp(argv[1], "--focused-cpu-attribution") == 0) {
         const int result = run_focused_cpu_experiment();
         return result;
