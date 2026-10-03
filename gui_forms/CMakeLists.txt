@@ -208,6 +208,7 @@ if(GUI_FORMS_BUILD_PREPARED_TEXT)
         $<BUILD_INTERFACE:GUI_FORMS_PREPARED_TEXT>)
     add_library(gui_forms_prepared_text STATIC
         src/render/text/prepared_service.cpp
+        src/render/text/prepared_window_shape.cpp
         src/render/text/prepared_raster.cpp)
     target_link_libraries(gui_forms_prepared_text
         PUBLIC gui_forms_core
@@ -1655,6 +1656,10 @@ if(GUI_FORMS_BUILD_TESTS)
         add_executable(gui_forms_prepared_window_batch_tests tests/prepared_window_batch_tests.cpp)
         target_link_libraries(gui_forms_prepared_window_batch_tests PRIVATE gui_forms_core)
         add_test(NAME gui_forms_prepared_window_batch_tests COMMAND gui_forms_prepared_window_batch_tests)
+        add_executable(gui_forms_prepared_window_shape_tests tests/prepared_window_shape_tests.cpp)
+        target_link_libraries(gui_forms_prepared_window_shape_tests PRIVATE gui_forms_prepared_text gui_forms_text_engine)
+        add_test(NAME gui_forms_prepared_window_shape_tests
+            COMMAND gui_forms_prepared_window_shape_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
         add_executable(gui_forms_prepared_text_service_tests tests/prepared_text_service_tests.cpp)
         target_link_libraries(gui_forms_prepared_text_service_tests PRIVATE gui_forms_prepared_text)
         add_test(NAME gui_forms_prepared_text_service_tests
