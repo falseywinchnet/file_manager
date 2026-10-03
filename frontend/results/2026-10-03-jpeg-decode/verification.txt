@@ -1,0 +1,1 @@
+PASS eight orientation transforms, geometry, colors, opaque alpha, grayscale, empty/truncated/range refusal

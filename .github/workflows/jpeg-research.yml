@@ -1,0 +1,52 @@
+name: JPEG research correctness
+on:
+  push:
+    branches: [main, 'codex/**']
+    paths:
+      - 'frontend/experiments/jpeg_decode/**'
+      - '.github/workflows/jpeg-research.yml'
+  pull_request:
+    paths:
+      - 'frontend/experiments/jpeg_decode/**'
+      - '.github/workflows/jpeg-research.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: jpeg-research-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  correctness:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, macos-26, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch exact codec source
+        run: cmake -DCODEC_DOWNLOAD_ROOT=.build/jpeg-codec-source -P frontend/experiments/jpeg_decode/fetch_codec.cmake
+      - name: Build independent scalar codec package
+        run: |
+          cmake -S .build/jpeg-codec-source/libjpeg-turbo-3.2.0 -B .build/jpeg-codec-build -DCMAKE_BUILD_TYPE=Release -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DWITH_SIMD=OFF -DWITH_TOOLS=OFF -DWITH_TESTS=OFF -DWITH_TURBOJPEG=ON -DCMAKE_INSTALL_LIBDIR=lib "-DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/.build/jpeg-codec"
+          cmake --build .build/jpeg-codec-build --config Release --parallel 2
+          cmake --install .build/jpeg-codec-build --config Release
+      - name: Build bounded metadata and pixel checks
+        run: |
+          cmake -S frontend/experiments/jpeg_decode -B .build/jpeg-research -DCMAKE_BUILD_TYPE=Release -DFILE_MANAGER_JPEG_CMAKE_PACKAGE=ON "-DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/.build/jpeg-codec"
+          cmake --build .build/jpeg-research --config Release --parallel 2
+      - name: Verify correctness without timing claims
+        run: ctest --test-dir .build/jpeg-research -C Release --output-on-failure --timeout 60
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jpeg-research-${{ matrix.os }}-${{ github.sha }}
+          path: |
+            .build/jpeg-research/Testing/Temporary/LastTest.log
+            .build/jpeg-research/CMakeCache.txt
+            .build/jpeg-codec-build/CMakeCache.txt
+          if-no-files-found: warn
