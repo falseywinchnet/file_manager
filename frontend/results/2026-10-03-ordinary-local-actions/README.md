@@ -116,7 +116,57 @@ it does not certify unchanged code. `focus-repair-source-sha256.json` identifies
 the reviewed source with LF-normalized UTF-8 hashes; the original receipt remains
 historical evidence.
 
-Native rerun remains pending. No packaged release is promoted by these changes.
+The native rerun at `a132e4f` passed both push (`37111165714`) and PR
+(`37111167644`) matrices on Windows, macOS and Linux. Screenshot review below
+nevertheless rejected that checkpoint for publication.
+
+## Same-identity inspector refresh correction
+
+**OBSERVED and REJECTED:** push run `37111165714`'s Mac
+`native-local-actions.png` showed `renamed-preview.txt` in the selected Details
+row but `native-preview.txt` in both the preview heading and Name property.
+Passing native assertions had verified the row and filesystem, not inspector
+consistency. `MacRejectedInspector.png` preserves that screenshot. No release
+was published from that checkpoint.
+
+`Application::apply_directory` replaced entry facts and restored the selected
+identity, relying on `ObjectView` selection notification to update the inspector.
+`ObjectView::replace_details_model` and `apply_selection` correctly emit no
+selection event when the primary and complete selected-ID sequence are
+unchanged. Thus a successful Rename or F5 could retain old facts and preview
+bytes. The application now owns the previous primary identity across model
+replacement and explicitly refreshes the inspector when the full nonempty
+selection survives unchanged. Changed selections keep their existing event
+path. This adds a comparison of selected IDs, not a new full-directory pass.
+
+**MEASURED regression:** the new Windows assertion failed against `a132e4f`
+with `ordinary rename must refresh inspector names while preserving selection
+identity`; `WindowsRejectedInspectorLastTest.log` retains that result. The
+regression checks inline Rename, its Undo, property Rename and its Undo. A
+second case overwrites a selected generated text file in place, invokes F5,
+and requires new bytes and the correct UTF-8 coverage caption while preserving
+selection identity. The Mac native test now checks both inspector names after
+Rename and Undo and waits for the renamed text preview before its screenshot.
+
+**House-style review:** root reviewed all authored hunks in `application.cpp`,
+`application_interaction_tests.cpp`, and `macos_preview_tests.mm` against the
+complete `planning/PROGRAMMING_HOUSE_STYLE.md`. The previous identity is owned;
+the selected-ID span is borrowed only for synchronous comparison before any
+further mutation. The named test predicate borrows window-owned controls for
+its synchronous wait and a static text literal. All new values have explicit
+types and initialization. File effects, refresh request, publication and
+assertions are sequential. The existing preview generation/revision checks
+remain authoritative for asynchronous completion. No new callback ownership,
+worker, API or dependency is introduced. No remaining violation was identified
+in this authored scope; unchanged legacy code is not certified. The separate
+spelling scan reports three files and zero candidates.
+
+The focused Windows rerun passed interaction and transfer suites (3.16 s and
+1.35 s) using MinGW GCC 16.2.0 Release with at most two compiler jobs. These are
+correctness durations, not latency measurements. `WindowsInspectorLastTest.log`
+records the run; `inspector-repair-source-sha256.json` identifies reviewed source.
+Native Windows/macOS/Linux rerun and new Mac screenshot review remain pending.
+These checks do not establish physical-input or packaged-entry-point acceptance.
 
 ## Original checkpoint source review
 

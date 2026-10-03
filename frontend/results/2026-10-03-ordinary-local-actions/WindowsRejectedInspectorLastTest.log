@@ -1,0 +1,19 @@
+Start testing: Oct 03 02:11 Pacific Daylight Time
+----------------------------------------------------------
+13/15 Testing: file_manager_application_interaction_tests
+13/15 Test: file_manager_application_interaction_tests
+Command: "C:/Users/Shadow/file_manager/frontend/.build/shadow-windows/file_manager_application_interaction_tests.exe"
+Directory: C:/Users/Shadow/file_manager/frontend/.build/shadow-windows
+"file_manager_application_interaction_tests" start time: Oct 03 02:11 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+file manager application interaction tests failed: ordinary rename must refresh inspector names while preserving selection identity
+<end of output>
+Test time =   0.44 sec
+----------------------------------------------------------
+Test Failed.
+"file_manager_application_interaction_tests" end time: Oct 03 02:11 Pacific Daylight Time
+"file_manager_application_interaction_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 02:11 Pacific Daylight Time

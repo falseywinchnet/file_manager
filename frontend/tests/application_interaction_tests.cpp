@@ -1926,6 +1926,32 @@ void test_selected_file_previews_reach_visible_layout() {
         "byte-limit disclosure must remain visible outside the elided preview body");
     require((*text).text().find("preview limited") == std::string::npos,
         "preview body must not mix synthetic truncation messages with file contents");
+    const std::filesystem::path refreshed_path = fixture.root() / "root.txt";
+    const file_manager::ObjectIdentity before_refresh = file_manager::observe_identity(refreshed_path);
+    constexpr std::string_view refreshed_text = "root changed in place\nA&B && C&D\n";
+    std::ofstream replacement(refreshed_path, std::ios::binary | std::ios::trunc);
+    replacement << refreshed_text;
+    replacement.close();
+    require(replacement.good() && file_manager::observe_identity(refreshed_path) == before_refresh,
+        "refresh fixture must change contents without changing filesystem identity");
+    const bool refresh_focused = (*window).request_focus(objects);
+    const bool refresh_requested = (*window).dispatch_key(
+        {gui_forms::KeyAction::down, gui_forms::PhysicalKey::f5});
+    require(refresh_focused && refresh_requested, "ordinary F5 must refresh the selected file");
+    struct RefreshedTextReady final {
+        const gui_forms::Label& text;
+        const gui_forms::Label& coverage;
+        std::string_view expected{};
+        bool operator()() const {
+            const bool ready = text.visible() && text.text() == expected &&
+                coverage.text() == "Text excerpt · UTF-8";
+            return ready;
+        }
+    };
+    require_eventually(*application, RefreshedTextReady{*text, *coverage, refreshed_text},
+        "same-identity refresh must replace preview bytes and retire the old truncation notice");
+    require((*objects).selected_id() == text_id,
+        "refresh must preserve selection while replacing its preview revision");
     // Prime retained chunks while text is selected, as the native host does.
     // A first paint only after PNG completion would miss stale replay state.
     ImageRecordingPainter text_window_painter{};
@@ -4607,15 +4633,21 @@ void test_ordinary_local_actions_outside_launch_root() {
         "ordinary rename must publish refreshed name");
     require((*objects).selected_id() == id && file_manager::observe_identity(destination) == identity,
         "ordinary rename outside launch root must preserve selection and filesystem identity");
+    const std::shared_ptr<gui_forms::PropertyList> properties = std::dynamic_pointer_cast<gui_forms::PropertyList>(
+        (*window).find("fm.selection.properties"));
+    const std::shared_ptr<gui_forms::Label> preview_name = std::dynamic_pointer_cast<gui_forms::Label>(
+        (*window).find("file-manager-app.shell.workspace.selection.inspector.facts.preview.name"));
+    require(properties && preview_name, "ordinary selection must expose property and preview names");
+    require((*properties).value("fm.property.name") == "ordinary.txt" && (*preview_name).text() == "ordinary.txt",
+        "ordinary rename must refresh inspector names while preserving selection identity");
     const bool rename_undone = (*undo).execute("fixture.ordinary.undo-rename");
     require(rename_undone, "ordinary rename Undo must execute");
     require_eventually(*application, NamedEntryReady{*objects, "root.txt", true},
         "ordinary rename Undo must restore original name");
     require(file_manager::observe_identity(source) == identity,
         "ordinary rename Undo must restore the exact source");
-    const std::shared_ptr<gui_forms::PropertyList> properties = std::dynamic_pointer_cast<gui_forms::PropertyList>(
-        (*window).find("fm.selection.properties"));
-    require(properties != nullptr, "ordinary Name property must exist");
+    require((*properties).value("fm.property.name") == "root.txt" && (*preview_name).text() == "root.txt",
+        "ordinary rename Undo must refresh both inspector names");
     const std::shared_ptr<gui_forms::TextBox> name_editor = std::dynamic_pointer_cast<gui_forms::TextBox>(
         (*properties).editor("fm.property.name"));
     require(name_editor && (*name_editor).enabled(), "ordinary Name property must be editable");
@@ -4627,10 +4659,14 @@ void test_ordinary_local_actions_outside_launch_root() {
         "ordinary property rename must accept normal keyboard editing");
     require_eventually(*application, NamedEntryReady{*objects, "property.txt", true},
         "ordinary property rename must publish its result");
+    require((*properties).value("fm.property.name") == "property.txt" && (*preview_name).text() == "property.txt",
+        "property rename must refresh the selected preview name");
     const bool property_undone = (*undo).execute("fixture.ordinary.undo-property");
     require(property_undone, "ordinary property rename must grant Undo");
     require_eventually(*application, NamedEntryReady{*objects, "root.txt", true},
         "ordinary property rename Undo must restore the source");
+    require((*properties).value("fm.property.name") == "root.txt" && (*preview_name).text() == "root.txt",
+        "property rename Undo must refresh both inspector names");
 
     // Construction at actual Home observes authority only; all mutations above
     // remain inside generated fixture data. Windows Home is a known-folder API.
