@@ -1000,6 +1000,28 @@ void HarfBuzzFontEngine::set_diagnostic_failure(TextLayoutFailure failure, std::
 }
 #endif
 
+std::optional<PrimaryLineMetrics> HarfBuzzFontEngine::primary_line_metrics(const FontSpec font) {
+    if (!valid_font_spec(font)) throw std::invalid_argument("Invalid primary line font");
+    for (Impl::Face& face : (*impl_).faces) {
+        if (!face.role || *face.role != font.role || face.weight != font.weight || face.italic != font.italic) continue;
+        const double bounded_size = std::clamp(font.size, 1.0, 4096.0);
+        const long long fixed_size = std::llround(bounded_size * 64.0);
+        const FT_F26Dot6 size = static_cast<FT_F26Dot6>(fixed_size);
+        const FT_Error sized = FT_Set_Char_Size(face.face, 0, size, 72U, 72U);
+        if (sized != 0 || (*face.face).size == nullptr) throw std::runtime_error("Primary line size setup failed");
+        const FT_Size_Metrics& metrics = (*(*face.face).size).metrics;
+        PrimaryLineMetrics result{};
+        result.face = face.id;
+        result.ascent_device = static_cast<double>(metrics.ascender) / 64.0;
+        result.descent_device = -static_cast<double>(metrics.descender) / 64.0;
+        const double native_height = static_cast<double>(metrics.height) / 64.0;
+        const double gap = native_height - result.ascent_device - result.descent_device;
+        result.line_gap_device = std::max(0.0, gap);
+        return result;
+    }
+    return std::nullopt;
+}
+
 ResolvedTextLayout HarfBuzzFontEngine::resolve(std::string_view utf8,
                                                FontSpec font) {
     ResolvedTextLayout result{};
