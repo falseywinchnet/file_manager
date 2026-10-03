@@ -1,0 +1,19 @@
+Start testing: Oct 02 23:10 Pacific Daylight Time
+----------------------------------------------------------
+14/15 Testing: file_manager_application_transfer_tests
+14/15 Test: file_manager_application_transfer_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_application_transfer_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_application_transfer_tests" start time: Oct 02 23:10 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+search editor did not receive focus
+<end of output>
+Test time =   1.39 sec
+----------------------------------------------------------
+Test Failed.
+"file_manager_application_transfer_tests" end time: Oct 02 23:10 Pacific Daylight Time
+"file_manager_application_transfer_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+End testing: Oct 02 23:10 Pacific Daylight Time

@@ -3288,6 +3288,11 @@ void Application::request_navigation(std::filesystem::path path,
                    "read-only roots are Home, Volumes, and explicit launch roots");
         return;
     }
+    if (created_folder_rename_ && pending_selection_identity_ &&
+        *pending_selection_identity_ == (*created_folder_rename_).identity) {
+        pending_selection_identity_.reset();
+    }
+    created_folder_rename_.reset();
     search_generation_.fetch_add(1);
     search_loading_ = false;
     criteria_loading_ = false;
@@ -3327,20 +3332,32 @@ void Application::apply_directory(DirectorySnapshot snapshot,
         snapshot.generation < applied_generation_) {
         return;
     }
+    if (created_folder_rename_ &&
+        (*created_folder_rename_).navigation_generation == snapshot.generation &&
+        (*created_folder_rename_).search_generation != search_generation_.load()) {
+        created_folder_rename_.reset();
+        pending_selection_identity_.reset();
+        return;
+    }
     applied_generation_ = snapshot.generation;
     if (!snapshot.available()) {
+        created_folder_rename_.reset();
         (*path_box_).set_text(path_utf8(location_));
         set_status("Location unavailable", snapshot.error);
         return;
     }
     const bool returning_from_virtual_surface =
         (*correspondence_).effectively_visible() || (*criteria_console_).visible();
+    const bool preserve_location_edit = created_folder_rename_ && (*breadcrumb_).editing() &&
+        window_ && (*window_).focused_control() == path_box_;
     // The snapshot is also the authoritative cache input for rebuild_tree()
     // below. Preserve its paths until that retained model has consumed them.
     location_ = snapshot.location;
     navigation_root_ = snapshot.root;
-    (*path_box_).set_text(path_utf8(location_));
-    rebuild_breadcrumb();
+    if (!preserve_location_edit) {
+        (*path_box_).set_text(path_utf8(location_));
+        rebuild_breadcrumb();
+    }
     (*correspondence_).set_items({});
     (*correspondence_).set_visible(false);
     (*criteria_console_).set_visible(false);
@@ -3417,6 +3434,18 @@ void Application::apply_directory(DirectorySnapshot snapshot,
     update_command_state();
     if (returning_from_virtual_surface) focus_active_object_surface();
     update_browsing_status();
+    if (created_folder_rename_) {
+        const CreatedFolderRename pending = *created_folder_rename_;
+        created_folder_rename_.reset();
+        const std::optional<DirectoryEntry> selected = selected_entry();
+        if (pending.navigation_generation == snapshot.generation &&
+            pending.search_generation == search_generation_.load() &&
+            !settings_open_ && !(*rename_box_).visible() && !transfer_in_flight_ &&
+            !property_rename_in_flight_ && focused_is_not_text_editor() && selected &&
+            (*selected).identity == pending.identity) {
+            begin_rename();
+        }
+    }
 }
 
 void Application::show_tree_root_menu() {
@@ -4437,8 +4466,38 @@ void Application::apply_platform_command(const PlatformCommandKind kind,
 void Application::request_create_folder() {
     if (!mutation_scope_active()) return;
     const std::filesystem::path parent = location_;
+    ++create_folder_request_generation_;
+    const CreateFolderContext context{requested_generation_.load(),
+        search_generation_.load(), create_folder_request_generation_};
+    created_folder_rename_.reset();
     set_status("Creating a folder", "protected operation · collision-safe");
-    post_worker(CreateFolderWork{shared_from_this(), parent});
+    post_worker(CreateFolderWork{shared_from_this(), parent, context});
+}
+
+void Application::apply_created_folder(OperationResult result, const CreateFolderContext& context) {
+    if (!result.succeeded()) {
+        apply_operation(std::move(result));
+        return;
+    }
+    const std::filesystem::path parent = result.resulting_path.parent_path();
+    const bool context_current = context.navigation_generation == requested_generation_.load() &&
+        context.search_generation == search_generation_.load() &&
+        context.request_generation == create_folder_request_generation_ &&
+        parent == location_ && !settings_open_ && !(*rename_box_).visible() &&
+        !transfer_in_flight_ && !property_rename_in_flight_ && focused_is_not_text_editor();
+    if (!context_current) {
+        // Creation has committed, but it cannot revoke a newer navigation or edit.
+        undo_available_ = result.undo_available;
+        update_mutation_controls();
+        set_status("Folder created", path_utf8(result.resulting_path));
+        return;
+    }
+    const ObjectIdentity identity = result.identity;
+    apply_operation(std::move(result));
+    if (identity.available()) {
+        created_folder_rename_ = CreatedFolderRename{identity,
+            requested_generation_.load(), search_generation_.load()};
+    }
 }
 
 void Application::begin_rename() {

@@ -327,6 +327,12 @@ private:
     void update_mutation_controls();
     void activate(std::string_view stable_id);
     void request_create_folder();
+    struct CreateFolderContext final {
+        std::uint64_t navigation_generation{};
+        std::uint64_t search_generation{};
+        std::uint64_t request_generation{};
+    };
+    void apply_created_folder(OperationResult result, const CreateFolderContext& context);
     void begin_rename();
     void commit_rename(std::string basename);
     void commit_property_name(std::string basename);
@@ -387,6 +393,13 @@ private:
     std::optional<ObjectIdentity> pending_selection_identity_{};
     std::optional<std::string> pending_delete_id_{};
     std::optional<std::string> rename_target_id_{};
+    struct CreatedFolderRename final {
+        ObjectIdentity identity{};
+        std::uint64_t navigation_generation{};
+        std::uint64_t search_generation{};
+    };
+    std::optional<CreatedFolderRename> created_folder_rename_{};
+    std::uint64_t create_folder_request_generation_{};
     struct PendingTransfer final {
         DirectoryEntry entry{};
         bool move{};

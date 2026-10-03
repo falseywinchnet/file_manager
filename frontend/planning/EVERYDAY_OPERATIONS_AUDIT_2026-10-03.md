@@ -5,6 +5,17 @@ The existing visible sibling "Audit File Manager Details against interviews"
 performed this read-only pass. Root retains implementation ownership. No worker
 agents or sibling edits were used.
 
+## Current repair checkpoint
+
+The sections below preserve the original audit. No-replace publication,
+basename-first rename/no-op and cancellable regular-file copy now passed both
+complete native matrices and are delivered in `v0.001-alpha.1371514`; see
+`../results/2026-10-03-cancellable-copy/DELIVERY.md`. New Folder naming is a later
+local implementation with five application cases passing, pending native CI;
+see `../results/2026-10-03-new-folder/README.md`. These supersede the corresponding
+missing-behavior observations below. Byte progress, broader operation admission,
+parent/source authority, metadata policy and durable recovery remain open.
+
 ## Present behavior
 
 Native default Open, regular-file/property rename, deterministic New Folder,
