@@ -132,7 +132,9 @@ jobs:
         run: |
           python3 -B tools/native_build_tests.py
           python3 -B gui_forms/tests/verify_install_tests.py
-          xvfb-run -a python3 tools/build_native.py --jobs 2
+          # Native lifecycle tests close and reopen the last X11 connection.
+          # Keep the test server alive without its automatic last-client reset.
+          xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" python3 tools/build_native.py --jobs 2
           python3 -B tools/export_native_sdks_tests.py
           python3 -B tools/export_native_sdks.py
       # Export the normal OFF SDK above before enabling source-only development
@@ -178,7 +180,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           cmake --build .build/native-linux-x64/gui-forms --target gui_forms_linux_prepared_text_host_tests --parallel 2
-          xvfb-run -a ctest --test-dir .build/native-linux-x64/gui-forms -R '^gui_forms_linux_prepared_text_host_tests$' --output-on-failure
+          xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" ctest --test-dir .build/native-linux-x64/gui-forms -R '^gui_forms_linux_prepared_text_host_tests$' --output-on-failure
       - name: Verify Mac prepared-frame native exposure and visibility
         if: runner.os == 'macOS'
         # Run after OFF diagnostics; development-only host rebuilding must not
