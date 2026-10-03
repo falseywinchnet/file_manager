@@ -177,6 +177,7 @@ int main(const int argc, char** argv) {
         std::optional<std::filesystem::path> quarantine{};
         std::string engine_root_id{};
         bool allow_mutations = false;
+        bool read_only = false;
         const std::vector<std::string> arguments = command_arguments(argc, argv);
         for (std::size_t index = 0; index < arguments.size(); ++index) {
             const std::string_view argument(arguments[index]);
@@ -188,13 +189,15 @@ int main(const int argc, char** argv) {
                 quarantine = file_manager::path_from_utf8(arguments[index]);
             } else if (argument == "--allow-mutations") {
                 allow_mutations = true;
+            } else if (argument == "--read-only") {
+                read_only = true;
             } else if (argument == "--engine-root-id" && index + 1 < arguments.size()) {
                 ++index;
                 engine_root_id = arguments[index];
             } else {
                 std::cerr << "usage: File Manager [--root DIRECTORY] "
                              "[--engine-root-id ID] "
-                             "[--allow-mutations --quarantine DIRECTORY]\n";
+                             "[--read-only | --allow-mutations --quarantine DIRECTORY]\n";
                 return 2;
             }
         }
@@ -202,10 +205,17 @@ int main(const int argc, char** argv) {
             std::cerr << "File Manager: --quarantine requires --allow-mutations\n";
             return 2;
         }
+        if (read_only && allow_mutations) {
+            std::cerr << "File Manager: --read-only conflicts with --allow-mutations\n";
+            return 2;
+        }
+        file_manager::OperationPolicy policy = file_manager::OperationPolicy::ordinary_local;
+        if (read_only) policy = file_manager::OperationPolicy::read_only;
+        if (allow_mutations) policy = file_manager::OperationPolicy::protected_profile;
 
         Runtime runtime{};
         runtime.application = std::make_shared<file_manager::Application>(
-            root, quarantine, allow_mutations, std::move(engine_root_id));
+            root, quarantine, policy, std::move(engine_root_id));
         file_manager::DocumentPickerRequest picker_request{};
         picker_request.profile = file_manager::DocumentPickerProfile::open_file;
         picker_request.protected_root = root;

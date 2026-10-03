@@ -37,9 +37,10 @@ printf '%s\n' "$daily" | /usr/bin/grep -q '^argument_count=0$'
 
 protected=$(HOME="$test_home" FILE_MANAGER_LAUNCH_DRY_RUN=1 \
   /bin/sh "$launcher" protected)
-printf '%s\n' "$protected" | /usr/bin/grep -q '^argument_count=4$'
+printf '%s\n' "$protected" | /usr/bin/grep -q '^argument_count=5$'
 printf '%s\n' "$protected" | /usr/bin/grep -q '^argument.1=--root$'
 printf '%s\n' "$protected" | /usr/bin/grep -q '^argument.3=--engine-root-id$'
+printf '%s\n' "$protected" | /usr/bin/grep -q '^argument.5=--read-only$'
 if printf '%s\n' "$protected" | /usr/bin/grep -q -- '--allow-mutations'; then
   printf '%s\n' "protected launcher unexpectedly enabled mutations" >&2
   exit 1

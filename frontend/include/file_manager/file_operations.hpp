@@ -12,6 +12,12 @@
 
 namespace file_manager {
 
+enum class OperationPolicy : std::uint8_t {
+    read_only,
+    ordinary_local,
+    protected_profile,
+};
+
 enum class OperationKind : std::uint8_t {
     create_folder,
     rename_object,
@@ -63,6 +69,8 @@ using OperationFaultCheck = std::function<std::optional<std::error_code>(
 
 class FileOperationService final {
 public:
+    // Ordinary actions carry request-time parent identity; no root grant is held.
+    explicit FileOperationService(OperationPolicy policy);
     FileOperationService(std::filesystem::path protected_root,
                          std::filesystem::path quarantine_root,
                          bool mutations_enabled,
@@ -80,17 +88,20 @@ public:
     [[nodiscard]] bool mutations_enabled() const noexcept {
         return mutations_enabled_;
     }
+    [[nodiscard]] OperationPolicy policy() const noexcept { return policy_; }
     [[nodiscard]] bool undo_available() const noexcept {
         const bool available = undo_.has_value();
         return available;
     }
 
     [[nodiscard]] OperationResult create_folder(
-        const std::filesystem::path& parent);
+        const std::filesystem::path& parent,
+        const ObjectIdentity& expected_parent = {});
     [[nodiscard]] OperationResult rename_object(
         const std::filesystem::path& source,
         const ObjectIdentity& expected,
-        std::string_view new_basename);
+        std::string_view new_basename,
+        const ObjectIdentity& expected_parent = {});
     [[nodiscard]] OperationResult quarantine_object(
         const std::filesystem::path& source,
         const ObjectIdentity& expected);
@@ -117,6 +128,7 @@ private:
         std::filesystem::path current_path{};
         std::filesystem::path original_path{};
         ObjectIdentity identity{};
+        ObjectIdentity parent_identity{};
     };
 
     [[nodiscard]] std::string next_operation_id();
@@ -138,6 +150,7 @@ private:
         const std::filesystem::path& source);
 
     std::filesystem::path protected_root_{};
+    OperationPolicy policy_{OperationPolicy::read_only};
     std::filesystem::path quarantine_root_{};
     bool mutations_enabled_{};
     OperationFaultCheck injected_fault_{};

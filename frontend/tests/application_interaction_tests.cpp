@@ -28,6 +28,36 @@ namespace file_manager {
 
 class ApplicationInteractionProbe final {
   public:
+    static void post_worker(Application& application, std::function<void()> work) {
+        application.post_worker(std::move(work));
+    }
+    static void navigate(Application& application, const std::filesystem::path& path) {
+        application.request_navigation(path, true);
+    }
+    static void attempt_protected_commands(Application& application) {
+        application.capture_transfer(false);
+        application.capture_transfer(true);
+        application.paste_transfer();
+        application.request_quarantine();
+        application.request_quarantine();
+        const std::optional<DirectoryEntry> source = application.selected_entry();
+        if (source) {
+            DirectoryEntry destination{};
+            destination.path = application.location_ / "Documents";
+            destination.identity = observe_identity(destination.path);
+            destination.directory = true;
+            application.request_internal_drop(*source, destination, false);
+            application.request_internal_drop(*source, destination, true);
+        }
+    }
+    static bool has_pending_transfer(const Application& application) {
+        const bool pending = application.pending_transfer_.has_value();
+        return pending;
+    }
+    static bool local_actions_available(const Application& application) {
+        const bool available = application.local_action_scope_active();
+        return available;
+    }
     static void post_ui(Application& application, std::function<void()> work) {
         application.post_ui(std::move(work));
     }
@@ -4491,10 +4521,194 @@ void test_installed_daily_navigation_when_requested() {
     (*application).stop();
 }
 
+void test_ordinary_local_actions_outside_launch_root() {
+    TemporaryTree fixture{};
+    const std::filesystem::path launch = fixture.root() / "Documents";
+    const std::filesystem::path repository_marker = fixture.root() / ".git";
+    std::filesystem::create_directory(repository_marker);
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(launch, std::nullopt,
+            file_manager::OperationPolicy::ordinary_local, std::string{});
+    ApplicationStopGuard guard{*application};
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
+    (*application).bind_host(host_noop, host_noop);
+    (*window).perform_layout();
+    const std::shared_ptr<gui_forms::ObjectView> objects = std::dynamic_pointer_cast<gui_forms::ObjectView>(
+        (*window).find("fm.objects.current-folder"));
+    const std::shared_ptr<gui_forms::TextBox> rename = std::dynamic_pointer_cast<gui_forms::TextBox>(
+        (*window).find("fm.operations.rename"));
+    require(objects && rename, "ordinary fixture must expose file and rename controls");
+    file_manager::ApplicationInteractionProbe::navigate(*application, fixture.root());
+    struct NamedEntryReady final {
+        const gui_forms::ObjectView& objects;
+        std::string_view name{};
+        bool expected{};
+        bool operator()() const {
+            const bool present = has_object_named(objects, name);
+            const bool ready = present == expected;
+            return ready;
+        }
+    };
+    require_eventually(*application, NamedEntryReady{*objects, "root.txt", true},
+        "ordinary navigation must leave launch root and enumerate repository contents");
+    const std::shared_ptr<gui_forms::Command> create =
+        file_manager::ApplicationInteractionProbe::command(*application, "file.new-folder");
+    const std::shared_ptr<gui_forms::Command> undo =
+        file_manager::ApplicationInteractionProbe::command(*application, "edit.undo");
+    require(create && undo && (*create).state().enabled,
+        "ordinary New Folder must be available without quarantine or services");
+    const bool create_executed = (*create).execute("fixture.ordinary.new-folder");
+    require(create_executed, "ordinary New Folder command must execute");
+    require_eventually(*application, NamedEntryReady{*objects, "New folder", true},
+        "ordinary folder must appear outside the launch root");
+    require((*rename).visible() && (*rename).text() == "New folder",
+        "new folder outside launch root must retain selection and begin naming");
+    const bool escaped = (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::escape});
+    require(escaped && !(*rename).visible(), "Escape must end automatic folder naming");
+    const bool create_undone = (*undo).execute("fixture.ordinary.undo-create");
+    require(create_undone, "ordinary folder undo command must execute");
+    require_eventually(*application, NamedEntryReady{*objects, "New folder", false},
+        "ordinary folder undo must refresh the displayed directory");
+
+    const std::filesystem::path source = fixture.root() / "root.txt";
+    const std::filesystem::path destination = fixture.root() / "ordinary.txt";
+    const file_manager::ObjectIdentity identity = file_manager::observe_identity(source);
+    const std::string id = object_id(*objects, "root.txt");
+    const bool selected = (*window).perform_semantic_action(id, gui_forms::SemanticAction::select);
+    require(selected, "ordinary rename source must select");
+    for (const std::string_view command_id : {"selection.copy", "selection.move", "selection.paste", "selection.delete"}) {
+        const std::shared_ptr<gui_forms::Command> command =
+            file_manager::ApplicationInteractionProbe::command(*application, command_id);
+        require(command && !(*command).state().enabled && !(*command).state().availability_reason.empty(),
+            "ordinary transfer/delete commands must remain unavailable with reasons");
+    }
+    file_manager::ApplicationInteractionProbe::attempt_protected_commands(*application);
+    require(!file_manager::ApplicationInteractionProbe::has_pending_transfer(*application) &&
+            file_manager::observe_identity(source) == identity,
+        "direct protected command methods must not gain ordinary mutation authority");
+    const bool rename_opened = (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::f2});
+    require(rename_opened && (*rename).selected_text() == "root", "ordinary F2 must select the basename");
+    const bool typed = (*window).dispatch_text({"ordinary"});
+    const bool committed = (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::enter});
+    require(typed && committed, "ordinary rename must accept text and Enter");
+    require_eventually(*application, NamedEntryReady{*objects, "ordinary.txt", true},
+        "ordinary rename must publish refreshed name");
+    require((*objects).selected_id() == id && file_manager::observe_identity(destination) == identity,
+        "ordinary rename outside launch root must preserve selection and filesystem identity");
+    const bool rename_undone = (*undo).execute("fixture.ordinary.undo-rename");
+    require(rename_undone, "ordinary rename Undo must execute");
+    require_eventually(*application, NamedEntryReady{*objects, "root.txt", true},
+        "ordinary rename Undo must restore original name");
+    require(file_manager::observe_identity(source) == identity,
+        "ordinary rename Undo must restore the exact source");
+    const std::shared_ptr<gui_forms::PropertyList> properties = std::dynamic_pointer_cast<gui_forms::PropertyList>(
+        (*window).find("fm.selection.properties"));
+    require(properties != nullptr, "ordinary Name property must exist");
+    const std::shared_ptr<gui_forms::TextBox> name_editor = std::dynamic_pointer_cast<gui_forms::TextBox>(
+        (*properties).editor("fm.property.name"));
+    require(name_editor && (*name_editor).enabled(), "ordinary Name property must be editable");
+    const bool property_focused = (*window).request_focus(name_editor);
+    (*name_editor).select_all();
+    const bool property_typed = (*window).dispatch_text({"property.txt"});
+    const bool property_committed = (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::enter});
+    require(property_focused && property_typed && property_committed,
+        "ordinary property rename must accept normal keyboard editing");
+    require_eventually(*application, NamedEntryReady{*objects, "property.txt", true},
+        "ordinary property rename must publish its result");
+    const bool property_undone = (*undo).execute("fixture.ordinary.undo-property");
+    require(property_undone, "ordinary property rename must grant Undo");
+    require_eventually(*application, NamedEntryReady{*objects, "root.txt", true},
+        "ordinary property rename Undo must restore the source");
+
+    // Construction at actual Home observes authority only; all mutations above
+    // remain inside generated fixture data. Windows Home is a known-folder API.
+    const std::filesystem::path home = file_manager::user_home_directory();
+    const std::shared_ptr<file_manager::Application> home_application =
+        std::make_shared<file_manager::Application>(home, std::nullopt,
+            file_manager::OperationPolicy::ordinary_local, std::string{});
+    ApplicationStopGuard home_guard{*home_application};
+    require(file_manager::ApplicationInteractionProbe::local_actions_available(*home_application),
+        "ordinary construction at Home must admit local actions without a root grant");
+    const std::shared_ptr<file_manager::Application> readonly_application =
+        std::make_shared<file_manager::Application>(fixture.root(), std::nullopt,
+            file_manager::OperationPolicy::read_only, std::string{});
+    ApplicationStopGuard readonly_guard{*readonly_application};
+    require(!file_manager::ApplicationInteractionProbe::local_actions_available(*readonly_application),
+        "explicit read-only construction must not admit local actions");
+}
+
+struct OrdinaryWorkerGate final {
+    std::atomic<bool> entered{};
+    std::atomic<bool> released{};
+    void wait() {
+        entered.store(true);
+        while (!released.load()) std::this_thread::sleep_for(1ms);
+    }
+    bool ready() const {
+        const bool value = entered.load();
+        return value;
+    }
+};
+
+struct ReleaseOrdinaryWorker final {
+    std::shared_ptr<OrdinaryWorkerGate> gate{};
+    ~ReleaseOrdinaryWorker() { (*gate).released.store(true); }
+};
+
+void test_ordinary_queued_parent_identity() {
+    TemporaryTree fixture{};
+    const std::filesystem::path parent = fixture.root() / "Documents";
+    const std::filesystem::path held = fixture.root() / "Pictures" / "Held";
+    const std::filesystem::path replacement_folder = parent / "New folder";
+    const std::filesystem::path held_folder = held / "New folder";
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(parent, std::nullopt,
+            file_manager::OperationPolicy::ordinary_local, std::string{});
+    ApplicationStopGuard guard{*application};
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
+    (*application).bind_host(host_noop, host_noop);
+    const std::shared_ptr<gui_forms::ObjectView> objects = std::dynamic_pointer_cast<gui_forms::ObjectView>(
+        (*window).find("fm.objects.current-folder"));
+    const std::shared_ptr<gui_forms::Label> status = std::dynamic_pointer_cast<gui_forms::Label>(
+        (*window).find("file-manager-app.shell.status.ready"));
+    require(objects && status, "queued ordinary fixture controls must exist");
+    require_eventually(*application, ObjectNamed{*objects, "inside.txt"},
+        "queued ordinary fixture must enumerate");
+    const std::shared_ptr<OrdinaryWorkerGate> gate = std::make_shared<OrdinaryWorkerGate>();
+    const ReleaseOrdinaryWorker release{gate};
+    // Both callbacks retain the gate. The release guard runs before application
+    // shutdown even when an assertion throws, so the existing worker can drain.
+    file_manager::ApplicationInteractionProbe::post_worker(*application,
+        std::bind_front(&OrdinaryWorkerGate::wait, gate));
+    require_eventually(*application, std::bind_front(&OrdinaryWorkerGate::ready, gate),
+        "existing application worker must reach the test gate");
+    const std::shared_ptr<gui_forms::Command> create =
+        file_manager::ApplicationInteractionProbe::command(*application, "file.new-folder");
+    require(create != nullptr, "queued ordinary New Folder command must exist");
+    const bool requested = (*create).execute("fixture.ordinary.queued-parent");
+    require(requested, "ordinary command must be requested before parent replacement");
+    std::filesystem::rename(parent, held);
+    std::filesystem::create_directory(parent);
+    (*gate).released.store(true);
+    struct ParentRefused final {
+        const gui_forms::Label& status;
+        bool operator()() const {
+            const bool refused = status.text() == "Operation refused · parent_identity_changed";
+            return refused;
+        }
+    };
+    require_eventually(*application, ParentRefused{*status},
+        "queued ordinary action must reject the request-time parent replacement");
+    require(!std::filesystem::exists(replacement_folder) && !std::filesystem::exists(held_folder),
+        "queued refusal must not create in either the replacement or moved parent");
+}
+
 } // namespace
 
 int main() {
     try {
+        test_ordinary_local_actions_outside_launch_root();
+        test_ordinary_queued_parent_identity();
         test_stop_during_ui_drain_revokes_remaining_callbacks();
         test_application_controls_navigate_real_directories();
         test_details_headers_sort_without_opening_objects();

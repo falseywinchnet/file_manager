@@ -66,7 +66,7 @@ case "$mode" in
     protected_root="$codex_runs/fmsandbox"
     [ -d "$protected_root" ] ||
       fail "protected dogfood root is missing: $protected_root"
-    set -- --root "$protected_root" --engine-root-id fm1-contained
+    set -- --root "$protected_root" --engine-root-id fm1-contained --read-only
     ;;
   mutation-sandbox)
     protected_root="$codex_runs/fmsandbox"

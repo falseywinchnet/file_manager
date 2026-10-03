@@ -42,6 +42,10 @@ public:
                 std::optional<std::filesystem::path> quarantine_root,
                 bool mutations_enabled,
                 std::string engine_root_id);
+    Application(std::filesystem::path launch_root,
+                std::optional<std::filesystem::path> quarantine_root,
+                OperationPolicy policy,
+                std::string engine_root_id);
     ~Application();
 
     Application(const Application&) = delete;
@@ -359,6 +363,7 @@ private:
     [[nodiscard]] std::string navigation_label(
         const std::filesystem::path& root) const;
     [[nodiscard]] bool mutation_scope_active() const;
+    [[nodiscard]] bool local_action_scope_active() const;
     [[nodiscard]] bool engine_search_available() const;
     void set_status(std::string text, std::string summary);
     void update_browsing_status();

@@ -58,6 +58,11 @@ remain unavailable, deferred, negotiating, or stubbed.
 
 ## Windows development consumption receipt (2026-09-29)
 
+Ordinary first-party New Folder/Rename development is reconciled in
+[FRONTEND_ORDINARY_LOCAL_ACTIONS.md](FRONTEND_ORDINARY_LOCAL_ACTIONS.md).
+This separates local actions from the protected fixture profile without adding
+an Engine grant, plugin capability, wire operation, or a daily-use acceptance claim.
+
 Existing per-row object/revision fields have the development source projection
 in [FRONTEND_SEARCH_SOURCE_RECORDS.md](FRONTEND_SEARCH_SOURCE_RECORDS.md).
 It preserves observations separately from filesystem authority; it does not
