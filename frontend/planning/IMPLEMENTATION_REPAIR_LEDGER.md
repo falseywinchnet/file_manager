@@ -28,6 +28,15 @@ layout only, not paint or complete input latency. See
 raw results and integration status. Prepared-window shaping/adoption and
 broader preview formats remain separate work.
 
+**Current wrapping follow-up:** the synchronous preview wrapper now reuses exact
+short candidate widths within one paragraph call. The 64 KiB repeated-word,
+seven-line HarfBuzz fixture improves from 6.232 ms to 0.756 ms median; the
+unbroken-word fixture retains substantial whole-word cost. Four toolkit suites
+and both active frontend application suites pass. See
+`../../gui_forms/results/2026-10-03-label-wrap-reuse/README.md` for raw paired
+measurements, correctness, review and the remaining native acceptance. This is
+wrapping work, not measured full-frame or input latency.
+
 The dated entries below retain historical checkpoints and pending states;
 the latest delivery/source paragraphs above take precedence.
 

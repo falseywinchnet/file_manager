@@ -28,7 +28,9 @@ BindingValue picture_box_size_mode_value(PictureBoxSizeMode mode);
                                 ContentAlignment alignment) noexcept;
 // Zero admits all lines. A positive limit returns the exact unlimited prefix
 // and stops resolving widths once that many complete lines are available.
-// The resolver is borrowed synchronously and is never retained.
+// The resolver is borrowed synchronously and is never retained. It supplies
+// stable metrics for identical bytes during a call; short repeated candidates
+// may reuse an exact previously resolved width within the paragraph traversal.
 [[nodiscard]] std::vector<std::string> label_lines(
     std::string_view text, FontSpec font, double width, TextWrapping wrapping,
     std::size_t maximum_lines = 0U);

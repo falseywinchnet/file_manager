@@ -981,6 +981,76 @@ struct LabelGraphemeWidth final {
     }
 };
 
+struct CountingGraphemeWidth final {
+    std::size_t& calls;
+    double advance{};
+
+    double operator()(const std::string_view text) const {
+        ++calls;
+        const TextStore store(text);
+        const GraphemeIndex count = store.grapheme_count();
+        const double width = static_cast<double>(count.value()) * advance;
+        return width;
+    }
+};
+
+void test_label_wrapping_reuses_widths_only_within_the_current_call() {
+    const FontSpec font{};
+    std::string source{};
+    source.reserve(4096U);
+    for (std::size_t index = 0U; index < 256U; ++index) { source.append("one two three x "); }
+    std::size_t calls{};
+    const TextWidthResolver first{CountingGraphemeWidth{calls, 10.0}};
+    const std::vector<std::string> lines = label_lines(
+        source, font, 90.0, TextWrapping::word, first, 7U);
+    const std::vector<std::string> expected{
+        "one two", "three x", "one two", "three x", "one two", "three x", "one two"};
+    require(lines == expected, "reused widths must preserve the exact wrapped lines");
+    require(calls <= 10U, "repeated short candidates must not be reshaped for each visible line");
+
+    // A new invocation can use a different font/provider. It must not inherit
+    // widths from the previous call, including for identical source bytes.
+    calls = 0U;
+    const TextWidthResolver second{CountingGraphemeWidth{calls, 20.0}};
+    const std::vector<std::string> changed = label_lines(
+        source, font, 90.0, TextWrapping::word, second, 7U);
+    const std::vector<std::string> expected_changed{"one", "two", "thre", "e x", "one", "two", "thre"};
+    require(changed == expected_changed && calls > 0U,
+            "width reuse must not survive a new resolver invocation");
+
+    // More distinct keys than the finite cache can retain, followed by a
+    // repeated old key, exercise eviction without making it a content limit.
+    std::string distinct{};
+    distinct.reserve(512U);
+    std::vector<std::string> expected_distinct{};
+    expected_distinct.reserve(81U);
+    for (std::size_t index = 0U; index < 80U; ++index) {
+        const std::string number = std::to_string(index);
+        std::string word("w");
+        word.append(number);
+        distinct.append(word);
+        distinct.push_back(' ');
+        expected_distinct.push_back(std::move(word));
+    }
+    distinct.append("w0");
+    expected_distinct.emplace_back("w0");
+    const std::vector<std::string> evicted = label_lines(
+        distinct, font, 30.0, TextWrapping::word, first);
+    require(evicted == expected_distinct,
+            "evicting remembered widths must preserve unlimited distinct-word coverage");
+
+    const std::string boundary(128U, 'a');
+    const std::string beyond(129U, 'a');
+    std::string long_source = boundary;
+    long_source.push_back(' ');
+    long_source.append(beyond);
+    const std::vector<std::string> long_lines = label_lines(
+        long_source, font, 1280.0, TextWrapping::word, first);
+    const std::vector<std::string> expected_long{boundary, boundary, "a"};
+    require(long_lines == expected_long,
+            "long cache keys must fall through without clipping source or splitting graphemes differently");
+}
+
 void test_label_wrapping_reuses_live_text_without_retaining_paragraph_storage() {
     const FontSpec font{};
     const TextWidthResolver resolve_width{LabelGraphemeWidth{}};
@@ -1658,6 +1728,7 @@ int main() {
         test_fixed_label_text_is_paint_only();
         test_fixed_label_measurement_does_not_resolve_unused_text();
         test_label_multiline_wrapping_and_alignment();
+        test_label_wrapping_reuses_widths_only_within_the_current_call();
         test_label_wrapping_reuses_live_text_without_retaining_paragraph_storage();
         test_label_line_limit_bounds_hidden_wrapping_work();
         test_label_line_limit_preserves_unlimited_prefix();
