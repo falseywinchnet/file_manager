@@ -1,0 +1,35 @@
+Start testing: Oct 03 01:26 Pacific Daylight Time
+----------------------------------------------------------
+31/76 Testing: gui_forms_prepared_window_shape_preview_verify
+31/76 Test: gui_forms_prepared_window_shape_preview_verify
+Command: "C:/Users/Shadow/file_manager/.build/prepared-window-input/gui_forms_prepared_window_shape_bench.exe" "--fonts" "C:/Users/Shadow/file_manager/gui_forms/assets/fonts" "--scene" "preview-seven" "--verify-only"
+Directory: C:/Users/Shadow/file_manager/.build/prepared-window-input
+"gui_forms_prepared_window_shape_preview_verify" start time: Oct 03 01:26 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+Exact geometry, retained rows, coverage, width and empty-EOF fixtures passed; no timings run
+<end of output>
+Test time =   0.30 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_prepared_window_shape_preview_verify" end time: Oct 03 01:26 Pacific Daylight Time
+"gui_forms_prepared_window_shape_preview_verify" time elapsed: 00:00:00
+----------------------------------------------------------
+
+32/76 Testing: gui_forms_prepared_window_shape_rows_verify
+32/76 Test: gui_forms_prepared_window_shape_rows_verify
+Command: "C:/Users/Shadow/file_manager/.build/prepared-window-input/gui_forms_prepared_window_shape_bench.exe" "--fonts" "C:/Users/Shadow/file_manager/gui_forms/assets/fonts" "--scene" "window-512" "--verify-only"
+Directory: C:/Users/Shadow/file_manager/.build/prepared-window-input
+"gui_forms_prepared_window_shape_rows_verify" start time: Oct 03 01:26 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+Exact geometry, retained rows, coverage, width and empty-EOF fixtures passed; no timings run
+<end of output>
+Test time =   0.62 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_prepared_window_shape_rows_verify" end time: Oct 03 01:26 Pacific Daylight Time
+"gui_forms_prepared_window_shape_rows_verify" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 01:26 Pacific Daylight Time
