@@ -23,6 +23,9 @@ public:
     static void navigate(Application& application, const std::filesystem::path& path) {
         application.request_navigation(path, true);
     }
+    static const std::filesystem::path& location(const Application& application) {
+        return application.location_;
+    }
     static std::shared_ptr<gui_forms::Command> command(const Application& application,
                                                        const std::string_view id) {
         for (const std::shared_ptr<gui_forms::Command>& command : application.commands_) {
@@ -303,13 +306,126 @@ void test_transfer_cancellation(const bool move) {
     (*application).stop();
     fixture.cleanup();
 }
+
+enum class NewFolderCase { commit_name, cancel_name, navigate_queued, navigate_after_create, edit_location_after_create };
+
+struct RenameVisible final {
+    const gui_forms::TextBox& editor;
+    bool operator()() const { return editor.visible(); }
+};
+struct LocationReady final {
+    const file_manager::Application& application;
+    const fs::path& expected;
+    bool operator()() const {
+        const bool ready = Probe::location(application) == expected;
+        return ready;
+    }
+};
+struct ObjectNamed final {
+    const gui_forms::ObjectView& objects;
+    std::string name{};
+    bool operator()() const {
+        for (const gui_forms::ObjectViewItem& item : objects.items()) {
+            if (item.name == name) return true;
+        }
+        return false;
+    }
+};
+
+void test_new_folder_naming(const NewFolderCase scenario) {
+    Fixture fixture{};
+    fixture.create();
+    const fs::path occupied = fixture.root() / "New folder";
+    fs::create_directory(occupied);
+    const file_manager::ObjectIdentity occupied_identity = file_manager::observe_identity(occupied);
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(fixture.root(), fixture.quarantine(), true, "");
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
+    StopApplication stop(*application);
+    (*application).bind_host(noop, noop);
+    (*window).resize({800.0, 600.0});
+    const std::shared_ptr<gui_forms::ObjectView> objects = std::dynamic_pointer_cast<gui_forms::ObjectView>(
+        (*window).find("fm.objects.current-folder"));
+    const std::shared_ptr<gui_forms::TextBox> rename = std::dynamic_pointer_cast<gui_forms::TextBox>(
+        (*window).find("fm.operations.rename"));
+    const std::shared_ptr<gui_forms::Command> create = Probe::command(*application, "file.new-folder");
+    const std::shared_ptr<gui_forms::Command> undo = Probe::command(*application, "edit.undo");
+    const std::shared_ptr<gui_forms::Command> focus_location = Probe::command(*application, "go.location");
+    const std::shared_ptr<gui_forms::TextBox> location = std::dynamic_pointer_cast<gui_forms::TextBox>(
+        (*window).find("fm.path.editor"));
+    require(objects && rename && create && undo && location && focus_location, "new-folder controls absent");
+    wait_for(*application, SourceListed{*objects}, "new-folder listing timed out");
+    const bool navigating = scenario == NewFolderCase::navigate_queued ||
+        scenario == NewFolderCase::navigate_after_create;
+    const std::shared_ptr<WorkerGate> gate = std::make_shared<WorkerGate>();
+    ReleaseGate release(gate);
+    if (scenario == NewFolderCase::navigate_queued) {
+        Probe::post_worker(*application, GateWork{gate});
+        wait_for(*application, GateStarted{*gate}, "new-folder gate did not start");
+    }
+    const bool requested = (*create).execute("fixture.new-folder");
+    require(requested, "New folder command refused");
+    if (scenario == NewFolderCase::navigate_after_create || scenario == NewFolderCase::edit_location_after_create) {
+        // Creation precedes this barrier; its refresh remains behind it.
+        Probe::post_worker(*application, GateWork{gate});
+        wait_for(*application, GateStarted{*gate}, "created-folder gate did not start");
+        (*application).drain_ui();
+        require(fs::exists(fixture.root() / "New folder 2") && !(*rename).visible(),
+            "created folder must await the authoritative refreshed listing");
+    }
+    const fs::path created = fixture.root() / "New folder 2";
+    if (navigating) {
+        Probe::navigate(*application, fixture.destination());
+        (*gate).release();
+        wait_for(*application, LocationReady{*application, fixture.destination()}, "newer navigation was lost");
+        require(fs::is_directory(created) && !(*rename).visible() && !(*gate).expired(),
+            "completed creation must preserve newer navigation without opening an editor");
+    } else if (scenario == NewFolderCase::edit_location_after_create) {
+        const bool focused = (*focus_location).execute("fixture.new-folder.focus-location");
+        const bool typed = (*window).dispatch_text({"draft path"});
+        require(focused && typed && (*window).focused_control() == location, "location editor did not receive focus");
+        (*gate).release();
+        wait_for(*application, ObjectNamed{*objects, "New folder 2"}, "new-folder refresh timed out during location editing");
+        require(!(*rename).visible() && (*window).focused_control() == location && (*location).text() == "draft path",
+            "new-folder naming must not steal an active text editor's focus or contents");
+    } else {
+        wait_for(*application, RenameVisible{*rename}, "created folder did not open its name editor");
+        const file_manager::ObjectIdentity created_identity = file_manager::observe_identity(created);
+        require(created_identity.available() && (*rename).text() == "New folder 2" &&
+            (*rename).selected_text() == "New folder 2" && (*window).focused_control() == rename &&
+            (*objects).selected_ids().size() == 1U, "new folder name must be fully selected and focused");
+        if (scenario == NewFolderCase::commit_name) {
+            const bool typed = (*window).dispatch_text({"Project notes"});
+            const bool committed = (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::enter});
+            require(typed && committed, "new folder name entry failed");
+            wait_for(*application, ObjectNamed{*objects, "Project notes"}, "named folder refresh timed out");
+            const fs::path renamed = fixture.root() / "Project notes";
+            require(file_manager::observe_identity(renamed) == created_identity && !fs::exists(created),
+                "naming must rename the exact created directory");
+        } else {
+            const bool cancelled = (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::escape});
+            require(cancelled && !(*rename).visible() && (*window).focused_control() == objects &&
+                file_manager::observe_identity(created) == created_identity && (*undo).state().enabled,
+                "Escape must retain the default-named folder and creation undo");
+        }
+    }
+    require(file_manager::observe_identity(occupied) == occupied_identity,
+        "New folder naming must preserve the preexisting directory");
+    (*application).stop();
+    fixture.cleanup();
+}
 }
 
 int main() {
     try {
         test_transfer_cancellation(false);
         test_transfer_cancellation(true);
-        std::cout << "Application transfer cancellation tests passed\n";
+        test_new_folder_naming(NewFolderCase::commit_name);
+        test_new_folder_naming(NewFolderCase::cancel_name);
+        test_new_folder_naming(NewFolderCase::navigate_queued);
+        test_new_folder_naming(NewFolderCase::navigate_after_create);
+        test_new_folder_naming(NewFolderCase::edit_location_after_create);
+        std::cout << "Application transfer and new-folder tests passed\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

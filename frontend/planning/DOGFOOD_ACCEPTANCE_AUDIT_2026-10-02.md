@@ -4,12 +4,18 @@ Status: **ACTIVE; first source pass, not a completed whole-product audit**.
 
 ## Current checkpoint — 2026-10-02
 
-**Latest delivery, 2026-10-03 UTC:** `v0.001-alpha.8a13ba1` is the downloadable
-Windows/macOS/Linux checkpoint. It includes worker-side search preparation and
-provider coverage/currentness disclosure, plus the earlier TXT/PNG and Details
-repairs. Both native matrices passed; archives were independently verified and
-the Mac text screenshot reviewed. The exact source/tree/release evidence is in
-`../results/2026-10-03-search-coverage/README.md`.
+**Latest delivery, 2026-10-03 UTC:** `v0.001-alpha.1371514` is the downloadable
+Windows/macOS/Linux checkpoint. It adds cancellable staged copying, explicit
+terminal/cleanup reporting, basename-first rename and native no-replace
+publication to the earlier search coverage, TXT/PNG and Details repairs. Both
+native matrices passed; archive contents/checksums were independently verified.
+Native Mac quarantine/xattr equivalence passed. Exact source/tree/release and
+visual-evidence limits are in `../results/2026-10-03-cancellable-copy/DELIVERY.md`.
+
+**Current development:** New Folder now offers naming after its created identity
+appears in a refreshed listing, with navigation/edit retirement. Five assembled
+application cases and the full Windows suite pass; native acceptance remains
+pending. See `../results/2026-10-03-new-folder/README.md`.
 
 The initial tables below describe the original audit baseline. Current source
 does have a Show/Hide preview control, a separate text coverage caption, four
@@ -22,8 +28,8 @@ The latest native Windows diagnostic is
 `../results/2026-10-03-native-paint/README.md`: settled small-control repaints are
 under 1 ms in a short local run, while full-window presentations remain roughly
 26–41 ms after the first frame. It provides no physical-input or Mac speed claim.
-The next operations priority is enforcing the existing no-overwrite publication
-law, followed by bounded cancellable regular-file copy and visible progress.
+No-replace publication and bounded cancellable regular-file copy are now in the
+download above. Visible byte progress and the broader operation gaps remain.
 
 The initial register and first-repair narrative below retain baseline evidence.
 Preview release `v0.001-alpha.b1986ad` is published for Windows, macOS arm64 and

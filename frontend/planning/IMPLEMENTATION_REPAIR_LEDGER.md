@@ -18,6 +18,16 @@ Current product acceptance is tracked in
 This is an extension of the repair register, not a declaration that earlier
 rows are all solved or that the audit is exhaustive.
 
+**2026-10-03 repair checkpoint:** no-replace publication, rename basename/no-op
+behavior and cancellable staged copying passed native Windows/macOS/Linux
+matrices and are published as `v0.001-alpha.1371514`. See
+`../results/2026-10-03-cancellable-copy/DELIVERY.md`. New Folder's missing immediate
+naming offer is now implemented with identity-bound refresh and supersession of
+deferred focus; five application cases and all 15 Windows suites pass. Native
+acceptance and physical-input/visual dogfood remain pending in
+`../results/2026-10-03-new-folder/README.md`. The historical state below is not
+the latest checkout/release description.
+
 This file is the durable handoff for ongoing implementation. Update it before
 and after every material repair so conversation compaction cannot erase why a
 change exists, what has actually been proved, or what remains unresolved.

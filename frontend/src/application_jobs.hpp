@@ -693,17 +693,19 @@ struct Application::PlatformCommandWork final {
 struct Application::CreateFolderReady final {
     std::shared_ptr<Application> self{};
     OperationResult result{};
+    CreateFolderContext context{};
     void operator()() {
-        (*self).apply_operation(std::move(result));
+        (*self).apply_created_folder(std::move(result), context);
     }
 };
 
 struct Application::CreateFolderWork final {
     std::shared_ptr<Application> self{};
     std::filesystem::path parent{};
+    CreateFolderContext context{};
     void operator()() const {
         OperationResult result = (*(*self).operations_).create_folder(parent);
-        (*self).post_ui(CreateFolderReady{self, std::move(result)});
+        (*self).post_ui(CreateFolderReady{self, std::move(result), context});
     }
 };
 
