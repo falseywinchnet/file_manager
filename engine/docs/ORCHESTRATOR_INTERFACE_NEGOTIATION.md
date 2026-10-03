@@ -952,9 +952,12 @@ The transport must account for the actual response envelope before claiming
 the response-byte limit; the current Service.Query signature alone cannot do so.
 
 **OBSERVED evidence:** the private exhaustive oracle exists; two bounded-reader
-variants were rejected for exact-lookup regression. A separately dispatched
-bounded accessor is now being measured, with shared format decoding and the
-legacy path free of optional budget dispatch. No successful result is assumed.
+variants were rejected for exact-lookup regression. The separately dispatched
+bounded accessor also failed to establish its no-regression gate and was removed;
+`../results/BOUNDED_SCAN_READER_2026-10-03.md` preserves that experiment.
+The later same-binary and timer-resolution audit in
+`../results/control-measurement-2026-10-03/README.md` exposes material measurement
+uncertainty without reversing rejection or promoting the capability.
 The root C++ source-record repair retains identity/metadata separately from
 current observations; full evidence/context and native indexed integration are
 still gates. Earlier candidate/rejection records remain intact.
