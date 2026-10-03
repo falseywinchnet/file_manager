@@ -1,0 +1,1306 @@
+﻿2026-10-03T04:01:22.7533705Z Current runner version: '2.337.0'
+2026-10-03T04:01:22.7553608Z ##[group]Runner Image Provisioner
+2026-10-03T04:01:22.7554268Z Hosted Compute Agent
+2026-10-03T04:01:22.7554785Z Version: 20260901.588
+2026-10-03T04:01:22.7555261Z Commit: f88ec8081b781fac6c440065ac7ff9e710ce3d0b
+2026-10-03T04:01:22.7555833Z Build Date: 2026-09-01T19:56:44Z
+2026-10-03T04:01:22.7556388Z Worker ID: {d02ca5fd-48c9-460c-b6f7-13e9c389176a}
+2026-10-03T04:01:22.7556928Z Azure Region: centralus
+2026-10-03T04:01:22.7557361Z ##[endgroup]
+2026-10-03T04:01:22.7558296Z ##[group]Operating System
+2026-10-03T04:01:22.7558757Z Ubuntu
+2026-10-03T04:01:22.7559190Z 24.04.5
+2026-10-03T04:01:22.7559567Z LTS
+2026-10-03T04:01:22.7559955Z ##[endgroup]
+2026-10-03T04:01:22.7560371Z ##[group]Runner Image
+2026-10-03T04:01:22.7560800Z Image: ubuntu-24.04
+2026-10-03T04:01:22.7561316Z Version: 20260927.320.1
+2026-10-03T04:01:22.7562522Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260927.320/images/ubuntu/Ubuntu2404-Readme.md
+2026-10-03T04:01:22.7563707Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260927.320
+2026-10-03T04:01:22.7564389Z ##[endgroup]
+2026-10-03T04:01:22.7565277Z ##[group]GITHUB_TOKEN Permissions
+2026-10-03T04:01:22.7567345Z Contents: read
+2026-10-03T04:01:22.7567807Z Metadata: read
+2026-10-03T04:01:22.7568215Z ##[endgroup]
+2026-10-03T04:01:22.7570396Z Secret source: Actions
+2026-10-03T04:01:22.7571084Z Cache mode: write
+2026-10-03T04:01:22.7571599Z Prepare workflow directory
+2026-10-03T04:01:22.7826115Z Prepare all required actions
+2026-10-03T04:01:22.7866632Z Getting action download info
+2026-10-03T04:01:23.0587007Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-03T04:01:23.1301153Z Download action repository 'actions/setup-go@v5' (SHA:40f1582b2485089dde7abd97c1529aa768e1baff)
+2026-10-03T04:01:23.6840171Z Download action repository 'msys2/setup-msys2@v2' (SHA:ec48f7c5447b3140e2b088413ae3a55687bccb6e)
+2026-10-03T04:01:23.9675166Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+2026-10-03T04:01:24.1539423Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-10-03T04:01:24.5182389Z Complete job name: linux-x64
+2026-10-03T04:01:24.5919735Z ##[group]Run actions/checkout@v4
+2026-10-03T04:01:24.5920754Z with:
+2026-10-03T04:01:24.5921427Z   repository: falseywinchnet/file_manager
+2026-10-03T04:01:24.5927174Z   token: ***
+2026-10-03T04:01:24.5927810Z   ssh-strict: true
+2026-10-03T04:01:24.5928449Z   ssh-user: git
+2026-10-03T04:01:24.5929116Z   persist-credentials: true
+2026-10-03T04:01:24.5929853Z   clean: true
+2026-10-03T04:01:24.5930538Z   sparse-checkout-cone-mode: true
+2026-10-03T04:01:24.5931294Z   fetch-depth: 1
+2026-10-03T04:01:24.5931924Z   fetch-tags: false
+2026-10-03T04:01:24.5932696Z   show-progress: true
+2026-10-03T04:01:24.5933353Z   lfs: false
+2026-10-03T04:01:24.5934082Z   submodules: false
+2026-10-03T04:01:24.5934754Z   set-safe-directory: true
+2026-10-03T04:01:24.5935540Z   allow-unsafe-pr-checkout: false
+2026-10-03T04:01:24.5936443Z ##[endgroup]
+2026-10-03T04:01:24.6756623Z Syncing repository: falseywinchnet/file_manager
+2026-10-03T04:01:24.6759538Z ##[group]Getting Git version info
+2026-10-03T04:01:24.6761219Z Working directory is '/home/runner/work/file_manager/file_manager'
+2026-10-03T04:01:24.6763567Z [command]/usr/bin/git version
+2026-10-03T04:01:24.6932905Z git version 2.55.0
+2026-10-03T04:01:24.6950507Z ##[endgroup]
+2026-10-03T04:01:24.6961121Z Temporarily overriding HOME='/home/runner/work/_temp/f8aa317f-0a4a-4709-a485-b5200f6c48ab' before making global git config changes
+2026-10-03T04:01:24.6964583Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-03T04:01:24.6968974Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/file_manager/file_manager
+2026-10-03T04:01:24.7004245Z Deleting the contents of '/home/runner/work/file_manager/file_manager'
+2026-10-03T04:01:24.7010733Z ##[group]Initializing the repository
+2026-10-03T04:01:24.7015134Z [command]/usr/bin/git init /home/runner/work/file_manager/file_manager
+2026-10-03T04:01:24.7123827Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-03T04:01:24.7136341Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-03T04:01:24.7139640Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-03T04:01:24.7144711Z hint: call:
+2026-10-03T04:01:24.7145887Z hint:
+2026-10-03T04:01:24.7147152Z hint: 	git config --global init.defaultBranch <name>
+2026-10-03T04:01:24.7148656Z hint:
+2026-10-03T04:01:24.7150107Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-03T04:01:24.7152413Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-03T04:01:24.7154205Z hint:
+2026-10-03T04:01:24.7155553Z hint: 	git branch -m <name>
+2026-10-03T04:01:24.7156828Z hint:
+2026-10-03T04:01:24.7158441Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-03T04:01:24.7160847Z Initialized empty Git repository in /home/runner/work/file_manager/file_manager/.git/
+2026-10-03T04:01:24.7165163Z [command]/usr/bin/git remote add origin https://github.com/falseywinchnet/file_manager
+2026-10-03T04:01:24.7170376Z ##[endgroup]
+2026-10-03T04:01:24.7172060Z ##[group]Disabling automatic garbage collection
+2026-10-03T04:01:24.7175389Z [command]/usr/bin/git config --local gc.auto 0
+2026-10-03T04:01:24.7205146Z ##[endgroup]
+2026-10-03T04:01:24.7206827Z ##[group]Setting up auth
+2026-10-03T04:01:24.7208581Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-03T04:01:24.7236229Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-03T04:01:24.7514407Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-03T04:01:24.7540273Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-03T04:01:24.7693821Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-03T04:01:24.7717896Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-03T04:01:24.7873133Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-03T04:01:24.7907883Z ##[endgroup]
+2026-10-03T04:01:24.7909111Z ##[group]Fetching the repository
+2026-10-03T04:01:24.7918548Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +bcdbd1e8f3ab547182b743567d089097a28f32d7:refs/remotes/pull/10/merge
+2026-10-03T04:01:27.2321471Z From https://github.com/falseywinchnet/file_manager
+2026-10-03T04:01:27.2322365Z  * [new ref]         bcdbd1e8f3ab547182b743567d089097a28f32d7 -> pull/10/merge
+2026-10-03T04:01:27.2324844Z ##[endgroup]
+2026-10-03T04:01:27.2325600Z ##[group]Determining the checkout info
+2026-10-03T04:01:27.2326554Z ##[endgroup]
+2026-10-03T04:01:27.2333586Z [command]/usr/bin/git sparse-checkout disable
+2026-10-03T04:01:27.2383153Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-03T04:01:27.2414840Z ##[group]Checking out the ref
+2026-10-03T04:01:27.2418150Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/10/merge
+2026-10-03T04:01:27.6472672Z Note: switching to 'refs/remotes/pull/10/merge'.
+2026-10-03T04:01:27.6473113Z 
+2026-10-03T04:01:27.6475261Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-10-03T04:01:27.6476877Z changes and commit them, and you can discard any commits you make in this
+2026-10-03T04:01:27.6477503Z state without impacting any branches by switching back to a branch.
+2026-10-03T04:01:27.6478295Z 
+2026-10-03T04:01:27.6478617Z If you want to create a new branch to retain commits you create, you may
+2026-10-03T04:01:27.6479174Z do so (now or later) by using -c with the switch command. Example:
+2026-10-03T04:01:27.6479490Z 
+2026-10-03T04:01:27.6479687Z   git switch -c <new-branch-name>
+2026-10-03T04:01:27.6479945Z 
+2026-10-03T04:01:27.6480143Z Or undo this operation with:
+2026-10-03T04:01:27.6480371Z 
+2026-10-03T04:01:27.6480488Z   git switch -
+2026-10-03T04:01:27.6480724Z 
+2026-10-03T04:01:27.6481019Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-10-03T04:01:27.6481361Z 
+2026-10-03T04:01:27.6481773Z HEAD is now at bcdbd1e Merge 3208090f2b9651420b2ab8fb905fe6537a7892cf into 8f20ccaec656c18909bdae27a3316d4b6f4aff05
+2026-10-03T04:01:27.6486139Z ##[endgroup]
+2026-10-03T04:01:27.6522423Z [command]/usr/bin/git log -1 --format=%H
+2026-10-03T04:01:27.6541702Z bcdbd1e8f3ab547182b743567d089097a28f32d7
+2026-10-03T04:01:27.6760010Z ##[group]Run actions/setup-go@v5
+2026-10-03T04:01:27.6760354Z with:
+2026-10-03T04:01:27.6760605Z   go-version-file: engine/go.mod
+2026-10-03T04:01:27.6760842Z   cache: false
+2026-10-03T04:01:27.6761099Z   check-latest: false
+2026-10-03T04:01:27.6763324Z   token: ***
+2026-10-03T04:01:27.6763584Z ##[endgroup]
+2026-10-03T04:01:27.7725443Z Setup go version spec 1.24
+2026-10-03T04:01:27.7953291Z Found in cache @ /opt/hostedtoolcache/go/1.24.13/x64
+2026-10-03T04:01:27.7956036Z (node:2088) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-03T04:01:27.7956897Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-03T04:01:27.7958613Z Added go to the path
+2026-10-03T04:01:27.7961301Z Successfully set up Go version 1.24
+2026-10-03T04:01:28.7628866Z go version go1.24.13 linux/amd64
+2026-10-03T04:01:28.7629167Z 
+2026-10-03T04:01:28.7629639Z ##[group]go env
+2026-10-03T04:01:30.5344973Z AR='ar'
+2026-10-03T04:01:30.5345824Z CC='gcc'
+2026-10-03T04:01:30.5346214Z CGO_CFLAGS='-O2 -g'
+2026-10-03T04:01:30.5346495Z CGO_CPPFLAGS=''
+2026-10-03T04:01:30.5346740Z CGO_CXXFLAGS='-O2 -g'
+2026-10-03T04:01:30.5347005Z CGO_ENABLED='1'
+2026-10-03T04:01:30.5347256Z CGO_FFLAGS='-O2 -g'
+2026-10-03T04:01:30.5347508Z CGO_LDFLAGS='-O2 -g'
+2026-10-03T04:01:30.5347742Z CXX='g++'
+2026-10-03T04:01:30.5347947Z GCCGO='gccgo'
+2026-10-03T04:01:30.5348265Z GO111MODULE=''
+2026-10-03T04:01:30.5348530Z GOAMD64='v1'
+2026-10-03T04:01:30.5348846Z GOARCH='amd64'
+2026-10-03T04:01:30.5349118Z GOAUTH='netrc'
+2026-10-03T04:01:30.5349360Z GOBIN=''
+2026-10-03T04:01:30.5349711Z GOCACHE='/home/runner/.cache/go-build'
+2026-10-03T04:01:30.5350081Z GOCACHEPROG=''
+2026-10-03T04:01:30.5350330Z GODEBUG=''
+2026-10-03T04:01:30.5350641Z GOENV='/home/runner/.config/go/env'
+2026-10-03T04:01:30.5350989Z GOEXE=''
+2026-10-03T04:01:30.5351293Z GOEXPERIMENT=''
+2026-10-03T04:01:30.5351587Z GOFIPS140='off'
+2026-10-03T04:01:30.5351840Z GOFLAGS=''
+2026-10-03T04:01:30.5352866Z GOGCCFLAGS='-fPIC -m64 -pthread -Wl,--no-gc-sections -fmessage-length=0 -ffile-prefix-map=/tmp/go-build3675344568=/tmp/go-build -gno-record-gcc-switches'
+2026-10-03T04:01:30.5353634Z GOHOSTARCH='amd64'
+2026-10-03T04:01:30.5353988Z GOHOSTOS='linux'
+2026-10-03T04:01:30.5354373Z GOINSECURE=''
+2026-10-03T04:01:30.5354706Z GOMOD='/dev/null'
+2026-10-03T04:01:30.5355057Z GOMODCACHE='/home/runner/go/pkg/mod'
+2026-10-03T04:01:30.5355482Z GONOPROXY=''
+2026-10-03T04:01:30.5355815Z GONOSUMDB=''
+2026-10-03T04:01:30.5356169Z GOOS='linux'
+2026-10-03T04:01:30.5356515Z GOPATH='/home/runner/go'
+2026-10-03T04:01:30.5356909Z GOPRIVATE=''
+2026-10-03T04:01:30.5357328Z GOPROXY='https://proxy.golang.org,direct'
+2026-10-03T04:01:30.5357825Z GOROOT='/opt/hostedtoolcache/go/1.24.13/x64'
+2026-10-03T04:01:30.5358335Z GOSUMDB='sum.golang.org'
+2026-10-03T04:01:30.5358743Z GOTELEMETRY='local'
+2026-10-03T04:01:30.5359199Z GOTELEMETRYDIR='/home/runner/.config/go/telemetry'
+2026-10-03T04:01:30.5359690Z GOTMPDIR=''
+2026-10-03T04:01:30.5360386Z GOTOOLCHAIN='auto'
+2026-10-03T04:01:30.5361019Z GOTOOLDIR='/opt/hostedtoolcache/go/1.24.13/x64/pkg/tool/linux_amd64'
+2026-10-03T04:01:30.5361549Z GOVCS=''
+2026-10-03T04:01:30.5361909Z GOVERSION='go1.24.13'
+2026-10-03T04:01:30.5362620Z GOWORK=''
+2026-10-03T04:01:30.5362989Z PKG_CONFIG='pkg-config'
+2026-10-03T04:01:30.5363355Z 
+2026-10-03T04:01:30.5363871Z ##[endgroup]
+2026-10-03T04:01:30.5447338Z ##[group]Run rustup toolchain install stable --profile minimal
+2026-10-03T04:01:30.5447880Z [36;1mrustup toolchain install stable --profile minimal[0m
+2026-10-03T04:01:30.5610903Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-03T04:01:30.5611262Z ##[endgroup]
+2026-10-03T04:01:30.9036023Z info: syncing channel updates for stable-x86_64-unknown-linux-gnu
+2026-10-03T04:01:31.3167897Z info: latest update on 2026-10-01 for version 1.99.0 (b940084d7 2026-09-28)
+2026-10-03T04:01:31.3266190Z info: removing previous version of component rustfmt
+2026-10-03T04:01:31.3384861Z info: removing previous version of component clippy
+2026-10-03T04:01:31.5439689Z info: removing previous version of component cargo
+2026-10-03T04:01:31.5527528Z info: removing previous version of component rust-std
+2026-10-03T04:01:31.5600773Z info: removing previous version of component rustc
+2026-10-03T04:01:31.5729720Z info: downloading 5 components
+2026-10-03T04:01:39.6103687Z 
+2026-10-03T04:01:39.6167332Z   stable-x86_64-unknown-linux-gnu updated - rustc 1.99.0 (b940084d7 2026-09-28) (from rustc 1.98.1 (48a229cea 2026-09-01))
+2026-10-03T04:01:39.6167859Z 
+2026-10-03T04:01:39.6249786Z ##[group]Run sudo apt-get update
+2026-10-03T04:01:39.6250101Z [36;1msudo apt-get update[0m
+2026-10-03T04:01:39.6250714Z [36;1msudo apt-get install -y cmake ninja-build clang generate-ninja pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev xvfb xauth xdg-utils[0m
+2026-10-03T04:01:39.6286149Z shell: /usr/bin/bash -e {0}
+2026-10-03T04:01:39.6286479Z ##[endgroup]
+2026-10-03T04:01:39.7557053Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-10-03T04:01:39.7711793Z Get:6 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
+2026-10-03T04:01:39.7935207Z Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease
+2026-10-03T04:01:39.7946436Z Get:3 http://azure.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+2026-10-03T04:01:39.8020728Z Get:4 http://azure.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
+2026-10-03T04:01:39.8075767Z Get:5 http://azure.archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+2026-10-03T04:01:39.9019240Z Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [458 kB]
+2026-10-03T04:01:39.9178612Z Get:8 https://packages.microsoft.com/ubuntu/24.04/prod noble/main armhf Packages [12.6 kB]
+2026-10-03T04:01:39.9217722Z Get:9 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [511 kB]
+2026-10-03T04:01:39.9915932Z Get:10 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1364 kB]
+2026-10-03T04:01:39.9966892Z Get:11 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [304 kB]
+2026-10-03T04:01:39.9990096Z Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [180 kB]
+2026-10-03T04:01:40.0013715Z Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1699 kB]
+2026-10-03T04:01:40.0063364Z Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [341 kB]
+2026-10-03T04:01:40.0070311Z Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [388 kB]
+2026-10-03T04:01:40.0103784Z Get:16 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1720 kB]
+2026-10-03T04:01:40.0154271Z Get:17 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [394 kB]
+2026-10-03T04:01:40.0173184Z Get:18 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
+2026-10-03T04:01:40.0301920Z Get:19 http://azure.archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [5764 B]
+2026-10-03T04:01:40.0712944Z Get:20 http://azure.archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [12.6 kB]
+2026-10-03T04:01:40.0720480Z Get:21 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [1069 kB]
+2026-10-03T04:01:40.0763415Z Get:22 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [221 kB]
+2026-10-03T04:01:40.0795856Z Get:23 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Components [46.3 kB]
+2026-10-03T04:01:40.0803120Z Get:24 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1216 kB]
+2026-10-03T04:01:40.0850983Z Get:25 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [244 kB]
+2026-10-03T04:01:40.0863348Z Get:26 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Components [76.3 kB]
+2026-10-03T04:01:40.0871847Z Get:27 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [1566 kB]
+2026-10-03T04:01:40.1352896Z Get:28 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [361 kB]
+2026-10-03T04:01:52.3897615Z Fetched 12.6 MB in 1s (10.5 MB/s)
+2026-10-03T04:01:53.1183630Z Reading package lists...
+2026-10-03T04:01:53.1433644Z Reading package lists...
+2026-10-03T04:01:53.3205927Z Building dependency tree...
+2026-10-03T04:01:53.3212357Z Reading state information...
+2026-10-03T04:01:53.4801384Z pkg-config is already the newest version (1.8.1-2build1).
+2026-10-03T04:01:53.4802078Z xvfb is already the newest version (2:21.1.12-1ubuntu1.8).
+2026-10-03T04:01:53.4802788Z xauth is already the newest version (1:1.1.2-1build1).
+2026-10-03T04:01:53.4803175Z xauth set to manually installed.
+2026-10-03T04:01:53.4803555Z xdg-utils is already the newest version (1.1.3-4.1ubuntu3).
+2026-10-03T04:01:53.4803898Z xdg-utils set to manually installed.
+2026-10-03T04:01:53.4804326Z The following additional packages will be installed:
+2026-10-03T04:01:53.4804738Z   cmake-data gir1.2-atk-1.0 gir1.2-atspi-2.0 gir1.2-freedesktop
+2026-10-03T04:01:53.4805321Z   gir1.2-freedesktop-dev gir1.2-glib-2.0-dev libatspi2.0-dev libblkid-dev
+2026-10-03T04:01:53.4805799Z   libdbus-1-dev libgirepository-2.0-0 libglib2.0-dev libglib2.0-dev-bin
+2026-10-03T04:01:53.4806271Z   libjsoncpp25 libmount-dev libpthread-stubs0-dev librhash0 libselinux1-dev
+2026-10-03T04:01:53.4806762Z   libsepol-dev libxau-dev libxcb1-dev libxdmcp-dev libxi-dev libxrender-dev
+2026-10-03T04:01:53.4811931Z   libxtst-dev uuid-dev x11proto-dev xorg-sgml-doctools xtrans-dev
+2026-10-03T04:01:53.4817383Z Suggested packages:
+2026-10-03T04:01:53.4817946Z   cmake-doc cmake-format elpa-cmake-mode libglib2.0-doc libgdk-pixbuf2.0-bin
+2026-10-03T04:01:53.4818417Z   libxml2-utils libx11-doc libxcb-doc libxext-doc
+2026-10-03T04:01:53.5290736Z The following NEW packages will be installed:
+2026-10-03T04:01:53.5291240Z   clang cmake cmake-data generate-ninja gir1.2-atk-1.0 gir1.2-atspi-2.0
+2026-10-03T04:01:53.5293546Z   gir1.2-freedesktop gir1.2-freedesktop-dev gir1.2-glib-2.0-dev
+2026-10-03T04:01:53.5294175Z   libatk-bridge2.0-dev libatk1.0-dev libatspi2.0-dev libblkid-dev
+2026-10-03T04:01:53.5295346Z   libdbus-1-dev libgirepository-2.0-0 libglib2.0-dev libglib2.0-dev-bin
+2026-10-03T04:01:53.5300667Z   libjsoncpp25 libmount-dev libpthread-stubs0-dev librhash0 libselinux1-dev
+2026-10-03T04:01:53.5301271Z   libsepol-dev libx11-dev libxau-dev libxcb1-dev libxcursor-dev libxdmcp-dev
+2026-10-03T04:01:53.5303491Z   libxext-dev libxfixes-dev libxi-dev libxrandr-dev libxrender-dev libxtst-dev
+2026-10-03T04:01:53.5306306Z   ninja-build uuid-dev x11proto-dev xorg-sgml-doctools xtrans-dev
+2026-10-03T04:01:53.5458822Z 0 upgraded, 39 newly installed, 0 to remove and 25 not upgraded.
+2026-10-03T04:01:53.5459585Z Need to get 21.2 MB of archives.
+2026-10-03T04:01:53.5460212Z After this operation, 91.7 MB of additional disk space will be used.
+2026-10-03T04:01:53.5461224Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-10-03T04:01:53.6055068Z Get:2 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 clang amd64 1:18.0-59~exp2 [5846 B]
+2026-10-03T04:01:53.6330125Z Get:3 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libjsoncpp25 amd64 1.9.5-6build1 [82.8 kB]
+2026-10-03T04:01:53.6619156Z Get:4 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 librhash0 amd64 1.4.3-3build1 [129 kB]
+2026-10-03T04:01:53.6903338Z Get:5 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 cmake-data all 3.28.3-1build7 [2155 kB]
+2026-10-03T04:01:53.7353011Z Get:6 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 cmake amd64 3.28.3-1build7 [11.2 MB]
+2026-10-03T04:01:53.8642763Z Get:7 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 generate-ninja amd64 0.0~git20240221.03d10f1-1 [1340 kB]
+2026-10-03T04:01:53.9029929Z Get:8 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 gir1.2-atk-1.0 amd64 2.52.0-1build1 [23.1 kB]
+2026-10-03T04:01:53.9319663Z Get:9 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 gir1.2-freedesktop amd64 1.80.1-1 [49.7 kB]
+2026-10-03T04:01:53.9601021Z Get:10 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 gir1.2-atspi-2.0 amd64 2.52.0-1build1 [19.8 kB]
+2026-10-03T04:01:53.9871603Z Get:11 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 gir1.2-glib-2.0-dev amd64 2.80.0-6ubuntu3.9 [848 kB]
+2026-10-03T04:01:54.0214536Z Get:12 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 gir1.2-freedesktop-dev amd64 1.80.1-1 [28.8 kB]
+2026-10-03T04:01:54.0489441Z Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 libglib2.0-dev-bin amd64 2.80.0-6ubuntu3.9 [138 kB]
+2026-10-03T04:01:54.0767708Z Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 uuid-dev amd64 2.39.3-9ubuntu6.6 [33.5 kB]
+2026-10-03T04:01:54.1043885Z Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 libblkid-dev amd64 2.39.3-9ubuntu6.6 [205 kB]
+2026-10-03T04:01:54.1333887Z Get:16 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libsepol-dev amd64 3.5-2build1 [384 kB]
+2026-10-03T04:01:54.1636215Z Get:17 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 libselinux1-dev amd64 3.5-2ubuntu2.1 [164 kB]
+2026-10-03T04:01:54.1916355Z Get:18 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 libmount-dev amd64 2.39.3-9ubuntu6.6 [14.9 kB]
+2026-10-03T04:01:54.2195736Z Get:19 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 libgirepository-2.0-0 amd64 2.80.0-6ubuntu3.9 [73.5 kB]
+2026-10-03T04:01:54.2939649Z Get:20 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 libglib2.0-dev amd64 2.80.0-6ubuntu3.9 [1860 kB]
+2026-10-03T04:01:54.3369645Z Get:21 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libatk1.0-dev amd64 2.52.0-1build1 [100 kB]
+2026-10-03T04:01:54.3644128Z Get:22 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 libdbus-1-dev amd64 1.14.10-4ubuntu4.1 [190 kB]
+2026-10-03T04:01:54.3933870Z Get:23 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 xorg-sgml-doctools all 1:1.11-1.1 [10.9 kB]
+2026-10-03T04:01:54.4205987Z Get:24 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 x11proto-dev all 2023.2-1 [602 kB]
+2026-10-03T04:01:54.4519988Z Get:25 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libxau-dev amd64 1:1.0.9-1build6 [9570 B]
+2026-10-03T04:01:54.4794099Z Get:26 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libxdmcp-dev amd64 1:1.1.3-0ubuntu6 [26.5 kB]
+2026-10-03T04:01:54.5073577Z Get:27 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 xtrans-dev all 1.4.0-1 [68.9 kB]
+2026-10-03T04:01:54.5350111Z Get:28 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libpthread-stubs0-dev amd64 0.4-1build3 [4746 B]
+2026-10-03T04:01:54.5626886Z Get:29 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libxcb1-dev amd64 1.15-1ubuntu2 [85.8 kB]
+2026-10-03T04:01:54.5903219Z Get:30 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libx11-dev amd64 2:1.8.7-1build1 [732 kB]
+2026-10-03T04:01:54.6236375Z Get:31 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libxext-dev amd64 2:1.3.4-1build2 [83.5 kB]
+2026-10-03T04:01:54.6507799Z Get:32 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libxfixes-dev amd64 1:6.0.0-2build1 [12.1 kB]
+2026-10-03T04:01:54.6785237Z Get:33 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libxi-dev amd64 2:1.8.1-1build1 [194 kB]
+2026-10-03T04:01:54.7133946Z Get:34 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libxtst-dev amd64 2:1.2.3-1.1build1 [15.9 kB]
+2026-10-03T04:01:54.7408732Z Get:35 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libatspi2.0-dev amd64 2.52.0-1build1 [76.2 kB]
+2026-10-03T04:01:54.7685276Z Get:36 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libatk-bridge2.0-dev amd64 2.52.0-1build1 [4284 B]
+2026-10-03T04:01:54.8786742Z Get:37 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libxrender-dev amd64 1:0.9.10-1.1build1 [26.3 kB]
+2026-10-03T04:01:54.9083071Z Get:38 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libxcursor-dev amd64 1:1.2.1-1build1 [31.8 kB]
+2026-10-03T04:01:54.9825351Z Get:39 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libxrandr-dev amd64 2:1.5.2-2build1 [26.4 kB]
+2026-10-03T04:01:55.0100356Z Get:40 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 ninja-build amd64 1.11.1-2 [129 kB]
+2026-10-03T04:01:55.3529092Z Fetched 21.2 MB in 1s (14.4 MB/s)
+2026-10-03T04:01:55.3935459Z Selecting previously unselected package clang.
+2026-10-03T04:01:55.5022771Z (Reading database ... 
+2026-10-03T04:01:55.5023571Z (Reading database ... 5%
+2026-10-03T04:01:55.5024130Z (Reading database ... 10%
+2026-10-03T04:01:55.5024440Z (Reading database ... 15%
+2026-10-03T04:01:55.5024702Z (Reading database ... 20%
+2026-10-03T04:01:55.5024959Z (Reading database ... 25%
+2026-10-03T04:01:55.5025204Z (Reading database ... 30%
+2026-10-03T04:01:55.5025476Z (Reading database ... 35%
+2026-10-03T04:01:55.5025722Z (Reading database ... 40%
+2026-10-03T04:01:55.5026049Z (Reading database ... 45%
+2026-10-03T04:01:55.5026398Z (Reading database ... 50%
+2026-10-03T04:01:55.5747680Z (Reading database ... 55%
+2026-10-03T04:01:56.3399620Z (Reading database ... 60%
+2026-10-03T04:01:57.0996471Z (Reading database ... 65%
+2026-10-03T04:01:57.5004794Z (Reading database ... 70%
+2026-10-03T04:01:57.8653606Z (Reading database ... 75%
+2026-10-03T04:01:58.4129030Z (Reading database ... 80%
+2026-10-03T04:01:59.8889242Z (Reading database ... 85%
+2026-10-03T04:02:00.8638944Z (Reading database ... 90%
+2026-10-03T04:02:02.5240151Z (Reading database ... 95%
+2026-10-03T04:02:02.5240766Z (Reading database ... 100%
+2026-10-03T04:02:02.5241569Z (Reading database ... 202296 files and directories currently installed.)
+2026-10-03T04:02:02.5283693Z Preparing to unpack .../00-clang_1%3a18.0-59~exp2_amd64.deb ...
+2026-10-03T04:02:02.5494034Z Unpacking clang (1:18.0-59~exp2) ...
+2026-10-03T04:02:03.0123398Z Selecting previously unselected package libjsoncpp25:amd64.
+2026-10-03T04:02:03.0233526Z Preparing to unpack .../01-libjsoncpp25_1.9.5-6build1_amd64.deb ...
+2026-10-03T04:02:03.0704276Z Unpacking libjsoncpp25:amd64 (1.9.5-6build1) ...
+2026-10-03T04:02:03.5011132Z Selecting previously unselected package librhash0:amd64.
+2026-10-03T04:02:03.5127444Z Preparing to unpack .../02-librhash0_1.4.3-3build1_amd64.deb ...
+2026-10-03T04:02:03.5483050Z Unpacking librhash0:amd64 (1.4.3-3build1) ...
+2026-10-03T04:02:03.5878879Z Selecting previously unselected package cmake-data.
+2026-10-03T04:02:03.5989363Z Preparing to unpack .../03-cmake-data_3.28.3-1build7_all.deb ...
+2026-10-03T04:02:03.6043900Z Unpacking cmake-data (3.28.3-1build7) ...
+2026-10-03T04:02:04.2559393Z Selecting previously unselected package cmake.
+2026-10-03T04:02:04.2685966Z Preparing to unpack .../04-cmake_3.28.3-1build7_amd64.deb ...
+2026-10-03T04:02:04.2694466Z Unpacking cmake (3.28.3-1build7) ...
+2026-10-03T04:02:04.7979144Z Selecting previously unselected package generate-ninja.
+2026-10-03T04:02:04.8097976Z Preparing to unpack .../05-generate-ninja_0.0~git20240221.03d10f1-1_amd64.deb ...
+2026-10-03T04:02:04.8107437Z Unpacking generate-ninja (0.0~git20240221.03d10f1-1) ...
+2026-10-03T04:02:05.0861622Z Selecting previously unselected package gir1.2-atk-1.0:amd64.
+2026-10-03T04:02:05.0972958Z Preparing to unpack .../06-gir1.2-atk-1.0_2.52.0-1build1_amd64.deb ...
+2026-10-03T04:02:05.0981388Z Unpacking gir1.2-atk-1.0:amd64 (2.52.0-1build1) ...
+2026-10-03T04:02:05.1128148Z Selecting previously unselected package gir1.2-freedesktop:amd64.
+2026-10-03T04:02:05.1235346Z Preparing to unpack .../07-gir1.2-freedesktop_1.80.1-1_amd64.deb ...
+2026-10-03T04:02:05.1243577Z Unpacking gir1.2-freedesktop:amd64 (1.80.1-1) ...
+2026-10-03T04:02:05.1388960Z Selecting previously unselected package gir1.2-atspi-2.0:amd64.
+2026-10-03T04:02:05.1495675Z Preparing to unpack .../08-gir1.2-atspi-2.0_2.52.0-1build1_amd64.deb ...
+2026-10-03T04:02:05.1502702Z Unpacking gir1.2-atspi-2.0:amd64 (2.52.0-1build1) ...
+2026-10-03T04:02:05.1695583Z Selecting previously unselected package gir1.2-glib-2.0-dev:amd64.
+2026-10-03T04:02:05.1802887Z Preparing to unpack .../09-gir1.2-glib-2.0-dev_2.80.0-6ubuntu3.9_amd64.deb ...
+2026-10-03T04:02:05.1811310Z Unpacking gir1.2-glib-2.0-dev:amd64 (2.80.0-6ubuntu3.9) ...
+2026-10-03T04:02:05.2505975Z Selecting previously unselected package gir1.2-freedesktop-dev:amd64.
+2026-10-03T04:02:05.2621019Z Preparing to unpack .../10-gir1.2-freedesktop-dev_1.80.1-1_amd64.deb ...
+2026-10-03T04:02:05.2627737Z Unpacking gir1.2-freedesktop-dev:amd64 (1.80.1-1) ...
+2026-10-03T04:02:05.2782229Z Selecting previously unselected package libglib2.0-dev-bin.
+2026-10-03T04:02:05.2886900Z Preparing to unpack .../11-libglib2.0-dev-bin_2.80.0-6ubuntu3.9_amd64.deb ...
+2026-10-03T04:02:05.2894472Z Unpacking libglib2.0-dev-bin (2.80.0-6ubuntu3.9) ...
+2026-10-03T04:02:05.3204140Z Selecting previously unselected package uuid-dev:amd64.
+2026-10-03T04:02:05.3312255Z Preparing to unpack .../12-uuid-dev_2.39.3-9ubuntu6.6_amd64.deb ...
+2026-10-03T04:02:05.3320580Z Unpacking uuid-dev:amd64 (2.39.3-9ubuntu6.6) ...
+2026-10-03T04:02:05.3535036Z Selecting previously unselected package libblkid-dev:amd64.
+2026-10-03T04:02:05.3640964Z Preparing to unpack .../13-libblkid-dev_2.39.3-9ubuntu6.6_amd64.deb ...
+2026-10-03T04:02:05.3649263Z Unpacking libblkid-dev:amd64 (2.39.3-9ubuntu6.6) ...
+2026-10-03T04:02:05.3972806Z Selecting previously unselected package libsepol-dev:amd64.
+2026-10-03T04:02:05.4079593Z Preparing to unpack .../14-libsepol-dev_3.5-2build1_amd64.deb ...
+2026-10-03T04:02:05.4086735Z Unpacking libsepol-dev:amd64 (3.5-2build1) ...
+2026-10-03T04:02:05.4295769Z Selecting previously unselected package libselinux1-dev:amd64.
+2026-10-03T04:02:05.4402274Z Preparing to unpack .../15-libselinux1-dev_3.5-2ubuntu2.1_amd64.deb ...
+2026-10-03T04:02:05.4409325Z Unpacking libselinux1-dev:amd64 (3.5-2ubuntu2.1) ...
+2026-10-03T04:02:05.4661577Z Selecting previously unselected package libmount-dev:amd64.
+2026-10-03T04:02:05.4766764Z Preparing to unpack .../16-libmount-dev_2.39.3-9ubuntu6.6_amd64.deb ...
+2026-10-03T04:02:05.4773589Z Unpacking libmount-dev:amd64 (2.39.3-9ubuntu6.6) ...
+2026-10-03T04:02:05.5676392Z Selecting previously unselected package libgirepository-2.0-0:amd64.
+2026-10-03T04:02:05.5785866Z Preparing to unpack .../17-libgirepository-2.0-0_2.80.0-6ubuntu3.9_amd64.deb ...
+2026-10-03T04:02:05.5793415Z Unpacking libgirepository-2.0-0:amd64 (2.80.0-6ubuntu3.9) ...
+2026-10-03T04:02:05.5946192Z Selecting previously unselected package libglib2.0-dev:amd64.
+2026-10-03T04:02:05.6055610Z Preparing to unpack .../18-libglib2.0-dev_2.80.0-6ubuntu3.9_amd64.deb ...
+2026-10-03T04:02:05.6063842Z Unpacking libglib2.0-dev:amd64 (2.80.0-6ubuntu3.9) ...
+2026-10-03T04:02:05.7568400Z Selecting previously unselected package libatk1.0-dev:amd64.
+2026-10-03T04:02:05.7678853Z Preparing to unpack .../19-libatk1.0-dev_2.52.0-1build1_amd64.deb ...
+2026-10-03T04:02:05.7686808Z Unpacking libatk1.0-dev:amd64 (2.52.0-1build1) ...
+2026-10-03T04:02:05.7900847Z Selecting previously unselected package libdbus-1-dev:amd64.
+2026-10-03T04:02:05.8036154Z Preparing to unpack .../20-libdbus-1-dev_1.14.10-4ubuntu4.1_amd64.deb ...
+2026-10-03T04:02:05.8044171Z Unpacking libdbus-1-dev:amd64 (1.14.10-4ubuntu4.1) ...
+2026-10-03T04:02:05.8307916Z Selecting previously unselected package xorg-sgml-doctools.
+2026-10-03T04:02:05.8417172Z Preparing to unpack .../21-xorg-sgml-doctools_1%3a1.11-1.1_all.deb ...
+2026-10-03T04:02:05.8423833Z Unpacking xorg-sgml-doctools (1:1.11-1.1) ...
+2026-10-03T04:02:05.8734609Z Selecting previously unselected package x11proto-dev.
+2026-10-03T04:02:05.8843982Z Preparing to unpack .../22-x11proto-dev_2023.2-1_all.deb ...
+2026-10-03T04:02:05.8851346Z Unpacking x11proto-dev (2023.2-1) ...
+2026-10-03T04:02:06.0174744Z Selecting previously unselected package libxau-dev:amd64.
+2026-10-03T04:02:06.0287531Z Preparing to unpack .../23-libxau-dev_1%3a1.0.9-1build6_amd64.deb ...
+2026-10-03T04:02:06.0461119Z Unpacking libxau-dev:amd64 (1:1.0.9-1build6) ...
+2026-10-03T04:02:06.0618067Z Selecting previously unselected package libxdmcp-dev:amd64.
+2026-10-03T04:02:06.0730103Z Preparing to unpack .../24-libxdmcp-dev_1%3a1.1.3-0ubuntu6_amd64.deb ...
+2026-10-03T04:02:06.0738836Z Unpacking libxdmcp-dev:amd64 (1:1.1.3-0ubuntu6) ...
+2026-10-03T04:02:06.0892524Z Selecting previously unselected package xtrans-dev.
+2026-10-03T04:02:06.1001003Z Preparing to unpack .../25-xtrans-dev_1.4.0-1_all.deb ...
+2026-10-03T04:02:06.1008939Z Unpacking xtrans-dev (1.4.0-1) ...
+2026-10-03T04:02:06.1198778Z Selecting previously unselected package libpthread-stubs0-dev:amd64.
+2026-10-03T04:02:06.1306046Z Preparing to unpack .../26-libpthread-stubs0-dev_0.4-1build3_amd64.deb ...
+2026-10-03T04:02:06.1314009Z Unpacking libpthread-stubs0-dev:amd64 (0.4-1build3) ...
+2026-10-03T04:02:06.1455999Z Selecting previously unselected package libxcb1-dev:amd64.
+2026-10-03T04:02:06.1561692Z Preparing to unpack .../27-libxcb1-dev_1.15-1ubuntu2_amd64.deb ...
+2026-10-03T04:02:06.1569926Z Unpacking libxcb1-dev:amd64 (1.15-1ubuntu2) ...
+2026-10-03T04:02:06.1733446Z Selecting previously unselected package libx11-dev:amd64.
+2026-10-03T04:02:06.1839826Z Preparing to unpack .../28-libx11-dev_2%3a1.8.7-1build1_amd64.deb ...
+2026-10-03T04:02:06.1847283Z Unpacking libx11-dev:amd64 (2:1.8.7-1build1) ...
+2026-10-03T04:02:06.2156123Z Selecting previously unselected package libxext-dev:amd64.
+2026-10-03T04:02:06.2262835Z Preparing to unpack .../29-libxext-dev_2%3a1.3.4-1build2_amd64.deb ...
+2026-10-03T04:02:06.2269869Z Unpacking libxext-dev:amd64 (2:1.3.4-1build2) ...
+2026-10-03T04:02:06.2466188Z Selecting previously unselected package libxfixes-dev:amd64.
+2026-10-03T04:02:06.2567237Z Preparing to unpack .../30-libxfixes-dev_1%3a6.0.0-2build1_amd64.deb ...
+2026-10-03T04:02:06.2575369Z Unpacking libxfixes-dev:amd64 (1:6.0.0-2build1) ...
+2026-10-03T04:02:06.2721174Z Selecting previously unselected package libxi-dev:amd64.
+2026-10-03T04:02:06.2830856Z Preparing to unpack .../31-libxi-dev_2%3a1.8.1-1build1_amd64.deb ...
+2026-10-03T04:02:06.2839147Z Unpacking libxi-dev:amd64 (2:1.8.1-1build1) ...
+2026-10-03T04:02:06.3030844Z Selecting previously unselected package libxtst-dev:amd64.
+2026-10-03T04:02:06.3134392Z Preparing to unpack .../32-libxtst-dev_2%3a1.2.3-1.1build1_amd64.deb ...
+2026-10-03T04:02:06.3141928Z Unpacking libxtst-dev:amd64 (2:1.2.3-1.1build1) ...
+2026-10-03T04:02:06.3291884Z Selecting previously unselected package libatspi2.0-dev:amd64.
+2026-10-03T04:02:06.3394936Z Preparing to unpack .../33-libatspi2.0-dev_2.52.0-1build1_amd64.deb ...
+2026-10-03T04:02:06.3402472Z Unpacking libatspi2.0-dev:amd64 (2.52.0-1build1) ...
+2026-10-03T04:02:06.5287216Z Selecting previously unselected package libatk-bridge2.0-dev:amd64.
+2026-10-03T04:02:06.5404919Z Preparing to unpack .../34-libatk-bridge2.0-dev_2.52.0-1build1_amd64.deb ...
+2026-10-03T04:02:06.5413684Z Unpacking libatk-bridge2.0-dev:amd64 (2.52.0-1build1) ...
+2026-10-03T04:02:06.5577516Z Selecting previously unselected package libxrender-dev:amd64.
+2026-10-03T04:02:06.5684555Z Preparing to unpack .../35-libxrender-dev_1%3a0.9.10-1.1build1_amd64.deb ...
+2026-10-03T04:02:06.5691365Z Unpacking libxrender-dev:amd64 (1:0.9.10-1.1build1) ...
+2026-10-03T04:02:06.5839007Z Selecting previously unselected package libxcursor-dev:amd64.
+2026-10-03T04:02:06.5943081Z Preparing to unpack .../36-libxcursor-dev_1%3a1.2.1-1build1_amd64.deb ...
+2026-10-03T04:02:06.5953183Z Unpacking libxcursor-dev:amd64 (1:1.2.1-1build1) ...
+2026-10-03T04:02:06.6148456Z Selecting previously unselected package libxrandr-dev:amd64.
+2026-10-03T04:02:06.6256343Z Preparing to unpack .../37-libxrandr-dev_2%3a1.5.2-2build1_amd64.deb ...
+2026-10-03T04:02:06.6264200Z Unpacking libxrandr-dev:amd64 (2:1.5.2-2build1) ...
+2026-10-03T04:02:06.9094295Z Selecting previously unselected package ninja-build.
+2026-10-03T04:02:06.9203126Z Preparing to unpack .../38-ninja-build_1.11.1-2_amd64.deb ...
+2026-10-03T04:02:06.9211772Z Unpacking ninja-build (1.11.1-2) ...
+2026-10-03T04:02:07.0095843Z Setting up libglib2.0-dev-bin (2.80.0-6ubuntu3.9) ...
+2026-10-03T04:02:07.1448073Z Setting up gir1.2-freedesktop:amd64 (1.80.1-1) ...
+2026-10-03T04:02:07.1466877Z Setting up libgirepository-2.0-0:amd64 (2.80.0-6ubuntu3.9) ...
+2026-10-03T04:02:07.1485767Z Setting up generate-ninja (0.0~git20240221.03d10f1-1) ...
+2026-10-03T04:02:07.1503302Z Setting up gir1.2-atk-1.0:amd64 (2.52.0-1build1) ...
+2026-10-03T04:02:07.1521168Z Setting up gir1.2-atspi-2.0:amd64 (2.52.0-1build1) ...
+2026-10-03T04:02:07.1539627Z Setting up libpthread-stubs0-dev:amd64 (0.4-1build3) ...
+2026-10-03T04:02:07.1559686Z Setting up ninja-build (1.11.1-2) ...
+2026-10-03T04:02:07.1578779Z Setting up xtrans-dev (1.4.0-1) ...
+2026-10-03T04:02:07.1598243Z Setting up libdbus-1-dev:amd64 (1.14.10-4ubuntu4.1) ...
+2026-10-03T04:02:07.4324319Z Setting up uuid-dev:amd64 (2.39.3-9ubuntu6.6) ...
+2026-10-03T04:02:07.4474162Z Setting up clang (1:18.0-59~exp2) ...
+2026-10-03T04:02:07.4651350Z Setting up libjsoncpp25:amd64 (1.9.5-6build1) ...
+2026-10-03T04:02:07.4670461Z Setting up libsepol-dev:amd64 (3.5-2build1) ...
+2026-10-03T04:02:07.4691582Z Setting up gir1.2-glib-2.0-dev:amd64 (2.80.0-6ubuntu3.9) ...
+2026-10-03T04:02:07.4711863Z Setting up librhash0:amd64 (1.4.3-3build1) ...
+2026-10-03T04:02:07.4732401Z Setting up xorg-sgml-doctools (1:1.11-1.1) ...
+2026-10-03T04:02:07.4753452Z Setting up cmake-data (3.28.3-1build7) ...
+2026-10-03T04:02:07.4806730Z Setting up libblkid-dev:amd64 (2.39.3-9ubuntu6.6) ...
+2026-10-03T04:02:07.4825326Z Setting up libselinux1-dev:amd64 (3.5-2ubuntu2.1) ...
+2026-10-03T04:02:07.4844776Z Setting up gir1.2-freedesktop-dev:amd64 (1.80.1-1) ...
+2026-10-03T04:02:07.4867215Z Setting up cmake (3.28.3-1build7) ...
+2026-10-03T04:02:07.4888230Z Setting up libmount-dev:amd64 (2.39.3-9ubuntu6.6) ...
+2026-10-03T04:02:07.4908919Z Setting up libglib2.0-dev:amd64 (2.80.0-6ubuntu3.9) ...
+2026-10-03T04:02:07.5003818Z Processing triggers for sgml-base (1.31) ...
+2026-10-03T04:02:07.5272041Z Setting up x11proto-dev (2023.2-1) ...
+2026-10-03T04:02:07.5319290Z Setting up libxau-dev:amd64 (1:1.0.9-1build6) ...
+2026-10-03T04:02:07.5345293Z Processing triggers for libc-bin (2.39-0ubuntu8.9) ...
+2026-10-03T04:02:10.9488335Z Processing triggers for man-db (2.12.0-4build2) ...
+2026-10-03T04:02:11.0216470Z Not building database; man-db/auto-update is not 'true'.
+2026-10-03T04:02:11.0507007Z Setting up libxdmcp-dev:amd64 (1:1.1.3-0ubuntu6) ...
+2026-10-03T04:02:11.2889256Z Processing triggers for libglib2.0-0t64:amd64 (2.80.0-6ubuntu3.9) ...
+2026-10-03T04:02:11.7174220Z Setting up libatk1.0-dev:amd64 (2.52.0-1build1) ...
+2026-10-03T04:02:12.0767945Z Setting up libxcb1-dev:amd64 (1.15-1ubuntu2) ...
+2026-10-03T04:02:12.3957774Z Setting up libx11-dev:amd64 (2:1.8.7-1build1) ...
+2026-10-03T04:02:12.4076373Z Setting up libxfixes-dev:amd64 (1:6.0.0-2build1) ...
+2026-10-03T04:02:12.4560947Z Setting up libxext-dev:amd64 (2:1.3.4-1build2) ...
+2026-10-03T04:02:12.4584470Z Setting up libxi-dev:amd64 (2:1.8.1-1build1) ...
+2026-10-03T04:02:12.4608777Z Setting up libxrender-dev:amd64 (1:0.9.10-1.1build1) ...
+2026-10-03T04:02:12.4629551Z Setting up libxtst-dev:amd64 (2:1.2.3-1.1build1) ...
+2026-10-03T04:02:12.4656861Z Setting up libatspi2.0-dev:amd64 (2.52.0-1build1) ...
+2026-10-03T04:02:12.4678559Z Setting up libxcursor-dev:amd64 (1:1.2.1-1build1) ...
+2026-10-03T04:02:12.4704705Z Setting up libatk-bridge2.0-dev:amd64 (2.52.0-1build1) ...
+2026-10-03T04:02:12.4725683Z Setting up libxrandr-dev:amd64 (2:1.5.2-2build1) ...
+2026-10-03T04:02:14.4444022Z 
+2026-10-03T04:02:14.4444619Z Running kernel seems to be up-to-date.
+2026-10-03T04:02:14.4445048Z 
+2026-10-03T04:02:14.4445210Z No services need to be restarted.
+2026-10-03T04:02:14.4445408Z 
+2026-10-03T04:02:14.4445621Z No containers need to be restarted.
+2026-10-03T04:02:14.4445812Z 
+2026-10-03T04:02:14.4446009Z No user sessions are running outdated binaries.
+2026-10-03T04:02:14.4446200Z 
+2026-10-03T04:02:14.4446429Z No VM guests are running outdated hypervisor (qemu) binaries on this host.
+2026-10-03T04:02:15.2522021Z ##[group]Run node gui_forms/tests/api_reference_search_tests.js
+2026-10-03T04:02:15.2522757Z [36;1mnode gui_forms/tests/api_reference_search_tests.js[0m
+2026-10-03T04:02:15.2559215Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-03T04:02:15.2559671Z ##[endgroup]
+2026-10-03T04:02:18.7473493Z Search order, 100-result bound, empty/no-match states and listener revocation passed
+2026-10-03T04:02:18.7610456Z ##[group]Run go test ./...
+2026-10-03T04:02:18.7610950Z [36;1mgo test ./...[0m
+2026-10-03T04:02:18.7611218Z [36;1mgo vet ./...[0m
+2026-10-03T04:02:18.7647757Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-03T04:02:18.7648129Z ##[endgroup]
+2026-10-03T04:02:29.1104202Z ?   	filemanager/engine/api	[no test files]
+2026-10-03T04:02:31.4556773Z ok  	filemanager/engine/benchmarks	0.212s
+2026-10-03T04:02:32.1778053Z ok  	filemanager/engine/cmd/fileman-engine	0.003s
+2026-10-03T04:02:32.1816531Z ok  	filemanager/engine/internal/catalog	0.003s
+2026-10-03T04:02:32.1883717Z ok  	filemanager/engine/internal/deployment	0.002s
+2026-10-03T04:02:32.1910988Z ok  	filemanager/engine/internal/exact	0.003s
+2026-10-03T04:02:33.5459716Z ok  	filemanager/engine/internal/generation	0.669s
+2026-10-03T04:02:33.5460802Z ok  	filemanager/engine/internal/identity	0.002s
+2026-10-03T04:02:33.5478031Z ok  	filemanager/engine/internal/live	0.007s
+2026-10-03T04:02:33.5481802Z ok  	filemanager/engine/internal/observation	0.003s
+2026-10-03T04:02:33.5482729Z ?   	filemanager/engine/internal/observation/fsevents	[no test files]
+2026-10-03T04:02:33.5483556Z ?   	filemanager/engine/internal/observation/rdcw	[no test files]
+2026-10-03T04:02:33.5484180Z ok  	filemanager/engine/internal/ownership	0.003s
+2026-10-03T04:02:33.5484818Z ?   	filemanager/engine/internal/ranking	[no test files]
+2026-10-03T04:02:33.5485435Z ok  	filemanager/engine/internal/sandbox	0.005s
+2026-10-03T04:02:33.5485920Z ok  	filemanager/engine/internal/scan	0.004s
+2026-10-03T04:02:33.8409974Z ok  	filemanager/engine/internal/service	0.298s
+2026-10-03T04:02:33.8410485Z ok  	filemanager/engine/internal/similarity	0.039s
+2026-10-03T04:02:33.8411102Z ok  	filemanager/engine/internal/transport	0.008s
+2026-10-03T04:02:33.8411450Z ok  	filemanager/engine/internal/workload	0.142s
+2026-10-03T04:02:34.8633593Z ##[group]Run python3 tools/native_compiler_identity.py
+2026-10-03T04:02:34.8633981Z [36;1mpython3 tools/native_compiler_identity.py[0m
+2026-10-03T04:02:34.8668858Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-03T04:02:34.8669202Z ##[endgroup]
+2026-10-03T04:02:40.3583532Z ##[group]Run actions/cache/restore@v4
+2026-10-03T04:02:40.3583790Z with:
+2026-10-03T04:02:40.3584260Z   path: gui_forms/third_party/skia
+gui_forms/third_party/harfbuzz
+gui_forms/third_party/freetype
+.build/native-linux-x64/skia
+
+2026-10-03T04:02:40.3584934Z   key: native-deps-v1-linux-x64-6987d99f4941a250b5d8-d4598b5609f00b76067e006cd0723f4d33d89118a96272b5b7bc52627483d8b8
+2026-10-03T04:02:40.3585411Z   enableCrossOsArchive: false
+2026-10-03T04:02:40.3585663Z   fail-on-cache-miss: false
+2026-10-03T04:02:40.3585888Z   lookup-only: false
+2026-10-03T04:02:40.3586125Z ##[endgroup]
+2026-10-03T04:02:40.4377817Z (node:6359) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-03T04:02:40.4378753Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-03T04:02:40.5692737Z Cache hit for: native-deps-v1-linux-x64-6987d99f4941a250b5d8-d4598b5609f00b76067e006cd0723f4d33d89118a96272b5b7bc52627483d8b8
+2026-10-03T04:02:40.5762464Z (node:6359) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-10-03T04:02:41.7383057Z Received 134217728 of 208898588 (64.3%), 128.0 MBs/sec
+2026-10-03T04:02:42.0511194Z Received 208898588 of 208898588 (100.0%), 151.6 MBs/sec
+2026-10-03T04:02:42.0512787Z Cache Size: ~199 MB (208898588 B)
+2026-10-03T04:02:42.0547219Z [command]/usr/bin/tar -xf /home/runner/work/_temp/fa0cf6dd-7d0d-4aa6-8197-999347ffe6d6/cache.tzst -P -C /home/runner/work/file_manager/file_manager --use-compress-program unzstd
+2026-10-03T04:02:42.6506988Z Cache restored successfully
+2026-10-03T04:02:42.6644807Z Cache restored from key: native-deps-v1-linux-x64-6987d99f4941a250b5d8-d4598b5609f00b76067e006cd0723f4d33d89118a96272b5b7bc52627483d8b8
+2026-10-03T04:02:42.6744648Z ##[group]Run python3 -B tools/native_build_tests.py
+2026-10-03T04:02:42.6745032Z [36;1mpython3 -B tools/native_build_tests.py[0m
+2026-10-03T04:02:42.6745393Z [36;1mpython3 -B gui_forms/tests/verify_install_tests.py[0m
+2026-10-03T04:02:42.6745840Z [36;1mxvfb-run -a python3 tools/build_native.py --jobs 2[0m
+2026-10-03T04:02:42.6746187Z [36;1mpython3 -B tools/export_native_sdks_tests.py[0m
+2026-10-03T04:02:42.6746540Z [36;1mpython3 -B tools/export_native_sdks.py[0m
+2026-10-03T04:02:42.6781861Z shell: /usr/bin/bash -e {0}
+2026-10-03T04:02:42.6782269Z ##[endgroup]
+2026-10-03T04:02:42.9884081Z ........
+2026-10-03T04:02:42.9884458Z ----------------------------------------------------------------------
+2026-10-03T04:02:42.9884957Z Ran 8 tests in 0.042s
+2026-10-03T04:02:42.9885142Z 
+2026-10-03T04:02:42.9885265Z OK
+2026-10-03T04:02:43.0596583Z ..
+2026-10-03T04:02:43.0597089Z fixture passed
+2026-10-03T04:02:43.0597915Z ----------------------------------------------------------------------
+2026-10-03T04:02:43.0598474Z Ran 2 tests in 0.003s
+2026-10-03T04:02:43.0598728Z 
+2026-10-03T04:02:43.0598869Z OK
+2026-10-03T04:02:43.0629065Z Missing component rejected: NotAComponent
+2026-10-03T04:02:43.0629664Z Missing component rejected: Application
+2026-10-03T04:02:43.0630288Z Installed-package verification passed
+2026-10-03T04:02:43.8878435Z Source state (before-build): 0 changed paths; /home/runner/work/file_manager/file_manager/.build/native-linux-x64/source-state-before-build.json
+2026-10-03T04:02:43.8879228Z + sh /home/runner/work/file_manager/file_manager/gui_forms/third_party/fetch_skia_cpu.sh
+2026-10-03T04:02:44.3455014Z HEAD is now at 2a9b593 [M152] Address incorrect handling of a map pointer in SkRP
+2026-10-03T04:02:44.3455739Z M	BUILD.gn
+2026-10-03T04:02:44.3456081Z M	gn/BUILDCONFIG.gn
+2026-10-03T04:02:44.3710346Z HEAD is now at d5515b5 Release libpng version 1.6.56
+2026-10-03T04:02:44.3787697Z HEAD is now at 646b7f5 [zlib][build] Remove fdopen #defines in zutil.h.
+2026-10-03T04:02:44.4090787Z HEAD is now at 264b5fb Update all copyright notices.
+2026-10-03T04:02:44.4133199Z + sh /home/runner/work/file_manager/file_manager/gui_forms/third_party/fetch_text_stack.sh
+2026-10-03T04:02:44.6478161Z HEAD is now at 56feae4 14.2.1
+2026-10-03T04:02:44.6787593Z HEAD is now at f4205da * Version 2.14.2 released. ==========================
+2026-10-03T04:02:44.6813639Z + sh /home/runner/work/file_manager/file_manager/gui_forms/third_party/build_skia_cpu_linux.sh /home/runner/work/file_manager/file_manager/.build/native-linux-x64/skia
+2026-10-03T04:02:44.7202634Z Done. Made 98 targets from 44 files in 33ms
+2026-10-03T04:02:44.7290698Z ninja: Entering directory `/home/runner/work/file_manager/file_manager/.build/native-linux-x64/skia'
+2026-10-03T04:02:44.7781469Z ninja: no work to do.
+2026-10-03T04:02:44.7788402Z + cmake -S /home/runner/work/file_manager/file_manager/gui_forms -B /home/runner/work/file_manager/file_manager/.build/native-linux-x64/gui-forms -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DGUI_FORMS_BUILD_GALLERY=OFF -DGUI_FORMS_BUILD_TESTS=ON -DCMAKE_INSTALL_PREFIX=/home/runner/work/file_manager/file_manager/.build/native-linux-x64/gui-forms-sdk -DGUI_FORMS_ENABLE_WINDOWS_HOST=OFF -DGUI_FORMS_ENABLE_MACOS_HOST=OFF -DGUI_FORMS_ENABLE_LINUX_HOST=ON -DGUI_FORMS_ENABLE_SKIA=ON -DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON -DGUI_FORMS_SKIA_PREBUILT=ON -DGUI_FORMS_SKIA_OUT=/home/runner/work/file_manager/file_manager/.build/native-linux-x64/skia
+2026-10-03T04:02:45.8541639Z -- The C compiler identification is GNU 13.3.0
+2026-10-03T04:02:46.9888929Z -- The CXX compiler identification is GNU 13.3.0
+2026-10-03T04:02:47.1301626Z -- Detecting C compiler ABI info
+2026-10-03T04:02:47.3754996Z -- Detecting C compiler ABI info - done
+2026-10-03T04:02:47.3867517Z -- Check for working C compiler: /usr/bin/cc - skipped
+2026-10-03T04:02:47.3924246Z -- Detecting C compile features
+2026-10-03T04:02:47.3980960Z -- Detecting C compile features - done
+2026-10-03T04:02:47.4247771Z -- Detecting CXX compiler ABI info
+2026-10-03T04:02:47.5217124Z -- Detecting CXX compiler ABI info - done
+2026-10-03T04:02:47.5331222Z -- Check for working CXX compiler: /usr/bin/c++ - skipped
+2026-10-03T04:02:47.5333654Z -- Detecting CXX compile features
+2026-10-03T04:02:47.5338809Z -- Detecting CXX compile features - done
+2026-10-03T04:02:47.6382933Z -- Found PkgConfig: /usr/bin/pkg-config (found version "1.8.1")
+2026-10-03T04:02:47.6447496Z -- Looking for unistd.h
+2026-10-03T04:02:47.6829129Z -- Looking for unistd.h - found
+2026-10-03T04:02:47.6829616Z -- Looking for fcntl.h
+2026-10-03T04:02:47.7198254Z -- Looking for fcntl.h - found
+2026-10-03T04:02:47.7684870Z CMake Warning at third_party/harfbuzz/CMakeLists.txt:4 (message):
+2026-10-03T04:02:47.7685703Z   The main build system for HarfBuzz is Meson.  CMake build support is
+2026-10-03T04:02:47.7686258Z   community-maintained and is not actively supported by HarfBuzz developers.
+2026-10-03T04:02:47.7686550Z 
+2026-10-03T04:02:47.7686555Z 
+2026-10-03T04:02:48.2018506Z -- Found Python3: /usr/bin/python3.12 (found version "3.12.3") found components: Interpreter
+2026-10-03T04:02:48.2163955Z -- Looking for atexit
+2026-10-03T04:02:48.2551071Z -- Looking for atexit - found
+2026-10-03T04:02:48.2551564Z -- Looking for mprotect
+2026-10-03T04:02:48.2920141Z -- Looking for mprotect - found
+2026-10-03T04:02:48.2920736Z -- Looking for sysconf
+2026-10-03T04:02:48.3291350Z -- Looking for sysconf - found
+2026-10-03T04:02:48.3291852Z -- Looking for getpagesize
+2026-10-03T04:02:48.3659061Z -- Looking for getpagesize - found
+2026-10-03T04:02:48.3659521Z -- Looking for mmap
+2026-10-03T04:02:48.4020110Z -- Looking for mmap - found
+2026-10-03T04:02:48.4020584Z -- Looking for isatty
+2026-10-03T04:02:48.4388279Z -- Looking for isatty - found
+2026-10-03T04:02:48.4388777Z -- Looking for sys/mman.h
+2026-10-03T04:02:48.4769341Z -- Looking for sys/mman.h - found
+2026-10-03T04:02:48.4769797Z -- Looking for stdbool.h
+2026-10-03T04:02:48.5150188Z -- Looking for stdbool.h - found
+2026-10-03T04:02:48.5309124Z -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+2026-10-03T04:02:48.6537546Z -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+2026-10-03T04:02:48.6545539Z -- Found Threads: TRUE
+2026-10-03T04:02:48.6899857Z -- Performing Test CXX_SUPPORTS_FLAG_BSYMB_FUNCS
+2026-10-03T04:02:48.7337426Z -- Performing Test CXX_SUPPORTS_FLAG_BSYMB_FUNCS - Success
+2026-10-03T04:02:48.7343097Z -- Performing Test COMPILER_SUPPORTS_CXX11
+2026-10-03T04:02:48.7776260Z -- Performing Test COMPILER_SUPPORTS_CXX11 - Success
+2026-10-03T04:02:48.8413087Z -- Found X11: /usr/include
+2026-10-03T04:02:48.8413899Z -- Looking for XOpenDisplay in /usr/lib/x86_64-linux-gnu/libX11.so;/usr/lib/x86_64-linux-gnu/libXext.so
+2026-10-03T04:02:48.8945747Z -- Looking for XOpenDisplay in /usr/lib/x86_64-linux-gnu/libX11.so;/usr/lib/x86_64-linux-gnu/libXext.so - found
+2026-10-03T04:02:48.8946830Z -- Looking for gethostbyname
+2026-10-03T04:02:48.9306417Z -- Looking for gethostbyname - found
+2026-10-03T04:02:48.9306847Z -- Looking for connect
+2026-10-03T04:02:48.9674089Z -- Looking for connect - found
+2026-10-03T04:02:48.9674564Z -- Looking for remove
+2026-10-03T04:02:49.0030484Z -- Looking for remove - found
+2026-10-03T04:02:49.0030868Z -- Looking for shmat
+2026-10-03T04:02:49.0382859Z -- Looking for shmat - found
+2026-10-03T04:02:49.0423869Z -- Checking for modules 'atk;atk-bridge-2.0'
+2026-10-03T04:02:49.0659217Z --   Found atk, version 2.52.0
+2026-10-03T04:02:49.0709266Z --   Found atk-bridge-2.0, version 2.52.0
+2026-10-03T04:02:49.3061421Z -- Configuring done (3.9s)
+2026-10-03T04:02:49.3749031Z -- Generating done (0.1s)
+2026-10-03T04:02:49.3753372Z -- Build files have been written to: /home/runner/work/file_manager/file_manager/.build/native-linux-x64/gui-forms
+2026-10-03T04:02:49.3941573Z + cmake --build /home/runner/work/file_manager/file_manager/.build/native-linux-x64/gui-forms --parallel 2
+2026-10-03T04:02:50.9097739Z [1/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftbase.c.o
+2026-10-03T04:02:50.9619710Z [2/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftbbox.c.o
+2026-10-03T04:02:50.9863850Z [3/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftbdf.c.o
+2026-10-03T04:02:51.1121222Z [4/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/autofit/autofit.c.o
+2026-10-03T04:02:51.1413208Z [5/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftcid.c.o
+2026-10-03T04:02:51.1633196Z [6/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftfstype.c.o
+2026-10-03T04:02:51.1872702Z [7/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftgasp.c.o
+2026-10-03T04:02:51.2598675Z [8/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftbitmap.c.o
+2026-10-03T04:02:51.2854062Z [9/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftgxval.c.o
+2026-10-03T04:02:51.2977848Z [10/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftglyph.c.o
+2026-10-03T04:02:51.3201602Z [11/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftinit.c.o
+2026-10-03T04:02:51.3429816Z [12/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftotval.c.o
+2026-10-03T04:02:51.3614575Z [13/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftpatent.c.o
+2026-10-03T04:02:51.3901709Z [14/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftmm.c.o
+2026-10-03T04:02:51.3911566Z [15/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftpfr.c.o
+2026-10-03T04:02:51.4195974Z [16/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftsynth.c.o
+2026-10-03T04:02:51.4470797Z [17/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/fttype1.c.o
+2026-10-03T04:02:51.4682460Z [18/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftwinfnt.c.o
+2026-10-03T04:02:51.6664845Z [19/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftstroke.c.o
+2026-10-03T04:02:51.6864859Z [20/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/bzip2/ftbzip2.c.o
+2026-10-03T04:02:51.8107037Z [21/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/bdf/bdf.c.o
+2026-10-03T04:02:52.0306362Z [22/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/cache/ftcache.c.o
+2026-10-03T04:02:52.2538311Z [23/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/cid/type1cid.c.o
+2026-10-03T04:02:52.5647095Z [24/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/cff/cff.c.o
+2026-10-03T04:02:52.6582451Z [25/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/lzw/ftlzw.c.o
+2026-10-03T04:02:52.9328571Z [26/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/pcf/pcf.c.o
+2026-10-03T04:02:52.9435661Z [27/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/gzip/ftgzip.c.o
+2026-10-03T04:02:53.3231283Z [28/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/pfr/pfr.c.o
+2026-10-03T04:02:53.7945297Z [29/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/pshinter/pshinter.c.o
+2026-10-03T04:02:53.9223120Z [30/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/psnames/psnames.c.o
+2026-10-03T04:02:54.1953203Z [31/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/raster/raster.c.o
+2026-10-03T04:02:54.5033477Z [32/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/psaux/psaux.c.o
+2026-10-03T04:02:54.6895429Z [33/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/sdf/sdf.c.o
+2026-10-03T04:02:54.8984867Z [34/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/smooth/smooth.c.o
+2026-10-03T04:02:54.9387514Z [35/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/svg/svg.c.o
+2026-10-03T04:02:55.9217607Z [36/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/sfnt/sfnt.c.o
+2026-10-03T04:02:56.4669174Z [37/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/type1/type1.c.o
+2026-10-03T04:02:56.6859262Z [38/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/type42/type42.c.o
+2026-10-03T04:02:56.7167885Z [39/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/truetype/truetype.c.o
+2026-10-03T04:02:56.7735567Z [40/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/builds/unix/ftsystem.c.o
+2026-10-03T04:02:56.7961551Z [41/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/base/ftdebug.c.o
+2026-10-03T04:02:56.7977187Z [42/414] Building C object third_party/freetype/CMakeFiles/freetype.dir/src/winfonts/winfnt.c.o
+2026-10-03T04:02:59.5209898Z [43/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/animation/animation_timeline/animation_timeline.cpp.o
+2026-10-03T04:02:59.7058081Z [44/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/application/application.cpp.o
+2026-10-03T04:03:00.3129452Z [45/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/binding/value/property_collection_value/property_collection_value.cpp.o
+2026-10-03T04:03:00.9337625Z [46/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/binding/value/property_object_value/property_object_value.cpp.o
+2026-10-03T04:03:02.0889442Z [47/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/binding/currency_manager/currency_manager.cpp.o
+2026-10-03T04:03:02.7648017Z [48/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/binding/value/binding_value.cpp.o
+2026-10-03T04:03:05.3009902Z [49/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/binding/binding_source/binding_source.cpp.o
+2026-10-03T04:03:05.5995578Z [50/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/binding/binding/binding.cpp.o
+2026-10-03T04:03:06.6718695Z [51/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/binding/control_bindings_collection/control_bindings_collection.cpp.o
+2026-10-03T04:03:07.2720862Z [52/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/types/damage_region/damage_region.cpp.o
+2026-10-03T04:03:07.3340404Z [53/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/binding/binding_context/binding_context.cpp.o
+2026-10-03T04:03:07.6860840Z [54/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/types/rect/rect.cpp.o
+2026-10-03T04:03:07.7625456Z [55/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/types/painter/painter.cpp.o
+2026-10-03T04:03:08.1558632Z [56/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/surface_material/material_fill_layer/material_fill_layer.cpp.o
+2026-10-03T04:03:08.6721672Z [57/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/surface_material/types/surface_material_types.cpp.o
+2026-10-03T04:03:09.6048134Z [58/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/text/text_store/text_store.cpp.o
+2026-10-03T04:03:09.7485265Z [59/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/theme/theme/theme.cpp.o
+2026-10-03T04:03:10.1017279Z [60/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/document_view/document_view_state.cpp.o
+2026-10-03T04:03:10.3582259Z [61/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/text/prepared/prepared_storage.cpp.o
+2026-10-03T04:03:10.4098563Z [62/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/text_shaping/validation/text_shaping_validation.cpp.o
+2026-10-03T04:03:10.7012637Z [63/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/typography/resolution/typography_resolution.cpp.o
+2026-10-03T04:03:10.8230657Z [64/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/text/unicode/unicode_grapheme.cpp.o
+2026-10-03T04:03:10.9899794Z [65/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/metrics/metrics/metrics.cpp.o
+2026-10-03T04:03:11.1967416Z [66/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/metrics/snapshot/metrics_snapshot.cpp.o
+2026-10-03T04:03:12.1858019Z [67/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp.o
+2026-10-03T04:03:12.8284716Z [68/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/resources/image_registry/image_registry.cpp.o
+2026-10-03T04:03:13.2960927Z [69/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/live_surface/buffer/live_surface_buffer.cpp.o
+2026-10-03T04:03:13.3409982Z [70/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/window/inspection/window_visual_inspection.cpp.o
+2026-10-03T04:03:13.7380098Z [71/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/live_surface/frame/live_surface_frame.cpp.o
+2026-10-03T04:03:14.0674375Z [72/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/live_surface/surface/live_surface.cpp.o
+2026-10-03T04:03:14.2571820Z [73/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/live_surface/wake_connection/live_surface_wake_connection.cpp.o
+2026-10-03T04:03:14.6160651Z [74/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/live_surface/write_lease/live_surface_write_lease.cpp.o
+2026-10-03T04:03:14.6967841Z [75/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/semantics/snapshot/semantic_snapshot.cpp.o
+2026-10-03T04:03:14.7388809Z [76/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/host/image/host_image.cpp.o
+2026-10-03T04:03:15.2331125Z [77/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/host/image/clipboard_image_wire.cpp.o
+2026-10-03T04:03:15.3160827Z [78/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/host/image/clipboard_dib.cpp.o
+2026-10-03T04:03:15.6688707Z [79/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/host/types/host_capabilities/host_capabilities.cpp.o
+2026-10-03T04:03:16.2074239Z [80/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/host/types/host_services_snapshot/host_services_snapshot.cpp.o
+2026-10-03T04:03:16.5434141Z [81/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/host/types/host_types.cpp.o
+2026-10-03T04:03:16.7406159Z [82/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/host/types/host_session_snapshot/host_session_snapshot.cpp.o
+2026-10-03T04:03:18.0591735Z [83/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/host/cursor_interaction/cursor_interaction.cpp.o
+2026-10-03T04:03:18.4749700Z [84/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/host/services/host_services.cpp.o
+2026-10-03T04:03:18.5989119Z [85/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/types/cursor_image/cursor_image.cpp.o
+2026-10-03T04:03:20.0250469Z [86/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/feedback/semantic_feedback/semantic_feedback.cpp.o
+2026-10-03T04:03:20.5325450Z [87/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/host/session/host_session.cpp.o
+2026-10-03T04:03:20.9977793Z [88/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/display/chunk/display_chunk.cpp.o
+2026-10-03T04:03:21.8283928Z [89/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/display/recording_painter/recording_painter.cpp.o
+2026-10-03T04:03:21.9976457Z [90/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/display/replay/replay_display_chunk.cpp.o
+2026-10-03T04:03:22.9414995Z [91/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/dispatcher/operation/dispatch_operation.cpp.o
+2026-10-03T04:03:23.1939315Z [92/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/dispatcher/state/post_dispatch.cpp.o
+2026-10-03T04:03:23.2438877Z [93/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/scheduler/frame_request_token/frame_request_token.cpp.o
+2026-10-03T04:03:24.2084627Z [94/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/scheduler/request/scheduled_frame_request.cpp.o
+2026-10-03T04:03:24.7140241Z [95/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/window/dispatcher/window_dispatcher.cpp.o
+2026-10-03T04:03:25.8420265Z [96/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/window/typography/window_typography.cpp.o
+2026-10-03T04:03:26.7276970Z [97/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/window/lifecycle/window_lifecycle.cpp.o
+2026-10-03T04:03:26.8778080Z [98/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/window/update_scope/update_scope.cpp.o
+2026-10-03T04:03:28.2881784Z [99/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/window/scheduler/window_scheduler.cpp.o
+2026-10-03T04:03:28.4854647Z [100/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/window/presentation/window_presentation.cpp.o
+2026-10-03T04:03:29.4004671Z [101/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/window/popup/popup_token.cpp.o
+2026-10-03T04:03:29.6840551Z [102/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/window/accelerator/accelerator_token.cpp.o
+2026-10-03T04:03:30.0491227Z [103/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/component/component/component.cpp.o
+2026-10-03T04:03:30.4132272Z [104/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/component/component_container/component_container.cpp.o
+2026-10-03T04:03:30.5126946Z [105/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/control/dispatcher/control_dispatcher.cpp.o
+2026-10-03T04:03:31.7210160Z [106/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/timer/timer/timer.cpp.o
+2026-10-03T04:03:32.0257042Z [107/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/control/stable_id/stable_id.cpp.o
+2026-10-03T04:03:33.1203832Z [108/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/control/static_tree/control_factory/control_factory.cpp.o
+2026-10-03T04:03:36.9661785Z [109/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/control/control/control.cpp.o
+2026-10-03T04:03:37.4701996Z [110/414] Building C object CMakeFiles/gui_forms_bidi.dir/third_party/sheenbidi/Source/SheenBidi.c.o
+2026-10-03T04:03:38.1837831Z [111/414] Building CXX object CMakeFiles/gui_forms_core.dir/src/core/window/window.cpp.o
+2026-10-03T04:03:47.3141371Z [112/414] Linking C static library third_party/freetype/libfreetype.a
+2026-10-03T04:03:47.4925527Z [113/414] Linking CXX static library libgui_forms_core.a
+2026-10-03T04:03:47.5579217Z [114/414] Linking C static library libgui_forms_bidi.a
+2026-10-03T04:03:49.2464919Z [115/414] Building CXX object CMakeFiles/gui_forms_text_engine.dir/src/render/text/harfbuzz/harfbuzz_font_engine.cpp.o
+2026-10-03T04:03:50.2507614Z [116/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/bitmap/bitmap.cpp.o
+2026-10-03T04:03:50.7814211Z [117/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/brush/hatch_brush.cpp.o
+2026-10-03T04:03:51.5191176Z [118/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/brush/linear_gradient_brush.cpp.o
+2026-10-03T04:03:52.2802679Z [119/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/brush/path_gradient_brush.cpp.o
+2026-10-03T04:03:52.7769952Z [120/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/brush/solid_brush.cpp.o
+2026-10-03T04:03:53.5190341Z [121/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/color/color.cpp.o
+2026-10-03T04:03:54.0736180Z [122/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/font/font.cpp.o
+2026-10-03T04:03:54.5565614Z [123/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/geometry/point_i/point_i.cpp.o
+2026-10-03T04:03:55.0758519Z [124/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/geometry/point_f/point_f.cpp.o
+2026-10-03T04:03:55.5880731Z [125/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/geometry/rect_i/rect_i.cpp.o
+2026-10-03T04:03:56.1527216Z [126/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/geometry/rect_f/rect_f.cpp.o
+2026-10-03T04:03:57.3556602Z [127/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/graphics_path/graphics_path.cpp.o
+2026-10-03T04:03:59.3218259Z [128/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/graphics_recorder/graphics_recorder.cpp.o
+2026-10-03T04:03:59.8923930Z [129/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/image_attributes/image_attributes.cpp.o
+2026-10-03T04:04:00.4189113Z [130/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/image_reference/image_reference.cpp.o
+2026-10-03T04:04:00.9227478Z [131/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/image_snapshot/image_snapshot.cpp.o
+2026-10-03T04:04:01.5000907Z [132/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/matrix/matrix.cpp.o
+2026-10-03T04:04:02.0016529Z [133/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/object/drawing_object.cpp.o
+2026-10-03T04:04:02.6168388Z [134/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/pen/pen.cpp.o
+2026-10-03T04:04:03.4375285Z [135/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/region/region.cpp.o
+2026-10-03T04:04:03.9759592Z [136/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/string_format/string_format.cpp.o
+2026-10-03T04:04:04.6465287Z [137/414] Building CXX object CMakeFiles/gui_drawing_core.dir/src/core/drawing/texture_brush/texture_brush.cpp.o
+2026-10-03T04:04:04.7215625Z [138/414] Linking CXX static library libgui_drawing_core.a
+2026-10-03T04:04:06.3190274Z [139/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/basic/basic_control_rendering.cpp.o
+2026-10-03T04:04:07.5760029Z [140/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/connected_controls/connected_controls.cpp.o
+2026-10-03T04:04:08.8715670Z [141/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/panel.cpp.o
+2026-10-03T04:04:09.9529257Z [142/414] Building CXX object third_party/harfbuzz/CMakeFiles/harfbuzz.dir/src/harfbuzz.cc.o
+2026-10-03T04:04:10.0231389Z [143/414] Linking C static library third_party/harfbuzz/libharfbuzz.a
+2026-10-03T04:04:10.0853060Z [144/414] Linking CXX static library libgui_forms_text_engine.a
+2026-10-03T04:04:10.2006093Z [145/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/group_box/group_box.cpp.o
+2026-10-03T04:04:12.5300702Z [146/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/picture_box/picture_box.cpp.o
+2026-10-03T04:04:12.8222644Z [147/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/label/label.cpp.o
+2026-10-03T04:04:14.3841171Z [148/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/button_base/button/button.cpp.o
+2026-10-03T04:04:15.5688868Z [149/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/button_base/button_base.cpp.o
+2026-10-03T04:04:15.9002944Z [150/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/button_base/button/drop_down_button/drop_down_button.cpp.o
+2026-10-03T04:04:18.0609677Z [151/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/button_base/check_box/check_box.cpp.o
+2026-10-03T04:04:18.2644692Z [152/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/button_base/radio_button/radio_button.cpp.o
+2026-10-03T04:04:19.4660932Z [153/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/button_base/link_label/link_label.cpp.o
+2026-10-03T04:04:19.8485444Z [154/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/raster_canvas/raster_canvas.cpp.o
+2026-10-03T04:04:22.7086225Z [155/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/breadcrumb_trail/breadcrumb_trail.cpp.o
+2026-10-03T04:04:22.7948952Z [156/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/tree_view/tree_view.cpp.o
+2026-10-03T04:04:26.2215143Z [157/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/correspondence_view/correspondence_view.cpp.o
+2026-10-03T04:04:27.0317189Z [158/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/object_view/object_view.cpp.o
+2026-10-03T04:04:27.8421136Z [159/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/card/card.cpp.o
+2026-10-03T04:04:28.8809615Z [160/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/card/review_card/review_card.cpp.o
+2026-10-03T04:04:29.7009427Z [161/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/commands/command/command.cpp.o
+2026-10-03T04:04:29.7683369Z [162/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/container/master_detail_view/master_detail_view.cpp.o
+2026-10-03T04:04:31.0218598Z [163/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/commands/command_binding/command_binding.cpp.o
+2026-10-03T04:04:33.0151512Z [164/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/menu/context_menu/context_menu.cpp.o
+2026-10-03T04:04:33.8667601Z [165/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/menu/menu_strip/menu_strip.cpp.o
+2026-10-03T04:04:34.0367720Z [166/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/anchored_popup_layer/anchored_popup_placement/anchored_popup_placement.cpp.o
+2026-10-03T04:04:35.3820085Z [167/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/anchored_popup_layer/anchored_popup_layer.cpp.o
+2026-10-03T04:04:35.5248757Z [168/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/scrollable_control/container_control/container_control.cpp.o
+2026-10-03T04:04:36.7945406Z [169/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/scrollable_control/container_control/user_control/user_control.cpp.o
+2026-10-03T04:04:36.8519398Z [170/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/scaled_panel/scaled_panel.cpp.o
+2026-10-03T04:04:38.1431608Z [171/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/group_box/scaled_group_box/scaled_group_box.cpp.o
+2026-10-03T04:04:38.6259447Z [172/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.cpp.o
+2026-10-03T04:04:40.7464518Z [173/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp.o
+2026-10-03T04:04:41.4519563Z [174/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/scrollable_control/container_control/responsive_track_panel/responsive_track_panel.cpp.o
+2026-10-03T04:04:42.6270603Z [175/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.cpp.o
+2026-10-03T04:04:43.1011451Z [176/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/scrollable_control/container_control/command_overflow_panel/command_overflow_panel.cpp.o
+2026-10-03T04:04:44.2891085Z [177/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/scrollable_control/container_control/split_container/splitter_panel/splitter_panel.cpp.o
+2026-10-03T04:04:45.2322952Z [178/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/scrollable_control/container_control/tab_control/tab_control.cpp.o
+2026-10-03T04:04:45.6529303Z [179/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/scrollable_control/container_control/split_container/splitter_grip.cpp.o
+2026-10-03T04:04:46.4141917Z [180/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/date_time_picker/date_time_utilities.cpp.o
+2026-10-03T04:04:46.7862304Z [181/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/date_time_picker/date_time_value/date_time_value.cpp.o
+2026-10-03T04:04:47.0598273Z [182/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/date_time_picker/date_time_format_provider/date_time_format_provider.cpp.o
+2026-10-03T04:04:47.4949916Z [183/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/scrollable_control/container_control/split_container/split_container.cpp.o
+2026-10-03T04:04:48.3329263Z [184/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/date_time_picker/calendar_popup_layer/calendar_popup_layer.cpp.o
+2026-10-03T04:04:49.8410494Z [185/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/date_time_picker/calendar_popup/calendar_popup.cpp.o
+2026-10-03T04:04:50.9593941Z [186/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/drawing_surface/drawing_surface.cpp.o
+2026-10-03T04:04:51.3541761Z [187/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/date_time_picker/date_time_picker.cpp.o
+2026-10-03T04:04:52.3383959Z [188/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/metrics_view/metrics_view.cpp.o
+2026-10-03T04:04:53.2759213Z [189/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/visual_inspector_view/visual_inspector_view.cpp.o
+2026-10-03T04:04:54.2339805Z [190/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/typography_specimen/typography_specimen.cpp.o
+2026-10-03T04:04:54.8710877Z [191/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/easing_preview/easing_preview.cpp.o
+2026-10-03T04:04:57.9374187Z [192/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/text_box/text_box.cpp.o
+2026-10-03T04:04:58.0870779Z [193/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/list_box/list_box.cpp.o
+2026-10-03T04:04:59.9220528Z [194/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/combo_box/drop_down_layer.cpp.o
+2026-10-03T04:05:00.2885952Z [195/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/list_box/checked_list_box/checked_list_box.cpp.o
+2026-10-03T04:05:01.5971432Z [196/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/numeric_up_down/spin_buttons.cpp.o
+2026-10-03T04:05:03.5267982Z [197/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/combo_box/combo_box.cpp.o
+2026-10-03T04:05:04.7178766Z [198/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/numeric_up_down/numeric_up_down.cpp.o
+2026-10-03T04:05:05.3137921Z [199/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/flags_value_editor/property_editor_drop_down_layer/property_editor_drop_down_layer.cpp.o
+2026-10-03T04:05:07.9996551Z [200/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/flags_value_editor/flags_value_editor.cpp.o
+2026-10-03T04:05:08.0245254Z [201/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/color_value_editor/color_value_editor.cpp.o
+2026-10-03T04:05:08.2101019Z [202/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/inspection/property_row_spec/property_row_spec.cpp.o
+2026-10-03T04:05:10.4646727Z [203/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/inspection/property_value_converter_registry/property_value_converter_registry.cpp.o
+2026-10-03T04:05:11.4528380Z [204/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/inspection/property_editor_registry/property_editor_registry.cpp.o
+2026-10-03T04:05:15.1111102Z [205/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/property_list/property_list.cpp.o
+2026-10-03T04:05:16.8923778Z [206/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/instrument_rack/rack_module_panel/rack_module_panel.cpp.o
+2026-10-03T04:05:18.2445654Z [207/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/property_grid/property_grid.cpp.o
+2026-10-03T04:05:20.0579182Z [208/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/core/resources/image_list/image_list/image_list.cpp.o
+2026-10-03T04:05:21.1395568Z [209/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/guidance/error_layer/error_layer.cpp.o
+2026-10-03T04:05:21.5350154Z [210/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/instrument_rack/instrument_rack.cpp.o
+2026-10-03T04:05:22.5047836Z [211/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/guidance/error_glyph/error_glyph.cpp.o
+2026-10-03T04:05:24.5109612Z [212/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/guidance/help_provider/help_provider.cpp.o
+2026-10-03T04:05:25.3439276Z [213/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/guidance/error_provider/error_provider.cpp.o
+2026-10-03T04:05:26.2527398Z [214/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/panel/material_panel/material_panel.cpp.o
+2026-10-03T04:05:26.5310178Z [215/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/range_control/range_control_rendering.cpp.o
+2026-10-03T04:05:28.1965534Z [216/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/range_control/track_bar/track_bar.cpp.o
+2026-10-03T04:05:28.3579903Z [217/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/range_control/range_control.cpp.o
+2026-10-03T04:05:30.1155518Z [218/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/range_control/scroll_bar/scroll_bar.cpp.o
+2026-10-03T04:05:30.1461890Z [219/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/range_control/progress_bar/progress_bar.cpp.o
+2026-10-03T04:05:31.4373384Z [220/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/range_control/scroll_bar/h_scroll_bar/h_scroll_bar.cpp.o
+2026-10-03T04:05:31.4626129Z [221/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/range_control/scroll_bar/v_scroll_bar/v_scroll_bar.cpp.o
+2026-10-03T04:05:32.5558479Z [222/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/scrollable_control/scroll_properties/scroll_properties.cpp.o
+2026-10-03T04:05:33.2906468Z [223/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/scrollable_control/scrollable_control.cpp.o
+2026-10-03T04:05:33.6818586Z [224/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/tool_tip/tool_tip_layer/tool_tip_layer.cpp.o
+2026-10-03T04:05:34.6278372Z [225/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/tool_tip/tool_tip_bubble/tool_tip_bubble.cpp.o
+2026-10-03T04:05:36.3241261Z [226/414] Building CXX object CMakeFiles/gui_forms_skia.dir/src/render/skia/raster/skia_raster.cpp.o
+2026-10-03T04:05:36.7183057Z [227/414] Building CXX object CMakeFiles/gui_forms_controls.dir/src/controls/tool_tip/tool_tip.cpp.o
+2026-10-03T04:05:37.0742249Z [228/414] Building CXX object CMakeFiles/gui_forms_skia.dir/src/render/skia/raster/clipboard_png.cpp.o
+2026-10-03T04:05:37.4455799Z [229/414] Building CXX object CMakeFiles/gui_drawing_c_api.dir/src/abi/drawing_platform_stub.cpp.o
+2026-10-03T04:05:38.3038588Z [230/414] Building CXX object CMakeFiles/gui_forms_host_headless.dir/src/host/headless/capabilities/headless_capabilities.cpp.o
+2026-10-03T04:05:39.6123449Z [231/414] Building CXX object CMakeFiles/gui_forms_host_headless.dir/src/host/headless/services/headless_host_services.cpp.o
+2026-10-03T04:05:41.3351933Z [232/414] Building CXX object CMakeFiles/gui_drawing_c_api.dir/src/abi/drawing_c_api.cpp.o
+2026-10-03T04:05:41.5363114Z [233/414] Linking CXX static library libgui_forms_controls.a
+2026-10-03T04:05:41.5645150Z [234/414] Building CXX object CMakeFiles/gui_forms_host_headless.dir/src/host/headless/session/headless_host.cpp.o
+2026-10-03T04:05:41.6084982Z [235/414] Linking CXX static library libgui_forms_skia.a
+2026-10-03T04:05:43.7822762Z [236/414] Building CXX object CMakeFiles/gui_forms_host_linux.dir/src/host/linux/accessibility/linux_accessibility.cpp.o
+2026-10-03T04:05:44.7366068Z [237/414] Building CXX object CMakeFiles/gui_forms_host_linux.dir/src/host/linux/application/linux_host.cpp.o
+2026-10-03T04:05:44.7369931Z /home/runner/work/file_manager/file_manager/gui_forms/src/host/linux/application/linux_host.cpp: In member function ‘void gui_forms::host::linux_detail::Wake::operator()() const’:
+2026-10-03T04:05:44.7371295Z /home/runner/work/file_manager/file_manager/gui_forms/src/host/linux/application/linux_host.cpp:394:30: warning: ignoring return value of ‘ssize_t write(int, const void*, size_t)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+2026-10-03T04:05:44.7372607Z   394 |     static_cast<void>(::write(descriptor, &byte, 1));
+2026-10-03T04:05:44.7373224Z       |                       ~~~~~~~^~~~~~~~~~~~~~~~~~~~~~
+2026-10-03T04:05:45.7159193Z [238/414] Building CXX object CMakeFiles/gui_forms_host_linux.dir/src/host/linux/services/linux_services.cpp.o
+2026-10-03T04:05:46.3620194Z [239/414] Building CXX object CMakeFiles/gui_forms_host_linux.dir/src/host/linux/services/linux_drag_drop.cpp.o
+2026-10-03T04:05:46.4557554Z [240/414] Linking CXX shared library libgui_drawing_abi0.so.0.1.0
+2026-10-03T04:05:46.5252061Z [241/414] Linking CXX static library libgui_forms_host_headless.a
+2026-10-03T04:05:49.6634483Z [242/414] Building CXX object CMakeFiles/gui_forms_host_linux.dir/src/host/linux/services/linux_dialogs.cpp.o
+2026-10-03T04:05:51.2767380Z [243/414] Building CXX object CMakeFiles/gui_forms_c_api.dir/src/abi/control_adapters/input_transparent_control/input_transparent_control.cpp.o
+2026-10-03T04:05:53.1612226Z [244/414] Building CXX object CMakeFiles/gui_forms_c_api.dir/src/abi/control_adapters/form_control/form_control.cpp.o
+2026-10-03T04:05:55.5191583Z [245/414] Building CXX object CMakeFiles/gui_forms_c_api.dir/src/abi/control_adapters/field_control/field_control.cpp.o
+2026-10-03T04:05:56.0921897Z [246/414] Building CXX object CMakeFiles/gui_forms_c_api.dir/src/abi/c_api.cpp.o
+2026-10-03T04:05:57.7782422Z [247/414] Building CXX object CMakeFiles/gui_forms_c_api.dir/src/abi/control_adapters/raster_control/raster_control.cpp.o
+2026-10-03T04:05:58.0241585Z [248/414] Building CXX object CMakeFiles/gui_forms_c_api.dir/src/abi/error/abi_error.cpp.o
+2026-10-03T04:05:58.0355503Z [249/414] Building CXX object CMakeFiles/gui_forms_c_api.dir/src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp.o
+2026-10-03T04:05:58.2619528Z [250/414] Building CXX object CMakeFiles/gui_forms_c_api.dir/src/abi/control_adapters/abi_property_object_control/abi_property_object_control.cpp.o
+2026-10-03T04:05:58.3360447Z [251/414] Linking CXX static library libgui_forms_host_linux.a
+2026-10-03T04:05:59.5249873Z [252/414] Building CXX object CMakeFiles/gui_forms_application.dir/src/runtime/application_bundle.cpp.o
+2026-10-03T04:05:59.6203809Z [253/414] Building CXX object CMakeFiles/gui_drawing_skia.dir/src/render/skia/executor/skia_executor.cpp.o
+2026-10-03T04:05:59.6224152Z [254/414] Creating library symlink libgui_drawing_abi0.so.0 libgui_drawing_abi0.so
+2026-10-03T04:05:59.7352736Z [255/414] Linking CXX shared library libgui_forms_abi0.so.0.4.0
+2026-10-03T04:05:59.8058168Z [256/414] Linking CXX static library libgui_drawing_skia.a
+2026-10-03T04:06:00.6104637Z [257/414] Building CXX object CMakeFiles/gui_drawing_raster_c_api.dir/src/abi/drawing_skia_c_api.cpp.o
+2026-10-03T04:06:00.6125391Z [258/414] Creating library symlink libgui_forms_abi0.so.0 libgui_forms_abi0.so
+2026-10-03T04:06:00.7997590Z [259/414] Linking CXX shared library libgui_drawing_raster0.so
+2026-10-03T04:06:01.6519989Z [260/414] Building CXX object CMakeFiles/gui_forms_application.dir/src/runtime/application/application.cpp.o
+2026-10-03T04:06:01.9844441Z [261/414] Linking CXX shared library libgui_forms_application.so.0.1.0
+2026-10-03T04:06:01.9867109Z [262/414] Creating library symlink libgui_forms_application.so.0 libgui_forms_application.so
+2026-10-03T04:06:02.3260224Z [263/414] Building CXX object CMakeFiles/gui_forms_cursor_interaction_tests.dir/tests/cursor_interaction_tests.cpp.o
+2026-10-03T04:06:02.3523993Z [264/414] Building CXX object CMakeFiles/gui_forms_audio_loop_scheduler_tests.dir/tests/audio/audio_loop_scheduler_tests.cpp.o
+2026-10-03T04:06:02.6224587Z [265/414] Building CXX object CMakeFiles/gui_forms_audio_loop_scheduler_tests.dir/src/audio/loop_transport/scheduler.cpp.o
+2026-10-03T04:06:02.7781993Z [266/414] Building CXX object CMakeFiles/gui_forms_x11_cursor_tests.dir/tests/x11_cursor_tests.cpp.o
+2026-10-03T04:06:04.0167913Z [267/414] Building CXX object CMakeFiles/gui_forms_cursor_image_tests.dir/tests/cursor_image_tests.cpp.o
+2026-10-03T04:06:05.0899622Z [268/414] Building CXX object CMakeFiles/gui_forms_application_contract_tests.dir/tests/application_contract_tests.cpp.o
+2026-10-03T04:06:05.5931686Z [269/414] Building CXX object CMakeFiles/gui_forms_application_native_tests.dir/tests/application_native_tests.cpp.o
+2026-10-03T04:06:06.6960592Z [270/414] Building CXX object CMakeFiles/gui_drawing_core_tests.dir/tests/drawing_core_tests.cpp.o
+2026-10-03T04:06:07.5954265Z [271/414] Building CXX object CMakeFiles/gui_forms_linux_host_tests.dir/tests/linux_host_tests.cpp.o
+2026-10-03T04:06:07.7478632Z [272/414] Building C object CMakeFiles/gui_drawing_c_api_c11_tests.dir/tests/drawing_c_api_c11_tests.c.o
+2026-10-03T04:06:08.3094016Z [273/414] Building CXX object CMakeFiles/gui_drawing_trace_equivalence_tests.dir/tests/drawing_trace_equivalence_tests.cpp.o
+2026-10-03T04:06:08.4466623Z [274/414] Building CXX object CMakeFiles/gui_forms_canvas_tests.dir/tests/canvas_tests.cpp.o
+2026-10-03T04:06:09.9169100Z [275/414] Building CXX object CMakeFiles/gui_forms_host_image_tests.dir/tests/host_image_tests.cpp.o
+2026-10-03T04:06:10.3593438Z [276/414] Building CXX object CMakeFiles/gui_forms_binary_search_tests.dir/tests/binary_search_tests.cpp.o
+2026-10-03T04:06:11.2569595Z [277/414] Building CXX object CMakeFiles/gui_forms_sort_algorithm_tests.dir/tests/sort_algorithm_tests.cpp.o
+2026-10-03T04:06:13.2106890Z [278/414] Building CXX object CMakeFiles/gui_forms_core_tests.dir/tests/core_tests.cpp.o
+2026-10-03T04:06:13.6353927Z [279/414] Building CXX object CMakeFiles/gui_forms_sort_lab.dir/tools/sort_lab.cpp.o
+2026-10-03T04:06:13.9511234Z [280/414] Building CXX object CMakeFiles/gui_forms_image_patch_lab.dir/tools/image_patch_lab.cpp.o
+2026-10-03T04:06:14.6827895Z [281/414] Building CXX object CMakeFiles/gui_forms_callback_lab.dir/tools/callback_lab.cpp.o
+2026-10-03T04:06:15.0481041Z [282/414] Building CXX object CMakeFiles/gui_forms_delegate_event_tests.dir/tests/delegate_event_tests.cpp.o
+2026-10-03T04:06:15.8311568Z [283/414] Building CXX object CMakeFiles/gui_forms_text_store_tests.dir/tests/text_store_tests.cpp.o
+2026-10-03T04:06:16.2651300Z [284/414] Building CXX object CMakeFiles/gui_forms_bounded_grapheme_tests.dir/tests/bounded_grapheme_tests.cpp.o
+2026-10-03T04:06:16.8376504Z [285/414] Building CXX object CMakeFiles/gui_forms_document_view_tests.dir/tests/document_view_tests.cpp.o
+2026-10-03T04:06:16.9307217Z [286/414] Building CXX object CMakeFiles/gui_forms_live_surface_tests.dir/tests/live_surface_tests.cpp.o
+2026-10-03T04:06:17.3385753Z [287/414] Building CXX object CMakeFiles/gui_forms_grapheme_conformance_tests.dir/tests/grapheme_conformance_tests.cpp.o
+2026-10-03T04:06:17.4744425Z [288/414] Building CXX object CMakeFiles/gui_forms_text_shaping_tests.dir/tests/text_shaping_tests.cpp.o
+2026-10-03T04:06:18.0718705Z [289/414] Building CXX object CMakeFiles/gui_forms_bounded_shape_tests.dir/tests/bounded_shape_tests.cpp.o
+2026-10-03T04:06:18.4099590Z [290/414] Building CXX object CMakeFiles/gui_forms_harfbuzz_font_engine_tests.dir/tests/harfbuzz_font_engine_tests.cpp.o
+2026-10-03T04:06:21.5603820Z [291/414] Building CXX object CMakeFiles/gui_forms_connected_controls_tests.dir/tests/connected_controls_tests.cpp.o
+2026-10-03T04:06:23.4462671Z [292/414] Building CXX object CMakeFiles/gui_forms_basic_controls_tests.dir/tests/basic_controls_tests.cpp.o
+2026-10-03T04:06:24.1680794Z [293/414] Building CXX object CMakeFiles/gui_forms_scrollable_control_tests.dir/tests/scrollable_control_tests.cpp.o
+2026-10-03T04:06:26.8084423Z [294/414] Building CXX object CMakeFiles/gui_forms_multiline_text_box_tests.dir/tests/multiline_text_box_tests.cpp.o
+2026-10-03T04:06:27.3284119Z [295/414] Building CXX object CMakeFiles/gui_forms_input_controls_tests.dir/tests/input_controls_tests.cpp.o
+2026-10-03T04:06:30.1418936Z [296/414] Building CXX object CMakeFiles/gui_forms_visual_inspection_tests.dir/tests/visual_inspection_tests.cpp.o
+2026-10-03T04:06:33.2800076Z [297/414] Building CXX object CMakeFiles/gui_forms_instrument_controls_tests.dir/tests/instrument_controls_tests.cpp.o
+2026-10-03T04:06:33.3680947Z [298/414] Building CXX object CMakeFiles/gui_forms_inspection_controls_tests.dir/tests/inspection_controls_tests.cpp.o
+2026-10-03T04:06:36.4670183Z [299/414] Building CXX object CMakeFiles/gui_forms_checked_list_box_tests.dir/tests/checked_list_box_tests.cpp.o
+2026-10-03T04:06:39.7647348Z [300/414] Building CXX object CMakeFiles/gui_forms_object_details_failure_tests.dir/tests/object_details_failure_tests.cpp.o
+2026-10-03T04:06:40.0855020Z [301/414] Building CXX object CMakeFiles/gui_forms_collection_controls_tests.dir/tests/collection_controls_tests.cpp.o
+2026-10-03T04:06:42.9970430Z [302/414] Building CXX object CMakeFiles/gui_forms_popup_controls_tests.dir/tests/popup_controls_tests.cpp.o
+2026-10-03T04:06:43.6764652Z [303/414] Building CXX object CMakeFiles/gui_forms_menu_controls_tests.dir/tests/menu_controls_tests.cpp.o
+2026-10-03T04:06:45.8350551Z [304/414] Building CXX object CMakeFiles/gui_forms_range_controls_tests.dir/tests/range_controls_tests.cpp.o
+2026-10-03T04:06:46.8601035Z [305/414] Building CXX object CMakeFiles/gui_forms_material_tests.dir/tests/material_tests.cpp.o
+2026-10-03T04:06:49.9249824Z [306/414] Building CXX object CMakeFiles/gui_forms_composition_controls_tests.dir/tests/composition_controls_tests.cpp.o
+2026-10-03T04:06:50.0580598Z [307/414] Building CXX object CMakeFiles/gui_forms_theme_tests.dir/tests/theme_tests.cpp.o
+2026-10-03T04:06:52.6149703Z [308/414] Building CXX object CMakeFiles/gui_forms_split_container_tests.dir/tests/split_container_tests.cpp.o
+2026-10-03T04:06:52.8727558Z [309/414] Building CXX object CMakeFiles/gui_forms_layout_panel_tests.dir/tests/layout_panel_tests.cpp.o
+2026-10-03T04:06:55.4984571Z [310/414] Building CXX object CMakeFiles/gui_forms_responsive_track_panel_tests.dir/tests/responsive_track_panel_tests.cpp.o
+2026-10-03T04:06:55.5540857Z [311/414] Building CXX object CMakeFiles/gui_forms_command_overflow_panel_tests.dir/tests/command_overflow_panel_tests.cpp.o
+2026-10-03T04:06:58.0020412Z [312/414] Building CXX object CMakeFiles/gui_forms_focus_scope_tests.dir/tests/focus_scope_tests.cpp.o
+2026-10-03T04:06:58.4235468Z [313/414] Building CXX object CMakeFiles/gui_forms_tab_control_tests.dir/tests/tab_control_tests.cpp.o
+2026-10-03T04:07:00.2224475Z [314/414] Building CXX object CMakeFiles/gui_forms_animation_tests.dir/tests/animation_tests.cpp.o
+2026-10-03T04:07:01.3329255Z [315/414] Building CXX object CMakeFiles/gui_forms_semantic_tests.dir/tests/semantic_tests.cpp.o
+2026-10-03T04:07:04.3597120Z [316/414] Building CXX object CMakeFiles/gui_forms_lifecycle_controls_tests.dir/tests/lifecycle_controls_tests.cpp.o
+2026-10-03T04:07:04.4471908Z [317/414] Building CXX object CMakeFiles/gui_forms_retained_lifetime_tests.dir/tests/retained_lifetime_tests.cpp.o
+2026-10-03T04:07:06.7833660Z [318/414] Building CXX object CMakeFiles/gui_forms_display_chunk_tests.dir/tests/display_chunk_tests.cpp.o
+2026-10-03T04:07:07.2467980Z [319/414] Building CXX object CMakeFiles/gui_forms_invalidation_damage_tests.dir/tests/invalidation_damage_tests.cpp.o
+2026-10-03T04:07:09.2677806Z [320/414] Building CXX object CMakeFiles/gui_forms_frame_scheduler_tests.dir/tests/frame_scheduler_tests.cpp.o
+2026-10-03T04:07:09.5943024Z [321/414] Building CXX object CMakeFiles/gui_forms_timer_tests.dir/tests/timer_tests.cpp.o
+2026-10-03T04:07:12.2467767Z [322/414] Building CXX object CMakeFiles/gui_forms_tooltip_tests.dir/tests/tooltip_tests.cpp.o
+2026-10-03T04:07:12.6153733Z [323/414] Building CXX object CMakeFiles/gui_forms_dispatcher_tests.dir/tests/dispatcher_tests.cpp.o
+2026-10-03T04:07:16.9332769Z [324/414] Building CXX object CMakeFiles/gui_forms_validation_tests.dir/tests/validation_tests.cpp.o
+2026-10-03T04:07:18.7163350Z [325/414] Building CXX object CMakeFiles/gui_forms_binding_tests.dir/tests/binding_tests.cpp.o
+2026-10-03T04:07:20.0128017Z [326/414] Building CXX object CMakeFiles/gui_forms_guidance_provider_tests.dir/tests/guidance_provider_tests.cpp.o
+2026-10-03T04:07:21.8836783Z [327/414] Building CXX object CMakeFiles/gui_forms_date_time_picker_tests.dir/tests/date_time_picker_tests.cpp.o
+2026-10-03T04:07:22.1356966Z [328/414] Building CXX object CMakeFiles/gui_forms_headless_trace_tests.dir/tests/headless_trace_tests.cpp.o
+2026-10-03T04:07:22.5180331Z [329/414] Building CXX object CMakeFiles/gui_forms_png_registry_tests.dir/tests/png_registry_tests.cpp.o
+2026-10-03T04:07:25.1215375Z [330/414] Building CXX object CMakeFiles/gui_forms_headless_trace_tests.dir/tests/support/headless_trace.cpp.o
+2026-10-03T04:07:25.4372279Z [331/414] Building C object CMakeFiles/gui_forms_c_api_c11_tests.dir/tests/c_api_c11_tests.c.o
+2026-10-03T04:07:25.7417753Z [332/414] Building CXX object CMakeFiles/gui_forms_c_api_cpp_tests.dir/tests/c_api_cpp_tests.cpp.o
+2026-10-03T04:07:26.3398039Z [333/414] Building CXX object CMakeFiles/gui_forms_skia_smoke.dir/src/render/skia/skia_raster_smoke.cpp.o
+2026-10-03T04:07:27.5289224Z [334/414] Building CXX object CMakeFiles/gui_forms_host_protocol_tests.dir/tests/host_protocol_tests.cpp.o
+2026-10-03T04:07:27.8007870Z [335/414] Building CXX object CMakeFiles/gui_forms_canvas_raster_tests.dir/tests/canvas_raster_tests.cpp.o
+2026-10-03T04:07:28.0680130Z [336/414] Building CXX object CMakeFiles/gui_drawing_raster_c_api_tests.dir/tests/drawing_raster_c_api_tests.cpp.o
+2026-10-03T04:07:28.2937051Z [337/414] Building CXX object CMakeFiles/gui_drawing_skia_tests.dir/tests/drawing_skia_tests.cpp.o
+2026-10-03T04:07:30.2310953Z [338/414] Building CXX object CMakeFiles/gui_forms_linux_accessibility_fixture.dir/tests/linux_accessibility_fixture.cpp.o
+2026-10-03T04:07:30.2943334Z [339/414] Linking CXX executable gui_forms_cursor_interaction_tests
+2026-10-03T04:07:30.3333058Z [340/414] Linking CXX executable gui_forms_audio_loop_scheduler_tests
+2026-10-03T04:07:30.3801682Z [341/414] Building CXX object CMakeFiles/gui_forms_linux_accessibility_fixture.dir/src/host/linux/accessibility/linux_accessibility.cpp.o
+2026-10-03T04:07:30.3803936Z [342/414] Linking CXX executable gui_forms_x11_cursor_tests
+2026-10-03T04:07:30.4423922Z [343/414] Linking CXX executable gui_forms_cursor_image_tests
+2026-10-03T04:07:30.4450707Z [344/414] Linking CXX executable gui_forms_application_contract_tests
+2026-10-03T04:07:30.5022889Z [345/414] Linking CXX executable gui_forms_application_native_tests
+2026-10-03T04:07:30.7068361Z [346/414] Linking CXX executable gui_forms_linux_host_tests
+2026-10-03T04:07:30.7539197Z [347/414] Linking CXX executable gui_drawing_core_tests
+2026-10-03T04:07:30.8206172Z [348/414] Linking CXX executable gui_forms_canvas_tests
+2026-10-03T04:07:30.8535089Z [349/414] Linking C executable gui_drawing_c_api_c11_tests
+2026-10-03T04:07:30.8981962Z [350/414] Linking CXX executable gui_drawing_trace_equivalence_tests
+2026-10-03T04:07:30.9581170Z [351/414] Linking CXX executable gui_forms_host_image_tests
+2026-10-03T04:07:31.0231547Z [352/414] Linking CXX executable gui_forms_core_tests
+2026-10-03T04:07:31.0646064Z [353/414] Linking CXX executable gui_forms_binary_search_tests
+2026-10-03T04:07:31.1041953Z [354/414] Linking CXX executable gui_forms_sort_algorithm_tests
+2026-10-03T04:07:31.1437728Z [355/414] Linking CXX executable gui_forms_sort_lab
+2026-10-03T04:07:31.1846568Z [356/414] Linking CXX executable gui_forms_image_patch_lab
+2026-10-03T04:07:31.2243468Z [357/414] Linking CXX executable gui_forms_callback_lab
+2026-10-03T04:07:31.2642988Z [358/414] Linking CXX executable gui_forms_delegate_event_tests
+2026-10-03T04:07:31.3256792Z [359/414] Linking CXX executable gui_forms_live_surface_tests
+2026-10-03T04:07:31.3432776Z [360/414] Building CXX object CMakeFiles/gui_forms_reference_examples.dir/examples/reference/clipboard_image.cpp.o
+2026-10-03T04:07:31.3678733Z [361/414] Linking CXX executable gui_forms_text_store_tests
+2026-10-03T04:07:31.3871377Z [362/414] Linking CXX executable gui_forms_bounded_grapheme_tests
+2026-10-03T04:07:31.4092073Z [363/414] Linking CXX executable gui_forms_document_view_tests
+2026-10-03T04:07:31.4274220Z [364/414] Linking CXX executable gui_forms_grapheme_conformance_tests
+2026-10-03T04:07:31.4516487Z [365/414] Linking CXX executable gui_forms_text_shaping_tests
+2026-10-03T04:07:31.4861810Z [366/414] Linking CXX executable gui_forms_bounded_shape_tests
+2026-10-03T04:07:31.5092046Z [367/414] Linking CXX executable gui_forms_harfbuzz_font_engine_tests
+2026-10-03T04:07:31.5678663Z [368/414] Linking CXX executable gui_forms_basic_controls_tests
+2026-10-03T04:07:31.5843877Z [369/414] Linking CXX executable gui_forms_connected_controls_tests
+2026-10-03T04:07:31.6393817Z [370/414] Linking CXX executable gui_forms_scrollable_control_tests
+2026-10-03T04:07:31.6638928Z [371/414] Linking CXX executable gui_forms_input_controls_tests
+2026-10-03T04:07:31.7128681Z [372/414] Linking CXX executable gui_forms_multiline_text_box_tests
+2026-10-03T04:07:31.7590559Z [373/414] Linking CXX executable gui_forms_inspection_controls_tests
+2026-10-03T04:07:31.7873990Z [374/414] Linking CXX executable gui_forms_visual_inspection_tests
+2026-10-03T04:07:31.8440355Z [375/414] Linking CXX executable gui_forms_instrument_controls_tests
+2026-10-03T04:07:31.8579880Z [376/414] Linking CXX executable gui_forms_checked_list_box_tests
+2026-10-03T04:07:31.9262635Z [377/414] Linking CXX executable gui_forms_collection_controls_tests
+2026-10-03T04:07:31.9272585Z [378/414] Linking CXX executable gui_forms_object_details_failure_tests
+2026-10-03T04:07:32.0002510Z [379/414] Linking CXX executable gui_forms_popup_controls_tests
+2026-10-03T04:07:32.0032872Z [380/414] Linking CXX executable gui_forms_menu_controls_tests
+2026-10-03T04:07:32.0700764Z [381/414] Linking CXX executable gui_forms_material_tests
+2026-10-03T04:07:32.0764066Z [382/414] Linking CXX executable gui_forms_range_controls_tests
+2026-10-03T04:07:32.1505777Z [383/414] Linking CXX executable gui_forms_composition_controls_tests
+2026-10-03T04:07:32.1527348Z [384/414] Linking CXX executable gui_forms_theme_tests
+2026-10-03T04:07:32.2256717Z [385/414] Linking CXX executable gui_forms_layout_panel_tests
+2026-10-03T04:07:32.2259455Z [386/414] Linking CXX executable gui_forms_split_container_tests
+2026-10-03T04:07:32.2983123Z [387/414] Linking CXX executable gui_forms_command_overflow_panel_tests
+2026-10-03T04:07:32.3007391Z [388/414] Linking CXX executable gui_forms_responsive_track_panel_tests
+2026-10-03T04:07:32.3737392Z [389/414] Linking CXX executable gui_forms_tab_control_tests
+2026-10-03T04:07:32.3776668Z [390/414] Linking CXX executable gui_forms_focus_scope_tests
+2026-10-03T04:07:32.4508048Z [391/414] Linking CXX executable gui_forms_animation_tests
+2026-10-03T04:07:32.4580097Z [392/414] Linking CXX executable gui_forms_semantic_tests
+2026-10-03T04:07:32.5219865Z [393/414] Linking CXX executable gui_forms_retained_lifetime_tests
+2026-10-03T04:07:32.5268448Z [394/414] Linking CXX executable gui_forms_lifecycle_controls_tests
+2026-10-03T04:07:32.5840008Z [395/414] Linking CXX executable gui_forms_invalidation_damage_tests
+2026-10-03T04:07:32.5897263Z [396/414] Linking CXX executable gui_forms_display_chunk_tests
+2026-10-03T04:07:32.6467631Z [397/414] Linking CXX executable gui_forms_frame_scheduler_tests
+2026-10-03T04:07:32.6537631Z [398/414] Linking CXX executable gui_forms_timer_tests
+2026-10-03T04:07:32.7154350Z [399/414] Linking CXX executable gui_forms_dispatcher_tests
+2026-10-03T04:07:32.7284669Z [400/414] Linking CXX executable gui_forms_tooltip_tests
+2026-10-03T04:07:32.8014645Z [401/414] Linking CXX executable gui_forms_binding_tests
+2026-10-03T04:07:32.8073413Z [402/414] Linking CXX executable gui_forms_validation_tests
+2026-10-03T04:07:32.8735103Z [403/414] Linking CXX executable gui_forms_date_time_picker_tests
+2026-10-03T04:07:32.8810788Z [404/414] Linking CXX executable gui_forms_guidance_provider_tests
+2026-10-03T04:07:32.9364486Z [405/414] Linking CXX executable gui_forms_png_registry_tests
+2026-10-03T04:07:32.9449985Z [406/414] Linking CXX executable gui_forms_headless_trace_tests
+2026-10-03T04:07:32.9814769Z [407/414] Linking C executable gui_forms_c_api_c11_tests
+2026-10-03T04:07:33.0027109Z [408/414] Linking CXX executable gui_forms_host_protocol_tests
+2026-10-03T04:07:33.0278043Z [409/414] Linking CXX executable gui_forms_c_api_cpp_tests
+2026-10-03T04:07:33.1900120Z [410/414] Linking CXX executable gui_forms_skia_smoke
+2026-10-03T04:07:33.2478523Z [411/414] Linking CXX executable gui_forms_canvas_raster_tests
+2026-10-03T04:07:33.2883072Z [412/414] Linking CXX executable gui_drawing_raster_c_api_tests
+2026-10-03T04:07:33.3734034Z [413/414] Linking CXX executable gui_drawing_skia_tests
+2026-10-03T04:07:33.3762492Z [414/414] Linking CXX executable gui_forms_linux_accessibility_fixture
+2026-10-03T04:07:33.3772694Z + ctest --test-dir /home/runner/work/file_manager/file_manager/.build/native-linux-x64/gui-forms --output-on-failure --timeout 120
+2026-10-03T04:07:34.1967205Z Internal ctest changing into directory: /home/runner/work/file_manager/file_manager/.build/native-linux-x64/gui-forms
+2026-10-03T04:07:34.7428043Z Test project /home/runner/work/file_manager/file_manager/.build/native-linux-x64/gui-forms
+2026-10-03T04:07:34.8130477Z       Start  1: cursor_interaction
+2026-10-03T04:07:34.8206555Z  1/74 Test  #1: cursor_interaction .......................   Passed    0.00 sec
+2026-10-03T04:07:34.8278044Z       Start  2: gui_forms_audio_loop_scheduler_tests
+2026-10-03T04:07:34.8993810Z  2/74 Test  #2: gui_forms_audio_loop_scheduler_tests .....   Passed    0.07 sec
+2026-10-03T04:07:34.8994572Z       Start  3: gui_forms_x11_cursors
+2026-10-03T04:07:34.9090455Z  3/74 Test  #3: gui_forms_x11_cursors ....................   Passed    0.01 sec
+2026-10-03T04:07:34.9091459Z       Start  4: gui_forms_cursor_images
+2026-10-03T04:07:34.9111203Z  4/74 Test  #4: gui_forms_cursor_images ..................   Passed    0.00 sec
+2026-10-03T04:07:34.9111967Z       Start  5: gui_forms_application_contract_tests
+2026-10-03T04:07:34.9132774Z  5/74 Test  #5: gui_forms_application_contract_tests .....   Passed    0.00 sec
+2026-10-03T04:07:34.9133523Z       Start  6: gui_forms_application_native_tests
+2026-10-03T04:07:35.6664166Z  6/74 Test  #6: gui_forms_application_native_tests .......Subprocess aborted***Exception:   0.75 sec
+2026-10-03T04:07:35.6665164Z 
+2026-10-03T04:07:35.6666197Z (gui_forms_application_native_tests:8627): dbind-WARNING **: 04:07:35.433: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+2026-10-03T04:07:35.6667944Z GUI.Forms Linux host: Cannot open the X11 display
+2026-10-03T04:07:35.6668723Z terminate called after throwing an instance of 'std::runtime_error'
+2026-10-03T04:07:35.6669628Z   what():  callback failure escaped or left native window open
+2026-10-03T04:07:35.6670190Z 
+2026-10-03T04:07:35.6670627Z       Start  7: gui_forms_linux_host_tests
+2026-10-03T04:07:36.2142890Z  7/74 Test  #7: gui_forms_linux_host_tests ...............   Passed    0.55 sec
+2026-10-03T04:07:36.3590156Z       Start  8: gui_forms_api_reference_tests
+2026-10-03T04:07:38.6421231Z  8/74 Test  #8: gui_forms_api_reference_tests ............   Passed    2.28 sec
+2026-10-03T04:07:38.6422003Z       Start  9: gui_drawing_core_tests
+2026-10-03T04:07:38.6448851Z  9/74 Test  #9: gui_drawing_core_tests ...................   Passed    0.00 sec
+2026-10-03T04:07:38.6449505Z       Start 10: gui_forms_canvas_tests
+2026-10-03T04:07:38.6710320Z 10/74 Test #10: gui_forms_canvas_tests ...................   Passed    0.03 sec
+2026-10-03T04:07:38.6711569Z       Start 11: gui_drawing_c_api_c11_tests
+2026-10-03T04:07:38.6729605Z 11/74 Test #11: gui_drawing_c_api_c11_tests ..............   Passed    0.00 sec
+2026-10-03T04:07:38.6730274Z       Start 12: gui_drawing_trace_equivalence_tests
+2026-10-03T04:07:38.6748861Z 12/74 Test #12: gui_drawing_trace_equivalence_tests ......   Passed    0.00 sec
+2026-10-03T04:07:38.6749802Z       Start 13: gui_drawing_renderer_boundary_audit
+2026-10-03T04:07:38.6893090Z 13/74 Test #13: gui_drawing_renderer_boundary_audit ......   Passed    0.01 sec
+2026-10-03T04:07:38.6893723Z       Start 14: gui_forms_host_image_tests
+2026-10-03T04:07:38.6908181Z 14/74 Test #14: gui_forms_host_image_tests ...............   Passed    0.00 sec
+2026-10-03T04:07:38.6909137Z       Start 15: gui_forms_core_tests
+2026-10-03T04:07:38.7150862Z 15/74 Test #15: gui_forms_core_tests .....................   Passed    0.02 sec
+2026-10-03T04:07:38.7151603Z       Start 16: gui_forms_binary_search_tests
+2026-10-03T04:07:38.7165984Z 16/74 Test #16: gui_forms_binary_search_tests ............   Passed    0.00 sec
+2026-10-03T04:07:38.7390276Z       Start 17: gui_forms_sort_algorithm_tests
+2026-10-03T04:07:38.7691971Z 17/74 Test #17: gui_forms_sort_algorithm_tests ...........   Passed    0.05 sec
+2026-10-03T04:07:38.7693436Z       Start 18: gui_forms_delegate_event_tests
+2026-10-03T04:07:38.7708679Z 18/74 Test #18: gui_forms_delegate_event_tests ...........   Passed    0.00 sec
+2026-10-03T04:07:38.7709181Z       Start 19: gui_forms_live_surface_tests
+2026-10-03T04:07:38.7726164Z 19/74 Test #19: gui_forms_live_surface_tests .............   Passed    0.00 sec
+2026-10-03T04:07:38.7727410Z       Start 20: gui_forms_text_store_tests
+2026-10-03T04:07:38.7743307Z 20/74 Test #20: gui_forms_text_store_tests ...............   Passed    0.00 sec
+2026-10-03T04:07:38.7743856Z       Start 21: gui_forms_bounded_grapheme_tests
+2026-10-03T04:07:38.7760564Z 21/74 Test #21: gui_forms_bounded_grapheme_tests .........   Passed    0.00 sec
+2026-10-03T04:07:38.7761809Z       Start 22: gui_forms_document_view_tests
+2026-10-03T04:07:38.7847038Z 22/74 Test #22: gui_forms_document_view_tests ............   Passed    0.01 sec
+2026-10-03T04:07:38.7848440Z       Start 23: gui_forms_grapheme_conformance_tests
+2026-10-03T04:07:38.7862669Z 23/74 Test #23: gui_forms_grapheme_conformance_tests .....   Passed    0.00 sec
+2026-10-03T04:07:38.7863171Z       Start 24: gui_forms_text_shaping_tests
+2026-10-03T04:07:38.7874291Z 24/74 Test #24: gui_forms_text_shaping_tests .............   Passed    0.00 sec
+2026-10-03T04:07:38.7874868Z       Start 25: gui_forms_bounded_shape_tests
+2026-10-03T04:07:38.8069492Z 25/74 Test #25: gui_forms_bounded_shape_tests ............   Passed    0.02 sec
+2026-10-03T04:07:38.8070063Z       Start 26: gui_forms_harfbuzz_font_engine_tests
+2026-10-03T04:07:38.8387541Z 26/74 Test #26: gui_forms_harfbuzz_font_engine_tests .....   Passed    0.03 sec
+2026-10-03T04:07:38.8388641Z       Start 27: gui_forms_basic_controls_tests
+2026-10-03T04:07:38.8433353Z 27/74 Test #27: gui_forms_basic_controls_tests ...........   Passed    0.00 sec
+2026-10-03T04:07:38.8435004Z       Start 28: gui_forms_connected_controls_tests
+2026-10-03T04:07:38.8456511Z 28/74 Test #28: gui_forms_connected_controls_tests .......   Passed    0.00 sec
+2026-10-03T04:07:38.8457078Z       Start 29: gui_forms_scrollable_control_tests
+2026-10-03T04:07:38.8475344Z 29/74 Test #29: gui_forms_scrollable_control_tests .......   Passed    0.00 sec
+2026-10-03T04:07:38.8476626Z       Start 30: gui_forms_input_controls_tests
+2026-10-03T04:07:38.8503568Z 30/74 Test #30: gui_forms_input_controls_tests ...........   Passed    0.00 sec
+2026-10-03T04:07:38.8504099Z       Start 31: gui_forms_multiline_text_box_tests
+2026-10-03T04:07:39.0965964Z 31/74 Test #31: gui_forms_multiline_text_box_tests .......   Passed    0.25 sec
+2026-10-03T04:07:39.0967226Z       Start 32: gui_forms_inspection_controls_tests
+2026-10-03T04:07:39.1374800Z 32/74 Test #32: gui_forms_inspection_controls_tests ......   Passed    0.04 sec
+2026-10-03T04:07:39.1376121Z       Start 33: gui_forms_visual_inspection_tests
+2026-10-03T04:07:39.1400708Z 33/74 Test #33: gui_forms_visual_inspection_tests ........   Passed    0.00 sec
+2026-10-03T04:07:39.1401572Z       Start 34: gui_forms_instrument_controls_tests
+2026-10-03T04:07:39.1434877Z 34/74 Test #34: gui_forms_instrument_controls_tests ......   Passed    0.00 sec
+2026-10-03T04:07:39.1435733Z       Start 35: gui_forms_checked_list_box_tests
+2026-10-03T04:07:39.1454132Z 35/74 Test #35: gui_forms_checked_list_box_tests .........   Passed    0.00 sec
+2026-10-03T04:07:39.1455001Z       Start 36: gui_forms_collection_controls_tests
+2026-10-03T04:07:39.3264963Z 36/74 Test #36: gui_forms_collection_controls_tests ......   Passed    0.18 sec
+2026-10-03T04:07:39.3266370Z       Start 37: gui_forms_object_details_failure_tests
+2026-10-03T04:07:39.3589046Z 37/74 Test #37: gui_forms_object_details_failure_tests ...   Passed    0.03 sec
+2026-10-03T04:07:39.3590361Z       Start 38: gui_forms_menu_controls_tests
+2026-10-03T04:07:39.3632076Z 38/74 Test #38: gui_forms_menu_controls_tests ............   Passed    0.00 sec
+2026-10-03T04:07:39.3632977Z       Start 39: gui_forms_popup_controls_tests
+2026-10-03T04:07:39.3652211Z 39/74 Test #39: gui_forms_popup_controls_tests ...........   Passed    0.00 sec
+2026-10-03T04:07:39.3652908Z       Start 40: gui_forms_range_controls_tests
+2026-10-03T04:07:39.3674915Z 40/74 Test #40: gui_forms_range_controls_tests ...........   Passed    0.00 sec
+2026-10-03T04:07:39.3675801Z       Start 41: gui_forms_material_tests
+2026-10-03T04:07:39.3694158Z 41/74 Test #41: gui_forms_material_tests .................   Passed    0.00 sec
+2026-10-03T04:07:39.3694949Z       Start 42: gui_forms_theme_tests
+2026-10-03T04:07:39.3719854Z 42/74 Test #42: gui_forms_theme_tests ....................   Passed    0.00 sec
+2026-10-03T04:07:39.3720762Z       Start 43: gui_forms_composition_controls_tests
+2026-10-03T04:07:39.3745442Z 43/74 Test #43: gui_forms_composition_controls_tests .....   Passed    0.00 sec
+2026-10-03T04:07:39.3746264Z       Start 44: gui_forms_split_container_tests
+2026-10-03T04:07:39.3773849Z 44/74 Test #44: gui_forms_split_container_tests ..........   Passed    0.00 sec
+2026-10-03T04:07:39.3774543Z       Start 45: gui_forms_layout_panel_tests
+2026-10-03T04:07:39.3805618Z 45/74 Test #45: gui_forms_layout_panel_tests .............   Passed    0.00 sec
+2026-10-03T04:07:39.3806474Z       Start 46: gui_forms_responsive_track_panel_tests
+2026-10-03T04:07:39.3825302Z 46/74 Test #46: gui_forms_responsive_track_panel_tests ...   Passed    0.00 sec
+2026-10-03T04:07:39.3826125Z       Start 47: gui_forms_command_overflow_panel_tests
+2026-10-03T04:07:39.3844062Z 47/74 Test #47: gui_forms_command_overflow_panel_tests ...   Passed    0.00 sec
+2026-10-03T04:07:39.3845123Z       Start 48: gui_forms_tab_control_tests
+2026-10-03T04:07:39.3866977Z 48/74 Test #48: gui_forms_tab_control_tests ..............   Passed    0.00 sec
+2026-10-03T04:07:39.3867738Z       Start 49: gui_forms_focus_scope_tests
+2026-10-03T04:07:39.3894736Z 49/74 Test #49: gui_forms_focus_scope_tests ..............   Passed    0.00 sec
+2026-10-03T04:07:39.3895476Z       Start 50: gui_forms_animation_tests
+2026-10-03T04:07:39.3913363Z 50/74 Test #50: gui_forms_animation_tests ................   Passed    0.00 sec
+2026-10-03T04:07:39.3914108Z       Start 51: gui_forms_semantic_tests
+2026-10-03T04:07:39.3939109Z 51/74 Test #51: gui_forms_semantic_tests .................   Passed    0.00 sec
+2026-10-03T04:07:39.3939925Z       Start 52: gui_forms_lifecycle_controls_tests
+2026-10-03T04:07:39.3961920Z 52/74 Test #52: gui_forms_lifecycle_controls_tests .......   Passed    0.00 sec
+2026-10-03T04:07:39.3962745Z       Start 53: gui_forms_retained_lifetime_tests
+2026-10-03T04:07:39.3989247Z 53/74 Test #53: gui_forms_retained_lifetime_tests ........   Passed    0.00 sec
+2026-10-03T04:07:39.3990060Z       Start 54: gui_forms_invalidation_damage_tests
+2026-10-03T04:07:39.4013361Z 54/74 Test #54: gui_forms_invalidation_damage_tests ......   Passed    0.00 sec
+2026-10-03T04:07:39.4014452Z       Start 55: gui_forms_display_chunk_tests
+2026-10-03T04:07:39.4032484Z 55/74 Test #55: gui_forms_display_chunk_tests ............   Passed    0.00 sec
+2026-10-03T04:07:39.4033225Z       Start 56: gui_forms_frame_scheduler_tests
+2026-10-03T04:07:39.4054200Z 56/74 Test #56: gui_forms_frame_scheduler_tests ..........   Passed    0.00 sec
+2026-10-03T04:07:39.4054940Z       Start 57: gui_forms_timer_tests
+2026-10-03T04:07:39.4072515Z 57/74 Test #57: gui_forms_timer_tests ....................   Passed    0.00 sec
+2026-10-03T04:07:39.4073483Z       Start 58: gui_forms_dispatcher_tests
+2026-10-03T04:07:39.4251140Z 58/74 Test #58: gui_forms_dispatcher_tests ...............   Passed    0.02 sec
+2026-10-03T04:07:39.4252324Z       Start 59: gui_forms_tooltip_tests
+2026-10-03T04:07:39.4289004Z 59/74 Test #59: gui_forms_tooltip_tests ..................   Passed    0.00 sec
+2026-10-03T04:07:39.4289732Z       Start 60: gui_forms_binding_tests
+2026-10-03T04:07:39.4318733Z 60/74 Test #60: gui_forms_binding_tests ..................   Passed    0.00 sec
+2026-10-03T04:07:39.4319407Z       Start 61: gui_forms_validation_tests
+2026-10-03T04:07:39.4340341Z 61/74 Test #61: gui_forms_validation_tests ...............   Passed    0.00 sec
+2026-10-03T04:07:39.4340854Z       Start 62: gui_forms_guidance_provider_tests
+2026-10-03T04:07:39.4361952Z 62/74 Test #62: gui_forms_guidance_provider_tests ........   Passed    0.00 sec
+2026-10-03T04:07:39.4362666Z       Start 63: gui_forms_date_time_picker_tests
+2026-10-03T04:07:39.4386788Z 63/74 Test #63: gui_forms_date_time_picker_tests .........   Passed    0.00 sec
+2026-10-03T04:07:39.4388101Z       Start 64: gui_forms_png_registry_tests
+2026-10-03T04:07:39.4435679Z 64/74 Test #64: gui_forms_png_registry_tests .............   Passed    0.00 sec
+2026-10-03T04:07:39.4436510Z       Start 65: gui_forms_headless_trace_tests
+2026-10-03T04:07:39.4453225Z 65/74 Test #65: gui_forms_headless_trace_tests ...........   Passed    0.00 sec
+2026-10-03T04:07:39.4454197Z       Start 66: gui_forms_host_protocol_tests
+2026-10-03T04:07:39.4536073Z 66/74 Test #66: gui_forms_host_protocol_tests ............   Passed    0.01 sec
+2026-10-03T04:07:39.4537098Z       Start 67: gui_forms_host_boundary_audit
+2026-10-03T04:07:39.6881913Z 67/74 Test #67: gui_forms_host_boundary_audit ............   Passed    0.23 sec
+2026-10-03T04:07:39.6883040Z       Start 68: gui_forms_c_api_c11_tests
+2026-10-03T04:07:39.7046926Z 68/74 Test #68: gui_forms_c_api_c11_tests ................   Passed    0.02 sec
+2026-10-03T04:07:39.7047518Z       Start 69: gui_forms_c_api_cpp_tests
+2026-10-03T04:07:39.7073079Z 69/74 Test #69: gui_forms_c_api_cpp_tests ................   Passed    0.00 sec
+2026-10-03T04:07:39.7073671Z       Start 70: gui_forms_skia_smoke
+2026-10-03T04:07:39.7391686Z 70/74 Test #70: gui_forms_skia_smoke .....................   Passed    0.03 sec
+2026-10-03T04:07:39.7392800Z       Start 71: gui_forms_canvas_raster_tests
+2026-10-03T04:07:42.0071093Z 71/74 Test #71: gui_forms_canvas_raster_tests ............   Passed    2.27 sec
+2026-10-03T04:07:42.0071780Z       Start 72: gui_forms_skia_archive_policy
+2026-10-03T04:07:42.2002026Z 72/74 Test #72: gui_forms_skia_archive_policy ............   Passed    0.19 sec
+2026-10-03T04:07:42.2004539Z       Start 73: gui_drawing_skia_tests
+2026-10-03T04:07:42.2043943Z 73/74 Test #73: gui_drawing_skia_tests ...................   Passed    0.00 sec
+2026-10-03T04:07:42.2045372Z       Start 74: gui_drawing_raster_c_api_tests
+2026-10-03T04:07:42.2073122Z 74/74 Test #74: gui_drawing_raster_c_api_tests ...........   Passed    0.00 sec
+2026-10-03T04:07:42.2075987Z 
+2026-10-03T04:07:42.2076263Z 99% tests passed, 1 tests failed out of 74
+2026-10-03T04:07:42.2076483Z 
+2026-10-03T04:07:42.2076595Z Total Test time (real) =   7.46 sec
+2026-10-03T04:07:42.2076773Z 
+2026-10-03T04:07:42.2076891Z The following tests FAILED:
+2026-10-03T04:07:42.2077415Z 	  6 - gui_forms_application_native_tests (Subprocess aborted)
+2026-10-03T04:07:42.2077768Z Errors while running CTest
+2026-10-03T04:07:42.2963217Z Traceback (most recent call last):
+2026-10-03T04:07:42.2964392Z   File "/home/runner/work/file_manager/file_manager/tools/build_native.py", line 161, in <module>
+2026-10-03T04:07:42.2964787Z     main()
+2026-10-03T04:07:42.2965222Z   File "/home/runner/work/file_manager/file_manager/tools/build_native.py", line 114, in main
+2026-10-03T04:07:42.2965692Z     build_toolkit(host, build, sdk, jobs)
+2026-10-03T04:07:42.2966118Z   File "/home/runner/work/file_manager/file_manager/tools/build_native.py", line 69, in build_toolkit
+2026-10-03T04:07:42.2966653Z     run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', '120')
+2026-10-03T04:07:42.2967146Z   File "/home/runner/work/file_manager/file_manager/tools/native_build_support.py", line 51, in run
+2026-10-03T04:07:42.2967581Z     subprocess.run(command, cwd=cwd, check=True)
+2026-10-03T04:07:42.2967909Z   File "/usr/lib/python3.12/subprocess.py", line 571, in run
+2026-10-03T04:07:42.2968243Z     raise CalledProcessError(retcode, process.args,
+2026-10-03T04:07:42.2968975Z subprocess.CalledProcessError: Command '['ctest', '--test-dir', '/home/runner/work/file_manager/file_manager/.build/native-linux-x64/gui-forms', '--output-on-failure', '--timeout', '120']' returned non-zero exit status 8.
+2026-10-03T04:07:42.3155695Z ##[error]Process completed with exit code 1.
+2026-10-03T04:07:42.3264119Z ##[group]Run actions/upload-artifact@v4
+2026-10-03T04:07:42.3264375Z with:
+2026-10-03T04:07:42.3264578Z   name: build-evidence-linux-x64
+2026-10-03T04:07:42.3266065Z   path: .build/native-linux-x64/**/Testing/Temporary/*LastTest.log
+.build/native-linux-x64/**/CMakeConfigureLog.yaml
+.build/native-linux-x64/package-check.json
+.build/native-linux-x64/source-state-*.json
+.build/native-linux-x64/paint-cost/*
+.build/native-linux-x64/focused-cpu/*
+.build/native-linux-x64/frontend/native-preview-failure.png
+.build/native-linux-x64/frontend/native-preview-failure.json
+.build/native-linux-x64/frontend/native-details.png
+.build/native-linux-x64/frontend/native-text-preview.png
+
+2026-10-03T04:07:42.3267578Z   if-no-files-found: ignore
+2026-10-03T04:07:42.3267788Z   compression-level: 6
+2026-10-03T04:07:42.3267976Z   overwrite: false
+2026-10-03T04:07:42.3268162Z   include-hidden-files: false
+2026-10-03T04:07:42.3268365Z ##[endgroup]
+2026-10-03T04:07:42.4649821Z (node:8782) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-03T04:07:42.4650422Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-03T04:07:42.6618688Z With the provided path, there will be 3 files uploaded
+2026-10-03T04:07:42.6625124Z Artifact name is valid!
+2026-10-03T04:07:42.6625862Z Root directory input is valid!
+2026-10-03T04:07:42.9493100Z Beginning upload of artifact content to blob storage
+2026-10-03T04:07:42.9698101Z (node:8782) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-10-03T04:07:43.1513322Z Uploaded bytes 16047
+2026-10-03T04:07:43.1951284Z Finished uploading artifact content to blob storage!
+2026-10-03T04:07:43.1951786Z SHA256 digest of uploaded artifact zip is e61046dacc226a84124c27e407a170e75c7dbb446a71803f8c4fa3116efcf4e6
+2026-10-03T04:07:43.1953508Z Finalizing artifact upload
+2026-10-03T04:07:43.4123296Z Artifact build-evidence-linux-x64.zip successfully finalized. Artifact ID 11264236202
+2026-10-03T04:07:43.4124130Z Artifact build-evidence-linux-x64 has been successfully uploaded! Final size is 16047 bytes. Artifact ID is 11264236202
+2026-10-03T04:07:43.4125114Z Artifact download URL: https://github.com/falseywinchnet/file_manager/actions/runs/37095128788/artifacts/11264236202
+2026-10-03T04:07:43.4281192Z Post job cleanup.
+2026-10-03T04:07:43.4990611Z [command]/usr/bin/git version
+2026-10-03T04:07:43.5031269Z git version 2.55.0
+2026-10-03T04:07:43.5066186Z Temporarily overriding HOME='/home/runner/work/_temp/816e909f-9247-4d54-8ebf-cf78e8ae2228' before making global git config changes
+2026-10-03T04:07:43.5066886Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-03T04:07:43.5071657Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/file_manager/file_manager
+2026-10-03T04:07:43.5106573Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-03T04:07:43.5135289Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-03T04:07:43.5322435Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-03T04:07:43.5342851Z http.https://github.com/.extraheader
+2026-10-03T04:07:43.5352769Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-03T04:07:43.5386290Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-03T04:07:43.5574100Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-03T04:07:43.5599517Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-03T04:07:43.5912953Z Cleaning up orphan processes
+2026-10-03T04:07:43.6120552Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/setup-go@v5, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

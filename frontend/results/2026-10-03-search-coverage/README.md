@@ -76,7 +76,28 @@ no test was disabled and this patch does not claim to fix it. A focused follow-u
 should distinguish the test's exists-before-close race from production discovery
 behavior before changing the provider.
 
-## House-style review
+## Native Linux display follow-up
+
+**OBSERVED:** at source `3208090f2b9651420b2ab8fb905fe6537a7892cf`,
+push run `37095125858` passed Linux, while PR run `37095128788` failed
+`gui_forms_application_native_tests` before building the frontend. The latter
+reported `Cannot open the X11 display` during repeated application lifecycles;
+the following Linux host test passed. `LinuxInitialFailure.log` retains the
+failed job. This is an intermittent display-availability failure, not evidence
+that search coverage caused a frontend regression. Its exact cause is unproven.
+
+**HYPOTHESIS:** Xvfb's automatic last-client reset races the next independent
+application connection. The workflow now supplies `-noreset` to both Xvfb
+invocations while retaining the default 1280x1024x24 screen, authentication,
+and all test assertions. The [Xserver manual](https://xorg.freedesktop.org/archive/X11R7.5/doc/man/man1/Xserver.1.html)
+defines this option as preventing reset when the last client connection closes.
+It does not suppress application/test failures. Fresh native CI is required;
+a passing run alone will not establish that the intermittent issue is eliminated.
+
+The two workflow invocations and this evidence record were reviewed for explicit
+execution order and unchanged test scope. No GUI.Forms runtime change is made.
+
+## Source house-style review
 
 Reviewed against `planning/PROGRAMMING_HOUSE_STYLE.md`: new coverage records and
 private projection header/tests; `optional_string_list` and the moved/extended
