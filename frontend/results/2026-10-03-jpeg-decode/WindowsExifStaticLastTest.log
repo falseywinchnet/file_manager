@@ -1,0 +1,35 @@
+Start testing: Oct 03 01:58 Pacific Daylight Time
+----------------------------------------------------------
+1/2 Testing: file_manager_jpeg_orientation_tests
+1/2 Test: file_manager_jpeg_orientation_tests
+Command: "C:/Users/Shadow/file_manager/.build/jpeg-research/file_manager_jpeg_orientation_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/jpeg-research
+"file_manager_jpeg_orientation_tests" start time: Oct 03 01:58 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+PASS EXIF IFD0 orientation in both byte orders; absent, malformed, ambiguous and bounded states
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_jpeg_orientation_tests" end time: Oct 03 01:58 Pacific Daylight Time
+"file_manager_jpeg_orientation_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/2 Testing: file_manager_jpeg_embedded_orientation_tests
+2/2 Test: file_manager_jpeg_embedded_orientation_tests
+Command: "C:/Users/Shadow/file_manager/.build/jpeg-research/file_manager_jpeg_experiment.exe" "--verify-only"
+Directory: C:/Users/Shadow/file_manager/.build/jpeg-research
+"file_manager_jpeg_embedded_orientation_tests" start time: Oct 03 01:58 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+PASS embedded EXIF and supplied orientations, geometry, colors, opaque alpha, grayscale, empty/truncated/range refusal
+<end of output>
+Test time =   0.06 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_jpeg_embedded_orientation_tests" end time: Oct 03 01:58 Pacific Daylight Time
+"file_manager_jpeg_embedded_orientation_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 01:58 Pacific Daylight Time

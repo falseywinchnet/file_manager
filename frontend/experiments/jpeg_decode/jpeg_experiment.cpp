@@ -1,4 +1,5 @@
 #include <turbojpeg.h>
+#include "exif_orientation.hpp"
 
 #include <array>
 #include <chrono>
@@ -8,6 +9,7 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -214,6 +216,15 @@ void orient_kernel(const Pixels& source, Pixels& destination) {
     return result;
 }
 
+[[nodiscard]] Pixels decode_exif(const std::span<const unsigned char> encoded) {
+    const jpeg_research::OrientationResult metadata = jpeg_research::read_orientation(encoded);
+    require(metadata.status == jpeg_research::OrientationStatus::absent ||
+            metadata.status == jpeg_research::OrientationStatus::present,
+            "EXIF orientation malformed, ambiguous or outside metadata bounds");
+    Pixels result = decode(encoded, metadata.value);
+    return result;
+}
+
 // Table oracle: quadrant labels in output TL, TR, BL, BR for each orientation.
 constexpr std::array<std::array<unsigned, 4>, 8> expected_quadrants{{
     {{0U, 1U, 2U, 3U}}, {{1U, 0U, 3U, 2U}}, {{3U, 2U, 1U, 0U}}, {{2U, 3U, 0U, 1U}},
@@ -249,8 +260,39 @@ void require_decode_rejection(const std::span<const unsigned char> bytes, const 
     require(rejected, "invalid specimen input was not rejected");
 }
 
+void verify_embedded_orientation(const std::vector<unsigned char>& encoded) {
+    // APP1 alone, with little-endian TIFF IFD0. Inject after SOI without changing
+    // the generated pixel encoding; the corner oracle remains independent.
+    constexpr std::array<unsigned char, 36U> app1{
+        0xff, 0xe1, 0, 0x22, 'E', 'x', 'i', 'f', 0, 0,
+        'I', 'I', 42, 0, 8, 0, 0, 0, 1, 0,
+        0x12, 1, 3, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+    };
+    std::vector<unsigned char> tagged{};
+    tagged.reserve(encoded.size() + app1.size());
+    tagged.insert(tagged.end(), encoded.begin(), encoded.begin() + 2);
+    tagged.insert(tagged.end(), app1.begin(), app1.end());
+    tagged.insert(tagged.end(), encoded.begin() + 2, encoded.end());
+    for (unsigned char orientation = 1U; orientation <= 8U; ++orientation) {
+        tagged[30U] = orientation;
+        const Pixels raster = decode_exif(tagged);
+        const int width = orientation < 5U ? 320 : 192;
+        const int height = orientation < 5U ? 192 : 320;
+        require(raster.width == width && raster.height == height, "embedded EXIF dimensions");
+        check_quadrants(raster, orientation);
+    }
+    const Pixels no_metadata = decode_exif(encoded);
+    check_quadrants(no_metadata, 1U);
+    tagged[30U] = 9U;
+    bool refused = false;
+    try { const Pixels invalid = decode_exif(tagged); static_cast<void>(invalid); }
+    catch (const std::runtime_error&) { refused = true; }
+    require(refused, "invalid EXIF must refuse before pixel publication");
+}
+
 void verify() {
     const std::vector<unsigned char> encoded = make_fixture(320, 192, false, false);
+    verify_embedded_orientation(encoded);
     for (unsigned orientation = 1U; orientation <= 8U; ++orientation) {
         const Pixels raster = decode(encoded, orientation);
         const int expected_width = orientation < 5U ? 320 : 192;
@@ -269,7 +311,7 @@ void verify() {
     require_decode_rejection({}, 1U);
     require_decode_rejection(encoded, 0U);
     require_decode_rejection(std::span<const unsigned char>(encoded.data(), encoded.size() / 2U), 1U);
-    std::cerr << "PASS eight orientation transforms, geometry, colors, opaque alpha, grayscale, empty/truncated/range refusal\n";
+    std::cerr << "PASS embedded EXIF and supplied orientations, geometry, colors, opaque alpha, grayscale, empty/truncated/range refusal\n";
 }
 
 void measure(const char* name, const int width, const int height, const bool progressive) {
@@ -290,9 +332,14 @@ void measure(const char* name, const int width, const int height, const bool pro
 
 } // namespace
 
-int main() {
+int main(const int argc, char** const argv) {
     try {
+        const bool measure_requested = argc == 2 && std::string_view(argv[1]) == "--measure";
+        const bool verify_requested = argc == 1 ||
+            (argc == 2 && std::string_view(argv[1]) == "--verify-only");
+        require(measure_requested || verify_requested, "use --verify-only or --measure");
         verify();
+        if (!measure_requested) return 0;
         std::cout << "fixture,orientation,repetition,encoded_bytes,width,height,output_bytes,decode_ms\n";
         measure("baseline-24mp", 6000, 4000, false);
         measure("progressive-3mp", 2048, 1536, true);

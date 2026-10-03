@@ -18,14 +18,26 @@ decoder, dependency distribution profile or provider protocol is selected.
 . ./tools/Enter-WindowsToolchain.ps1
 cmake -S frontend/experiments/jpeg_decode -B .build/jpeg-decode -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build .build/jpeg-decode --parallel 2
-.build/jpeg-decode/file_manager_jpeg_experiment.exe > .build/jpeg-decode/results.csv 2> .build/jpeg-decode/verification.txt
+ctest --test-dir .build/jpeg-decode --output-on-failure
+.build/jpeg-decode/file_manager_jpeg_experiment.exe --measure > .build/jpeg-decode/results.csv 2> .build/jpeg-decode/verification.txt
 python -B frontend/experiments/jpeg_decode/summarize.py .build/jpeg-decode/results.csv
 ```
 
 Check each exit status before using output. CMake requires exact pkg-config
-`libturbojpeg=3.2.0`; it neither fetches nor installs dependencies. The adjacent
-toolchain is read-only. Other platforms have not run this specimen. Compile mode
-is C++20 with warnings-as-errors.
+`libturbojpeg=3.2.0` by default; that route neither fetches nor installs
+dependencies. The adjacent toolchain is read-only. Default execution and
+`--verify-only` run correctness only; timing now requires `--measure` explicitly.
+Compile mode is C++20 with warnings-as-errors.
+
+The separate `JPEG research correctness` workflow builds Windows, macOS and
+Linux from the SHA-256-pinned upstream 3.2.0 archive. `fetch_codec.cmake` downloads
+only into the caller's build directory. Upstream is configured, built and
+installed independently, then this project consumes its exact-version CMake
+package with `FILE_MANAGER_JPEG_CMAKE_PACKAGE=ON` and `CMAKE_PREFIX_PATH`.
+The workflow disables SIMD and builds static libraries for correctness checks;
+it supplies no comparable performance result or production packaging decision.
+Native results remain pending until that workflow completes. Neither codec nor
+experiment is installed into File Manager by this workflow.
 
 ## Bounds and unverified edges
 
@@ -36,10 +48,21 @@ is C++20 with warnings-as-errors.
 - Largest non-upscaling codec factor fitting 1024-square output, otherwise
   refusal. Contiguous opaque BGRA8 is at most 4 MiB. Rotation/reflection can
   temporarily retain both source and destination allocations.
-- Orientation is an argument, **not parsed EXIF**. All eight transforms have
-  independent corner-permutation and non-square geometry checks. Grayscale,
-  alpha, empty/truncated input and invalid argument checks also run. Independent
-  fixture coverage for source/ICC/precision/scan-limit refusal is incomplete.
+- The independent, allocation-free metadata reader extracts primary IFD0
+  orientation from pre-SOS EXIF APP1 data in either TIFF byte order. Missing
+  orientation defaults to one. Duplicate EXIF/Orientation, invalid field type,
+  count, value or extent refuse explicitly. Work stops at 1 MiB of header,
+  4096 markers or 4096 IFD0 entries; encoded input is capped at 16 MiB. Other
+  IFD links and unknown tag payloads are never traversed. This is a deliberately
+  narrow orientation reader, not complete JPEG/EXIF conformance validation.
+  The codec still validates the encoded image.
+- Literal metadata fixtures cover all eight values in both byte orders,
+  absence, every truncated header prefix, ambiguous/malformed cases and work
+  bounds. A generated JPEG with embedded little-endian EXIF exercises all eight
+  transforms against independent corner-permutation and non-square geometry
+  checks. Grayscale, alpha and empty/truncated/range refusal also run.
+  Independent coverage for source/ICC/precision/scan-limit refusal remains
+  incomplete; no real-photo corpus is claimed.
 - No ICC conversion. In the pinned
   [3.2.0 implementation](https://github.com/libjpeg-turbo/libjpeg-turbo/blob/3.2.0/src/turbojpeg.c),
   absent profile data returns `-1`, warning severity and zero size. The specimen
@@ -53,6 +76,13 @@ transform. Encoding, validation, final raster destruction, process startup,
 file I/O, IPC, upload and native paint are excluded. Highly compressible generated
 quadrants are correctness anchors, not a photographic corpus or perceptual oracle.
 "baseline-24mp" means baseline JPEG encoding, not a performance control.
+The older checked-in timing results used supplied orientation arguments and
+predate metadata parsing; they are not measurements of the new EXIF path.
+
+The orientation field and default were checked against CIPA DC-008-2026,
+section 4.6.5.1.6, available through the
+[official Exif standards index](https://www.cipa.jp/e/std/std-sec.html).
+The parser's bounds and duplicate-refusal rules are local research policy.
 
 ## Route to an actual preview
 
