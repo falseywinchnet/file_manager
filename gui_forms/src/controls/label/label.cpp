@@ -322,6 +322,13 @@ void Label::set_use_mnemonic(bool value) {
 
 Size Label::measure(const Size available) {
     const Rect requested = requested_bounds();
+    if (requested.width > 0.0 && requested.height > 0.0) {
+        // Neither dimension depends on text. Painting still resolves wrapping
+        // against the arranged width, with the current font and complete text.
+        const Size measured{std::min(available.width, requested.width),
+                            std::min(available.height, requested.height)};
+        return measured;
+    }
     const std::string text = display_text();
     const FontSpec font = effective_font((*this).font());
     const double wrap_width = requested.width > 0.0

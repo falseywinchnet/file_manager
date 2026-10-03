@@ -1,0 +1,157 @@
+Start testing: Oct 03 03:59 Pacific Daylight Time
+----------------------------------------------------------
+14/72 Testing: gui_forms_windows_text_tests
+14/72 Test: gui_forms_windows_text_tests
+Command: "C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows/gui_forms_windows_text_tests.exe" "C:/Users/Shadow/file_manager/gui_forms/assets/fonts"
+Directory: C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows
+"gui_forms_windows_text_tests" start time: Oct 03 03:59 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+Главная scale=1 weight=400 width=47 status=0
+File scale=1 weight=400 width=25 status=0
+Файл 123 scale=1 weight=400 width=60 status=0
+Українська scale=1 weight=400 width=65 status=0
+Вид scale=1 weight=400 width=24 status=0
+Материалы scale=1 weight=400 width=69 status=0
+Инструменты scale=1 weight=400 width=77 status=0
+Вставить scale=1 weight=400 width=53 status=0
+Основной scale=1 weight=400 width=58 status=0
+日本語 scale=1 weight=400 width=42 status=0
+العربية scale=1 weight=400 width=36 status=0
+עברית scale=1 weight=400 width=37 status=0
+हिन्दी scale=1 weight=400 width=26 status=0
+বাংলা scale=1 weight=400 width=32 status=0
+ਪੰਜਾਬੀ scale=1 weight=400 width=33 status=0
+Главная scale=1 weight=700 width=48 status=0
+File scale=1 weight=700 width=28 status=0
+Файл 123 scale=1 weight=700 width=60 status=0
+Українська scale=1 weight=700 width=68 status=0
+Вид scale=1 weight=700 width=24 status=0
+Материалы scale=1 weight=700 width=71 status=0
+Инструменты scale=1 weight=700 width=83 status=0
+Вставить scale=1 weight=700 width=53 status=0
+Основной scale=1 weight=700 width=62 status=0
+日本語 scale=1 weight=700 width=42 status=0
+العربية scale=1 weight=700 width=43 status=0
+עברית scale=1 weight=700 width=42 status=0
+हिन्दी scale=1 weight=700 width=31 status=0
+বাংলা scale=1 weight=700 width=37 status=0
+ਪੰਜਾਬੀ scale=1 weight=700 width=38 status=0
+Главная scale=1.5 weight=400 width=46 status=0
+File scale=1.5 weight=400 width=24.6667 status=0
+Файл 123 scale=1.5 weight=400 width=58 status=0
+Українська scale=1.5 weight=400 width=64 status=0
+Вид scale=1.5 weight=400 width=22.6667 status=0
+Материалы scale=1.5 weight=400 width=68.6667 status=0
+Инструменты scale=1.5 weight=400 width=79.3333 status=0
+Вставить scale=1.5 weight=400 width=51.3333 status=0
+Основной scale=1.5 weight=400 width=58.6667 status=0
+日本語 scale=1.5 weight=400 width=42 status=0
+العربية scale=1.5 weight=400 width=35.3333 status=0
+עברית scale=1.5 weight=400 width=36 status=0
+हिन्दी scale=1.5 weight=400 width=26 status=0
+বাংলা scale=1.5 weight=400 width=32.6667 status=0
+ਪੰਜਾਬੀ scale=1.5 weight=400 width=32 status=0
+Главная scale=1.5 weight=700 width=46 status=0
+File scale=1.5 weight=700 width=28.6667 status=0
+Файл 123 scale=1.5 weight=700 width=58.6667 status=0
+Українська scale=1.5 weight=700 width=64.6667 status=0
+Вид scale=1.5 weight=700 width=24 status=0
+Материалы scale=1.5 weight=700 width=70.6667 status=0
+Инструменты scale=1.5 weight=700 width=82 status=0
+Вставить scale=1.5 weight=700 width=52.6667 status=0
+Основной scale=1.5 weight=700 width=59.3333 status=0
+日本語 scale=1.5 weight=700 width=44 status=0
+العربية scale=1.5 weight=700 width=40 status=0
+עברית scale=1.5 weight=700 width=39.3333 status=0
+हिन्दी scale=1.5 weight=700 width=29.3333 status=0
+বাংলা scale=1.5 weight=700 width=36 status=0
+ਪੰਜਾਬੀ scale=1.5 weight=700 width=35.3333 status=0
+Главная scale=2 weight=400 width=45 status=0
+File scale=2 weight=400 width=24.5 status=0
+Файл 123 scale=2 weight=400 width=58 status=0
+Українська scale=2 weight=400 width=63.5 status=0
+Вид scale=2 weight=400 width=23 status=0
+Материалы scale=2 weight=400 width=69 status=0
+Инструменты scale=2 weight=400 width=81 status=0
+Вставить scale=2 weight=400 width=51.5 status=0
+Основной scale=2 weight=400 width=59.5 status=0
+日本語 scale=2 weight=400 width=42 status=0
+العربية scale=2 weight=400 width=36 status=0
+עברית scale=2 weight=400 width=36.5 status=0
+हिन्दी scale=2 weight=400 width=26.5 status=0
+বাংলা scale=2 weight=400 width=31.5 status=0
+ਪੰਜਾਬੀ scale=2 weight=400 width=32.5 status=0
+Главная scale=2 weight=700 width=47.5 status=0
+File scale=2 weight=700 width=28.5 status=0
+Файл 123 scale=2 weight=700 width=59.5 status=0
+Українська scale=2 weight=700 width=66.5 status=0
+Вид scale=2 weight=700 width=24 status=0
+Материалы scale=2 weight=700 width=71.5 status=0
+Инструменты scale=2 weight=700 width=82 status=0
+Вставить scale=2 weight=700 width=54 status=0
+Основной scale=2 weight=700 width=60.5 status=0
+日本語 scale=2 weight=700 width=43.5 status=0
+العربية scale=2 weight=700 width=39.5 status=0
+עברית scale=2 weight=700 width=39 status=0
+हिन्दी scale=2 weight=700 width=29 status=0
+বাংলা scale=2 weight=700 width=34 status=0
+ਪੰਜਾਬੀ scale=2 weight=700 width=35 status=0
+<end of output>
+Test time =   2.80 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_windows_text_tests" end time: Oct 03 03:59 Pacific Daylight Time
+"gui_forms_windows_text_tests" time elapsed: 00:00:02
+----------------------------------------------------------
+
+19/72 Testing: gui_forms_core_tests
+19/72 Test: gui_forms_core_tests
+Command: "C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows/gui_forms_core_tests.exe"
+Directory: C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows
+"gui_forms_core_tests" start time: Oct 03 03:59 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+gui_forms_core_tests: all tests passed
+<end of output>
+Test time =   0.11 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_core_tests" end time: Oct 03 03:59 Pacific Daylight Time
+"gui_forms_core_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+29/72 Testing: gui_forms_basic_controls_tests
+29/72 Test: gui_forms_basic_controls_tests
+Command: "C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows/gui_forms_basic_controls_tests.exe"
+Directory: C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows
+"gui_forms_basic_controls_tests" start time: Oct 03 03:59 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+label preview cost: bytes=65536 drawn_lines=7 width_queries=92 queried_bytes=1028
+gui_forms_basic_controls_tests: all tests passed
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_basic_controls_tests" end time: Oct 03 03:59 Pacific Daylight Time
+"gui_forms_basic_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+47/72 Testing: gui_forms_layout_panel_tests
+47/72 Test: gui_forms_layout_panel_tests
+Command: "C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows/gui_forms_layout_panel_tests.exe"
+Directory: C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows
+"gui_forms_layout_panel_tests" start time: Oct 03 03:59 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+layout-panel-tests: pass
+<end of output>
+Test time =   0.08 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_layout_panel_tests" end time: Oct 03 03:59 Pacific Daylight Time
+"gui_forms_layout_panel_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 03:59 Pacific Daylight Time

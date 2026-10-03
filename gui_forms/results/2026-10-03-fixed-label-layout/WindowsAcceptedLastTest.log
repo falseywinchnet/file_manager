@@ -1,0 +1,20 @@
+Start testing: Oct 03 03:53 Pacific Daylight Time
+----------------------------------------------------------
+36/89 Testing: gui_forms_basic_controls_tests
+36/89 Test: gui_forms_basic_controls_tests
+Command: "C:/Users/Shadow/file_manager/gui_forms/.build/windows-prepared-dev/gui_forms_basic_controls_tests.exe"
+Directory: C:/Users/Shadow/file_manager/gui_forms/.build/windows-prepared-dev
+"gui_forms_basic_controls_tests" start time: Oct 03 03:53 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+label preview cost: bytes=65536 drawn_lines=7 width_queries=92 queried_bytes=1028
+gui_forms_basic_controls_tests: all tests passed
+<end of output>
+Test time =   0.07 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_basic_controls_tests" end time: Oct 03 03:53 Pacific Daylight Time
+"gui_forms_basic_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 03:53 Pacific Daylight Time
