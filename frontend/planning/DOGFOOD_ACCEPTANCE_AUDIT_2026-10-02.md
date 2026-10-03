@@ -13,6 +13,14 @@ archive checks and Mac preview/Details image review are recorded in
 below preserve their earlier development checkpoints. Catalogue substring
 activation and thumbnails remain unfinished.
 
+**Subsequent development checkpoint:** bounded scan correctness is established
+on the generated fixtures, but the legacy performance gate remains unpassed;
+the experiment is retained outside active source. Prepared-window immutable
+input, aggregate admission and final-owner budget retirement pass five Windows
+suites. Revocation now preserves epoch history. These are private foundations,
+not evidence that text rendering or application responsiveness has improved.
+The new GUI tests await native CI; the published package above remains current.
+
 **Latest delivery, 2026-10-03 UTC:** `v0.001-alpha.1371514` is the downloadable
 Windows/macOS/Linux checkpoint. It adds cancellable staged copying, explicit
 terminal/cleanup reporting, basename-first rename and native no-replace

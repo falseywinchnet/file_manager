@@ -6,10 +6,20 @@ Status: **ACTIVE WORKING RECORD — 0.001-alpha repair toward real daily use**.
 and search source-record retention, is published on all three platforms after
 both native matrices, archive verification and Mac preview/Details image review.
 See `../results/2026-10-03-search-source-records/DELIVERY.md`. Current development
-is the bounded catalogue-reader candidate and reconciled substring profile;
+includes the reconciled substring profile and a bounded-reader experiment;
 the reserved cursor namespace guard refuses the unavailable predicate rather
 than treating it as a legacy exact-name continuation. No catalogue substring
 capability or thumbnail availability is advertised.
+
+**2026-10-03 development review:** the new bounded-reader candidate passes
+correctness/race/vet but has not established the legacy no-regression gate.
+Its six paired aggregates and source are preserved under Engine's rejected
+experiment evidence; the active legacy reader remains unchanged. Private
+prepared-window ownership/admission now passes five local suites, including
+retained payload lifetime and a fixed epoch-revival defect. See
+`../../gui_forms/experiments/PREPARED_WINDOW_BATCH_2026-10-03.md`.
+Native CI is pending. This is not yet shaping, rendering, indexed-search
+availability, thumbnail delivery or a new dogfood release.
 
 ## Current owner dogfood correction — 2026-10-02
 
