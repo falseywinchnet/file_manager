@@ -934,3 +934,27 @@ is selected, existing source is not certified, and no speed/currentness/platform
 promotion is claimed. The complete `planning/PROGRAMMING_HOUSE_STYLE.md` governs
 any later implementation, tests and tooling with an exact source-review scope;
 this round authored only prose and fixture-shaped JSON.
+
+## Development reconciliation 010 — catalogue substring profile
+
+2026-10-03 UTC. Root integration review of candidate reply 009 records the
+implementation/conformance profile in
+[`ENGINE_CATALOGUE_SUBSTRING_DEVELOPMENT.md`](../../orchestrator/spec/contracts/ENGINE_CATALOGUE_SUBSTRING_DEVELOPMENT.md).
+This opens bounded development implementation, not capability advertisement or
+production routing. It does not select a persistent substring index or change
+the accepted storage/relevance architecture.
+
+The profile resolves predicate/capability naming, cached path-order scope,
+`exact_substring` evidence, versioned opaque Orchestrator cursor wrapping,
+provisional work ceilings, distinct cancellation/deadline errors, and visible
+unverified cached matches. Existing exact-query and fallback semantics remain.
+The transport must account for the actual response envelope before claiming
+the response-byte limit; the current Service.Query signature alone cannot do so.
+
+**OBSERVED evidence:** the private exhaustive oracle exists; two bounded-reader
+variants were rejected for exact-lookup regression. A separately dispatched
+bounded accessor is now being measured, with shared format decoding and the
+legacy path free of optional budget dispatch. No successful result is assumed.
+The root C++ source-record repair retains identity/metadata separately from
+current observations; full evidence/context and native indexed integration are
+still gates. Earlier candidate/rejection records remain intact.

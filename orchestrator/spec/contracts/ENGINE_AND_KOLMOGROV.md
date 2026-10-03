@@ -32,6 +32,13 @@ The frozen experimental family is semantic major `0`, minor `1`.
 
 ## Required I1 operation subset
 
+The separately gated
+[catalogue substring development profile](ENGINE_CATALOGUE_SUBSTRING_DEVELOPMENT.md)
+specifies implementation/conformance work under ORC-ENG-001. Its capability is
+not available and its bounds are not measured performance claims. Existing exact
+requests and legacy continuations remain unchanged. Reserving a new cursor
+prefix in the adapter does not enable a provider or advertise the new predicate.
+
 | Operation | Authority | Frozen semantic outcome |
 |---|---|---|
 | `engine.version` | query | Component/build/protocol, process `instance_id`, contract families, feature names, and capability states/reasons. |

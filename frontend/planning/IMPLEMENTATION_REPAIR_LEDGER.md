@@ -2,6 +2,15 @@
 
 Status: **ACTIVE WORKING RECORD — 0.001-alpha repair toward real daily use**.
 
+**Latest verified delivery:** `v0.001-alpha.d4dcb24`, including New Folder naming
+and search source-record retention, is published on all three platforms after
+both native matrices, archive verification and Mac preview/Details image review.
+See `../results/2026-10-03-search-source-records/DELIVERY.md`. Current development
+is the bounded catalogue-reader candidate and reconciled substring profile;
+the reserved cursor namespace guard refuses the unavailable predicate rather
+than treating it as a legacy exact-name continuation. No catalogue substring
+capability or thumbnail availability is advertised.
+
 ## Current owner dogfood correction — 2026-10-02
 
 **GIVEN:** the owner tested the macOS package across multiple file types and

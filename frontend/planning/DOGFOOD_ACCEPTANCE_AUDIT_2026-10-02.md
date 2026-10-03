@@ -4,6 +4,15 @@ Status: **ACTIVE; first source pass, not a completed whole-product audit**.
 
 ## Current checkpoint — 2026-10-02
 
+**Latest delivery update:**
+[`v0.001-alpha.d4dcb24`](https://github.com/falseywinchnet/file_manager/releases/tag/v0.001-alpha.d4dcb24)
+is now published with New Folder naming and retained search source records.
+Both native matrices pass; tested and rebase-merged trees match; independent
+archive checks and Mac preview/Details image review are recorded in
+`../results/2026-10-03-search-source-records/DELIVERY.md`. The dated paragraphs
+below preserve their earlier development checkpoints. Catalogue substring
+activation and thumbnails remain unfinished.
+
 **Latest delivery, 2026-10-03 UTC:** `v0.001-alpha.1371514` is the downloadable
 Windows/macOS/Linux checkpoint. It adds cancellable staged copying, explicit
 terminal/cleanup reporting, basename-first rename and native no-replace
