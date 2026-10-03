@@ -14,8 +14,16 @@ visual-evidence limits are in `../results/2026-10-03-cancellable-copy/DELIVERY.m
 
 **Current development:** New Folder now offers naming after its created identity
 appears in a refreshed listing, with navigation/edit retirement. Five assembled
-application cases and the full Windows suite pass; native acceptance remains
-pending. See `../results/2026-10-03-new-folder/README.md`.
+application cases and both native matrices pass at `47dcf619`; the identical
+tree is merged as `66757297`. Physical-input/visual acceptance and a new portable
+release remain pending. See `../results/2026-10-03-new-folder/README.md`.
+
+**Current source repair:** typed Engine identity/revision observations now survive
+client decoding, background preparation and displayed-row lifetime. Shared page
+provenance avoids per-row scan-token copies. Local validation and the remaining
+native/identity-equivalence gaps are recorded in
+`../results/2026-10-03-search-source-records/README.md`. This supplies neither
+thumbnails nor indexed ordinary-text acceleration.
 
 The initial tables below describe the original audit baseline. Current source
 does have a Show/Hide preview control, a separate text coverage caption, four

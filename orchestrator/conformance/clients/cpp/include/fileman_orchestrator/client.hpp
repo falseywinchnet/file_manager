@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <map>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -192,12 +193,25 @@ struct BootstrapSnapshot {
     [[nodiscard]] bool orchestrator_gate_ready() const noexcept;
 };
 
+// Owned provider observations, not a native filesystem identity or read grant.
+// Nullopt is unreported; reported empty values remain distinguishable.
+struct SearchObjectIdentityInfo {
+    std::optional<std::string> root_id{};
+    std::optional<std::string> file_object_id{};
+    std::optional<std::string> incarnation{};
+    std::optional<std::map<std::string, std::string, std::less<>>> platform_key{};
+};
+
 struct SearchResultInfo {
     std::string name{};
     std::filesystem::path path{};
     std::string kind{};
-    std::uint64_t size{};
+    std::int64_t size{};
     bool unavailable{};
+    SearchObjectIdentityInfo object{};
+    std::optional<std::uint64_t> generation{};
+    std::optional<std::uint32_t> mode{};
+    std::optional<std::int64_t> modified_unix_nanoseconds{};
 };
 
 struct SearchCursorInfo {

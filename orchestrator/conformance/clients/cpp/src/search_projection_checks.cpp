@@ -1,6 +1,7 @@
 #include "search_projection.hpp"
 
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -75,6 +76,108 @@ void test_malformed_coverage() {
     require_rejected(R"(,"unavailable_paths":[null])");
     require_rejected(R"(,"scan_id":42)");
 }
+
+std::string source_response(const std::string_view identity,
+    const std::string_view size, const std::string_view metadata,
+    const std::string_view revision) {
+    std::string bytes = R"({"id":"source-test","status":"success","result":{"source":"catalogue","complete":true,"generation":17,"results":[{"object":{"path":"/docs/example.txt")";
+    bytes.append(identity);
+    bytes += R"(},"metadata":{"name":"example.txt","kind":"file","size":)";
+    bytes.append(size);
+    bytes.append(metadata);
+    bytes += R"(},"unavailable":false)";
+    bytes.append(revision);
+    bytes += "}]}}";
+    return bytes;
+}
+
+void test_owned_source_identity_and_integer_domains() {
+    std::string bytes = source_response(
+        R"(,"root":"docs","id":"opaque-18446744073709551615","incarnation":"birth-1","platform_key":{"volume_serial":"ABCD","file_id":"00000000000000000000000000000001"})",
+        "-9223372036854775808",
+        R"(,"mode":4294967295,"modified_unix_nano":9223372036854775807)",
+        R"(,"generation":18446744073709551615)");
+    const orc::SearchPageInfo page = orc::detail::project_search_response(bytes, "source-test");
+    bytes.clear();
+    bytes.shrink_to_fit();
+    const orc::SearchResultInfo& row = page.results.at(0U);
+    require(row.object.root_id == "docs" && row.object.file_object_id == "opaque-18446744073709551615" &&
+                row.object.incarnation == "birth-1" && row.object.platform_key &&
+                (*row.object.platform_key).at("file_id") == "00000000000000000000000000000001",
+            "source identity must own exact strings after response retirement");
+    require(row.size == std::numeric_limits<std::int64_t>::min() &&
+                row.mode == std::numeric_limits<std::uint32_t>::max() &&
+                row.modified_unix_nanoseconds == std::numeric_limits<std::int64_t>::max() &&
+                row.generation == std::numeric_limits<std::uint64_t>::max() && page.generation == 17U,
+            "stored integer domains and row/page generations must remain distinct");
+    const std::string alternate = source_response(
+        R"(,"root_id":"docs","file_object_id":"semantic-id")", "9223372036854775807",
+        R"(,"mode":0,"modified_unix_nano":-9223372036854775808)", R"(,"generation":0)");
+    const orc::SearchPageInfo alternate_page = orc::detail::project_search_response(alternate, "source-test");
+    const orc::SearchResultInfo& alternate_row = alternate_page.results.at(0U);
+    require(alternate_row.object.root_id == "docs" && alternate_row.object.file_object_id == "semantic-id" &&
+                alternate_row.size == std::numeric_limits<std::int64_t>::max() && alternate_row.mode == 0U &&
+                alternate_row.modified_unix_nanoseconds == std::numeric_limits<std::int64_t>::min() &&
+                alternate_row.generation == 0U,
+            "semantic identity spellings and the opposite integer endpoints must project exactly");
+}
+
+void test_source_optional_fields_and_aliases() {
+    const std::string absent = source_response({}, "0", {}, {});
+    const orc::SearchPageInfo missing = orc::detail::project_search_response(absent, "source-test");
+    const orc::SearchResultInfo& row = missing.results.at(0U);
+    require(!row.object.root_id && !row.object.file_object_id && !row.object.incarnation &&
+                !row.object.platform_key && !row.mode && !row.modified_unix_nanoseconds && !row.generation,
+            "missing source fields must remain unreported despite a reported page generation");
+    const std::string nulls = source_response(
+        R"(,"root":null,"id":null,"incarnation":null,"platform_key":null)", "0",
+        R"(,"mode":null,"modified_unix_nano":null)", R"(,"generation":null)");
+    const orc::SearchPageInfo null_page = orc::detail::project_search_response(nulls, "source-test");
+    const orc::SearchResultInfo& null_row = null_page.results.at(0U);
+    require(!null_row.object.root_id && !null_row.object.file_object_id && !null_row.object.incarnation &&
+                !null_row.object.platform_key && !null_row.mode && !null_row.modified_unix_nanoseconds &&
+                !null_row.generation, "null source fields must remain unreported");
+    const std::string empties = source_response(
+        R"(,"root":"","root_id":"","id":null,"file_object_id":"","incarnation":"","platform_key":{})",
+        "0", {}, {});
+    const orc::SearchPageInfo empty_page = orc::detail::project_search_response(empties, "source-test");
+    const orc::SearchObjectIdentityInfo& identity = empty_page.results.at(0U).object;
+    require(identity.root_id == "" && identity.file_object_id == "" && identity.incarnation == "" &&
+                identity.platform_key && (*identity.platform_key).empty(),
+            "reported empty identity fields must survive agreeing and null aliases");
+}
+
+void reject_source(const std::string_view identity, const std::string_view size,
+    const std::string_view metadata, const std::string_view revision) {
+    const std::string bytes = source_response(identity, size, metadata, revision);
+    bool rejected{};
+    try {
+        const orc::SearchPageInfo page = orc::detail::project_search_response(bytes, "source-test");
+        static_cast<void>(page);
+    } catch (const orc::ClientError&) { rejected = true; }
+    require(rejected, "invalid source record must reject the whole page");
+}
+
+void test_invalid_source_records() {
+    reject_source(R"(,"root":"a","root_id":"b")", "0", {}, {});
+    reject_source(R"(,"id":"a","file_object_id":"b")", "0", {}, {});
+    reject_source(R"(,"root":42,"root_id":"a")", "0", {}, {});
+    reject_source(R"(,"file_object_id":[])" , "0", {}, {});
+    reject_source(R"(,"incarnation":false)", "0", {}, {});
+    reject_source(R"(,"platform_key":[])", "0", {}, {});
+    reject_source(R"(,"platform_key":{"file_id":42})", "0", {}, {});
+    reject_source({}, "9223372036854775808", {}, {});
+    reject_source({}, "-9223372036854775809", {}, {});
+    reject_source({}, "1.0", {}, {});
+    reject_source({}, "1e2", {}, {});
+    reject_source({}, "null", {}, {});
+    reject_source({}, "0", R"(,"mode":4294967296)", {});
+    reject_source({}, "0", R"(,"mode":-1)", {});
+    reject_source({}, "0", R"(,"modified_unix_nano":9223372036854775808)", {});
+    reject_source({}, "0", R"(,"modified_unix_nano":false)", {});
+    reject_source({}, "0", {}, R"(,"generation":18446744073709551616)");
+    reject_source({}, "0", {}, R"(,"generation":-1)");
+}
 } // namespace
 
 int main() {
@@ -82,6 +185,9 @@ int main() {
         test_owned_coverage();
         test_live_and_unreported_coverage();
         test_malformed_coverage();
+        test_owned_source_identity_and_integer_domains();
+        test_source_optional_fields_and_aliases();
+        test_invalid_source_records();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

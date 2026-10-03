@@ -46,6 +46,11 @@ state retains only flags. A browsable per-query evidence view remains open.
 
 ## Scope still open
 
+The subsequent [source-record repair](FRONTEND_SEARCH_SOURCE_RECORDS.md)
+reconciles the identity spellings and signed metadata projection listed below.
+The paragraph retains this earlier repair's scope; ranking/evidence, platform
+identity comparison and criteria revalidation remain open.
+
 Per-row identity, signed stored metadata, rank/certainty/evidence, live work
 counters, platform identity comparison and criteria revalidation are not fixed
 by this repair. Runtime `root`/`id` and fixture `root_id`/`file_object_id` spellings,

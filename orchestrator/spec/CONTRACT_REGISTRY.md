@@ -58,6 +58,11 @@ remain unavailable, deferred, negotiating, or stubbed.
 
 ## Windows development consumption receipt (2026-09-29)
 
+Existing per-row object/revision fields have the development source projection
+in [FRONTEND_SEARCH_SOURCE_RECORDS.md](FRONTEND_SEARCH_SOURCE_RECORDS.md).
+It preserves observations separately from filesystem authority; it does not
+admit thumbnail production, identity equivalence or a new wire operation.
+
 The existing ORC-FE-001 search reply has the additive C++ coverage preservation
 repair described in [FRONTEND_SEARCH_COVERAGE.md](FRONTEND_SEARCH_COVERAGE.md).
 It preserves existing wire facts and introduces no new operation, provider

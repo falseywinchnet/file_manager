@@ -123,6 +123,7 @@ private:
     friend class ApplicationLatencyProbe;
 
     using EntryMap = std::unordered_map<std::string, DirectoryEntry>;
+    using SearchSourceMap = std::unordered_map<std::string, SearchResultSource>;
     using PathMap = std::unordered_map<std::string, std::filesystem::path>;
     using TreeEntriesMap = std::unordered_map<std::string, std::vector<DirectoryEntry>>;
     using SettingsValueMap = std::unordered_map<std::string, fileman::orchestrator::SettingValue>;
@@ -382,6 +383,7 @@ private:
     std::vector<std::filesystem::path> history_{};
     std::size_t history_index_{};
     EntryMap entries_{};
+    SearchSourceMap search_sources_{};
     PathMap tree_locations_{};
     TreeEntriesMap tree_directory_entries_{};
     std::unordered_set<std::string> tree_expanded_paths_{};

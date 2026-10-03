@@ -376,6 +376,18 @@ std::uint64_t unsigned_integer(const JsonValue& value, const std::string_view co
     return result;
 }
 
+std::int64_t signed_integer(const JsonValue& value, const std::string_view context) {
+    const JsonNumber* number = std::get_if<JsonNumber>(&value.value);
+    if (number == nullptr) fail(std::string(context) + " must be a signed integer");
+    std::int64_t result{};
+    const std::string& text = (*number).text;
+    const std::from_chars_result parsed = std::from_chars(text.data(), text.data() + text.size(), result);
+    if (parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size()) {
+        fail(std::string(context) + " is outside the signed integer range");
+    }
+    return result;
+}
+
 std::string json_escape(const std::string_view input) {
     std::ostringstream output{};
     output << '"';
@@ -601,6 +613,59 @@ std::optional<std::uint64_t> optional_unsigned_integer(
     if (std::holds_alternative<std::nullptr_t>(value.value)) return std::nullopt;
     const std::uint64_t result = unsigned_integer(value, context);
     return result;
+}
+
+std::optional<std::string> optional_object_string(
+    const JsonValue::Object& record, const std::string_view name) {
+    const JsonValue::Object::const_iterator found = record.find(name);
+    if (found == record.end()) return std::nullopt;
+    const std::optional<std::string> result = optional_string((*found).second, name);
+    return result;
+}
+
+std::optional<std::string> identity_alias(const JsonValue::Object& record,
+    const std::string_view runtime_name, const std::string_view semantic_name) {
+    std::optional<std::string> runtime = optional_object_string(record, runtime_name);
+    std::optional<std::string> semantic = optional_object_string(record, semantic_name);
+    if (runtime && semantic && *runtime != *semantic) {
+        fail("conflicting search object identity spellings");
+    }
+    if (runtime) return runtime;
+    return semantic;
+}
+
+SearchObjectIdentityInfo project_search_identity(const JsonValue::Object& record) {
+    SearchObjectIdentityInfo identity{};
+    identity.root_id = identity_alias(record, "root", "root_id");
+    identity.file_object_id = identity_alias(record, "id", "file_object_id");
+    identity.incarnation = optional_object_string(record, "incarnation");
+    const JsonValue::Object::const_iterator found = record.find("platform_key");
+    if (found != record.end() && !std::holds_alternative<std::nullptr_t>((*found).second.value)) {
+        const JsonValue::Object& fields = object((*found).second, "search object platform_key");
+        identity.platform_key.emplace();
+        for (const JsonValue::Object::value_type& member : fields) {
+            const std::string& value = string(member.second, "search object platform_key value");
+            (*identity.platform_key).emplace(member.first, value);
+        }
+    }
+    return identity;
+}
+
+void project_search_revision(const JsonValue::Object& record,
+    const JsonValue::Object& metadata, SearchResultInfo& projected) {
+    const JsonValue::Object::const_iterator generation = record.find("generation");
+    if (generation != record.end()) {
+        projected.generation = optional_unsigned_integer((*generation).second, "search row generation");
+    }
+    const JsonValue::Object::const_iterator mode = metadata.find("mode");
+    if (mode != metadata.end() && !std::holds_alternative<std::nullptr_t>((*mode).second.value)) {
+        const std::uint64_t value = unsigned_integer((*mode).second, "search stored mode");
+        projected.mode = narrow_u32(value, "search stored mode");
+    }
+    const JsonValue::Object::const_iterator modified = metadata.find("modified_unix_nano");
+    if (modified != metadata.end() && !std::holds_alternative<std::nullptr_t>((*modified).second.value)) {
+        projected.modified_unix_nanoseconds = signed_integer((*modified).second, "search stored mtime");
+    }
 }
 
 SettingValue parse_setting_value(const JsonValue& value,
@@ -926,9 +991,11 @@ SearchPageInfo detail::project_search_response(
             string(field(metadata, "name"), "search result name"),
             string(field(object_record, "path"), "search result path"),
             string(field(metadata, "kind"), "search result kind"),
-            unsigned_integer(field(metadata, "size"), "search result size"),
+            signed_integer(field(metadata, "size"), "search result size"),
             boolean(field(record, "unavailable"), "search result unavailable"),
         };
+        projected.object = project_search_identity(object_record);
+        project_search_revision(record, metadata, projected);
         page.names.push_back(projected.name);
         page.results.push_back(std::move(projected));
     }

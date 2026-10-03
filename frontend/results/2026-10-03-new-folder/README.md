@@ -69,6 +69,14 @@ settings-transition and multiple-creation schedules are not claimed measured.
 
 ## House-style review
 
+Subsequent native delivery checkpoint: both workflows `37102663219` (push) and
+`37102664839` (PR) passed Windows x64, macOS arm64, Linux x64 and house-style
+jobs at `47dcf61991da79f9d0034c68efff5db37617a9b2`. PR #17 was rebase-merged as
+`66757297ffc6c08a76dcd9b576b5da49f86e4cfa`; root verified full tree equality
+`f0d9068500f0fc0d3f13f3bdfc314b87b4905bab`. This closes the native CI gate above,
+not physical-input/visual acceptance. The `1371514` portable release predates
+this change; publication of a newer portable build is separate work.
+
 Reviewed against `planning/PROGRAMMING_HOUSE_STYLE.md`: the context and pending
 record definitions, CreateFolderWork/Ready, request/application result paths,
 navigation retirement, guarded directory projection, pending selection/focus
