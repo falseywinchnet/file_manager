@@ -1,0 +1,21 @@
+?   	filemanager/engine/api	[no test files]
+ok  	filemanager/engine/benchmarks	0.620s
+ok  	filemanager/engine/cmd/fileman-engine	0.701s
+ok  	filemanager/engine/internal/catalog	(cached)
+ok  	filemanager/engine/internal/deployment	(cached)
+ok  	filemanager/engine/internal/exact	(cached)
+ok  	filemanager/engine/internal/generation	(cached)
+ok  	filemanager/engine/internal/identity	(cached)
+ok  	filemanager/engine/internal/live	(cached)
+ok  	filemanager/engine/internal/observation	(cached)
+?   	filemanager/engine/internal/observation/fsevents	[no test files]
+ok  	filemanager/engine/internal/observation/rdcw	(cached)
+ok  	filemanager/engine/internal/ownership	(cached)
+?   	filemanager/engine/internal/ranking	[no test files]
+ok  	filemanager/engine/internal/sandbox	(cached)
+ok  	filemanager/engine/internal/scan	(cached)
+ok  	filemanager/engine/internal/service	1.587s
+ok  	filemanager/engine/internal/similarity	(cached)
+ok  	filemanager/engine/internal/transport	0.517s
+ok  	filemanager/engine/internal/windowssecure	(cached)
+ok  	filemanager/engine/internal/workload	(cached)

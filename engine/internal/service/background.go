@@ -349,34 +349,70 @@ func (s *Service) backgroundStale() bool {
 
 func (s *Service) backgroundWorkStatus(now time.Time) (api.WorkStatus, bool, string) {
 	s.background.mu.Lock()
-	controller := s.background.controller
+	var controller *backgroundController = s.background.controller
 	s.background.mu.Unlock()
-	if controller == nil {
+	var captured backgroundStatusSnapshot = backgroundStatusSnapshot{}
+	if controller != nil {
+		controller.mu.Lock()
+		captured = controller.captureStatusLocked()
+		controller.mu.Unlock()
+	}
+	var status api.WorkStatus = api.WorkStatus{}
+	var stale bool = false
+	var warning string = ""
+	status, stale, warning = captured.project(now)
+	return status, stale, warning
+}
+
+// backgroundStatusSnapshot owns values only; it never borrows mutable coalescer
+// storage. Projection may run after the controller changes or is replaced.
+type backgroundStatusSnapshot struct {
+	present                 bool
+	coalescer               observation.Snapshot
+	running                 bool
+	lastError               string
+	completeForExactCurrent bool
+	coverageLimitation      string
+}
+
+// captureStatusLocked requires the controller mutex and performs no projection.
+func (controller *backgroundController) captureStatusLocked() backgroundStatusSnapshot {
+	var captured backgroundStatusSnapshot = backgroundStatusSnapshot{
+		present: true, coalescer: controller.coalescer.Snapshot(),
+		running: controller.running, lastError: controller.lastError,
+		completeForExactCurrent: controller.completeForExactCurrent,
+		coverageLimitation:      controller.coverageLimitation,
+	}
+	return captured
+}
+
+func (captured backgroundStatusSnapshot) project(now time.Time) (api.WorkStatus, bool, string) {
+	if !captured.present {
 		return api.WorkStatus{Currentness: api.CurrentnessManual}, false, ""
 	}
-	controller.mu.Lock()
-	defer controller.mu.Unlock()
-	snapshot := controller.coalescer.Snapshot()
-	status := api.WorkStatus{
-		BackgroundIngestion: controller.running,
-		BacklogKnown:        controller.running && snapshot.Initialized,
+	var snapshot observation.Snapshot = captured.coalescer
+	var status api.WorkStatus = api.WorkStatus{
+		BackgroundIngestion: captured.running,
+		BacklogKnown:        captured.running && snapshot.Initialized,
 		PendingObservations: snapshot.PendingObservations,
 		ObservationGap:      snapshot.ReconcileRequired,
 		ObservationSource:   snapshot.Observed.Source,
 		ObservationEpoch:    snapshot.Observed.Epoch,
 		ObservedWatermark:   snapshot.Observed.Position,
 		WatermarkDurable:    false,
-		ObservationError:    controller.lastError,
-		CoverageIncomplete:  !controller.completeForExactCurrent,
+		ObservationError:    captured.lastError,
+		CoverageIncomplete:  !captured.completeForExactCurrent,
 	}
 	if snapshot.HasReconciled {
 		status.ReconciledWatermark = snapshot.Reconciled.Position
 	}
 	if !snapshot.Oldest.IsZero() && now.After(snapshot.Oldest) {
-		status.OldestObservationMS = uint64(now.Sub(snapshot.Oldest) / time.Millisecond)
+		var age time.Duration = now.Sub(snapshot.Oldest)
+		var milliseconds time.Duration = age / time.Millisecond
+		status.OldestObservationMS = uint64(milliseconds)
 	}
 	switch {
-	case !controller.running:
+	case !captured.running:
 		status.Currentness = api.CurrentnessObservationUnavailable
 	case snapshot.InFlight:
 		status.Currentness = api.CurrentnessReconciling
@@ -389,15 +425,16 @@ func (s *Service) backgroundWorkStatus(now time.Time) (api.WorkStatus, bool, str
 	default:
 		status.Currentness = api.CurrentnessCurrentVolatile
 	}
-	warning := ""
+	var warning string = ""
 	if status.Currentness == api.CurrentnessCoverageIncomplete {
-		warning = controller.coverageLimitation + "; the exact catalogue is reconciled through delivered observations but currentness remains incomplete"
+		warning = captured.coverageLimitation + "; the exact catalogue is reconciled through delivered observations but currentness remains incomplete"
 	} else if status.Currentness != api.CurrentnessCurrentVolatile {
 		warning = "background observation has not reconciled the exact catalogue through its latest volatile watermark"
 	} else if !status.WatermarkDurable {
 		warning = "background currentness is volatile; the live generation manifest does not yet commit its observation watermark"
 	}
-	return status, status.Currentness != api.CurrentnessCurrentVolatile, warning
+	var stale bool = status.Currentness != api.CurrentnessCurrentVolatile
+	return status, stale, warning
 }
 
 func sameObservationStream(left, right observation.Cursor) bool {

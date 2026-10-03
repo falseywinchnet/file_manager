@@ -47,17 +47,26 @@ func (s *Service) Configuration() api.EffectiveConfiguration {
 }
 
 func (s *Service) effectiveConfiguration(roots []api.RootSpec, persistentPolicy bool) api.EffectiveConfiguration {
-	configuration := api.EffectiveConfiguration{
+	var ingestionMode string = s.backgroundIngestionMode()
+	var configuration api.EffectiveConfiguration = s.effectiveConfigurationWithIngestion(roots, persistentPolicy, ingestionMode)
+	return configuration
+}
+
+// effectiveConfigurationWithIngestion retains the supplied root slice in the
+// result. The caller supplies owned roots and a mode from the same capture.
+func (s *Service) effectiveConfigurationWithIngestion(roots []api.RootSpec, persistentPolicy bool, ingestionMode string) api.EffectiveConfiguration {
+	var configuration api.EffectiveConfiguration = api.EffectiveConfiguration{
 		Schema: api.EngineConfigurationSchema, SchemaMajor: 0, SchemaMinor: 1,
 		Deployment: s.guard.Deployment(), Sandboxed: s.guard.Sandboxed(), Persistent: s.Persistent(),
 		StoreOutsideRoots: s.durable == nil || !anyRootContains(roots, s.durableDirectory),
-		IngestionMode:     s.backgroundIngestionMode(), RootPolicy: roots, RootPolicyPersistent: persistentPolicy,
+		IngestionMode:     ingestionMode, RootPolicy: roots, RootPolicyPersistent: persistentPolicy,
 	}
-	digestMaterial := configuration
+	var digestMaterial api.EffectiveConfiguration = configuration
 	digestMaterial.Digest = ""
 	digestMaterial.RootPolicyPersistent = false
-	encoded, _ := json.Marshal(digestMaterial)
-	digest := sha256.Sum256(encoded)
+	var encoded []byte = nil
+	encoded, _ = json.Marshal(digestMaterial)
+	var digest [sha256.Size]byte = sha256.Sum256(encoded)
 	configuration.Digest = hex.EncodeToString(digest[:])
 	return configuration
 }
