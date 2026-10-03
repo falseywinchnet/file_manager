@@ -18,6 +18,8 @@ namespace file_manager {
 // during join, preserving mutation semantics; cancellable reads observe stop.
 // Runtime owns Application and explicitly calls stop before releasing it; queue
 // entries retain it through invocation. Subscriptions revoke before owner teardown.
+// Mutations and Undo execute only on the serialized operation queue. Navigation,
+// preview, search and service reads use the independent existing read queue.
 // ChecksumProgressReport borrows last_report only within synchronous checksum_sha256.
 
 struct Application::BootstrapUnavailable final {

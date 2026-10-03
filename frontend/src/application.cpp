@@ -531,6 +531,14 @@ Application::Application(std::filesystem::path protected_root,
     install_dynamic_controls();
     install_handlers();
     worker_ = std::thread(&Application::worker_loop, this);
+    try {
+        if (operations_) operation_worker_ = std::thread(&Application::operation_loop, this);
+    } catch (...) {
+        // A failed second thread must not leave the first running against a
+        // partially constructed owner, or terminate through its destructor.
+        stop();
+        throw;
+    }
 }
 
 Application::~Application() {
@@ -2597,6 +2605,15 @@ void Application::post_worker(std::function<void()> work) {
     worker_cv_.notify_one();
 }
 
+void Application::post_operation(std::function<void()> work) {
+    {
+        const std::lock_guard<std::mutex> lock(operation_mutex_);
+        if (stopping_.load() || !operations_) return;
+        operation_queue_.push(std::move(work));
+    }
+    operation_cv_.notify_one();
+}
+
 void Application::post_ui(std::function<void()> work) {
     std::function<void()> wake{};
     {
@@ -2627,6 +2644,25 @@ void Application::worker_loop() {
     }
 }
 
+void Application::operation_loop() {
+    for (;;) {
+        std::function<void()> work{};
+        {
+            std::unique_lock<std::mutex> lock(operation_mutex_);
+            operation_cv_.wait(lock, std::bind_front(&Application::operation_ready, this));
+            if (stopping_.load() && operation_queue_.empty()) return;
+            work = std::move(operation_queue_.front());
+            operation_queue_.pop();
+        }
+        try {
+            work();
+        } catch (const std::exception& error) {
+            const std::string message = error.what();
+            post_ui(std::bind_front(&Application::on_worker_failed, this, message));
+        }
+    }
+}
+
 void Application::drain_ui() {
     std::queue<std::function<void()>> pending{};
     {
@@ -2641,18 +2677,21 @@ void Application::drain_ui() {
     }
 }
 
-// Called on the UI/owning thread. Existing worker jobs drain during join so
+// Called on the UI/owning thread. Both queues drain admitted jobs during join so
 // admitted mutations retain their completion semantics; UI completions are revoked.
 void Application::stop() {
     if (stopping_.exchange(true)) return;
     {
-        std::scoped_lock<std::mutex, std::mutex> lock(worker_mutex_, ui_mutex_);
+        const std::scoped_lock<std::mutex, std::mutex, std::mutex> lock(
+            worker_mutex_, operation_mutex_, ui_mutex_);
         wake_ = {};
         request_close_ = {};
         while (!ui_queue_.empty()) ui_queue_.pop();
     }
     worker_cv_.notify_all();
+    operation_cv_.notify_all();
     if (worker_.joinable()) worker_.join();
+    if (operation_worker_.joinable()) operation_worker_.join();
 }
 
 void Application::navigate_breadcrumb(const std::filesystem::path& target, const gui_forms::CommandInvocation&) {
@@ -2725,6 +2764,11 @@ bool Application::worker_ready() {
     return ready;
 }
 
+bool Application::operation_ready() {
+    const bool ready = stopping_.load() || !operation_queue_.empty();
+    return ready;
+}
+
 void Application::on_worker_failed(const std::string& message) {
     set_status("Background operation failed", message);
 }
@@ -2774,6 +2818,10 @@ void Application::hide_settings() {
         (mutation_scope_active() ? " · protected operations admitted"
             : local_action_scope_active() ? " · New Folder and Rename available"
                                           : " · read-only observation"));
+    if (refresh_after_settings_) {
+        refresh_after_settings_ = false;
+        refresh_after_operation();
+    }
 }
 
 void Application::select_settings_tab(std::string tab, std::string title) {
@@ -3337,6 +3385,7 @@ void Application::request_navigation(std::filesystem::path path,
     const std::uint64_t generation = requested_generation_.fetch_add(1) + 1;
     const std::filesystem::path root = (*target).root;
     path = (*target).path;
+    pending_navigation_ = PendingNavigation{path, add_history};
     set_status("Reading " + path_utf8(path),
                "direct filesystem · " + navigation_label(root) +
                    " · read-only observation");
@@ -3359,6 +3408,7 @@ void Application::apply_directory(DirectorySnapshot snapshot,
         snapshot.generation < applied_generation_) {
         return;
     }
+    pending_navigation_.reset();
     if (created_folder_rename_ &&
         (*created_folder_rename_).navigation_generation == snapshot.generation &&
         (*created_folder_rename_).search_generation != search_generation_.load()) {
@@ -4522,7 +4572,7 @@ void Application::request_create_folder() {
         search_generation_.load(), create_folder_request_generation_};
     created_folder_rename_.reset();
     set_status("Creating a folder", "local operation · collision-safe");
-    post_worker(CreateFolderWork{shared_from_this(), parent, context, parent_identity});
+    post_operation(CreateFolderWork{shared_from_this(), parent, context, parent_identity});
 }
 
 void Application::apply_created_folder(OperationResult result, const CreateFolderContext& context) {
@@ -4541,6 +4591,7 @@ void Application::apply_created_folder(OperationResult result, const CreateFolde
         undo_available_ = result.undo_available;
         update_mutation_controls();
         set_status("Folder created", path_utf8(result.resulting_path));
+        if (settings_open_) refresh_after_operation();
         return;
     }
     const ObjectIdentity identity = result.identity;
@@ -4592,7 +4643,7 @@ void Application::commit_rename(std::string basename) {
                "revalidating no-follow filesystem identity");
     const std::filesystem::path parent = entry.path.parent_path();
     const ObjectIdentity parent_identity = observe_identity(parent);
-    post_worker(RenameWork{shared_from_this(), entry, std::move(basename), parent_identity});
+    post_operation(RenameWork{shared_from_this(), entry, std::move(basename), parent_identity});
 }
 
 void Application::commit_property_name(std::string basename) {
@@ -4614,7 +4665,7 @@ void Application::commit_property_name(std::string basename) {
                "property edit · revalidating no-follow filesystem identity");
     const std::filesystem::path parent = (*entry).path.parent_path();
     const ObjectIdentity parent_identity = observe_identity(parent);
-    post_worker(PropertyRenameWork{shared_from_this(), *entry, std::move(basename), parent_identity});
+    post_operation(PropertyRenameWork{shared_from_this(), *entry, std::move(basename), parent_identity});
 }
 
 void Application::cancel_rename() {
@@ -4658,7 +4709,7 @@ void Application::paste_transfer() {
                    transfer.entry.name,
                transfer.move ? "same-volume identity-preserving publication"
                              : "staged no-follow copy · no overwrite");
-    post_worker(TransferWork{shared_from_this(), transfer, destination, generation});
+    post_operation(TransferWork{shared_from_this(), transfer, destination, generation});
 }
 
 void Application::cancel_transfer() {
@@ -4744,7 +4795,7 @@ void Application::request_internal_drop(const DirectoryEntry& source,
                    " to " + destination.name,
                copy ? "drag copy · staged no-overwrite publication"
                     : "drag move · same-volume identity publication");
-    post_worker(InternalDropWork{shared_from_this(), source, destination, copy, generation});
+    post_operation(InternalDropWork{shared_from_this(), source, destination, copy, generation});
 }
 
 void Application::request_quarantine() {
@@ -4762,14 +4813,14 @@ void Application::request_quarantine() {
     const DirectoryEntry entry = (*found).second;
     set_status("Moving " + entry.name + " to quarantine",
                "revalidating no-follow filesystem identity");
-    post_worker(QuarantineWork{shared_from_this(), entry});
+    post_operation(QuarantineWork{shared_from_this(), entry});
 }
 
 void Application::request_undo() {
     if (!operations_) return;
     set_status("Undoing the last operation",
                "identity and destination revalidation");
-    post_worker(UndoWork{shared_from_this()});
+    post_operation(UndoWork{shared_from_this()});
 }
 
 void Application::apply_operation(OperationResult result) {
@@ -4791,7 +4842,7 @@ void Application::apply_operation(OperationResult result) {
         show_operation_failure(result);
         return;
     }
-    if (result.identity.available() && !result.resulting_path.empty() &&
+    if (!pending_navigation_ && result.identity.available() && !result.resulting_path.empty() &&
         result.resulting_path.parent_path() == location_) {
         pending_selection_identity_ = result.identity;
     } else {
@@ -4800,7 +4851,27 @@ void Application::apply_operation(OperationResult result) {
     set_status(result.message,
                result.operation_id + (result.undo_available ? " · undo available"
                                                              : " · committed"));
-    request_navigation(location_, false);
+    refresh_after_operation();
+}
+
+void Application::refresh_after_operation() {
+    if (search_showing_ || criteria_showing_ || search_loading_ || criteria_loading_) {
+        pending_selection_identity_.reset();
+        return;
+    }
+    if (settings_open_) {
+        pending_selection_identity_.reset();
+        refresh_after_settings_ = true;
+        return;
+    }
+    if (pending_navigation_) {
+        // The displayed location can lag a newer user request. Refresh that
+        // owned destination after the mutation, retaining its history intent.
+        PendingNavigation navigation = *pending_navigation_;
+        request_navigation(std::move(navigation.path), navigation.add_history);
+    } else {
+        request_navigation(location_, false);
+    }
 }
 
 void Application::apply_transfer(OperationResult result,
