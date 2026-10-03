@@ -6,31 +6,43 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <stdexcept>
 #include <string>
-#include <unistd.h>
 
 namespace {
 
 class TestArea final {
 public:
     TestArea() {
-        base_ = std::filesystem::temp_directory_path() /
-            ("file-manager-operations-" + std::to_string(::getpid()));
-        std::error_code ignored{};
-        std::filesystem::remove_all(base_, ignored);
-        std::filesystem::create_directories(base_ / "source");
-        std::filesystem::create_directories(base_ / "quarantine");
-        base_ = std::filesystem::canonical(base_);
+        parent_ = std::filesystem::canonical(std::filesystem::temp_directory_path());
+        std::random_device random{};
+        for (unsigned int attempt = 0; attempt < 128U; ++attempt) {
+            const unsigned int token = random();
+            base_ = parent_ / ("file-manager-operations-" + std::to_string(token));
+            std::error_code error{};
+            if (!std::filesystem::create_directory(base_, error)) {
+                if (error && error != std::errc::file_exists) throw std::system_error(error);
+                continue;
+            }
+            identity_ = file_manager::observe_identity(base_);
+            if (!identity_.available()) throw std::runtime_error("fixture identity unavailable; directory retained");
+            try {
+                std::filesystem::create_directory(base_ / "source");
+                std::filesystem::create_directory(base_ / "quarantine");
+            } catch (...) {
+                cleanup();
+                throw;
+            }
+            return;
+        }
+        throw std::runtime_error("exclusive operation fixture creation exhausted");
     }
 
     TestArea(const TestArea&) = delete;
     TestArea& operator=(const TestArea&) = delete;
 
-    ~TestArea() {
-        std::error_code ignored{};
-        std::filesystem::remove_all(base_, ignored);
-    }
+    ~TestArea() { cleanup(); }
 
     [[nodiscard]] std::filesystem::path source() const {
         const std::filesystem::path result = base_ / "source";
@@ -46,7 +58,22 @@ public:
     }
 
 private:
+    void cleanup() noexcept {
+        try {
+            if (!identity_.available() || !base_.is_absolute() || base_.parent_path() != parent_ ||
+                std::filesystem::canonical(base_) != base_ ||
+                file_manager::observe_identity(base_) != identity_) {
+                std::cerr << "Operation fixture cleanup scope changed; retained\n";
+                return;
+            }
+            std::error_code error{};
+            std::filesystem::remove_all(base_, error);
+            if (error) std::cerr << "Operation fixture cleanup failed: " << error.message() << '\n';
+        } catch (...) { std::cerr << "Operation fixture cleanup failed; retained\n"; }
+    }
+    std::filesystem::path parent_{};
     std::filesystem::path base_{};
+    file_manager::ObjectIdentity identity_{};
 };
 
 bool require(const bool condition, const char* message) {
@@ -189,6 +216,55 @@ struct CancelAfterFourChecks final {
     }
 };
 
+// Synchronous cancellation observes only this test's newly created copy stage.
+// Native identity observation sees an open Windows writer's current extent.
+struct CancelAfterStageBytes final {
+    const std::filesystem::path& parent;
+    std::uint64_t& observed_bytes;
+    bool operator()() const {
+        for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(parent)) {
+            const std::filesystem::path path = entry.path();
+            const std::filesystem::path leaf = path.filename();
+            const std::string name = leaf.string();
+            if (!name.starts_with(".fm-stage-")) continue;
+            const file_manager::ObjectIdentity identity = file_manager::observe_identity(path);
+            if (identity.available() && identity.type == std::filesystem::file_type::regular && identity.size > 0) {
+                observed_bytes = identity.size;
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
+bool test_copy_cancellation_after_bytes(const TestArea& area) {
+    const std::filesystem::path root = area.source();
+    const std::filesystem::path source = root / "cancel-after-bytes.txt";
+    const std::filesystem::path destination = root / "cancel-after-bytes-destination";
+    std::filesystem::create_directory(destination);
+    const std::string contents(16U * 1024U * 1024U, 'x');
+    write_file(source, contents);
+    const file_manager::ObjectIdentity before = file_manager::observe_identity(source);
+    file_manager::FileOperationService operations(root, area.quarantine(), true);
+    std::uint64_t observed_bytes{};
+    const file_manager::OperationResult cancelled = operations.copy_object(
+        source, before, destination, CancelAfterStageBytes{destination, observed_bytes});
+    if (!require(cancelled.terminal == file_manager::OperationTerminal::cancelled &&
+        observed_bytes > 0 && !cancelled.recoverable_object_retained &&
+        !std::filesystem::exists(destination / source.filename()) && !has_copy_stage(destination) &&
+        file_manager::observe_identity(source).same_revision(before) && read_fixture_text(source) == contents,
+        "cancellation after file bytes must clean the stage and preserve the source")) return false;
+#if !defined(__APPLE__)
+    if (!require(observed_bytes <= 256U * 1024U,
+        "Windows/Linux cancellation must stop after the first bounded chunk")) return false;
+#endif
+    const file_manager::OperationResult retry = operations.copy_object(source, before, destination);
+    const std::filesystem::path published = destination / source.filename();
+    if (!require(retry.succeeded() && read_fixture_text(published) == contents &&
+        !has_copy_stage(destination), "cancelled file copy must remain retryable")) return false;
+    return true;
+}
+
 struct PublicationFault final {
     file_manager::OperationFaultPoint point;
     std::errc error;
@@ -219,6 +295,7 @@ struct DiskFullAfterThirdNode final {
 int main() {
     TestArea area{};
     if (!test_native_publication(area.source())) return 1;
+    if (!test_copy_cancellation_after_bytes(area)) return 1;
     file_manager::FileOperationService disabled(
         area.source(), area.quarantine(), false);
     const file_manager::OperationResult disabled_create = disabled.create_folder(area.source());

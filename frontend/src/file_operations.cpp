@@ -1,6 +1,7 @@
 #include "file_manager/platform_paths.hpp"
 #include "file_manager/file_operations.hpp"
 #include "native_file.hpp"
+#include "native_copy.hpp"
 #include "native_publication.hpp"
 
 #include <cstdlib>
@@ -62,6 +63,42 @@ struct CopyOutcome final {
     std::string message{};
 };
 
+// Set only after this traversal successfully creates its own stage root.
+// Failure to observe that root's identity leaves it retained for inspection.
+struct CopyStageIdentity final {
+    bool created{};
+    ObjectIdentity identity{};
+};
+
+CopyOutcome regular_copy_outcome(const NativeCopyResult& native) {
+    CopyOutcome result{};
+    switch (native.terminal) {
+        case NativeCopyTerminal::complete:
+            result = {true, false, "copied", "file copied to stage"};
+            break;
+        case NativeCopyTerminal::cancelled:
+            result = {false, true, "cancelled", "copy cancelled before publication"};
+            break;
+        case NativeCopyTerminal::source_changed:
+            result = {false, false, "identity_changed", identity_changed_message()};
+            break;
+        case NativeCopyTerminal::callback_failed:
+            result = {false, false, "copy_callback_failed", "copy cancellation callback failed"};
+            break;
+        case NativeCopyTerminal::failed:
+            result = {false, false, "file_copy_failed",
+                native.error ? native.error.message() : "file copy failed"};
+            break;
+    }
+    if (native.source_close_error) {
+        result.message += " · source close: " + native.source_close_error.message();
+    }
+    if (native.stage_close_error) {
+        result.message += " · stage close: " + native.stage_close_error.message();
+    }
+    return result;
+}
+
 OperationTerminal publication_failure_terminal(const std::error_code& error) {
     if (error == std::errc::file_exists) return OperationTerminal::conflict;
     if (error == std::errc::cross_device_link ||
@@ -84,6 +121,8 @@ std::string publication_failure_code(const std::error_code& error,
 CopyOutcome copy_node_no_follow(const std::filesystem::path& source,
                                 const std::filesystem::path& destination,
                                 const std::uint64_t source_device,
+                                NativeCopyWorkspace& workspace,
+                                CopyStageIdentity& created_stage,
                                 const CancellationCheck& cancelled,
                                 const OperationFaultCheck& injected_fault) {
     if (cancelled && cancelled()) {
@@ -120,6 +159,13 @@ CopyOutcome copy_node_no_follow(const std::filesystem::path& source,
                         error ? error.message() : "copy stage directory was not created"};
                 return outcome;
             }
+            created_stage.created = true;
+            created_stage.identity = observe_identity(destination);
+            if (!created_stage.identity.available()) {
+                const CopyOutcome outcome{false, false, "stage_identity_unavailable",
+                    "created copy stage cannot be identified; it was retained"};
+                return outcome;
+            }
             std::filesystem::directory_iterator iterator(source, error);
             if (error) {
                 const CopyOutcome outcome{false, false, "source_enumeration_failed", error.message()};
@@ -127,9 +173,13 @@ CopyOutcome copy_node_no_follow(const std::filesystem::path& source,
             }
             const std::filesystem::directory_iterator end{};
             while (iterator != end) {
+                const std::filesystem::path child_source = (*iterator).path();
+                const std::filesystem::path child_name = child_source.filename();
+                const std::filesystem::path child_destination = destination / child_name;
+                CopyStageIdentity child_stage{};
                 const CopyOutcome child = copy_node_no_follow(
-                    (*iterator).path(), destination / (*iterator).path().filename(),
-                    source_device, cancelled, injected_fault);
+                    child_source, child_destination, source_device, workspace,
+                    child_stage, cancelled, injected_fault);
                 if (!child.success) return child;
                 iterator.increment(error);
                 if (error) {
@@ -141,12 +191,11 @@ CopyOutcome copy_node_no_follow(const std::filesystem::path& source,
             return outcome;
         }
         case std::filesystem::file_type::regular: {
-            if (!std::filesystem::copy_file(source, destination, error) || error) {
-                const CopyOutcome outcome{false, false, "file_copy_failed",
-                        error ? error.message() : "file was not copied"};
-                return outcome;
-            }
-            const CopyOutcome outcome{true, false, "copied", "file copied to stage"};
+            const NativeCopyResult copied = copy_regular_file_to_stage(
+                source, destination, identity, cancelled, workspace);
+            created_stage.created = copied.stage_created;
+            created_stage.identity = copied.stage_identity;
+            const CopyOutcome outcome = regular_copy_outcome(copied);
             return outcome;
         }
         case std::filesystem::file_type::symlink: {
@@ -170,6 +219,13 @@ CopyOutcome copy_node_no_follow(const std::filesystem::path& source,
 #endif
             if (error) {
                 const CopyOutcome outcome{false, false, "symlink_copy_failed", error.message()};
+                return outcome;
+            }
+            created_stage.created = true;
+            created_stage.identity = observe_identity(destination);
+            if (!created_stage.identity.available()) {
+                const CopyOutcome outcome{false, false, "stage_identity_unavailable",
+                    "created copy link cannot be identified; it was retained"};
                 return outcome;
             }
             const CopyOutcome outcome{true, false, "copied", "symlink leaf copied to stage"};
@@ -611,26 +667,31 @@ OperationResult FileOperationService::copy_object(
         return value;
     }
 
-    const CopyOutcome copied = copy_node_no_follow(
-        source, stage, expected.device, cancelled, injected_fault_);
-    const ObjectIdentity stage_identity = observe_identity(stage);
-    if (!copied.success) {
-        const bool cleaned = !stage_identity.available() ||
-            cleanup_stage(stage, stage_identity);
-        OperationResult value = result(OperationKind::copy_object,
-                            copied.cancelled ? OperationTerminal::cancelled
-                                             : OperationTerminal::failed,
-                            copied.code, copied.message,
-                            source, stage, expected);
-        value.operation_id = operation_id;
-        value.recoverable_object_retained = !cleaned;
-        return value;
+    // Allocate the reusable byte workspace before creating any stage objects.
+    NativeCopyWorkspace workspace{};
+    CopyStageIdentity created_stage{};
+    CopyOutcome copied{};
+    try {
+        copied = copy_node_no_follow(source, stage, expected.device, workspace,
+            created_stage, cancelled, injected_fault_);
+        if (copied.success && cancelled && cancelled()) {
+            copied = {false, true, "cancelled", "copy cancelled before publication"};
+        }
+    } catch (const std::exception& failure) {
+        copied = {false, false, "copy_failed", failure.what()};
+    } catch (...) {
+        copied = {false, false, "copy_failed", "copy failed before publication"};
     }
-    if (cancelled && cancelled()) {
-        const bool cleaned = cleanup_stage(stage, stage_identity);
+    const ObjectIdentity stage_identity = created_stage.identity;
+    if (!copied.success) {
+        const bool cleaned = !created_stage.created ||
+            cleanup_stage(stage, stage_identity);
+        OperationTerminal terminal = OperationTerminal::failed;
+        if (copied.cancelled) terminal = OperationTerminal::cancelled;
+        else if (copied.code == "identity_changed") terminal = OperationTerminal::conflict;
         OperationResult value = result(OperationKind::copy_object,
-                            OperationTerminal::cancelled,
-                            "cancelled", "copy cancelled before publication",
+                            terminal,
+                            copied.code, copied.message,
                             source, stage, expected);
         value.operation_id = operation_id;
         value.recoverable_object_retained = !cleaned;

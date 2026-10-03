@@ -119,6 +119,7 @@ private:
     struct ServicesReady;
     struct ServicesWork;
     friend class ApplicationInteractionProbe;
+    friend class ApplicationTransferProbe;
     friend class ApplicationLatencyProbe;
 
     using EntryMap = std::unordered_map<std::string, DirectoryEntry>;
@@ -332,6 +333,7 @@ private:
     void cancel_rename();
     void capture_transfer(bool move);
     void paste_transfer();
+    void cancel_transfer();
     void observe_object_pointer(const gui_forms::PointerEvent& event);
     void request_internal_drop(const DirectoryEntry& source,
                                const DirectoryEntry& destination,
@@ -391,7 +393,9 @@ private:
     };
     std::optional<PendingTransfer> pending_transfer_{};
     std::atomic_uint64_t transfer_generation_{};
+    std::atomic_uint64_t cancelled_transfer_generation_{};
     bool transfer_in_flight_{};
+    bool transfer_cancellable_{};
     bool property_rename_in_flight_{};
     std::string pointer_drag_hover_id_{};
     InternalDragController pointer_drag_{};
@@ -489,6 +493,7 @@ private:
     std::shared_ptr<gui_forms::Command> command_copy_{};
     std::shared_ptr<gui_forms::Command> command_move_{};
     std::shared_ptr<gui_forms::Command> command_paste_{};
+    std::shared_ptr<gui_forms::Command> command_cancel_copy_{};
     std::shared_ptr<gui_forms::Command> command_undo_{};
     std::shared_ptr<gui_forms::Command> command_delete_{};
     std::shared_ptr<gui_forms::Command> command_rename_{};
