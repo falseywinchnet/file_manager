@@ -1,0 +1,24 @@
+{
+  "status": "REJECTED for admission: no-regression gate not established; not a statistical slowdown proof",
+  "baseline_parent_reported": "d4dcb245",
+  "measured_patch": "measured.patch",
+  "final_style_patch": "candidate.patch",
+  "final_style_validation": "Reconstruction/source review only. No compiler after release; last tests and timing precede seven named-return style corrections.",
+  "artifacts": {
+    "archive.ps1": "600b062e60cbb9a24b9954bf8825512de13fe9ab8011d4482da6a02a09e6ae5e",
+    "audit.py": "8980bbad446060f44632f6565fff53108cb88aee905b4f69dc949b550a6290b0",
+    "baseline-segment.go.txt": "395670b8098ee79583a699142241a708aa30b719ae4a756502693dea25f54b68",
+    "candidate.patch": "7778d1a186d9576360c687578caee645089e52a309cc7ec7beeefa584fe63f09",
+    "logs.zip": "df9ab003760bd060c9b688074df17339249d804737632e6058d6c1aef4399646",
+    "measured-manifest.json": "43c3ac33c674a17c22a0523ca49774a1520abeecbab49aa8352401859fbc2b07",
+    "measured.patch": "49187399985963f54a92f1e0e817f36bb6854eae66fd7a0d0b970c1616c46915",
+    "prepare.ps1": "89919299eda14a5428694703c8d9edbafab7cea8d4fef9899297fa4ffd1157d5",
+    "sources.zip": "c4748c5989b0f90b47113f0b2768bfeec29b947b3ed607870ea84cdcab3b680a"
+  },
+  "final_sources": {
+    "final-source/engine/internal/generation/segment.go": "54b56eae28a191330e34db42f4f28362a4e015cbdeff9d52673f81fdceeb3eba",
+    "final-source/engine/internal/generation/bounded_scan_candidate.go": "cf1e952e4f95075bb4bbdabbd9c5cf84025994f6231b78ec672e637bda39c821",
+    "final-source/engine/internal/generation/bounded_scan_candidate_test.go": "0d52ea3abfa845494e1ba6042166194755fc48068798fd156c149365b5226e73",
+    "final-source/engine/benchmarks/bounded_scan_candidate_test.go": "5447336593feb17a7952f138b5c4b93195834e9cec9c701a70f30967cf4eb87d"
+  }
+}

@@ -1,0 +1,3 @@
+# Preserve the exact archived bytes named by manifest.json on every host.
+# CRLF source snapshots and unified-diff context whitespace are evidence data.
+* -text -whitespace
