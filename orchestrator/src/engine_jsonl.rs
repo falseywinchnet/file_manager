@@ -1,4 +1,5 @@
 use crate::common::{ContractRef, TerminalStatus};
+use crate::engine_catalogue_cursor::{CataloguePredicate, catalogue_predicate};
 use crate::engine_contract::{
     ENGINE_LIVE_SEMANTIC_MAJOR, ENGINE_LIVE_SEMANTIC_MINOR, ENGINE_SEMANTIC_MAJOR,
     ENGINE_SEMANTIC_MINOR, EngineFlag, EngineLiveQueryResultFixture, EngineLiveWork,
@@ -554,6 +555,32 @@ impl<C: EngineJsonlCaller> EngineSearchProvider for EngineJsonlSearchAdapter<C> 
             );
         }
 
+        // Reserve the new predicate's namespace before legacy text-as-name
+        // continuation dispatch. Its provider capability is not enabled yet.
+        if let Some(cursor) = &request.cursor {
+            if cursor.source == EngineSearchCursorSource::Catalogue {
+                match catalogue_predicate(&cursor.value) {
+                    Ok(CataloguePredicate::LegacyExact) => {}
+                    Ok(CataloguePredicate::SubstringV1) => {
+                        let unavailable: EngineQueryResultFixture = catalogue_failure(
+                            TerminalStatus::Unsupported,
+                            "ENGINE_CATALOGUE_TEXT_UNSUPPORTED",
+                            "catalogue substring continuation capability is unavailable",
+                        );
+                        return unavailable;
+                    }
+                    Err(_) => {
+                        let invalid: EngineQueryResultFixture = catalogue_failure(
+                            TerminalStatus::Invalid,
+                            "ORCHESTRATOR_INVALID_CURSOR",
+                            "catalogue substring cursor wrapper is invalid",
+                        );
+                        return invalid;
+                    }
+                }
+            }
+        }
+
         // This adapter has no negotiated catalogue name/path substring
         // predicate. Plan Unsupported before issuing an inexact substitute;
         // the broker's existing allowlist may then use bounded live search.
@@ -1092,6 +1119,44 @@ mod tests {
         let params: serde_json::Value = caller.params.expect("catalogue continuation");
         assert_eq!(params["filters"]["name"], "ledger.txt");
         assert_eq!(params["cursor"], "old-cursor");
+    }
+
+    fn require_reserved_cursor_stays_catalogue(value: &str, expected: TerminalStatus) {
+        use crate::engine_contract::{EngineSearchCursor, EngineSearchCursorSource};
+        use crate::engine_port::{EngineSearchBroker, EngineSearchOutcome, EngineSearchPolicy};
+        let mut request: EngineSearchRequest = search_request();
+        request.cursor = Some(EngineSearchCursor {
+            source: EngineSearchCursorSource::Catalogue,
+            value: value.to_owned(),
+        });
+        let caller: RecordingCaller = RecordingCaller::default();
+        let adapter: EngineJsonlSearchAdapter<RecordingCaller> =
+            EngineJsonlSearchAdapter::new(caller);
+        let mut broker: EngineSearchBroker<EngineJsonlSearchAdapter<RecordingCaller>> =
+            EngineSearchBroker::new(adapter);
+        let outcome: EngineSearchOutcome =
+            broker.search(&request, EngineSearchPolicy::PreferCatalogue);
+        assert!(matches!(outcome, EngineSearchOutcome::Catalogue(_)));
+        assert_eq!(outcome.terminal(), expected);
+        let provider: &mut EngineJsonlSearchAdapter<RecordingCaller> = broker.provider_mut();
+        let caller: &mut RecordingCaller = provider.peer_mut();
+        assert!(
+            caller.method.is_empty(),
+            "reserved cursors must neither issue legacy exact calls nor fall back to live"
+        );
+    }
+
+    #[test]
+    fn reserved_substring_cursors_cannot_become_legacy_exact_queries() {
+        require_reserved_cursor_stays_catalogue(
+            ".fm-substring-v1.opaque",
+            TerminalStatus::Unsupported,
+        );
+        require_reserved_cursor_stays_catalogue(".fm-substring-v1.", TerminalStatus::Invalid);
+        require_reserved_cursor_stays_catalogue(".fm-substring-v2.opaque", TerminalStatus::Invalid);
+        let token: String = "x".repeat(4096);
+        let oversized: String = format!(".fm-substring-v1.{token}");
+        require_reserved_cursor_stays_catalogue(&oversized, TerminalStatus::Invalid);
     }
 
     #[test]

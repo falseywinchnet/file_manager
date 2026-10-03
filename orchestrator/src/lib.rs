@@ -11,6 +11,7 @@ pub mod availability;
 pub mod cli;
 pub mod common;
 pub mod contract;
+mod engine_catalogue_cursor;
 pub mod engine_contract;
 pub mod engine_jsonl;
 #[cfg(any(target_os = "macos", windows))]
