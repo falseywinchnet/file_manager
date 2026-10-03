@@ -116,4 +116,19 @@ bool prepared_window_batch_current(const PreparedWindowBatchStorage& batch) {
     const bool live = !(*batch.ledger).closing;
     return live;
 }
+PreparedTextStatus prepared_window_worker_current_locked(const PreparedWindowBatchStorage& batch) noexcept {
+    if (!batch.authority || !batch.ledger) return PreparedTextStatus::invalid_input;
+    const PreparedWindowBatchAuthority& authority = *batch.authority;
+    if (authority.closing || (*batch.ledger).closing) return PreparedTextStatus::closing;
+    if (!authority.desired || !same_prepared_window_key(*authority.desired, batch.key))
+        return PreparedTextStatus::stale;
+    return PreparedTextStatus::success;
+}
+PreparedTextStatus prepared_window_worker_current(const PreparedWindowBatchStorage& batch) {
+    if (!batch.authority || !batch.ledger) return PreparedTextStatus::invalid_input;
+    std::lock_guard<std::mutex> authority_lock((*batch.authority).mutex);
+    std::lock_guard<std::mutex> ledger_lock((*batch.ledger).mutex);
+    const PreparedTextStatus status = prepared_window_worker_current_locked(batch);
+    return status;
+}
 }

@@ -225,10 +225,56 @@ void retirement_tests() {
     require(detail::desire_prepared_window(*fixture.authority, fixture.key) == gf::PreparedTextStatus::generation_exhausted,
         "Exhaustion cannot recycle an earlier authority");
 }
+struct WorkerObservation final {
+    Fixture& fixture;
+    const detail::PreparedWindowBatchStorage& batch;
+    gf::PreparedTextStatus observed{gf::PreparedTextStatus::pending};
+    gf::PreparedTextStatus desired{gf::PreparedTextStatus::pending};
+    gf::PreparedTextStatus admitted{gf::PreparedTextStatus::pending};
+    bool owner_current{};
+    void run() {
+        observed = detail::prepared_window_worker_current(batch);
+        owner_current = detail::prepared_window_batch_current(batch);
+        detail::PreparedWindowKey next = fixture.key;
+        ++next.authority.epoch;
+        desired = detail::desire_prepared_window(*fixture.authority, next);
+        std::unique_ptr<detail::PreparedWindowBatchStorage> output{};
+        admitted = fixture.admit(output);
+    }
+};
+void worker_observation_tests() {
+    Fixture fixture{};
+    std::unique_ptr<detail::PreparedWindowBatchStorage> batch{};
+    require(fixture.admit(batch) == gf::PreparedTextStatus::success, "Worker observation admission");
+    fixture.own();
+    WorkerObservation observation{fixture, *batch};
+    std::thread worker(&WorkerObservation::run, &observation);
+    worker.join();
+    require(observation.observed == gf::PreparedTextStatus::success && !observation.owner_current,
+        "Worker observation does not require owner executor");
+    require(observation.desired == gf::PreparedTextStatus::wrong_executor &&
+        observation.admitted == gf::PreparedTextStatus::wrong_executor && fixture.input,
+        "Read-only observation grants no mutation authority");
+    {
+        std::lock_guard<std::mutex> lock((*fixture.authority).mutex);
+        ++(*(*fixture.authority).desired).projection_generation;
+    }
+    require(detail::prepared_window_worker_current(*batch) == gf::PreparedTextStatus::stale,
+        "Worker checks full identity even when epoch is unchanged");
+    {
+        std::lock_guard<std::mutex> lock((*fixture.ledger).mutex);
+        (*fixture.ledger).closing = true;
+    }
+    require(detail::prepared_window_worker_current(*batch) == gf::PreparedTextStatus::closing,
+        "Ledger closing takes precedence over stale work");
+    require((*fixture.ledger).usage.payload_generations == 1U,
+        "Revocation and closing preserve retained generation charge");
+}
 int main() {
     try {
         failure_tests();
         retirement_tests();
+        worker_observation_tests();
         std::cout << "Prepared-window batch admission tests passed\n";
         return 0;
     } catch (const std::exception& failure) {

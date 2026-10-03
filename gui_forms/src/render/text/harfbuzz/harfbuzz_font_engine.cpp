@@ -925,8 +925,8 @@ std::unique_ptr<BoundedShapedText> HarfBuzzFontEngine::shape_with_workspace(
 #endif
     const ShapeStorageLimits ceiling{};
     if (limits.input_bytes == 0U || limits.input_bytes > ceiling.input_bytes ||
-        limits.runs == 0U || limits.runs > ceiling.runs ||
-        limits.glyphs == 0U || limits.glyphs > ceiling.glyphs ||
+        (!utf8.empty() && (limits.runs == 0U || limits.glyphs == 0U)) ||
+        limits.runs > ceiling.runs || limits.glyphs > ceiling.glyphs ||
         limits.output_bytes > ceiling.output_bytes || limits.workspace_bytes > ceiling.workspace_bytes ||
         utf8.size() > limits.input_bytes || limits.input_bytes > workspace.scalar_capacity_ ||
         limits.runs > workspace.staging_.run_capacity || limits.glyphs > workspace.staging_.glyph_capacity) {

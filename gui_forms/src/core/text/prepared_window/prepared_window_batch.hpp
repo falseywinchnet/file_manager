@@ -14,10 +14,22 @@ struct PreparedWindowBatchAuthority final {
     std::uint64_t last_epoch{};
     bool closing{};
 };
-// Storage descriptors only. No glyphs, geometry or renderable status exist in
-// this stage. Paragraph bytes remain solely in immutable input storage.
+// Admission descriptors. Shaping adds a separate immutable geometry table;
+// paragraph bytes remain solely in immutable input storage.
 struct PreparedWindowRowStorage final {
     std::size_t paragraph_index{};
+};
+// Glyph/run coordinates remain paragraph-relative device units. Source mapping
+// belongs to the retained paragraph descriptor, never to a glyph index.
+// Arrays become const at transfer; even a const unique_ptr alone would not
+// make mutable array elements immutable.
+struct PreparedWindowGeometryRow final {
+    std::size_t paragraph_index{};
+    PreparedTextMetrics metrics{};
+    std::unique_ptr<const render::text::BoundedFontRun[]> runs{};
+    std::unique_ptr<const render::text::ShapedGlyph[]> glyphs{};
+    std::size_t run_count{};
+    std::size_t glyph_count{};
 };
 struct PreparedWindowBatchStorage final {
     PreparedReservation reservation{};
@@ -29,6 +41,11 @@ struct PreparedWindowBatchStorage final {
     std::unique_ptr<const PreparedWindowRowStorage[]> rows{};
     std::size_t row_count{};
     std::size_t requested_bytes{};
+    std::unique_ptr<const PreparedWindowGeometryRow[]> geometry{};
+    std::array<FontFaceId, PreparedTextLimits::font_faces> face_ids{};
+    std::size_t run_count{};
+    std::size_t glyph_count{};
+    std::size_t workspace_peak_bytes{};
 };
 // After the first desire, session/controller remain fixed and epoch must
 // strictly increase, even for identical text. Exhaustion cannot wrap or revive.
@@ -43,4 +60,9 @@ struct PreparedWindowBatchStorage final {
     std::shared_ptr<const PreparedFontBank>, PreparedWindowInput&,
     std::unique_ptr<PreparedWindowBatchStorage>& output);
 [[nodiscard]] bool prepared_window_batch_current(const PreparedWindowBatchStorage&);
+// Observation only: does not grant desire/admission rights to the worker.
+[[nodiscard]] PreparedTextStatus prepared_window_worker_current(const PreparedWindowBatchStorage&);
+// Caller holds authority.mutex then ledger.mutex through check and publication.
+[[nodiscard]] PreparedTextStatus prepared_window_worker_current_locked(
+    const PreparedWindowBatchStorage&) noexcept;
 }
