@@ -93,18 +93,40 @@ void SearchCoverageSummary::observe(const fileman::orchestrator::SearchPageInfo&
 
 std::string SearchCoverageSummary::describe(const fileman::orchestrator::SearchPageInfo& page) const {
     std::string description{};
-    if (page.source == "catalogue") description += " · cached matches; current identity and criteria not rechecked";
-    if (page.terminal == "partial") description += " · partial provider page";
+    if (page.source == "catalogue") description += " · indexed matches may have changed";
+    if (page.terminal == "partial") description += " · partial search results";
     if (!page.complete) {
         if (page.cursor) description += " · more results available";
-        else description += " · search incomplete; no continuation supplied";
+        else description += " · search incomplete; no more results available";
     }
-    if (stale) description += " · stale catalogue reported";
+    if (stale) description += " · index needs refresh";
     if (unavailable) description += " · locations unavailable";
-    if (warnings) description += " · provider warnings reported";
-    if (unreported) description += " · coverage unreported";
+    if (warnings) description += " · search reported warnings";
+    if (unreported) description += " · search coverage unavailable";
     if (omitted) description += " · some returned paths could not be displayed";
     return description;
+}
+
+std::string SearchCoverageSummary::result_status(const std::size_t count, const bool criteria,
+    const fileman::orchestrator::SearchPageInfo& page) const {
+    std::string status{};
+    if (count == 0U) {
+        status = criteria ? "No criteria matches shown" : "No matches shown";
+    } else {
+        status = std::to_string(count);
+        if (criteria) status += count == 1U ? " criteria match shown" : " criteria matches shown";
+        else status += count == 1U ? " match shown" : " matches shown";
+    }
+    // Keep the most consequential coverage state in the primary status field.
+    // The secondary description retains all states, including earlier pages.
+    if (!page.complete || page.terminal == "partial") status += " · partial search";
+    else if (stale) status += " · index needs refresh";
+    else if (unavailable) status += " · some locations unavailable";
+    else if (warnings) status += " · search warnings";
+    else if (unreported) status += " · coverage unavailable";
+    else if (omitted) status += " · some results omitted";
+    else if (page.source == "catalogue") status += " · indexed results";
+    return status;
 }
 
 PreparedSearchPage prepare_search_page(const std::filesystem::path& canonical_root,

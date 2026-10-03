@@ -136,3 +136,20 @@ RSS/peak staging memory, physical I/O and CPU attribution; deep/long/large trees
 hard links/replacement/currentness, longer accumulated lists and native paint.
 This experiment identifies and moves a measured UI blocking cost; it does not
 complete the search or responsiveness objective.
+
+## Subsequent native verification and delivery
+
+2026-10-03 UTC: source `81473681782555fd1cd3b949273b4bcf74a882f6` passed both
+complete native matrices, runs `36997543145` and `36997653188`. PR 9 rebase-merged
+as `8f20ccaec656c18909bdae27a3316d4b6f4aff05`; both source trees are
+`ef425f7897d389ef4e68c522c3d0183227ce368b`. Independent download checks verified
+clean source receipts, SHA-256 sidecars and all 40 Linux/42 Mac/44 Windows
+receipt-listed files. Published archive digests read back from GitHub match.
+Release: `https://github.com/falseywinchnet/file_manager/releases/tag/v0.001-alpha.8147368`.
+
+The actual Mac preview harness passed text/PNG/unsupported/Details checks;
+its saved text-preview screenshot was visually reviewed. Caption/readable-text
+checks counted 235/1078 pixels and the four-column Details header check passed.
+These checks close the earlier native build/integration gate for this source,
+not physical search interaction, end-to-end latency or all cross-platform cases.
+The later coverage projection is excluded from this release.

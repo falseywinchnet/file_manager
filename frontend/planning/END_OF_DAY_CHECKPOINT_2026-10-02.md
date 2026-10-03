@@ -1,5 +1,11 @@
 # File Manager end-of-day checkpoint
 
+Resume note (2026-10-03 UTC): the owner explicitly resumed after reboot. This
+document remains the historical pause receipt. PR 9 subsequently passed both
+native matrices, merged as `8f20cca` with identical tested tree, and was published
+as `v0.001-alpha.8147368`. Coverage follow-up evidence and remaining scope are
+recorded in `../results/2026-10-03-search-coverage/README.md`.
+
 2026-10-02. **GIVEN:** owner explicitly paused the active goal and requested a
 report and commit because the machine is out of time. Goal is paused, not
 complete. No shutdown operation was requested or performed.
