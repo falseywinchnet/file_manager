@@ -28,7 +28,12 @@ the experiment is retained outside active source. Prepared-window immutable
 input, aggregate admission and final-owner budget retirement pass five Windows
 suites. Revocation now preserves epoch history. These are private foundations,
 not evidence that text rendering or application responsiveness has improved.
-The new GUI tests await native CI; the published package above remains current.
+PR 19's push and pull-request matrices (37106083278 and 37106091606) now pass
+Windows/macOS/Linux, including the new GUI tests. Tested head
+`3ae551d30c9e0e5165d34896ca9b17a53facae7f` was rebase-merged as
+`3d1aedecad7a854dd6933322e664366cb4898eb4`; both have tree
+`033b1c5406f6d68c8a20e816d05a9d297ff368dc`. These private foundations enable no
+new user feature, so the published package above remains current.
 
 **Latest delivery, 2026-10-03 UTC:** `v0.001-alpha.1371514` is the downloadable
 Windows/macOS/Linux checkpoint. It adds cancellable staged copying, explicit

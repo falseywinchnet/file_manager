@@ -146,3 +146,14 @@ complete independent bidi paragraphs, full script coverage and existing A2
 correctness; do not assume a glyph expansion ratio or concatenate paragraphs.
 Measure allocation counts and peak bytes on empty, short, mixed-script and
 512-row windows. Neither candidate is selected here.
+
+## Native integration checkpoint
+
+**MEASURED 2026-10-03:** PR 19 push run 37106083278 and pull-request run
+37106091606 both completed successfully on Windows, macOS and Linux, with
+the development input/batch tests enabled. Tested source
+`3ae551d30c9e0e5165d34896ca9b17a53facae7f` and rebase merge
+`3d1aedecad7a854dd6933322e664366cb4898eb4` have the identical complete tree
+`033b1c5406f6d68c8a20e816d05a9d297ff368dc`. This closes native integration
+of the private ownership stage; it adds no shaping/rendering or responsiveness
+claim. Draft PR 14's input stage is included and superseded by PR 19.
