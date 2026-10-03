@@ -1925,6 +1925,13 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_bounded_shape_workspace_tests PRIVATE gui_forms_text_engine)
         add_test(NAME gui_forms_bounded_shape_workspace_tests COMMAND gui_forms_bounded_shape_workspace_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
 
+        add_executable(gui_forms_prepared_window_shape_bench tests/prepared_window_shape_bench.cpp)
+        target_link_libraries(gui_forms_prepared_window_shape_bench PRIVATE gui_forms_text_engine)
+        add_test(NAME gui_forms_prepared_window_shape_preview_verify
+            COMMAND gui_forms_prepared_window_shape_bench --fonts "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts" --scene preview-seven --verify-only)
+        add_test(NAME gui_forms_prepared_window_shape_rows_verify
+            COMMAND gui_forms_prepared_window_shape_bench --fonts "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts" --scene window-512 --verify-only)
+
         add_executable(gui_forms_harfbuzz_font_engine_tests
             tests/harfbuzz_font_engine_tests.cpp
         )
