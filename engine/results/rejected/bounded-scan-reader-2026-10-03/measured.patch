@@ -1,0 +1,808 @@
+--- a/engine/internal/generation/segment.go
++++ b/engine/internal/generation/segment.go
+@@ -684,11 +684,7 @@
+ 	if hasNonzero(encoded[20:24]) {
+ 		return storedBinding{}, errors.New("binding reserved bytes are nonzero")
+ 	}
+-	result := storedBinding{
+-		object: binary.LittleEndian.Uint32(encoded[0:4]), parent: binary.LittleEndian.Uint32(encoded[4:8]),
+-		nameOffset: binary.LittleEndian.Uint64(encoded[8:16]),
+-		nameLength: uint64(binary.LittleEndian.Uint32(encoded[16:20])),
+-	}
++	var result storedBinding = decodeStoredBinding(&encoded)
+ 	if uint64(result.object) >= r.header.objectCount || uint64(result.parent) >= r.header.objectCount {
+ 		return storedBinding{}, errors.New("binding references an object outside the segment")
+ 	}
+@@ -716,12 +712,12 @@
+ 	if err := r.cache.readAt(encoded[:], descriptor.offset+index*pathRecordSize); err != nil {
+ 		return "", 0, fmt.Errorf("read path index %d: %w", index, err)
+ 	}
+-	offset := binary.LittleEndian.Uint64(encoded[0:8])
+-	length := uint64(binary.LittleEndian.Uint32(encoded[8:12]))
+-	ordinal := binary.LittleEndian.Uint32(encoded[12:16])
++	var path storedPath = decodeStoredPath(&encoded)
+ 	tableLength := r.header.bindingCount * pathRecordSize
+-	value, err := r.readBoundedString(descriptor, tableLength+offset, length)
+-	return value, ordinal, err
++	var value string = ""
++	var err error = nil
++	value, err = r.readBoundedString(descriptor, tableLength+path.offset, path.length)
++	return value, path.ordinal, err
+ }
+ 
+ func (r *Reader) nameOrdinalAt(index uint64) (uint32, error) {
+--- /dev/null
++++ b/engine/internal/generation/bounded_scan_candidate.go
+@@ -0,0 +1,342 @@
++package generation
++
++// Private bounded scan experiment; no service capability is enabled here.
++import (
++	"context"
++	"crypto/sha256"
++	"encoding/binary"
++	"errors"
++	"io"
++	"os"
++	"path/filepath"
++
++	"filemanager/engine/internal/catalog"
++)
++
++var ErrScanReadBudget error = errors.New("bounded scan logical read budget exhausted")
++var ErrScanStringBudget error = errors.New("bounded scan stored string budget exceeded")
++
++// These pure field decoders are shared with the legacy reader. Validation and
++// I/O remain with their callers; neither decoder retains its input array.
++func decodeStoredBinding(encoded *[bindingRecordSize]byte) storedBinding {
++	var result storedBinding = storedBinding{
++		object: binary.LittleEndian.Uint32(encoded[0:4]), parent: binary.LittleEndian.Uint32(encoded[4:8]),
++		nameOffset: binary.LittleEndian.Uint64(encoded[8:16]),
++		nameLength: uint64(binary.LittleEndian.Uint32(encoded[16:20])),
++	}
++	return result
++}
++
++type storedPath struct {
++	offset  uint64
++	length  uint64
++	ordinal uint32
++}
++
++func decodeStoredPath(encoded *[pathRecordSize]byte) storedPath {
++	var result storedPath = storedPath{
++		offset:  binary.LittleEndian.Uint64(encoded[0:8]),
++		length:  uint64(binary.LittleEndian.Uint32(encoded[8:12])),
++		ordinal: binary.LittleEndian.Uint32(encoded[12:16]),
++	}
++	return result
++}
++
++// BoundedScanCandidate borrows a checked immutable Reader. Its owner must keep
++// that reader open and must not run Check or Close concurrently with a scan.
++// One accessor belongs to one request and is not concurrently callable. Returned
++// rows/records own their strings; scratch is reused only after making that copy.
++// Logical bytes include cache hits and admitted reads that later fail. They do
++// not bound physical prefetch, result storage, or elapsed time. A cache lock or
++// native ReadAt is synchronous and cannot be interrupted by these context checks.
++type BoundedScanCandidate struct {
++	reader        *Reader
++	ctx           context.Context
++	maximumBytes  uint64
++	maximumString uint64
++	used          uint64
++	err           error
++	scratch       []byte
++}
++
++func NewBoundedScanCandidate(reader *Reader, ctx context.Context, maximumBytes, maximumString uint64) (*BoundedScanCandidate, error) {
++	if reader == nil || reader.file == nil || ctx == nil || reader.metadata.SegmentDigest == ([sha256.Size]byte{}) {
++		return nil, errors.New("bounded scan requires a live digest-checked reader and context")
++	}
++	var scan *BoundedScanCandidate = &BoundedScanCandidate{
++		reader: reader, ctx: ctx, maximumBytes: maximumBytes, maximumString: maximumString,
++		used: 0, err: nil, scratch: nil,
++	}
++	var err error = scan.checkOwner()
++	if err != nil {
++		return nil, err
++	}
++	return scan, nil
++}
++
++func (s *BoundedScanCandidate) ReadBytes() uint64 { return s.used }
++
++func (s *BoundedScanCandidate) fail(err error) error {
++	if s.err == nil {
++		s.err = err
++	}
++	return s.err
++}
++
++func (s *BoundedScanCandidate) checkContext() error {
++	if s.err != nil {
++		return s.err
++	}
++	var err error = s.ctx.Err()
++	if err != nil {
++		s.fail(err)
++	}
++	return s.err
++}
++
++// Stat checks the borrowed file's lifetime even when every read would hit cache.
++// It observes this segment file, never the stored source paths. Concurrent owner
++// closure is excluded by the borrow contract, not synchronized by this check.
++func (s *BoundedScanCandidate) checkOwner() error {
++	var err error = s.checkContext()
++	if err != nil {
++		return err
++	}
++	var info os.FileInfo = nil
++	info, err = s.reader.file.Stat()
++	if err != nil {
++		s.fail(err)
++		return s.err
++	}
++	if info.Size() < 0 || uint64(info.Size()) != s.reader.cache.fileSize {
++		s.fail(errors.New("bounded scan segment size changed"))
++	}
++	return s.err
++}
++
++func (s *BoundedScanCandidate) reserve(length uint64) error {
++	var err error = s.checkContext()
++	if err != nil {
++		return err
++	}
++	if length > s.maximumBytes-s.used {
++		s.fail(ErrScanReadBudget)
++		return s.err
++	}
++	s.used += length
++	return nil
++}
++
++// Bounds are checked with subtraction before adding component-relative offsets.
++func (s *BoundedScanCandidate) extent(part descriptor, offset, length uint64) error {
++	var size uint64 = s.reader.cache.fileSize
++	if part.offset > size || part.length > size-part.offset || offset > part.length || length > part.length-offset {
++		s.fail(io.ErrUnexpectedEOF)
++	}
++	return s.err
++}
++
++// The caller has validated the extent and precharged the complete request.
++// Align chunks to cache blocks so each <=32KiB call touches at most one block.
++func (s *BoundedScanCandidate) readCharged(output []byte, offset uint64) error {
++	var err error = nil
++	for len(output) != 0 {
++		err = s.checkContext()
++		if err != nil {
++			return err
++		}
++		var count int = readBlockSize - int(offset%readBlockSize)
++		if count > len(output) {
++			count = len(output)
++		}
++		err = s.reader.cache.readAt(output[:count], offset)
++		if err != nil {
++			s.fail(err)
++		}
++		err = s.checkContext()
++		if err != nil {
++			return err
++		}
++		offset += uint64(count)
++		output = output[count:]
++	}
++	return nil
++}
++
++func (s *BoundedScanCandidate) readFixed(output []byte, part descriptor, offset uint64) error {
++	var length uint64 = uint64(len(output))
++	var err error = s.extent(part, offset, length)
++	if err != nil {
++		return err
++	}
++	err = s.reserve(length)
++	if err != nil {
++		return err
++	}
++	var absolute uint64 = part.offset + offset
++	err = s.readCharged(output, absolute)
++	return err
++}
++
++func (s *BoundedScanCandidate) bindingAt(ordinal uint32) (storedBinding, error) {
++	var part descriptor = s.reader.header.descriptors[componentBindings-1]
++	var offset uint64 = uint64(ordinal) * bindingRecordSize
++	var encoded [bindingRecordSize]byte = [bindingRecordSize]byte{}
++	var err error = s.readFixed(encoded[:], part, offset)
++	if err != nil {
++		return storedBinding{}, err
++	}
++	var result storedBinding = decodeStoredBinding(&encoded)
++	if hasNonzero(encoded[20:24]) || uint64(result.object) >= s.reader.header.objectCount || uint64(result.parent) >= s.reader.header.objectCount {
++		s.fail(errors.New("invalid bounded scan binding"))
++		return storedBinding{}, s.err
++	}
++	return result, nil
++}
++
++func (s *BoundedScanCandidate) objectAt(ordinal uint32) (catalog.Object, error) {
++	var part descriptor = s.reader.header.descriptors[componentObjects-1]
++	var offset uint64 = uint64(ordinal) * objectRecordSize
++	var encoded [objectRecordSize]byte = [objectRecordSize]byte{}
++	var err error = s.readFixed(encoded[:], part, offset)
++	if err != nil {
++		return catalog.Object{}, err
++	}
++	var object catalog.Object = catalog.Object{}
++	object, err = decodeObject(encoded[:])
++	if err != nil {
++		s.fail(err)
++		return catalog.Object{}, s.err
++	}
++	return object, nil
++}
++
++func (s *BoundedScanCandidate) readString(part descriptor, offset, length uint64) (string, error) {
++	var err error = s.extent(part, offset, length)
++	if err != nil {
++		return "", err
++	}
++	if length > maximumStoredString || length > s.maximumString {
++		s.fail(ErrScanStringBudget)
++		return "", s.err
++	}
++	err = s.reserve(length)
++	if err != nil {
++		return "", err
++	}
++	// The format's 1MiB cap establishes safe int narrowing on supported hosts.
++	if int(length) > cap(s.scratch) {
++		s.scratch = make([]byte, int(length))
++	}
++	s.scratch = s.scratch[:int(length)]
++	var absolute uint64 = part.offset + offset
++	err = s.readCharged(s.scratch, absolute)
++	if err != nil {
++		return "", err
++	}
++	var result string = string(s.scratch)
++	return result, nil
++}
++
++func (s *BoundedScanCandidate) pathAt(ordinal uint32) (string, error) {
++	var part descriptor = s.reader.header.descriptors[componentPaths-1]
++	var encoded [pathRecordSize]byte = [pathRecordSize]byte{}
++	var offset uint64 = uint64(ordinal) * pathRecordSize
++	var err error = s.readFixed(encoded[:], part, offset)
++	if err != nil {
++		return "", err
++	}
++	var path storedPath = decodeStoredPath(&encoded)
++	var tableLength uint64 = s.reader.header.bindingCount * pathRecordSize
++	if path.ordinal != ordinal || tableLength > part.length || path.offset > part.length-tableLength {
++		s.fail(errors.New("invalid bounded scan path record"))
++		return "", s.err
++	}
++	var stringOffset uint64 = tableLength + path.offset
++	var value string = ""
++	value, err = s.readString(part, stringOffset, path.length)
++	return value, err
++}
++
++func (s *BoundedScanCandidate) Record(ordinal uint32) (catalog.Record, bool, error) {
++	var err error = s.checkOwner()
++	if err != nil {
++		return catalog.Record{}, false, err
++	}
++	if uint64(ordinal) >= s.reader.header.bindingCount {
++		return catalog.Record{}, false, nil
++	}
++	var binding storedBinding = storedBinding{}
++	binding, err = s.bindingAt(ordinal)
++	if err != nil {
++		return catalog.Record{}, false, err
++	}
++	var object catalog.Object = catalog.Object{}
++	object, err = s.objectAt(binding.object)
++	if err != nil {
++		return catalog.Record{}, false, err
++	}
++	var name string = ""
++	name, err = s.readString(s.reader.header.descriptors[componentNames-1], binding.nameOffset, binding.nameLength)
++	if err != nil {
++		return catalog.Record{}, false, err
++	}
++	var path string = ""
++	path, err = s.pathAt(ordinal)
++	if err != nil {
++		return catalog.Record{}, false, err
++	}
++	var result catalog.Record = catalog.Record{
++		Root: s.reader.root.ID, Path: filepath.Join(s.reader.root.Path, filepath.FromSlash(path)), Name: name,
++		Kind: object.Kind, Size: object.Size, Mode: object.Mode, ModifiedUnixNano: object.ModifiedUnixNano, Identity: object.Identity,
++	}
++	err = s.checkContext()
++	if err != nil {
++		return catalog.Record{}, false, err
++	}
++	return result, true, nil
++}
++
++func (s *BoundedScanCandidate) Row(ordinal uint32) (catalog.Row, bool, error) {
++	var err error = s.checkOwner()
++	if err != nil {
++		return catalog.Row{}, false, err
++	}
++	if uint64(ordinal) >= s.reader.header.bindingCount {
++		return catalog.Row{}, false, nil
++	}
++	var binding storedBinding = storedBinding{}
++	binding, err = s.bindingAt(ordinal)
++	if err != nil {
++		return catalog.Row{}, false, err
++	}
++	var object catalog.Object = catalog.Object{}
++	object, err = s.objectAt(binding.object)
++	if err != nil {
++		return catalog.Row{}, false, err
++	}
++	var parent catalog.Object = catalog.Object{}
++	parent, err = s.objectAt(binding.parent)
++	if err != nil {
++		return catalog.Row{}, false, err
++	}
++	var name string = ""
++	name, err = s.readString(s.reader.header.descriptors[componentNames-1], binding.nameOffset, binding.nameLength)
++	if err != nil {
++		return catalog.Row{}, false, err
++	}
++	var path string = ""
++	path, err = s.pathAt(ordinal)
++	if err != nil {
++		return catalog.Row{}, false, err
++	}
++	var result catalog.Row = catalog.Row{
++		RelativePath: filepath.FromSlash(path), Name: name, Kind: object.Kind, Size: object.Size, Mode: object.Mode,
++		ModifiedUnixNano: object.ModifiedUnixNano, Identity: object.Identity, Parent: parent.Identity,
++	}
++	err = s.checkContext()
++	if err != nil {
++		return catalog.Row{}, false, err
++	}
++	return result, true, nil
++}
+--- /dev/null
++++ b/engine/internal/generation/bounded_scan_candidate_test.go
+@@ -0,0 +1,273 @@
++package generation
++
++import (
++	"context"
++	"errors"
++	"math"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"filemanager/engine/api"
++	"filemanager/engine/internal/catalog"
++	"filemanager/engine/internal/workload"
++)
++
++func boundedScanFixture(t *testing.T, corpus workload.Corpus) *Reader {
++	t.Helper()
++	var root api.RootSpec = api.RootSpec{ID: "bounded-fixture", Path: filepath.Join(t.TempDir(), "logical-source")}
++	var shard *catalog.Shard = nil
++	var err error = nil
++	shard, err = corpus.ReferenceShard(root)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var path string = filepath.Join(t.TempDir(), "fixture.seg")
++	var metadata Metadata = Metadata{}
++	metadata, err = Write(path, 7, shard)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var reader *Reader = nil
++	reader, err = Open(path, root)
++	if err != nil {
++		t.Fatal(err)
++	}
++	err = reader.Check(metadata.SegmentDigest)
++	if err != nil {
++		reader.Close()
++		t.Fatal(err)
++	}
++	return reader
++}
++
++func boundedScanNew(t *testing.T, reader *Reader, ctx context.Context, bytes, stringBytes uint64) *BoundedScanCandidate {
++	t.Helper()
++	var scan *BoundedScanCandidate = nil
++	var err error = nil
++	scan, err = NewBoundedScanCandidate(reader, ctx, bytes, stringBytes)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return scan
++}
++
++func TestBoundedScanCompleteRecordsAndAccounting(t *testing.T) {
++	var reader *Reader = boundedScanFixture(t, workload.CorrectnessV1())
++	defer reader.Close()
++	var scan *BoundedScanCandidate = boundedScanNew(t, reader, context.Background(), math.MaxUint64, maximumStoredString)
++	var used uint64 = 0
++	var ordinal uint32 = 0
++	for ordinal = 0; uint64(ordinal) < reader.Len(); ordinal++ {
++		var wantRow catalog.Row = catalog.Row{}
++		var wantRecord catalog.Record = catalog.Record{}
++		var row catalog.Row = catalog.Row{}
++		var record catalog.Record = catalog.Record{}
++		var exists bool = false
++		var err error = nil
++		wantRow, exists, err = reader.Row(ordinal)
++		if err != nil || !exists {
++			t.Fatal("legacy row", err)
++		}
++		wantRecord, exists, err = reader.Record(ordinal)
++		if err != nil || !exists {
++			t.Fatal("legacy record", err)
++		}
++		row, exists, err = scan.Row(ordinal)
++		if err != nil || !exists || row != wantRow {
++			t.Fatal("complete row mismatch", ordinal, err)
++		}
++		record, exists, err = scan.Record(ordinal)
++		if err != nil || !exists || record != wantRecord {
++			t.Fatal("complete record mismatch", ordinal, err)
++		}
++		var storedPathBytes uint64 = uint64(len(filepath.ToSlash(wantRow.RelativePath)))
++		var recordBytes uint64 = bindingRecordSize + objectRecordSize + pathRecordSize + uint64(len(wantRow.Name)) + storedPathBytes
++		used += 2*recordBytes + objectRecordSize
++		if scan.ReadBytes() != used {
++			t.Fatal("logical count mismatch", scan.ReadBytes(), used)
++		}
++		// Scratch now holds the last path; previously returned name stays owned.
++		if row != wantRow || record != wantRecord {
++			t.Fatal("scratch escaped")
++		}
++	}
++	var absent catalog.Record = catalog.Record{}
++	var exists bool = true
++	var err error = nil
++	absent, exists, err = scan.Record(uint32(reader.Len()))
++	if err != nil || exists || absent != (catalog.Record{}) || scan.ReadBytes() != used {
++		t.Fatal("EOF changed state")
++	}
++	var absentRow catalog.Row = catalog.Row{}
++	absentRow, exists, err = scan.Row(math.MaxUint32)
++	if err != nil || exists || absentRow != (catalog.Row{}) || scan.ReadBytes() != used {
++		t.Fatal("row EOF changed state")
++	}
++}
++
++func TestBoundedScanExactBudgetsAndStickyFailure(t *testing.T) {
++	var reader *Reader = boundedScanFixture(t, workload.CorrectnessV1())
++	defer reader.Close()
++	var want catalog.Row = catalog.Row{}
++	var exists bool = false
++	var err error = nil
++	want, exists, err = reader.Row(0)
++	if err != nil || !exists {
++		t.Fatal(err)
++	}
++	var nameBytes uint64 = uint64(len(want.Name))
++	var pathBytes uint64 = uint64(len(filepath.ToSlash(want.RelativePath)))
++	var exact uint64 = bindingRecordSize + 2*objectRecordSize + pathRecordSize + nameBytes + pathBytes
++	var scan *BoundedScanCandidate = boundedScanNew(t, reader, context.Background(), exact, maximumStoredString)
++	var row catalog.Row = catalog.Row{}
++	row, exists, err = scan.Row(0)
++	if err != nil || !exists || row != want || scan.ReadBytes() != exact {
++		t.Fatal("exact budget failed", err)
++	}
++	row, exists, err = scan.Row(0)
++	if !errors.Is(err, ErrScanReadBudget) || exists || row != (catalog.Row{}) || scan.ReadBytes() != exact {
++		t.Fatal("cache hit was not charged")
++	}
++	row, exists, err = scan.Row(math.MaxUint32)
++	if !errors.Is(err, ErrScanReadBudget) || exists || row != (catalog.Row{}) {
++		t.Fatal("EOF erased sticky error")
++	}
++	// Every insufficient budget must fail without publishing any part of a row.
++	var limit uint64 = 0
++	for limit = 0; limit < exact; limit++ {
++		scan = boundedScanNew(t, reader, context.Background(), limit, maximumStoredString)
++		row, exists, err = scan.Row(0)
++		if !errors.Is(err, ErrScanReadBudget) || exists || row != (catalog.Row{}) || scan.ReadBytes() > limit {
++			t.Fatal("short row budget", limit, err)
++		}
++		var before uint64 = scan.ReadBytes()
++		var record catalog.Record = catalog.Record{}
++		record, exists, err = scan.Record(0)
++		if !errors.Is(err, ErrScanReadBudget) || exists || record != (catalog.Record{}) || scan.ReadBytes() != before {
++			t.Fatal("sticky record failure")
++		}
++	}
++	var exactRecord uint64 = exact - objectRecordSize
++	scan = boundedScanNew(t, reader, context.Background(), exactRecord, maximumStoredString)
++	var record catalog.Record = catalog.Record{}
++	record, exists, err = scan.Record(0)
++	if err != nil || !exists || record.Name != want.Name || scan.ReadBytes() != exactRecord {
++		t.Fatal("exact record budget")
++	}
++	scan = boundedScanNew(t, reader, context.Background(), exact, nameBytes-1)
++	row, exists, err = scan.Row(0)
++	if !errors.Is(err, ErrScanStringBudget) || exists || row != (catalog.Row{}) || cap(scan.scratch) != 0 || scan.ReadBytes() != bindingRecordSize+2*objectRecordSize {
++		t.Fatal("string refusal allocated or charged", err)
++	}
++	scan = boundedScanNew(t, reader, context.Background(), bindingRecordSize+2*objectRecordSize+nameBytes-1, maximumStoredString)
++	row, exists, err = scan.Row(0)
++	if !errors.Is(err, ErrScanReadBudget) || exists || row != (catalog.Row{}) || cap(scan.scratch) != 0 {
++		t.Fatal("read refusal allocated string")
++	}
++}
++
++func TestBoundedScanOwnerAndCancellation(t *testing.T) {
++	var reader *Reader = boundedScanFixture(t, workload.CorrectnessV1())
++	defer reader.Close()
++	var unchecked *Reader = nil
++	var err error = nil
++	unchecked, err = Open(reader.file.Name(), reader.Root())
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer unchecked.Close()
++	var scan *BoundedScanCandidate = nil
++	scan, err = NewBoundedScanCandidate(unchecked, context.Background(), 1000, 1000)
++	if err == nil || scan != nil {
++		t.Fatal("unchecked reader accepted")
++	}
++	var ctx context.Context = nil
++	var cancel context.CancelFunc = nil
++	ctx, cancel = context.WithCancel(context.Background())
++	defer cancel()
++	scan = boundedScanNew(t, reader, ctx, 10000, 1000)
++	var independent *BoundedScanCandidate = boundedScanNew(t, reader, context.Background(), 10000, 1000)
++	var saved catalog.Record = catalog.Record{}
++	var exists bool = false
++	saved, exists, err = scan.Record(0)
++	if err != nil || !exists {
++		t.Fatal(err)
++	}
++	var before uint64 = scan.ReadBytes()
++	cancel()
++	var record catalog.Record = catalog.Record{}
++	record, exists, err = scan.Record(1)
++	if !errors.Is(err, context.Canceled) || exists || record != (catalog.Record{}) || scan.ReadBytes() != before {
++		t.Fatal("cancellation changed result/budget")
++	}
++	record, exists, err = independent.Record(0)
++	if err != nil || !exists || record != saved {
++		t.Fatal("query state leaked into reader")
++	}
++	err = reader.Close()
++	if err != nil {
++		t.Fatal(err)
++	}
++	record, exists, err = independent.Record(0)
++	if err == nil || exists || record != (catalog.Record{}) {
++		t.Fatal("closed owner served warm cache", err)
++	}
++	if saved.Name == "" || saved.Path == "" {
++		t.Fatal("returned ownership lost")
++	}
++	scan, err = NewBoundedScanCandidate(reader, context.Background(), 1000, 1000)
++	if err == nil || scan != nil {
++		t.Fatal("closed reader accepted", err)
++	}
++}
++
++// A named context wrapper schedules real context cancellation at a selected
++// read checkpoint. It changes no file bytes and injects no I/O/cache failure.
++type scanCancelCheckpoint struct {
++	context.Context
++	cancel context.CancelFunc
++	calls  int
++	at     int
++}
++
++func (c *scanCancelCheckpoint) Err() error {
++	c.calls++
++	if c.calls == c.at {
++		c.cancel()
++	}
++	var err error = c.Context.Err()
++	return err
++}
++
++func TestBoundedScanChunkCancellationAndLongOwnedStrings(t *testing.T) {
++	var name string = strings.Repeat("x", 70000)
++	var corpus workload.Corpus = workload.Corpus{Name: "bounded-long-v1", Entries: []workload.Entry{{Object: 1, RelativePath: name, Kind: api.ObjectRegular}}}
++	var reader *Reader = boundedScanFixture(t, corpus)
++	defer reader.Close()
++	var normal *BoundedScanCandidate = boundedScanNew(t, reader, context.Background(), 1<<20, maximumStoredString)
++	var record catalog.Record = catalog.Record{}
++	var exists bool = false
++	var err error = nil
++	record, exists, err = normal.Record(0)
++	if err != nil || !exists || record.Name != name {
++		t.Fatal("long string", err)
++	}
++	var ctx context.Context = nil
++	var cancel context.CancelFunc = nil
++	ctx, cancel = context.WithCancel(context.Background())
++	defer cancel()
++	var checkpoints scanCancelCheckpoint = scanCancelCheckpoint{Context: ctx, cancel: cancel, calls: 0, at: math.MaxInt}
++	var scan *BoundedScanCandidate = boundedScanNew(t, reader, &checkpoints, 1<<20, maximumStoredString)
++	// Directly exercise the same string accessor to identify the second chunk's
++	// before/after boundary without relying on row orchestration call counts.
++	checkpoints.at = checkpoints.calls + 5
++	var value string = ""
++	value, err = scan.readString(reader.header.descriptors[componentNames-1], 0, uint64(len(name)))
++	if !errors.Is(err, context.Canceled) || value != "" || scan.ReadBytes() != uint64(len(name)) {
++		t.Fatal("chunk cancellation/precharge", err, scan.ReadBytes())
++	}
++	if record.Name != name {
++		t.Fatal("returned string borrowed reusable storage")
++	}
++}
+--- /dev/null
++++ b/engine/benchmarks/bounded_scan_candidate_test.go
+@@ -0,0 +1,151 @@
++package benchmarks
++
++// Private differential control, sharing only the existing formula oracle and
++// fixture. Cursor/page shapes are test values, not a service contract.
++import (
++	"context"
++	"crypto/sha256"
++	"encoding/json"
++	"hash"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"filemanager/engine/internal/catalog"
++	"filemanager/engine/internal/generation"
++)
++
++func boundedSubstringPage(ctx context.Context, reader *generation.Reader, query substringQuery, next uint64) (substringPage, uint64, error) {
++	var page substringPage = substringPage{Cursor: substringCursor{Generation: reader.Metadata().Generation, Query: query, Next: next}}
++	var scan *generation.BoundedScanCandidate = nil
++	var err error = nil
++	scan, err = generation.NewBoundedScanCandidate(reader, ctx, 4<<20, 64<<10)
++	if err != nil {
++		return substringPage{}, 0, err
++	}
++	page.Records = make([]catalog.Record, 0, substringPageResults)
++	var lower string = strings.ToLower(query.Text)
++	var prefix string = query.Scope + "/"
++	var hasScope bool = query.Scope != ""
++	var length uint64 = reader.Len()
++	for page.Cursor.Next < length && page.Examined < substringPageRows && len(page.Records) < substringPageResults {
++		var row catalog.Row = catalog.Row{}
++		var exists bool = false
++		row, exists, err = scan.Row(uint32(page.Cursor.Next))
++		if err != nil {
++			return substringPage{}, scan.ReadBytes(), err
++		}
++		if !exists {
++			return substringPage{}, scan.ReadBytes(), substringInvalid
++		}
++		var path string = filepath.ToSlash(row.RelativePath)
++		var relative string = path
++		var eligible bool = true
++		if hasScope {
++			eligible = strings.HasPrefix(path, prefix)
++			if eligible {
++				relative = path[len(prefix):]
++			}
++		}
++		if !query.Descendants && strings.Contains(relative, "/") {
++			eligible = false
++		}
++		var matched bool = false
++		if eligible {
++			var normalized string = strings.ToLower(path)
++			matched = strings.Contains(normalized, lower)
++		}
++		if matched {
++			var record catalog.Record = catalog.Record{}
++			record, exists, err = scan.Record(uint32(page.Cursor.Next))
++			if err != nil {
++				return substringPage{}, scan.ReadBytes(), err
++			}
++			if !exists || record.Name != row.Name || record.Identity != row.Identity {
++				return substringPage{}, scan.ReadBytes(), substringInvalid
++			}
++			page.Records = append(page.Records, record)
++		}
++		page.Cursor.Next++
++		page.Examined++
++	}
++	err = ctx.Err()
++	if err != nil {
++		return substringPage{}, scan.ReadBytes(), err
++	}
++	page.Complete = page.Cursor.Next == length
++	return page, scan.ReadBytes(), nil
++}
++
++func boundedSubstringRun(ctx context.Context, reader *generation.Reader, query substringQuery) (substringSummary, uint64, error) {
++	var summary substringSummary = substringSummary{}
++	var digest hash.Hash = sha256.New()
++	var encoder *json.Encoder = json.NewEncoder(digest)
++	var next uint64 = 0
++	var logicalBytes uint64 = 0
++	for {
++		var page substringPage = substringPage{}
++		var pageBytes uint64 = 0
++		var err error = nil
++		page, pageBytes, err = boundedSubstringPage(ctx, reader, query, next)
++		logicalBytes += pageBytes
++		if err != nil {
++			return substringSummary{}, logicalBytes, err
++		}
++		if page.Examined == 0 && !page.Complete {
++			return substringSummary{}, logicalBytes, substringInvalid
++		}
++		summary.Pages++
++		summary.Examined += page.Examined
++		if len(page.Records) == 0 {
++			summary.EmptyPages++
++		}
++		var index int = 0
++		for index = 0; index < len(page.Records); index++ {
++			err = encoder.Encode(page.Records[index])
++			if err != nil {
++				return substringSummary{}, logicalBytes, err
++			}
++			summary.Matches++
++		}
++		next = page.Cursor.Next
++		if page.Complete {
++			break
++		}
++	}
++	summary = substringFinish(digest, summary)
++	return summary, logicalBytes, nil
++}
++
++func TestBoundedScanSubstringDifferential(t *testing.T) {
++	var reader *generation.Reader = nil
++	reader, _, _, _ = substringBuild(t, 7)
++	defer reader.Close()
++	var queries []substringQuery = []substringQuery{
++		{Text: "ancestor", Descendants: true}, {Text: "ancestor/014", Descendants: true},
++		{Text: "a", Descendants: true}, {Text: "ÉCLAIR", Descendants: true},
++		{Text: "e\u0301", Descendants: true}, {Text: "missing", Descendants: true},
++		{Text: "ancestor", Scope: "bucket-050-AnCeStOr", Descendants: false},
++		{Text: "ancestor", Descendants: false}, {Text: "099-plain", Descendants: true},
++		{Text: "plain", Scope: "notes..old", Descendants: true},
++	}
++	var index int = 0
++	for index = 0; index < len(queries); index++ {
++		var expected substringSummary = substringSummary{}
++		var actual substringSummary = substringSummary{}
++		var bytes uint64 = 0
++		var err error = nil
++		expected, err = substringOracle(reader.Root(), queries[index])
++		if err != nil {
++			t.Fatal(err)
++		}
++		actual, bytes, err = boundedSubstringRun(context.Background(), reader, queries[index])
++		if err != nil || actual.Digest != expected.Digest || actual.Matches != expected.Matches || actual.Examined != uint64(substringFixtureCount) {
++			t.Fatalf("query=%+v got=%+v want=%+v err=%v", queries[index], actual, expected, err)
++		}
++		if queries[index].Text == "missing" && actual.EmptyPages != actual.Pages {
++			t.Fatal("no-match pages did not progress")
++		}
++		t.Logf("query=%q scope=%q descendants=%v matches=%d pages=%d examined=%d read_bytes=%d digest=%x", queries[index].Text, queries[index].Scope, queries[index].Descendants, actual.Matches, actual.Pages, actual.Examined, bytes, actual.Digest)
++	}
++}
