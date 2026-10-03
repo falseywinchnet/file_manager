@@ -11,7 +11,10 @@ namespace gui_forms::render::text {
 // immutable and alive through native engine destruction and retained results.
 class PreparedWindowShaper final {
 public:
-    explicit PreparedWindowShaper(std::shared_ptr<const detail::PreparedFontBank> fonts);
+    // owner_bytes charges fixed first-party session context sharing this
+    // workspace allowance. Opaque native/allocator/thread costs are separate.
+    explicit PreparedWindowShaper(std::shared_ptr<const detail::PreparedFontBank> fonts,
+        const std::size_t owner_bytes = 0U);
     PreparedWindowShaper(const PreparedWindowShaper&) = delete;
     PreparedWindowShaper& operator=(const PreparedWindowShaper&) = delete;
     [[nodiscard]] PreparedTextStatus initialize();
@@ -23,6 +26,7 @@ public:
     [[nodiscard]] PreparedTextStatus shape(detail::PreparedWindowBatchStorage& batch);
 private:
     std::shared_ptr<const detail::PreparedFontBank> fonts_{};
+    const std::size_t owner_bytes_{};
     std::thread::id executor_{std::this_thread::get_id()};
     BoundedShapeWorkspace workspace_{};
     std::unique_ptr<HarfBuzzFontEngine> engine_{};

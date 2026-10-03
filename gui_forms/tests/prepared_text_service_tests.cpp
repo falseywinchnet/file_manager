@@ -3,9 +3,77 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 
 namespace {
 using namespace prepared_test;
+
+void test_identity_exhaustion() {
+    constexpr std::uint64_t terminal = std::numeric_limits<std::uint64_t>::max();
+    std::atomic<std::uint64_t> local{terminal - 1U};
+    std::uint64_t output = 42U;
+    PreparedTextStatus status = detail::acquire_prepared_identity(local, output);
+    require(status == PreparedTextStatus::success && output == terminal - 1U,
+        "last permitted identity is issued exactly once");
+    output = 42U;
+    status = detail::acquire_prepared_identity(local, output);
+    require(status == PreparedTextStatus::generation_exhausted && output == 42U && local.load() == terminal,
+        "exhausted identity source neither wraps nor changes output");
+    std::atomic<std::uint64_t> zero{0U};
+    status = detail::acquire_prepared_identity(zero, output);
+    require(status == PreparedTextStatus::generation_exhausted && output == 42U,
+        "zero cannot be issued as an identity");
+}
+
+void test_session_claim(const std::span<const std::byte> bytes) {
+    PreparedTextService service{};
+    EncodedFontLease bank = make_bank(service, bytes);
+    const std::shared_ptr<const detail::PreparedFontBank>& fonts = detail::PreparedTextAccess::fonts(bank);
+    const std::shared_ptr<detail::PreparedLedger> ledger = (*fonts).ledger;
+    detail::PreparedSessionClaim claim{};
+    PreparedTextStatus status = claim.acquire({});
+    require(status == PreparedTextStatus::invalid_input, "null claim refuses");
+    {
+        detail::PreparedSessionClaim setup{};
+        status = setup.acquire(ledger);
+        require(status == PreparedTextStatus::success, "private setup claims ledger");
+        status = setup.acquire(ledger);
+        require(status == PreparedTextStatus::busy, "repeated claim preserves ownership");
+        status = claim.acquire(ledger);
+        require(status == PreparedTextStatus::busy, "another owner cannot share workspace session");
+        std::unique_ptr<PreparedTextSession> refused{};
+        status = service.open_session(bank, nullptr, refused);
+        require(status == PreparedTextStatus::busy && !refused, "private claim blocks A2 without publishing session");
+        // No worker was created in this setup scope; automatic cleanup releases
+        // its claim just as an unsuccessful start must do.
+    }
+    std::unique_ptr<PreparedTextSession> session{};
+    status = service.open_session(bank, nullptr, session);
+    require(status == PreparedTextStatus::success, "A2 opens after abandoned setup retires");
+    status = claim.acquire(ledger);
+    require(status == PreparedTextStatus::busy, "live A2 blocks private workspace");
+    const PreparedTextKey key = make_key(service, bank, "retained");
+    PreparedTextLayout retained{};
+    prepare(service, *session, key, "retained", retained);
+    (*session).begin_close();
+    status = claim.acquire(ledger);
+    require(status == PreparedTextStatus::busy, "close alone cannot release workspace ownership");
+    (*session).join_and_release();
+    status = claim.acquire(ledger);
+    require(status == PreparedTextStatus::success, "confirmed join releases workspace ownership");
+    const PreparedTextBudgetSnapshot usage = service.budget_snapshot();
+    require(usage.payload_generations == 1U && !retained.empty(), "workspace retirement does not release retained geometry");
+    std::unique_ptr<PreparedTextSession> replacement{};
+    status = service.open_session(bank, nullptr, replacement);
+    require(status == PreparedTextStatus::busy && !replacement, "joined A2 weak registry cannot bypass private claim");
+    claim.release();
+    claim.release();
+    status = service.open_session(bank, nullptr, replacement);
+    require(status == PreparedTextStatus::success, "idempotent private release permits next A2");
+    service.begin_close();
+    status = claim.acquire(ledger);
+    require(status == PreparedTextStatus::closing, "closed ledger cannot acquire workspace claim");
+}
 
 void test_generations(const std::span<const std::byte> bytes) {
     PreparedTextService service{};
@@ -272,6 +340,8 @@ int main(const int argc, char** const argv) {
     try {
         require(argc == 2, "font directory required");
         const std::vector<std::byte> bytes = read_font(std::filesystem::path(argv[1]));
+        test_identity_exhaustion();
+        test_session_claim(bytes);
         test_generations(bytes);
         test_authority(bytes);
         test_validation_and_fonts(bytes);
