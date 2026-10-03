@@ -37,6 +37,17 @@ F2 basename Rename/Undo with filesystem observations. See
 
 ## Current owner dogfood correction — 2026-10-02
 
+**2026-10-03 native ordinary-action rejection:** checkpoint `922e0fc` passed
+Linux but failed two Mac checks. The generated outside-launch navigation
+fixture omitted explicit admission on macOS; its test probe is corrected
+without widening product navigation. The native window also exposed Details
+header focus surviving semantic item selection and consuming F2. Root is
+repairing that reusable input behavior with focused regression coverage while
+retaining the native acceptance assertions. See the ordinary-action result
+record for rejected logs and rerun status. JPEG/EXIF work remains separately
+preserved on its research branch/stash; no JPEG or thumbnail capability is
+advertised by this repair.
+
 **GIVEN:** the owner tested the macOS package across multiple file types and
 reported no working previews, no thumbnails, slow/unsmooth interaction,
 incomplete Details columns and headers, missing content-size folder icons, and

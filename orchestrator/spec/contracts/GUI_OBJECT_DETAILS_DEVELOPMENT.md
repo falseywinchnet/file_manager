@@ -102,6 +102,12 @@ These bindings are **CANDIDATE consumer integration choices** until checked
 against File Manager's existing shortcuts and native keyboard behavior. Their
 existence does not establish screen-reader access to columns.
 
+Explicit semantic actions addressing an item (focus, select, press or show-menu)
+move internal keyboard focus from the header to that item, matching pointer
+entry into the body. Re-selecting the same item must still retire header focus
+and update focused semantics; an unchanged selection is not an unchanged focus.
+Keys the body does not handle remain available to consumer accelerators.
+
 First sort activation proposes ascending; repeated activation of the accepted
 column proposes the opposite direction. Only the consumer can accept the
 request by publishing actual order and indicator state. Disabled/non-sortable

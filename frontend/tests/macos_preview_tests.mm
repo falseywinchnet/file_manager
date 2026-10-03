@@ -302,6 +302,10 @@ void exercise_local_actions(PreviewState& state, NSWindow* const native) {
             {gui_forms::KeyAction::down, gui_forms::PhysicalKey::f2});
         if (!focused || !began || !(*rename).effectively_visible() ||
             (*rename).selected_text() != "native-preview") {
+            std::cerr << "Native Rename state: object_focus=" << focused
+                      << " key_handled=" << began
+                      << " editor_visible=" << (*rename).effectively_visible()
+                      << " selected_text=" << (*rename).selected_text() << '\n';
             throw std::runtime_error("native F2 did not select the filename basename");
         }
         const bool typed = (*state.model).dispatch_text({"renamed-preview"});

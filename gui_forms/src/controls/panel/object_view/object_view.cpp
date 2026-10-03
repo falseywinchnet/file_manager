@@ -1253,6 +1253,12 @@ bool ObjectView::on_semantic_child_action(std::string_view id,
                    action != SemanticAction::select &&
                    action != SemanticAction::press &&
                    action != SemanticAction::show_menu)) return false;
+    // An item-addressed action enters the body even when its selection is
+    // unchanged. Header focus otherwise consumes the consumer's next key.
+    if (header_focused_) {
+        header_focused_ = false;
+        invalidate(Dirty::paint | Dirty::semantics);
+    }
     if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));
     if (action == SemanticAction::show_menu) {
         if (!is_selected(id)) select_index(*index, false);

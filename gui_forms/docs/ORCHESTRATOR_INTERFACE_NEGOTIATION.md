@@ -1,5 +1,15 @@
 # Orchestrator ↔ GUI.Forms interface negotiation
 
+## Details semantic item focus correction — 2026-10-03
+
+The existing Details input contract now explicitly requires an item-addressed
+semantic action to leave internal header focus, including when the selected
+identity is unchanged. The correction changes no public type or signature.
+The retained Mac ordinary-action failure and focused regression are recorded in
+`../../frontend/results/2026-10-03-ordinary-local-actions/README.md`; native
+acceptance of the correction remains pending. This is a correction to the
+existing in-process control behavior, not a new capability or stable ABI.
+
 ## Details and title/menu source reconciliation — 2026-10-02
 
 The bounded source candidates are registered in the canonical

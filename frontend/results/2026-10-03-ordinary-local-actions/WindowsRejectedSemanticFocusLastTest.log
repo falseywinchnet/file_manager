@@ -1,0 +1,19 @@
+Start testing: Oct 03 01:51 Pacific Daylight Time
+----------------------------------------------------------
+41/74 Testing: gui_forms_collection_controls_tests
+41/74 Test: gui_forms_collection_controls_tests
+Command: "C:/Users/Shadow/file_manager/.build/prepared-window-input/gui_forms_collection_controls_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/prepared-window-input
+"gui_forms_collection_controls_tests" start time: Oct 03 01:51 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+gui_forms_collection_controls_tests: semantic item action must retire internal header focus
+<end of output>
+Test time =   0.14 sec
+----------------------------------------------------------
+Test Failed.
+"gui_forms_collection_controls_tests" end time: Oct 03 01:51 Pacific Daylight Time
+"gui_forms_collection_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 01:51 Pacific Daylight Time
