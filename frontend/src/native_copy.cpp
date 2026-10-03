@@ -169,15 +169,17 @@ public:
 #endif
 };
 
-struct CopyPermissions final {
+struct CopyMetadata final {
 #if defined(_WIN32)
     DWORD attributes{FILE_ATTRIBUTE_NORMAL};
+    LARGE_INTEGER modified{};
 #else
     mode_t mode{};
+    timespec modified{};
 #endif
 };
 
-[[nodiscard]] std::error_code read_permissions(const CopyFile& source, CopyPermissions& permissions) noexcept {
+[[nodiscard]] std::error_code read_metadata(const CopyFile& source, CopyMetadata& metadata) noexcept {
 #if defined(_WIN32)
     FILE_BASIC_INFO information{};
     if (!GetFileInformationByHandleEx(source.handle, FileBasicInfo, &information, sizeof(information))) {
@@ -185,7 +187,14 @@ struct CopyPermissions final {
         return error;
     }
     if ((information.FileAttributes & FILE_ATTRIBUTE_READONLY) != 0) {
-        permissions.attributes = FILE_ATTRIBUTE_READONLY;
+        metadata.attributes = FILE_ATTRIBUTE_READONLY;
+    }
+    metadata.modified = information.LastWriteTime;
+    // Do not pass zero/negative timestamps as setter control values. This
+    // writer supports positive absolute Windows times; refuse before staging.
+    if (metadata.modified.QuadPart <= 0) {
+        const std::error_code error = std::make_error_code(std::errc::operation_not_supported);
+        return error;
     }
 #else
     struct stat information{};
@@ -193,21 +202,35 @@ struct CopyPermissions final {
         const std::error_code error = native_error();
         return error;
     }
-    permissions.mode = information.st_mode & 0777;
+    metadata.mode = information.st_mode & 0777;
+#if defined(__APPLE__)
+    metadata.modified = information.st_mtimespec;
+#else
+    metadata.modified = information.st_mtim;
+#endif
 #endif
     return {};
 }
 
-[[nodiscard]] std::error_code apply_permissions(const CopyFile& stage, const CopyPermissions& permissions) noexcept {
+// Source metadata was captured through its validated handle. Apply only after
+// data writes and source revalidation, through the still-owned stage handle.
+// Access/creation/status-change times keep their native new-object behavior.
+[[nodiscard]] std::error_code apply_metadata(const CopyFile& stage, const CopyMetadata& metadata) noexcept {
 #if defined(_WIN32)
     FILE_BASIC_INFO information{};
-    information.FileAttributes = permissions.attributes;
+    information.FileAttributes = metadata.attributes;
+    information.LastWriteTime = metadata.modified;
     if (!SetFileInformationByHandle(stage.handle, FileBasicInfo, &information, sizeof(information))) {
         const std::error_code error = native_error();
         return error;
     }
 #else
-    if (::fchmod(stage.handle, permissions.mode) != 0) {
+    const timespec times[2]{{0, UTIME_OMIT}, metadata.modified};
+    if (::futimens(stage.handle, times) != 0) {
+        const std::error_code error = native_error();
+        return error;
+    }
+    if (::fchmod(stage.handle, metadata.mode) != 0) {
         const std::error_code error = native_error();
         return error;
     }
@@ -397,8 +420,8 @@ void perform_copy(const std::filesystem::path& source_path,
         result.terminal = NativeCopyTerminal::source_changed;
         return;
     }
-    CopyPermissions permissions{};
-    result.error = read_permissions(source, permissions);
+    CopyMetadata metadata{};
+    result.error = read_metadata(source, metadata);
     if (result.error) return;
     if (stop_requested(cancelled, result)) return;
     result.error = stage.create_stage(stage_path);
@@ -435,8 +458,8 @@ void perform_copy(const std::filesystem::path& source_path,
         fail(result, std::make_error_code(std::errc::io_error));
         return;
     }
-    const std::error_code permission_error = apply_permissions(stage, permissions);
-    if (permission_error) fail(result, permission_error);
+    const std::error_code metadata_error = apply_metadata(stage, metadata);
+    if (metadata_error) fail(result, metadata_error);
 }
 } // namespace
 

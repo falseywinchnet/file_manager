@@ -1,0 +1,49 @@
+Start testing: Oct 03 03:16 Pacific Daylight Time
+----------------------------------------------------------
+3/15 Testing: file_manager_file_operations_tests
+3/15 Test: file_manager_file_operations_tests
+Command: "C:/Users/Shadow/file_manager/frontend/.build/shadow-windows/file_manager_file_operations_tests.exe"
+Directory: C:/Users/Shadow/file_manager/frontend/.build/shadow-windows
+"file_manager_file_operations_tests" start time: Oct 03 03:16 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+<end of output>
+Test time =   0.37 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_file_operations_tests" end time: Oct 03 03:16 Pacific Daylight Time
+"file_manager_file_operations_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/15 Testing: file_manager_native_copy_tests
+4/15 Test: file_manager_native_copy_tests
+Command: "C:/Users/Shadow/file_manager/frontend/.build/shadow-windows/file_manager_native_copy_tests.exe"
+Directory: C:/Users/Shadow/file_manager/frontend/.build/shadow-windows
+"file_manager_native_copy_tests" start time: Oct 03 03:16 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+owned_temp=C:/Users/Shadow/AppData/Local/Temp/file-manager-native-copy-1659941915
+PASS empty/small/multichunk; bounded progress, contents, identities and modification dates
+PASS progress-driven partial cancellation and observer exceptions; owned stages and closes
+PASS existing destination preserved; no ownership
+PASS before-create cancellation; post-write cancellation and callback exception
+PASS source revision mismatch before creation
+PASS ordinary and read-only permissions
+owned_cleanup=verified and removed
+PASS native copy fixtures; workspace reused
+<end of output>
+Test time =   0.26 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_native_copy_tests" end time: Oct 03 03:16 Pacific Daylight Time
+"file_manager_native_copy_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 03:16 Pacific Daylight Time
