@@ -45,7 +45,9 @@ particular Windows Engine's 64-bit file index and frontend's 128-bit ID are not
 interchangeable. No stored size/time is used for display facts or file I/O.
 This does not revalidate cached predicates, grant content reads, prove thumbnail
 eligibility, or accelerate ordinary text search. Rank/certainty/ordered evidence
-and live work counters still need their own complete projection.
+and retained request context are extended by
+[FRONTEND_SEARCH_MATCH_CONTEXT.md](FRONTEND_SEARCH_MATCH_CONTEXT.md).
+Live work counters still need their own complete projection.
 
 Conformance must cover ownership after response retirement, runtime and semantic
 spellings, missing/null/empty fields, integer limits and invalid types; frontend

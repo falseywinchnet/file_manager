@@ -537,3 +537,23 @@ Native operations continue their independent identity revalidation.
 integer domains, ownership, optionality and source-API rebuild rules before this
 adapter repair. No provider call or capability is added. Identity equivalence,
 full ranking/evidence projection and thumbnail eligibility remain unresolved.
+
+### Retained match and request context — 2026-10-03
+
+**Orchestrator request:** project existing rank/certainty/ordered evidence without
+discarding unknown channel claims, and keep each displayed row's submitted query
+and own page provenance. Appending must not relabel older rows with newer context.
+
+**Observed producer reply:** api.Result/api.Evidence already serialize these
+observations, including optional nested inert details and observation timestamps.
+The source client can preserve them without changing Engine transport or storage.
+
+**Frontend reply:** one immutable request owner per page records arguments used
+for the actual client call; result cards describe their own retained page and
+provider claims. Current path observations and operation validation remain separate.
+
+**Orchestrator reconciliation:**
+`../../orchestrator/spec/FRONTEND_SEARCH_MATCH_CONTEXT.md` records numeric domains,
+optional values, inert details, lifetime and presentation before implementation.
+This extends the source-record repair, with no new query capability or wire method.
+Provider speed, current-identity comparison and thumbnail eligibility remain open.

@@ -13,7 +13,18 @@ The investigation below retains its original source observations. Private
 checked-generation substring-reference correctness/paired evidence is now
 recorded in `../../engine/results/SUBSTRING_REFERENCE_EXPERIMENT_2026-10-02.md`;
 it enables no production search route. The next bounded-reader candidate is
-under separate review, including regression controls for legacy exact queries.
+retained as a rejected experiment in
+`../../engine/results/BOUNDED_SCAN_READER_2026-10-03.md`: paired 10k controls
+did not establish the required legacy exact-query non-regression. Active Engine
+source is unchanged. Larger-corpus/native throughput acceptance remains open.
+
+The source-client match/request repair is specified in
+`../../orchestrator/spec/FRONTEND_SEARCH_MATCH_CONTEXT.md`. It preserves rank,
+certainty and ordered evidence, shares submitted arguments once per returned
+page, and prevents appended pages from relabeling earlier correspondence rows.
+Validation is recorded separately in
+`../results/2026-10-03-search-match-context/README.md`. It enables no indexed
+substring route and supplies no latency improvement claim.
 
 The frontend follow-up adds generation/shutdown checks to SearchWork and
 CriteriaWork before connection and at synchronous service-call boundaries.

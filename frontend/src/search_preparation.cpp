@@ -72,6 +72,49 @@ DirectoryEntry observed_search_entry(const std::filesystem::path& path,
 
 } // namespace
 
+SearchMatchPresentation describe_search_match(const SearchResultSource& source) {
+    SearchMatchPresentation presentation{
+        .source_label = "Source not reported", .source_badge = "UNREPORTED",
+        .generation_detail = "Source generation not reported",
+        .match_summary = "Match reason not reported"};
+    if (source.page) {
+        const SearchPageSource& page = *source.page;
+        if (page.lane == "catalogue") {
+            presentation.source_label = "Local index";
+            presentation.source_badge = "CATALOGUE";
+            presentation.generation_detail = page.generation
+                ? "Index generation " + std::to_string(*page.generation)
+                : "Index generation not reported";
+            if (source.record.generation && source.record.generation != page.generation) {
+                presentation.generation_detail += " · record generation ";
+                presentation.generation_detail += std::to_string(*source.record.generation);
+            }
+        } else if (page.lane == "live_filesystem") {
+            presentation.source_label = "Live filesystem";
+            presentation.source_badge = "LIVE";
+            presentation.generation_detail = "Live filesystem observation; no catalogue generation claimed";
+        } else if (!page.lane.empty()) {
+            presentation.source_label = "Unrecognized source";
+            presentation.source_badge = "OTHER";
+        }
+    }
+    if (source.record.evidence && !(*source.record.evidence).empty()) {
+        const std::vector<fileman::orchestrator::SearchEvidenceInfo>& records = *source.record.evidence;
+        const fileman::orchestrator::SearchEvidenceInfo& evidence = records.front();
+        presentation.match_summary = "Other match evidence reported";
+        if (evidence.channel == "exact") {
+            if (evidence.kind == "exact_name") presentation.match_summary = "Provider reports a name match";
+            else if (evidence.kind == "exact_path") presentation.match_summary = "Provider reports a path match";
+            else if (evidence.kind == "exact_substring") presentation.match_summary = "Provider reports an indexed path match";
+            else if (evidence.kind == "metadata") presentation.match_summary = "Provider reports a metadata match";
+        } else if (evidence.channel == "live_filesystem" && evidence.kind == "exact_name") {
+            presentation.match_summary = "Provider reports a live name/path match";
+        }
+        if (evidence.inferred) presentation.match_summary += " · inferred";
+    }
+    return presentation;
+}
+
 void SearchCoverageSummary::observe(const fileman::orchestrator::SearchPageInfo& page,
                                     const std::size_t rejected, const bool append) {
     if (!append) *this = SearchCoverageSummary{};
@@ -130,7 +173,8 @@ std::string SearchCoverageSummary::result_status(const std::size_t count, const 
 }
 
 PreparedSearchPage prepare_search_page(const std::filesystem::path& canonical_root,
-    fileman::orchestrator::SearchPageInfo page, const CancellationCheck& cancelled) {
+    fileman::orchestrator::SearchPageInfo page, const CancellationCheck& cancelled,
+    std::shared_ptr<const SearchRequestContext> request) {
     PreparedSearchPage cancelled_result{};
     cancelled_result.cancelled = true;
     if (cancelled && cancelled()) return cancelled_result;
@@ -142,8 +186,10 @@ PreparedSearchPage prepare_search_page(const std::filesystem::path& canonical_ro
     prepared.entries.reserve(page.results.size());
     std::shared_ptr<const SearchPageSource> page_source{};
     if (!page.results.empty()) {
-        page_source = std::make_shared<const SearchPageSource>(
-            SearchPageSource{page.source, page.coverage.scan_id, page.generation});
+        SearchPageSource retained{
+            .lane = page.source, .scan_id = page.coverage.scan_id,
+            .generation = page.generation, .request = std::move(request)};
+        page_source = std::make_shared<const SearchPageSource>(std::move(retained));
     }
     for (fileman::orchestrator::SearchResultInfo& result : page.results) {
         if (cancelled && cancelled()) return cancelled_result;

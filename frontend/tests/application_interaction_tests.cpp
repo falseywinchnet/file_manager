@@ -58,14 +58,15 @@ class ApplicationInteractionProbe final {
         return generation;
     }
     static void show_coverage_page(Application& application,
-        fileman::orchestrator::SearchPageInfo page, const bool append, const bool criteria) {
+        fileman::orchestrator::SearchPageInfo page, const bool append, const bool criteria,
+        std::shared_ptr<const SearchRequestContext> request = {}) {
         if (!append) application.search_generation_.fetch_add(1U);
         const std::uint64_t generation = application.search_generation_.load();
         application.criteria_showing_ = criteria;
         application.filter_ = "coverage";
         (*application.search_box_).set_text("coverage");
-        PreparedSearchPage prepared = prepare_search_page(application.protected_root_, std::move(page));
-        if (criteria) application.apply_engine_criteria(std::move(prepared), {}, generation, append);
+        PreparedSearchPage prepared = prepare_search_page(application.protected_root_, std::move(page), {}, std::move(request));
+        if (criteria) application.apply_engine_criteria(std::move(prepared), generation, append);
         else application.apply_engine_search(std::move(prepared), "coverage", generation, append);
     }
     static void advance_search_generation(Application& application) {
@@ -74,6 +75,16 @@ class ApplicationInteractionProbe final {
     static std::size_t source_count(const Application& application) {
         const std::size_t count = application.search_sources_.size();
         return count;
+    }
+    static gui_forms::CorrespondenceItem correspondence_for_path(const Application& application,
+        const std::filesystem::path& path) {
+        for (const Application::EntryMap::value_type& entry : application.entries_) {
+            if (entry.second.path != path) continue;
+            for (const gui_forms::CorrespondenceItem& item : (*application.correspondence_).items()) {
+                if (item.stable_id == entry.first) return item;
+            }
+        }
+        throw std::runtime_error("displayed correspondence path was not found");
     }
     // The copy owns its record; no UI map borrow survives the next publication.
     static SearchResultSource source_for_path(const Application& application,
@@ -102,7 +113,7 @@ class ApplicationInteractionProbe final {
         PreparedSearchPage prepared{};
         prepared.cancelled = true;
         const std::uint64_t generation = application.search_generation_.load();
-        if (criteria) application.apply_engine_criteria(std::move(prepared), {}, generation, false);
+        if (criteria) application.apply_engine_criteria(std::move(prepared), generation, false);
         else application.apply_engine_search(std::move(prepared), "coverage", generation, false);
     }
     static bool search_cancelled(const std::shared_ptr<Application>& application,
@@ -168,7 +179,7 @@ class ApplicationInteractionProbe final {
         page.generation = catalogue_generation;
         page.results = std::move(results);
         PreparedSearchPage prepared = prepare_search_page(application.protected_root_, std::move(page));
-        application.apply_engine_criteria(std::move(prepared), {}, generation, false);
+        application.apply_engine_criteria(std::move(prepared), generation, false);
         return generation;
     }
     static bool criteria_showing(const Application& application) {
@@ -1579,8 +1590,23 @@ void test_search_preparation_owns_observations_and_cancellation() {
     page.results[0].object.incarnation = "old-incarnation";
     page.results[0].generation = 19U;
     page.results[0].modified_unix_nanoseconds = -7;
+    file_manager::SearchRequestContext submitted{};
+    submitted.root_id = "indexed-root";
+    submitted.relative_path = "Documents";
+    // Ownership-only record: this does not admit a combined text/filter route.
+    submitted.text = "original query";
+    submitted.exact_filters = {{"name", "original.txt"}, {"kind", "file"}};
+    submitted.maximum_results = 250U;
+    submitted.incoming_cursor = fileman::orchestrator::SearchCursorInfo{"catalogue", "original-cursor"};
+    std::shared_ptr<const file_manager::SearchRequestContext> request =
+        std::make_shared<const file_manager::SearchRequestContext>(submitted);
+    const std::weak_ptr<const file_manager::SearchRequestContext> request_lifetime = request;
     file_manager::PreparedSearchPage prepared =
-        file_manager::prepare_search_page(fixture.root(), page);
+        file_manager::prepare_search_page(fixture.root(), page, {}, request);
+    request.reset();
+    submitted.text = "new control contents";
+    submitted.exact_filters.clear();
+    submitted.incoming_cursor.reset();
     require(!prepared.cancelled && prepared.rejected == 3U && prepared.entries.size() == 2U,
             "preparation must reject unavailable, absent and outside-root paths");
     require(prepared.page.source == "live" && prepared.page.complete && prepared.page.results.empty(),
@@ -1594,6 +1620,16 @@ void test_search_preparation_owns_observations_and_cancellation() {
                     source.record.object.incarnation == "old-incarnation" && source.record.generation == 19U &&
                     source.record.modified_unix_nanoseconds == -7,
                 "preparation must preserve different provider facts separately from the current observation");
+        require((*source.page).request &&
+                    (*source.page).request == (*prepared.entries[1].source.page).request,
+                "rows must share one immutable submitted request");
+        const file_manager::SearchRequestContext& actual_request = *(*source.page).request;
+        require(actual_request.root_id == "indexed-root" && actual_request.relative_path == "Documents" &&
+                    actual_request.text == "original query" && actual_request.descendants &&
+                    actual_request.maximum_results == 250U && actual_request.exact_filters.size() == 2U &&
+                    actual_request.exact_filters[0].value == "original.txt" && actual_request.incoming_cursor &&
+                    (*actual_request.incoming_cursor).value == "original-cursor",
+                "request arguments must survive retirement and later query/filter mutations");
     }
     require(prepared.entries[0].entry.name == "root.txt" && !prepared.entries[0].entry.directory &&
                 prepared.entries[0].entry.metadata.logical_size == fixture_size &&
@@ -1635,7 +1671,39 @@ void test_search_preparation_owns_observations_and_cancellation() {
     prepared.entries.pop_back();
     require(!page_lifetime.expired(), "one remaining row must keep shared page provenance alive");
     prepared.entries.clear();
-    require(page_lifetime.expired(), "retiring the last row must release shared page provenance");
+    require(page_lifetime.expired() && request_lifetime.expired(),
+            "retiring the last row must release shared page provenance and request context");
+}
+
+void test_search_match_claims_remain_bounded() {
+    file_manager::SearchResultSource source{};
+    file_manager::SearchMatchPresentation presentation = file_manager::describe_search_match(source);
+    require(presentation.source_badge == "UNREPORTED" && presentation.match_summary == "Match reason not reported",
+            "absent provenance must not become a live observation or match claim");
+    file_manager::SearchPageSource page{.lane = "future-source", .generation = 99U};
+    source.page = std::make_shared<const file_manager::SearchPageSource>(std::move(page));
+    fileman::orchestrator::SearchEvidenceInfo first{};
+    first.kind = "exact_name";
+    first.channel = "future-channel";
+    first.inferred = true;
+    fileman::orchestrator::SearchEvidenceInfo later{};
+    later.kind = "exact_path";
+    later.channel = "exact";
+    later.exact = true;
+    source.record.evidence = std::vector<fileman::orchestrator::SearchEvidenceInfo>{first, later};
+    presentation = file_manager::describe_search_match(source);
+    require(presentation.source_badge == "OTHER" && presentation.source_label == "Unrecognized source" &&
+                presentation.match_summary == "Other match evidence reported · inferred",
+            "unknown channels must remain uninterpreted and later evidence must not replace the first claim");
+    file_manager::SearchPageSource live{.lane = "live_filesystem"};
+    source.page = std::make_shared<const file_manager::SearchPageSource>(std::move(live));
+    first.channel = "live_filesystem";
+    first.inferred = false;
+    source.record.evidence = std::vector<fileman::orchestrator::SearchEvidenceInfo>{first};
+    presentation = file_manager::describe_search_match(source);
+    require(presentation.source_badge == "LIVE" &&
+                presentation.match_summary == "Provider reports a live name/path match",
+            "live path matching must not be promoted to indexed or current-file predicate verification");
 }
 
 void test_search_source_records_follow_displayed_rows() {
@@ -1652,22 +1720,55 @@ void test_search_source_records_follow_displayed_rows() {
     page.results = {{"stored-root", fixture.root() / "root.txt", "file", -1, false}};
     page.results[0].object.file_object_id = "original-record";
     page.results[0].generation = 26U;
-    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, page, false, false);
+    page.results[0].rank = 8U;
+    page.results[0].certainty = 0.75;
+    fileman::orchestrator::SearchEvidenceInfo evidence{};
+    evidence.kind = "exact_name";
+    evidence.channel = "exact";
+    evidence.score = 1.0;
+    evidence.exact = true;
+    page.results[0].evidence = std::vector<fileman::orchestrator::SearchEvidenceInfo>{evidence};
+    file_manager::SearchRequestContext request_values{};
+    request_values.root_id = "fixture-root";
+    request_values.text = "coverage";
+    request_values.maximum_results = 100U;
+    const std::shared_ptr<const file_manager::SearchRequestContext> first_request =
+        std::make_shared<const file_manager::SearchRequestContext>(request_values);
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, page, false, false, first_request);
     file_manager::SearchResultSource retained =
         file_manager::ApplicationInteractionProbe::source_for_path(*application, fixture.root() / "root.txt");
     require(retained.page && (*retained.page).lane == "catalogue" && (*retained.page).generation == 27U &&
                 retained.record.generation == 26U && retained.record.size == -1 &&
-                retained.record.object.file_object_id == "original-record" && !(*retained.page).scan_id,
+                retained.record.object.file_object_id == "original-record" && !(*retained.page).scan_id &&
+                retained.record.rank == 8U && retained.record.certainty == 0.75 && retained.record.evidence &&
+                (*retained.record.evidence)[0].kind == "exact_name" && (*retained.page).request == first_request,
             "UI search publication must own the original provider record without page-generation substitution");
 
     page.results[0].object.file_object_id = "duplicate-new-record";
+    page.generation = 28U;
     page.results.push_back({"stored-folder", fixture.root() / "Documents", "directory", 0, false});
     page.results[1].object.file_object_id = "folder-record";
-    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, page, true, false);
+    request_values.incoming_cursor = fileman::orchestrator::SearchCursorInfo{"catalogue", "next-page"};
+    const std::shared_ptr<const file_manager::SearchRequestContext> second_request =
+        std::make_shared<const file_manager::SearchRequestContext>(request_values);
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, page, true, false, second_request);
     retained = file_manager::ApplicationInteractionProbe::source_for_path(*application, fixture.root() / "root.txt");
     require(file_manager::ApplicationInteractionProbe::source_count(*application) == 2U &&
-                retained.record.object.file_object_id == "original-record",
+                retained.record.object.file_object_id == "original-record" && (*retained.page).request == first_request,
             "append must retain original duplicate pairs and add only new displayed rows");
+    const file_manager::SearchResultSource folder_source =
+        file_manager::ApplicationInteractionProbe::source_for_path(*application, fixture.root() / "Documents");
+    require((*folder_source.page).request == second_request,
+            "new appended rows must retain their own submitted continuation context");
+    const gui_forms::CorrespondenceItem original_card =
+        file_manager::ApplicationInteractionProbe::correspondence_for_path(*application, fixture.root() / "root.txt");
+    const gui_forms::CorrespondenceItem later_card =
+        file_manager::ApplicationInteractionProbe::correspondence_for_path(*application, fixture.root() / "Documents");
+    require(original_card.information_detail == "Index generation 27 · record generation 26" &&
+                original_card.excerpt == "Provider reports a name match" &&
+                later_card.information_detail == "Index generation 28" &&
+                later_card.excerpt == "Match reason not reported",
+            "appended cards must retain each row's original generation and report missing match reasons honestly");
 
     file_manager::ApplicationInteractionProbe::deliver_obsolete_search(*application, {});
     require(file_manager::ApplicationInteractionProbe::source_count(*application) == 2U,
@@ -1687,10 +1788,16 @@ void test_search_source_records_follow_displayed_rows() {
 
     page.source = "catalogue";
     page.coverage.scan_id.reset();
-    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, page, false, true);
+    request_values.text.clear();
+    request_values.incoming_cursor.reset();
+    request_values.exact_filters = {{"kind", "directory"}};
+    const std::shared_ptr<const file_manager::SearchRequestContext> criteria_request =
+        std::make_shared<const file_manager::SearchRequestContext>(request_values);
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, page, false, true, criteria_request);
     retained = file_manager::ApplicationInteractionProbe::source_for_path(*application, fixture.root() / "Documents");
     require(retained.page && (*retained.page).lane == "catalogue" && !(*retained.page).scan_id &&
-                retained.record.object.file_object_id == "folder-record",
+                retained.record.object.file_object_id == "folder-record" && (*retained.page).request == criteria_request &&
+                (*(*retained.page).request).exact_filters[0].value == "directory",
             "criteria publication must preserve its paired source record too");
     page.results[0].object.file_object_id = "duplicate-folder";
     page.results.push_back({"root", fixture.root() / "root.txt", "file", 0, false});
@@ -4393,6 +4500,7 @@ int main() {
         test_details_headers_sort_without_opening_objects();
         test_search_supersession_retires_replies_and_shutdown();
         test_search_preparation_owns_observations_and_cancellation();
+        test_search_match_claims_remain_bounded();
         test_search_source_records_follow_displayed_rows();
         test_search_coverage_survives_paging_and_resets_on_replacement();
         test_selected_file_previews_reach_visible_layout();
