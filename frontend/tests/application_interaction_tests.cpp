@@ -71,6 +71,40 @@ class ApplicationInteractionProbe final {
     static void advance_search_generation(Application& application) {
         application.search_generation_.fetch_add(1U);
     }
+    static std::size_t source_count(const Application& application) {
+        const std::size_t count = application.search_sources_.size();
+        return count;
+    }
+    // The copy owns its record; no UI map borrow survives the next publication.
+    static SearchResultSource source_for_path(const Application& application,
+        const std::filesystem::path& path) {
+        for (const Application::EntryMap::value_type& item : application.entries_) {
+            if (item.second.path == path) {
+                const SearchResultSource source = application.search_sources_.at(item.first);
+                return source;
+            }
+        }
+        throw std::runtime_error("displayed search path was not found");
+    }
+    static void publish_root_directory(Application& application) {
+        const std::uint64_t generation = application.requested_generation_.load();
+        DirectorySnapshot snapshot = read_directory(application.protected_root_,
+            application.protected_root_, {}, generation);
+        application.apply_directory(std::move(snapshot), false);
+    }
+    static void deliver_obsolete_search(Application& application,
+        fileman::orchestrator::SearchPageInfo page) {
+        const std::uint64_t previous = application.search_generation_.fetch_add(1U);
+        PreparedSearchPage prepared = prepare_search_page(application.protected_root_, std::move(page));
+        application.apply_engine_search(std::move(prepared), "coverage", previous, false);
+    }
+    static void deliver_cancelled_search(Application& application, const bool criteria) {
+        PreparedSearchPage prepared{};
+        prepared.cancelled = true;
+        const std::uint64_t generation = application.search_generation_.load();
+        if (criteria) application.apply_engine_criteria(std::move(prepared), {}, generation, false);
+        else application.apply_engine_search(std::move(prepared), "coverage", generation, false);
+    }
     static bool search_cancelled(const std::shared_ptr<Application>& application,
                                  const std::uint64_t generation) {
         const Application::SearchCancelled cancelled{application, generation};
@@ -1536,15 +1570,34 @@ void test_search_preparation_owns_observations_and_cancellation() {
         {"outside", fixture.quarantine(), "directory", 0U, false},
         {"unavailable", fixture.root() / "root.txt", "file", 0U, true},
     };
+    // A large but frame-bounded scan token must occupy one shared page allocation,
+    // even when several accepted rows retain it.
+    const std::string scan_id(64U * 1024U, 's');
+    page.coverage.scan_id = scan_id;
+    page.results[0].object.root_id = "indexed-root";
+    page.results[0].object.file_object_id = "opaque-provider-id";
+    page.results[0].object.incarnation = "old-incarnation";
+    page.results[0].generation = 19U;
+    page.results[0].modified_unix_nanoseconds = -7;
     file_manager::PreparedSearchPage prepared =
         file_manager::prepare_search_page(fixture.root(), page);
     require(!prepared.cancelled && prepared.rejected == 3U && prepared.entries.size() == 2U,
             "preparation must reject unavailable, absent and outside-root paths");
     require(prepared.page.source == "live" && prepared.page.complete && prepared.page.results.empty(),
-            "preparation must keep provenance and retire raw provider addresses");
-    require(prepared.entries[0].name == "root.txt" && !prepared.entries[0].directory &&
-                prepared.entries[0].metadata.logical_size == fixture_size &&
-                prepared.entries[0].identity.available() && prepared.entries[1].directory,
+            "preparation must retire the redundant raw page records");
+    {
+        const file_manager::SearchResultSource& source = prepared.entries[0].source;
+        require(source.page && (*source.page).lane == "live" && (*source.page).scan_id == scan_id &&
+                    source.page == prepared.entries[1].source.page &&
+                    source.record.name == "provider-name" && source.record.kind == "directory" &&
+                    source.record.size == 999 && source.record.object.file_object_id == "opaque-provider-id" &&
+                    source.record.object.incarnation == "old-incarnation" && source.record.generation == 19U &&
+                    source.record.modified_unix_nanoseconds == -7,
+                "preparation must preserve different provider facts separately from the current observation");
+    }
+    require(prepared.entries[0].entry.name == "root.txt" && !prepared.entries[0].entry.directory &&
+                prepared.entries[0].entry.metadata.logical_size == fixture_size &&
+                prepared.entries[0].entry.identity.available() && prepared.entries[1].entry.directory,
             "prepared rows must use native facts rather than provider display metadata");
     std::size_t checks{};
     const file_manager::PreparedSearchPage cancelled = file_manager::prepare_search_page(
@@ -1575,9 +1628,83 @@ void test_search_preparation_owns_observations_and_cancellation() {
                 "preparation must preserve the refusal to traverse a symlink parent");
     }
     const bool removed = std::filesystem::remove(fixture.root() / "root.txt");
-    require(removed && prepared.entries[0].name == "root.txt" &&
-                prepared.entries[0].metadata.logical_size == fixture_size,
+    require(removed && prepared.entries[0].entry.name == "root.txt" &&
+                prepared.entries[0].entry.metadata.logical_size == fixture_size,
             "prepared values must own their observation without retaining source-file handles");
+    const std::weak_ptr<const file_manager::SearchPageSource> page_lifetime = prepared.entries[0].source.page;
+    prepared.entries.pop_back();
+    require(!page_lifetime.expired(), "one remaining row must keep shared page provenance alive");
+    prepared.entries.clear();
+    require(page_lifetime.expired(), "retiring the last row must release shared page provenance");
+}
+
+void test_search_source_records_follow_displayed_rows() {
+    TemporaryTree fixture{};
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(fixture.root(), std::nullopt, false, std::string{});
+    ApplicationStopGuard guard{*application};
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
+    fileman::orchestrator::SearchPageInfo page{};
+    page.source = "catalogue";
+    page.terminal = "success";
+    page.complete = true;
+    page.generation = 27U;
+    page.results = {{"stored-root", fixture.root() / "root.txt", "file", -1, false}};
+    page.results[0].object.file_object_id = "original-record";
+    page.results[0].generation = 26U;
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, page, false, false);
+    file_manager::SearchResultSource retained =
+        file_manager::ApplicationInteractionProbe::source_for_path(*application, fixture.root() / "root.txt");
+    require(retained.page && (*retained.page).lane == "catalogue" && (*retained.page).generation == 27U &&
+                retained.record.generation == 26U && retained.record.size == -1 &&
+                retained.record.object.file_object_id == "original-record" && !(*retained.page).scan_id,
+            "UI search publication must own the original provider record without page-generation substitution");
+
+    page.results[0].object.file_object_id = "duplicate-new-record";
+    page.results.push_back({"stored-folder", fixture.root() / "Documents", "directory", 0, false});
+    page.results[1].object.file_object_id = "folder-record";
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, page, true, false);
+    retained = file_manager::ApplicationInteractionProbe::source_for_path(*application, fixture.root() / "root.txt");
+    require(file_manager::ApplicationInteractionProbe::source_count(*application) == 2U &&
+                retained.record.object.file_object_id == "original-record",
+            "append must retain original duplicate pairs and add only new displayed rows");
+
+    file_manager::ApplicationInteractionProbe::deliver_obsolete_search(*application, {});
+    require(file_manager::ApplicationInteractionProbe::source_count(*application) == 2U,
+            "obsolete search completion must not retire current source records");
+    file_manager::ApplicationInteractionProbe::deliver_cancelled_search(*application, false);
+    require(file_manager::ApplicationInteractionProbe::source_count(*application) == 2U,
+            "cancelled search completion must not retire current source records");
+    page.source = "live_filesystem";
+    page.coverage.scan_id = "replacement-scan";
+    page.results.erase(page.results.begin());
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, page, false, false);
+    retained = file_manager::ApplicationInteractionProbe::source_for_path(*application, fixture.root() / "Documents");
+    require(file_manager::ApplicationInteractionProbe::source_count(*application) == 1U &&
+                retained.page && (*retained.page).lane == "live_filesystem" &&
+                (*retained.page).scan_id == "replacement-scan",
+            "replacement must retire old records and retain the actual source lane/scan");
+
+    page.source = "catalogue";
+    page.coverage.scan_id.reset();
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, page, false, true);
+    retained = file_manager::ApplicationInteractionProbe::source_for_path(*application, fixture.root() / "Documents");
+    require(retained.page && (*retained.page).lane == "catalogue" && !(*retained.page).scan_id &&
+                retained.record.object.file_object_id == "folder-record",
+            "criteria publication must preserve its paired source record too");
+    page.results[0].object.file_object_id = "duplicate-folder";
+    page.results.push_back({"root", fixture.root() / "root.txt", "file", 0, false});
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, page, true, true);
+    retained = file_manager::ApplicationInteractionProbe::source_for_path(*application, fixture.root() / "Documents");
+    require(file_manager::ApplicationInteractionProbe::source_count(*application) == 2U &&
+                retained.record.object.file_object_id == "folder-record",
+            "criteria append must retain the original source when skipping a duplicate");
+    file_manager::ApplicationInteractionProbe::deliver_cancelled_search(*application, true);
+    require(file_manager::ApplicationInteractionProbe::source_count(*application) == 2U,
+            "cancelled criteria delivery must leave displayed source records intact");
+    file_manager::ApplicationInteractionProbe::publish_root_directory(*application);
+    require(file_manager::ApplicationInteractionProbe::source_count(*application) == 0U,
+            "ordinary directory publication must release search source records");
 }
 
 void test_search_supersession_retires_replies_and_shutdown() {
@@ -4266,6 +4393,7 @@ int main() {
         test_details_headers_sort_without_opening_objects();
         test_search_supersession_retires_replies_and_shutdown();
         test_search_preparation_owns_observations_and_cancellation();
+        test_search_source_records_follow_displayed_rows();
         test_search_coverage_survives_paging_and_resets_on_replacement();
         test_selected_file_previews_reach_visible_layout();
         test_application_command_surfaces_and_house_mark();

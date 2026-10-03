@@ -3387,6 +3387,7 @@ void Application::apply_directory(DirectorySnapshot snapshot,
     const std::vector<std::string> previous_selection(
         (*objects_).selected_ids().begin(), (*objects_).selected_ids().end());
     entries_.clear();
+    search_sources_.clear();
     std::vector<gui_forms::ObjectViewItem> items{};
     items.reserve(snapshot.entries.size());
     std::string pending_selection_id{};
@@ -3634,6 +3635,7 @@ void Application::prepare_criteria_surface() {
     criteria_cursor_.reset();
     search_order_.clear();
     entries_.clear();
+    search_sources_.clear();
     (*correspondence_).set_items({});
     (*correspondence_).set_visible(false);
     (*objects_).set_items({});
@@ -3778,6 +3780,7 @@ void Application::request_engine_criteria(const bool next_page) {
         criteria_loading_ = false;
         criteria_cursor_.reset();
         entries_.clear();
+        search_sources_.clear();
         search_order_.clear();
         (*objects_).set_items({});
         (*objects_).clear_selection();
@@ -3872,6 +3875,7 @@ void Application::apply_engine_criteria(
     }
     if (!append) {
         entries_.clear();
+        search_sources_.clear();
         search_order_.clear();
     }
     const std::vector<std::string> previous_selection(
@@ -3880,13 +3884,15 @@ void Application::apply_engine_criteria(
     search_coverage_.observe(page, rejected, append);
     const std::string coverage_notice = search_coverage_.describe(page);
     std::size_t duplicate{};
-    for (DirectoryEntry& entry : prepared.entries) {
+    for (PreparedSearchEntry& row : prepared.entries) {
+        DirectoryEntry& entry = row.entry;
         const std::string stable_id = entry.stable_id;
         if (entries_.contains(stable_id)) {
             ++duplicate;
             continue;
         }
         entries_.emplace(stable_id, std::move(entry));
+        search_sources_.emplace(stable_id, std::move(row.source));
         search_order_.push_back(stable_id);
     }
     std::vector<gui_forms::ObjectViewItem> items{};
@@ -3967,6 +3973,7 @@ void Application::apply_engine_search(
     search_showing_ = true;
     if (!append) {
         entries_.clear();
+        search_sources_.clear();
         search_order_.clear();
     }
     const std::vector<std::string> previous_selection(
@@ -3975,13 +3982,15 @@ void Application::apply_engine_search(
     search_coverage_.observe(page, rejected, append);
     const std::string coverage_notice = search_coverage_.describe(page);
     std::size_t duplicate{};
-    for (DirectoryEntry& entry : prepared.entries) {
+    for (PreparedSearchEntry& row : prepared.entries) {
+        DirectoryEntry& entry = row.entry;
         const std::string stable_id = entry.stable_id;
         if (entries_.contains(stable_id)) {
             ++duplicate;
             continue;
         }
         entries_.emplace(stable_id, std::move(entry));
+        search_sources_.emplace(stable_id, std::move(row.source));
         search_order_.push_back(stable_id);
     }
     std::vector<gui_forms::ObjectViewItem> items{};

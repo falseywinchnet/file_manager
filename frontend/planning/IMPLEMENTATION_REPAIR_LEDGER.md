@@ -28,6 +28,17 @@ acceptance and physical-input/visual dogfood remain pending in
 `../results/2026-10-03-new-folder/README.md`. The historical state below is not
 the latest checkout/release description.
 
+**2026-10-03 source-record follow-up:** the New Folder change passed both native
+matrices at `47dcf619` and rebase-merged as `66757297`, with identical tree
+`f0d9068500f0fc0d3f13f3bdfc314b87b4905bab`. The latest portable release above
+does not yet include it. Search now preserves typed source identity/revision
+through the C++ client, background preparation and UI row lifetime, separately
+from current filesystem observations. All 15 local suites, the Windows-selected
+Orchestrator gates and independent source review pass. Native CI is pending;
+see `../results/2026-10-03-search-source-records/README.md`, including retained
+failures and source-review scope. Thumbnail eligibility and indexed substring
+acceleration remain unfinished.
+
 This file is the durable handoff for ongoing implementation. Update it before
 and after every material repair so conversation compaction cannot erase why a
 change exists, what has actually been proved, or what remains unresolved.

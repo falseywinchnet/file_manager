@@ -3,14 +3,34 @@
 #include "file_manager/filesystem_model.hpp"
 #include "fileman_orchestrator/client.hpp"
 
+#include <memory>
+
 namespace file_manager {
+
+// Shared by rows from one page. Large source/scan strings are stored once;
+// the last displayed row releases them. Page and row generations stay distinct.
+struct SearchPageSource final {
+    std::string lane{};
+    std::optional<std::string> scan_id{};
+    std::optional<std::uint64_t> generation{};
+};
+
+struct SearchResultSource final {
+    fileman::orchestrator::SearchResultInfo record{};
+    std::shared_ptr<const SearchPageSource> page{};
+};
+
+struct PreparedSearchEntry final {
+    DirectoryEntry entry{};
+    SearchResultSource source{};
+};
 
 // Owned worker-to-UI value. Entries are path observations made during preparation,
 // not proof that a cached provider match still has the same identity or metadata.
 // Ordinary open/mutation operations must continue their own identity revalidation.
 struct PreparedSearchPage final {
     fileman::orchestrator::SearchPageInfo page{};
-    std::vector<DirectoryEntry> entries{};
+    std::vector<PreparedSearchEntry> entries{};
     std::size_t rejected{};
     bool cancelled{};
 };

@@ -140,7 +140,12 @@ PreparedSearchPage prepare_search_page(const std::filesystem::path& canonical_ro
     }
     PreparedSearchPage prepared{};
     prepared.entries.reserve(page.results.size());
-    for (const fileman::orchestrator::SearchResultInfo& result : page.results) {
+    std::shared_ptr<const SearchPageSource> page_source{};
+    if (!page.results.empty()) {
+        page_source = std::make_shared<const SearchPageSource>(
+            SearchPageSource{page.source, page.coverage.scan_id, page.generation});
+    }
+    for (fileman::orchestrator::SearchResultInfo& result : page.results) {
         if (cancelled && cancelled()) return cancelled_result;
         std::filesystem::path path = result.path.lexically_normal();
         if (!path_is_within(canonical_root, path)) {
@@ -161,11 +166,12 @@ PreparedSearchPage prepare_search_page(const std::filesystem::path& canonical_ro
             continue;
         }
         DirectoryEntry entry = observed_search_entry(path, observed);
-        prepared.entries.push_back(std::move(entry));
+        SearchResultSource source{std::move(result), page_source};
+        prepared.entries.push_back({std::move(entry), std::move(source)});
     }
     if (cancelled && cancelled()) return cancelled_result;
-    // Raw addresses are no longer needed by the consumer; retain only provenance
-    // and cursor metadata alongside the independently owned observations.
+    // Accepted records now belong to their prepared rows. Retire rejected records
+    // and redundant names; page coverage and continuation remain separately owned.
     std::vector<fileman::orchestrator::SearchResultInfo> retired_results{};
     retired_results.swap(page.results);
     std::vector<std::string> retired_names{};

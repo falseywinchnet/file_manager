@@ -516,3 +516,24 @@ ownership, optionality and UI rules are recorded in
 Engine contracts and source-bound cursors are unchanged. Rebuild the C++ source
 library and consumers together; no binary ABI compatibility is claimed.
 Per-row identity/evidence preservation and currentness comparison remain open.
+
+### Source object/revision preservation — 2026-10-03 UTC
+
+**Orchestrator request:** preserve existing object identity and stored revision
+facts through ORC-FE-001 without equating them with current filesystem facts.
+
+**Observed producer reply:** Engine `api/types.go` and Orchestrator
+`kernel.rs::search_response` already carry the runtime fields. Semantic fixture
+identity spellings differ. Signed size/time and unsigned mode/generation require
+exact integer projection, not unsigned-size substitution.
+
+**Frontend reply:** retain owned source/current pairs through worker publication
+and UI result lifetime. Refuse malformed projections; preserve absent fields.
+Retire on replacement/navigation; keep original pairs when skipping duplicates.
+Native operations continue their independent identity revalidation.
+
+**Orchestrator reconciliation:**
+`../../orchestrator/spec/FRONTEND_SEARCH_SOURCE_RECORDS.md` defines alias conflict,
+integer domains, ownership, optionality and source-API rebuild rules before this
+adapter repair. No provider call or capability is added. Identity equivalence,
+full ranking/evidence projection and thumbnail eligibility remain unresolved.
