@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <exception>
+#include <new>
 #include <utility>
 
 namespace file_manager {
@@ -793,6 +794,85 @@ struct Application::TransferCancelled final {
     }
 };
 
+// One job owns one coalescing slot. The worker replaces numeric progress and
+// changes the owned path only at node boundaries. The UI takes one snapshot;
+// no per-buffer closures or unbounded progress queue are retained.
+struct Application::TransferProgressState final {
+    std::mutex mutex{};
+    CopyProgress latest{};
+    bool queued{};
+
+    [[nodiscard]] bool offer(const CopyProgress& progress) {
+        const std::lock_guard<std::mutex> lock(mutex);
+        if (latest.current_source != progress.current_source) latest.current_source = progress.current_source;
+        latest.phase = progress.phase;
+        latest.copied_bytes = progress.copied_bytes;
+        latest.completed_objects = progress.completed_objects;
+        latest.total_bytes = progress.total_bytes;
+        const bool notify = !queued;
+        queued = true;
+        return notify;
+    }
+
+    [[nodiscard]] CopyProgress take() {
+        const std::lock_guard<std::mutex> lock(mutex);
+        CopyProgress snapshot = latest;
+        queued = false;
+        return snapshot;
+    }
+};
+
+struct Application::TransferProgressReady final {
+    std::shared_ptr<Application> self{};
+    std::shared_ptr<TransferProgressState> state{};
+    std::uint64_t generation{};
+
+    void operator()() const {
+        const CopyProgress progress = (*state).take();
+        if (!(*self).transfer_in_flight_ || generation != (*self).transfer_generation_.load() ||
+            generation == (*self).cancelled_transfer_generation_.load()) return;
+        std::string detail = format_bytes(progress.copied_bytes);
+        if (progress.total_bytes) {
+            detail += " / ";
+            detail += format_bytes(*progress.total_bytes);
+        } else {
+            detail += " copied · ";
+            detail += std::to_string(progress.completed_objects);
+            detail += " objects completed";
+        }
+        std::string label{"Copying "};
+        if (progress.phase != CopyPhase::copying) label = "Finishing copy · ";
+        const std::filesystem::path name = progress.current_source.filename();
+        label += path_utf8(name);
+        (*self).set_status(std::move(label), std::move(detail));
+    }
+};
+
+struct Application::TransferProgressReport final {
+    std::shared_ptr<Application> self{};
+    std::shared_ptr<TransferProgressState> state{};
+    std::uint64_t generation{};
+
+    [[nodiscard]] static CopyProgressObserver prepare(const std::shared_ptr<Application>& self,
+                                         const std::uint64_t generation) {
+        // Progress is optional. Failure to allocate its mailbox/observer must
+        // not strand a transfer in the busy state before the service starts.
+        try {
+            const std::shared_ptr<TransferProgressState> state = std::make_shared<TransferProgressState>();
+            CopyProgressObserver observer = TransferProgressReport{self, state, generation};
+            return observer;
+        } catch (const std::bad_alloc&) {
+            return {};
+        }
+    }
+
+    void operator()(const CopyProgress& progress) const {
+        if ((*self).stopping_.load() || generation != (*self).transfer_generation_.load()) return;
+        const bool notify = (*state).offer(progress);
+        if (notify) (*self).post_ui(TransferProgressReady{self, state, generation});
+    }
+};
+
 struct Application::TransferWork final {
     std::shared_ptr<Application> self{};
     PendingTransfer transfer{};
@@ -804,9 +884,10 @@ struct Application::TransferWork final {
             result = (*(*self).operations_).move_object(
                 transfer.entry.path, transfer.entry.identity, destination);
         } else {
+            const CopyProgressObserver progress = TransferProgressReport::prepare(self, generation);
             result = (*(*self).operations_).copy_object(
                 transfer.entry.path, transfer.entry.identity, destination,
-                TransferCancelled{self, generation});
+                TransferCancelled{self, generation}, progress);
         }
         (*self).post_ui(TransferReady{self, std::move(result), generation});
     }
@@ -841,9 +922,10 @@ struct Application::InternalDropWork final {
     void operator()() const {
         OperationResult result{};
         if (copy) {
+            const CopyProgressObserver progress = TransferProgressReport::prepare(self, generation);
             result = (*(*self).operations_).copy_object(
                 source.path, source.identity, destination.path,
-                InternalDropCancelled{self, generation});
+                InternalDropCancelled{self, generation}, progress);
         } else {
             result = (*(*self).operations_).move_object(
                 source.path, source.identity, destination.path);

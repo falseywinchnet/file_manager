@@ -4,15 +4,43 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <limits>
+#include <new>
 #include <random>
 #include <stdexcept>
 #include <string>
 #include <thread>
+
+namespace progress_allocation_fixture {
+// Only the calling test thread is armed, around synchronous progress setup.
+// Reject once, then permit normal failure handling and all other allocations.
+thread_local std::size_t permitted = std::numeric_limits<std::size_t>::max();
+thread_local bool rejected{};
+}
+
+void* operator new(const std::size_t bytes) {
+    if (progress_allocation_fixture::permitted != std::numeric_limits<std::size_t>::max()) {
+        if (progress_allocation_fixture::permitted == 0U) {
+            progress_allocation_fixture::permitted = std::numeric_limits<std::size_t>::max();
+            progress_allocation_fixture::rejected = true;
+            throw std::bad_alloc{};
+        }
+        --progress_allocation_fixture::permitted;
+    }
+    const std::size_t allocation_size = bytes == 0U ? 1U : bytes;
+    void* const memory = std::malloc(allocation_size);
+    if (memory == nullptr) throw std::bad_alloc{};
+    return memory;
+}
+
+void operator delete(void* const memory) noexcept { std::free(memory); }
+void operator delete(void* const memory, const std::size_t) noexcept { std::free(memory); }
 
 namespace file_manager {
 class ApplicationTransferProbe final {
@@ -48,6 +76,69 @@ public:
         const Application::TransferCancelled check{application, generation};
         const bool result = check();
         return result;
+    }
+
+    static bool progress_coalesces() {
+        Application::TransferProgressState state{};
+        CopyProgress progress{};
+        progress.current_source = "source.txt";
+        progress.total_bytes = 10000U;
+        std::size_t notifications{};
+        for (std::uint64_t bytes = 0U; bytes <= 10000U; ++bytes) {
+            progress.copied_bytes = bytes;
+            const bool notify = state.offer(progress);
+            if (notify) ++notifications;
+        }
+        const CopyProgress latest = state.take();
+        const bool rearmed = state.offer(progress);
+        const bool correct = notifications == 1U && latest.copied_bytes == 10000U &&
+            latest.total_bytes == 10000U && latest.current_source == "source.txt" && rearmed;
+        return correct;
+    }
+
+    static bool progress_setup_failure_falls_back(const std::shared_ptr<Application>& application) {
+        for (std::size_t permitted = 0U; permitted <= 1U; ++permitted) {
+            progress_allocation_fixture::rejected = false;
+            progress_allocation_fixture::permitted = permitted;
+            const CopyProgressObserver observer = Application::TransferProgressReport::prepare(application, 7U);
+            progress_allocation_fixture::permitted = std::numeric_limits<std::size_t>::max();
+            if (!progress_allocation_fixture::rejected || observer) return false;
+        }
+        const CopyProgressObserver recovered = Application::TransferProgressReport::prepare(application, 7U);
+        const bool available = static_cast<bool>(recovered);
+        return available;
+    }
+
+    static bool progress_respects_terminal_state(const std::shared_ptr<Application>& application) {
+        Application& model = *application;
+        const std::shared_ptr<Application::TransferProgressState> state =
+            std::make_shared<Application::TransferProgressState>();
+        CopyProgress progress{};
+        progress.current_source = "source.txt";
+        progress.copied_bytes = 1024U;
+        progress.total_bytes = 2048U;
+        const bool offered = (*state).offer(progress);
+        if (!offered) return false;
+        model.transfer_generation_.store(7U);
+        model.cancelled_transfer_generation_.store(7U);
+        model.transfer_in_flight_ = true;
+        model.set_status("Cancellation sentinel", "Keep terminal state");
+        const Application::TransferProgressReady current{application, state, 7U};
+        current();
+        const gui_forms::Label& status = *model.form_.file_manager_app_shell_status_ready;
+        if (status.text() != "Cancellation sentinel") return false;
+        model.cancelled_transfer_generation_.store(0U);
+        const Application::TransferProgressReady obsolete{application, state, 6U};
+        obsolete();
+        if (status.text() != "Cancellation sentinel") return false;
+        model.transfer_in_flight_ = false;
+        current();
+        if (status.text() != "Cancellation sentinel") return false;
+        model.transfer_in_flight_ = true;
+        current();
+        const bool current_visible = status.text() == "Copying source.txt";
+        model.transfer_in_flight_ = false;
+        return current_visible;
     }
 };
 }
@@ -242,6 +333,10 @@ void test_transfer_cancellation(const bool move) {
     require(objects && cancel && status && capture && paste && cancel_command, "transfer controls absent");
     require(!(*cancel).visible() && !(*cancel_command).state().enabled, "idle must not offer copy cancellation");
     wait_for(*application, SourceListed{*objects}, "source listing timed out");
+    require(Probe::progress_setup_failure_falls_back(application),
+        "mailbox and observer allocation failure must fall back before copying without escaping setup");
+    require(Probe::progress_respects_terminal_state(application),
+        "obsolete, cancelled and completed copies must reject late progress while active copies display it");
     std::string source_id{};
     for (const gui_forms::ObjectViewItem& item : (*objects).items()) {
         if (item.name == "source.txt") source_id = item.stable_id;
@@ -418,6 +513,7 @@ void test_new_folder_naming(const NewFolderCase scenario) {
 
 int main() {
     try {
+        require(Probe::progress_coalesces(), "copy progress must retain one notification and the latest snapshot");
         test_transfer_cancellation(false);
         test_transfer_cancellation(true);
         test_new_folder_naming(NewFolderCase::commit_name);

@@ -6,6 +6,7 @@
 
 #include <cstdlib>
 #include <iomanip>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <system_error>
@@ -70,6 +71,50 @@ struct CopyStageIdentity final {
     ObjectIdentity identity{};
 };
 
+struct CopyObserverFailure final {};
+
+// The traversal owns one snapshot. Path replacement happens per node, never
+// per byte-buffer write. Observer and native callback borrows are synchronous.
+struct CopyProgressState final {
+    const CopyProgressObserver& observer;
+    CopyProgress snapshot{};
+
+    void publish() const {
+        if (!observer) return;
+        try { observer(snapshot); }
+        catch (...) { throw CopyObserverFailure{}; }
+    }
+
+    void begin_node(const std::filesystem::path& source) {
+        if (!observer) return;
+        snapshot.current_source = source;
+        publish();
+    }
+
+    void complete_node(const std::filesystem::path& source) {
+        if (!observer) return;
+        if (snapshot.completed_objects == std::numeric_limits<std::uint64_t>::max()) {
+            throw std::overflow_error("copy progress object count overflow");
+        }
+        snapshot.current_source = source;
+        ++snapshot.completed_objects;
+        publish();
+    }
+};
+
+struct CopyLeafProgress final {
+    CopyProgressState& state;
+    std::uint64_t prior_bytes{};
+
+    void operator()(const NativeCopyProgress progress) const {
+        if (progress.copied_bytes > std::numeric_limits<std::uint64_t>::max() - prior_bytes) {
+            throw std::overflow_error("copy progress byte count overflow");
+        }
+        state.snapshot.copied_bytes = prior_bytes + progress.copied_bytes;
+        state.publish();
+    }
+};
+
 CopyOutcome regular_copy_outcome(const NativeCopyResult& native) {
     CopyOutcome result{};
     switch (native.terminal) {
@@ -83,7 +128,7 @@ CopyOutcome regular_copy_outcome(const NativeCopyResult& native) {
             result = {false, false, "identity_changed", identity_changed_message()};
             break;
         case NativeCopyTerminal::callback_failed:
-            result = {false, false, "copy_callback_failed", "copy cancellation callback failed"};
+            result = {false, false, "copy_callback_failed", "copy callback failed"};
             break;
         case NativeCopyTerminal::failed:
             result = {false, false, "file_copy_failed",
@@ -124,7 +169,9 @@ CopyOutcome copy_node_no_follow(const std::filesystem::path& source,
                                 NativeCopyWorkspace& workspace,
                                 CopyStageIdentity& created_stage,
                                 const CancellationCheck& cancelled,
-                                const OperationFaultCheck& injected_fault) {
+                                const OperationFaultCheck& injected_fault,
+                                CopyProgressState& progress,
+                                const std::optional<ObjectIdentity>& requested_revision = std::nullopt) {
     if (cancelled && cancelled()) {
         const CopyOutcome outcome{false, true, "cancelled", "copy cancelled before publication"};
         return outcome;
@@ -140,6 +187,11 @@ CopyOutcome copy_node_no_follow(const std::filesystem::path& source,
                 "copy refuses to cross a nested volume boundary"};
         return outcome;
     }
+    if (requested_revision && !identity.same_revision(*requested_revision)) {
+        const CopyOutcome outcome{false, false, "identity_changed", identity_changed_message()};
+        return outcome;
+    }
+    progress.begin_node(source);
     if (injected_fault) {
         if (const std::optional<std::error_code> fault = injected_fault(
                 OperationFaultPoint::copy_before_node, source)) {
@@ -179,7 +231,7 @@ CopyOutcome copy_node_no_follow(const std::filesystem::path& source,
                 CopyStageIdentity child_stage{};
                 const CopyOutcome child = copy_node_no_follow(
                     child_source, child_destination, source_device, workspace,
-                    child_stage, cancelled, injected_fault);
+                    child_stage, cancelled, injected_fault, progress);
                 if (!child.success) return child;
                 iterator.increment(error);
                 if (error) {
@@ -187,14 +239,20 @@ CopyOutcome copy_node_no_follow(const std::filesystem::path& source,
                     return outcome;
                 }
             }
+            progress.complete_node(source);
             const CopyOutcome outcome{true, false, "copied", "directory copied to stage"};
             return outcome;
         }
         case std::filesystem::file_type::regular: {
+            NativeCopyProgressObserver native_progress{};
+            if (progress.observer) {
+                native_progress = CopyLeafProgress{progress, progress.snapshot.copied_bytes};
+            }
             const NativeCopyResult copied = copy_regular_file_to_stage(
-                source, destination, identity, cancelled, workspace);
+                source, destination, identity, cancelled, workspace, native_progress);
             created_stage.created = copied.stage_created;
             created_stage.identity = copied.stage_identity;
+            if (copied.terminal == NativeCopyTerminal::complete) progress.complete_node(source);
             const CopyOutcome outcome = regular_copy_outcome(copied);
             return outcome;
         }
@@ -228,6 +286,7 @@ CopyOutcome copy_node_no_follow(const std::filesystem::path& source,
                     "created copy link cannot be identified; it was retained"};
                 return outcome;
             }
+            progress.complete_node(source);
             const CopyOutcome outcome{true, false, "copied", "symlink leaf copied to stage"};
             return outcome;
         }
@@ -685,7 +744,8 @@ OperationResult FileOperationService::copy_object(
     const std::filesystem::path& source,
     const ObjectIdentity& expected,
     const std::filesystem::path& destination_parent,
-    const CancellationCheck& cancelled) {
+    const CancellationCheck& cancelled,
+    const CopyProgressObserver& progress) {
     const std::string operation_id = next_operation_id();
     if (!mutations_enabled_) {
         OperationResult value = result(OperationKind::copy_object,
@@ -756,12 +816,23 @@ OperationResult FileOperationService::copy_object(
     NativeCopyWorkspace workspace{};
     CopyStageIdentity created_stage{};
     CopyOutcome copied{};
+    CopyProgressState progress_state{progress};
+    const std::optional<ObjectIdentity> requested_revision{expected};
+    if (expected.type == std::filesystem::file_type::regular) {
+        progress_state.snapshot.total_bytes = expected.size;
+    }
     try {
         copied = copy_node_no_follow(source, stage, expected.device, workspace,
-            created_stage, cancelled, injected_fault_);
+            created_stage, cancelled, injected_fault_, progress_state, requested_revision);
+        if (copied.success) {
+            progress_state.snapshot.phase = CopyPhase::finalizing;
+            progress_state.publish();
+        }
         if (copied.success && cancelled && cancelled()) {
             copied = {false, true, "cancelled", "copy cancelled before publication"};
         }
+    } catch (const CopyObserverFailure&) {
+        copied = {false, false, "copy_callback_failed", "copy progress observer failed"};
     } catch (const std::exception& failure) {
         copied = {false, false, "copy_failed", failure.what()};
     } catch (...) {
@@ -805,6 +876,28 @@ OperationResult FileOperationService::copy_object(
             value.recoverable_object_retained = !cleaned;
             return value;
         }
+    }
+    bool publication_cancelled{};
+    bool publication_callback_failed{};
+    try {
+        progress_state.snapshot.phase = CopyPhase::publishing;
+        progress_state.publish();
+        if (cancelled) publication_cancelled = cancelled();
+    } catch (...) {
+        publication_callback_failed = true;
+    }
+    if (publication_cancelled || publication_callback_failed) {
+        const bool cleaned = cleanup_stage(stage, stage_identity);
+        const OperationTerminal terminal = publication_callback_failed
+            ? OperationTerminal::failed : OperationTerminal::cancelled;
+        const std::string code = publication_callback_failed ? "copy_callback_failed" : "cancelled";
+        const std::string message = publication_callback_failed
+            ? "copy callback failed before publication" : "copy cancelled before publication";
+        OperationResult value = result(OperationKind::copy_object, terminal, code, message,
+            source, stage, expected);
+        value.operation_id = operation_id;
+        value.recoverable_object_retained = !cleaned;
+        return value;
     }
     const std::error_code error = rename_no_replace(stage, destination);
     if (error) {

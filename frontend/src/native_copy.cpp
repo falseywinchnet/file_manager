@@ -56,6 +56,21 @@ void fail(NativeCopyResult& result, const std::error_code error) noexcept {
     return true;
 }
 
+[[nodiscard]] bool report_progress(const NativeCopyProgressObserver& observer,
+                                   const std::uint64_t expected_size,
+                                   NativeCopyResult& result) noexcept {
+    if (!observer) return true;
+    const NativeCopyProgress progress{result.copied_bytes, expected_size};
+    try {
+        observer(progress);
+    } catch (...) {
+        result.terminal = NativeCopyTerminal::callback_failed;
+        result.error = std::make_error_code(std::errc::operation_canceled);
+        return false;
+    }
+    return true;
+}
+
 // Handles stay with this invocation. Explicit closes report errors; lifetime
 // cleanup is only the fallback during an unexpected exception. POSIX close is
 // never retried after EINTR, because retry can close a reused descriptor.
@@ -203,7 +218,7 @@ struct CopyPermissions final {
 #if !defined(__APPLE__)
 void copy_bounded(const CopyFile& source, const CopyFile& stage, const std::uint64_t expected_size,
                   const CancellationCheck& cancelled, NativeCopyWorkspace& workspace,
-                  NativeCopyResult& result) noexcept {
+                  const NativeCopyProgressObserver& progress, NativeCopyResult& result) noexcept {
     const std::span<std::byte> bytes = workspace.bytes();
 #if defined(_WIN32)
     static_assert(NativeCopyWorkspace::capacity <= std::numeric_limits<DWORD>::max());
@@ -261,6 +276,7 @@ void copy_bounded(const CopyFile& source, const CopyFile& stage, const std::uint
             }
             offset += written;
             result.copied_bytes += written;
+            if (!report_progress(progress, expected_size, result)) return;
         }
     }
     if (stop_requested(cancelled, result)) return;
@@ -269,6 +285,7 @@ void copy_bounded(const CopyFile& source, const CopyFile& stage, const std::uint
 #else
 struct MacCopyContext final {
     const CancellationCheck& cancelled;
+    const NativeCopyProgressObserver& progress;
     NativeCopyResult& result;
     std::uint64_t expected_size{};
 };
@@ -308,6 +325,7 @@ int mac_copy_progress(const int what, const int phase, const copyfile_state_t st
             context.result.error = std::make_error_code(std::errc::io_error);
             return COPYFILE_QUIT;
         }
+        if (!report_progress(context.progress, context.expected_size, context.result)) return COPYFILE_QUIT;
         if (stop_requested(context.cancelled, context.result)) return COPYFILE_QUIT;
         return COPYFILE_CONTINUE;
     } catch (...) {
@@ -318,10 +336,11 @@ int mac_copy_progress(const int what, const int phase, const copyfile_state_t st
 }
 
 void copy_mac(const CopyFile& source, const CopyFile& stage, const std::uint64_t expected_size,
-              const CancellationCheck& cancelled, NativeCopyResult& result) noexcept {
+              const CancellationCheck& cancelled, const NativeCopyProgressObserver& progress,
+              NativeCopyResult& result) noexcept {
     const copyfile_state_t state = copyfile_state_alloc();
     if (state == nullptr) { fail(result, native_error()); return; }
-    MacCopyContext context{cancelled, result, expected_size};
+    MacCopyContext context{cancelled, progress, result, expected_size};
     // copyfile_state_set takes the callback address itself, not its address of
     // storage; this cast is confined to Apple's documented foreign interface.
     const int callback_set = copyfile_state_set(state, COPYFILE_STATE_STATUS_CB,
@@ -348,8 +367,11 @@ void copy_mac(const CopyFile& source, const CopyFile& stage, const std::uint64_t
                     result.terminal = NativeCopyTerminal::source_changed;
                     result.error = std::make_error_code(std::errc::io_error);
                 } else {
-                    const bool stopped = stop_requested(cancelled, result);
-                    (void)stopped;
+                    const bool reported = report_progress(progress, expected_size, result);
+                    if (reported) {
+                        const bool stopped = stop_requested(cancelled, result);
+                        (void)stopped;
+                    }
                 }
             }
         }
@@ -363,6 +385,7 @@ void copy_mac(const CopyFile& source, const CopyFile& stage, const std::uint64_t
 void perform_copy(const std::filesystem::path& source_path,
                   const std::filesystem::path& stage_path, const ObjectIdentity& expected,
                   const CancellationCheck& cancelled, NativeCopyWorkspace& workspace,
+                  const NativeCopyProgressObserver& progress,
                   CopyFile& source, CopyFile& stage, NativeCopyResult& result) {
     if (stop_requested(cancelled, result)) return;
     result.error = source.open_source(source_path);
@@ -384,11 +407,12 @@ void perform_copy(const std::filesystem::path& source_path,
     const NativeObjectObservation created = stage.observe();
     result.stage_identity = created.identity;
     if (created.error) { fail(result, created.error); return; }
+    if (!report_progress(progress, expected.size, result)) return;
 #if defined(__APPLE__)
     (void)workspace;
-    copy_mac(source, stage, expected.size, cancelled, result);
+    copy_mac(source, stage, expected.size, cancelled, progress, result);
 #else
-    copy_bounded(source, stage, expected.size, cancelled, workspace, result);
+    copy_bounded(source, stage, expected.size, cancelled, workspace, progress, result);
 #endif
     if (result.terminal != NativeCopyTerminal::complete) return;
     const NativeObjectObservation after = source.observe();
@@ -419,12 +443,12 @@ void perform_copy(const std::filesystem::path& source_path,
 NativeCopyResult copy_regular_file_to_stage(
     const std::filesystem::path& source_path, const std::filesystem::path& stage_path,
     const ObjectIdentity& expected, const CancellationCheck& cancelled,
-    NativeCopyWorkspace& workspace) noexcept {
+    NativeCopyWorkspace& workspace, const NativeCopyProgressObserver& progress) noexcept {
     NativeCopyResult result{};
     CopyFile source{};
     CopyFile stage{};
     try {
-        perform_copy(source_path, stage_path, expected, cancelled, workspace, source, stage, result);
+        perform_copy(source_path, stage_path, expected, cancelled, workspace, progress, source, stage, result);
     } catch (const std::bad_alloc&) {
         fail(result, std::make_error_code(std::errc::not_enough_memory));
     } catch (...) {

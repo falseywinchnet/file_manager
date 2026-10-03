@@ -1,0 +1,14 @@
+{
+  "encoding": "UTF-8 without BOM, normalized LF",
+  "sha256": {
+    "frontend/include/file_manager/file_operations.hpp": "9aead163e3b5d45ed07d941dc64cee8e71aa7c64080ec118c126819c9cdef93a",
+    "frontend/src/file_operations.cpp": "11198a436d15f83f794e6820b27177c715dee8fb1c489425d66c1b9165863d71",
+    "frontend/src/application.hpp": "0f6726b304a3d4fe36f076947780494c917697933fedd95838304ce8163646c4",
+    "frontend/src/application_jobs.hpp": "a2a44430b388863d036ee9f86e26ee19743f088ca0b0636fbf28eca786fb1d36",
+    "frontend/src/native_copy.hpp": "4adf794740fb55a6812b01ed1af420fed42e85f10b25857d3c5a974b5d1c01ea",
+    "frontend/src/native_copy.cpp": "1c57daf44a29e79b2bc4c83021fc2262de21a0d36f168b346612adf85ea59c08",
+    "frontend/tests/file_operations_tests.cpp": "6d7e72237526e189f2a37a196f1181f5c956f9ebc4983de6287313f99861a3f4",
+    "frontend/tests/application_transfer_tests.cpp": "cc8db52b8b3bab85a91f4420ee845a4ac6e86648ad35c2af062c4442f6bdbc61",
+    "frontend/tests/native_copy_tests.cpp": "b130edd6c4aa29dcb31f22475f3a3a9a3c7d3179be1a4bcddd44185966ff4fee"
+  }
+}

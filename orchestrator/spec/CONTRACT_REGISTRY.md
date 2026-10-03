@@ -63,6 +63,11 @@ Ordinary first-party New Folder/Rename development is reconciled in
 This separates local actions from the protected fixture profile without adding
 an Engine grant, plugin capability, wire operation, or a daily-use acceptance claim.
 
+The frontend's confirmed Copy progress and bounded UI delivery projection is
+recorded in [FRONTEND_COPY_PROGRESS.md](FRONTEND_COPY_PROGRESS.md). It is a
+source-level development addition; it does not activate ordinary Copy or change
+its metadata policy, filesystem authority, or terminal-result meaning.
+
 Existing per-row object/revision fields have the development source projection
 in [FRONTEND_SEARCH_SOURCE_RECORDS.md](FRONTEND_SEARCH_SOURCE_RECORDS.md).
 It preserves observations separately from filesystem authority; it does not
