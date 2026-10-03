@@ -1,0 +1,18 @@
+[
+  {
+    "path": "gui_forms/src/controls/label/label.cpp",
+    "sha256_utf8_lf": "bf6cd0ae713c670bd953f50b09ce149ff7de5864deb695253b4333b5fd62e2fc"
+  },
+  {
+    "path": "gui_forms/tests/basic_controls_tests.cpp",
+    "sha256_utf8_lf": "65d85d7ad7db03da33ad1ec860438e56330d95f5411da625268fbed78feb5fac"
+  },
+  {
+    "path": "gui_forms/benchmarks/label_layout_probe.cpp",
+    "sha256_utf8_lf": "aa77050ec32fd4453de31aec7d08afb004bc4cc3a808c15aa7ac235dc72715d1"
+  },
+  {
+    "path": "gui_forms/CMakeLists.txt",
+    "sha256_utf8_lf": "7a1468902047d648bd57f3126cfb2269915e4ff771adb19092e90ece7061ce17"
+  }
+]

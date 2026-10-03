@@ -873,6 +873,60 @@ void test_fixed_label_text_is_paint_only() {
             "auto-sized label text must continue to participate in layout");
 }
 
+class CountingLabelMetrics final : public TextMetricsProvider {
+public:
+    ResolvedTextLayout resolve_text_layout_utf8(
+        const std::string_view text, const FontSpec font) override {
+        ++calls;
+        const ResolvedTextLayout result = estimate_text_layout_utf8(text, font);
+        return result;
+    }
+
+    std::size_t calls{};
+};
+
+void test_fixed_label_measurement_does_not_resolve_unused_text() {
+    // The provider outlives the Window's non-owning registration.
+    CountingLabelMetrics provider{};
+    const std::string source(65536U, 'x');
+    const std::shared_ptr<Label> label = make_control<Label>(
+        StableId("label.fixed-measurement"), source);
+    (*label).set_requested_bounds({0.0, 0.0, 190.0, 108.0});
+    (*label).set_text_wrapping(TextWrapping::word);
+    (*label).set_maximum_lines(7U);
+    Window window(label, {190.0, 108.0});
+    window.set_text_metrics_provider(&provider);
+    provider.calls = 0U;
+    const Size complete = (*label).measure({300.0, 200.0});
+    const Size constrained = (*label).measure({80.0, 40.0});
+    const Size empty = (*label).measure({0.0, 0.0});
+    require(complete == Size{190.0, 108.0} && constrained == Size{80.0, 40.0} &&
+                empty == Size{},
+            "fixed label measurement must retain requested and available size semantics");
+    require(provider.calls == 0U,
+            "fixed label layout must not resolve text whose metrics cannot affect either dimension");
+
+    // AutoSize does not change Label's existing explicit-bounds precedence.
+    (*label).set_auto_size(true);
+    window.set_text_scale(1.5);
+    provider.calls = 0U;
+    const Size scaled = (*label).measure({300.0, 200.0});
+    require(scaled == complete && provider.calls == 0U,
+            "explicit label dimensions remain authoritative with AutoSize and text scaling");
+
+    (*label).set_text("one two three four");
+    (*label).set_requested_bounds({0.0, 0.0, 80.0, 0.0});
+    provider.calls = 0U;
+    const Size content_height = (*label).measure({300.0, 200.0});
+    require(content_height.width == 80.0 && content_height.height > 0.0 && provider.calls > 0U,
+            "content-derived label height must still resolve text");
+    (*label).set_requested_bounds({0.0, 0.0, 0.0, 40.0});
+    provider.calls = 0U;
+    const Size content_width = (*label).measure({300.0, 200.0});
+    require(content_width.width > 0.0 && content_width.height == 40.0 && provider.calls > 0U,
+            "content-derived label width must still resolve text");
+}
+
 void test_label_multiline_wrapping_and_alignment() {
     std::shared_ptr<gui_forms::Label> label = make_control<Label>(StableId("label.multiline"),
                                      "Retained labels wrap words\nand preserve breaks");
@@ -1602,6 +1656,7 @@ int main() {
         test_link_and_callback_disposal();
         test_wrong_thread_property_mutation_is_rejected();
         test_fixed_label_text_is_paint_only();
+        test_fixed_label_measurement_does_not_resolve_unused_text();
         test_label_multiline_wrapping_and_alignment();
         test_label_wrapping_reuses_live_text_without_retaining_paragraph_storage();
         test_label_line_limit_bounds_hidden_wrapping_work();

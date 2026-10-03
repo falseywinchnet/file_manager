@@ -2,13 +2,34 @@
 
 Status: **ACTIVE WORKING RECORD — 0.001-alpha repair toward real daily use**.
 
-**Latest verified delivery:** `v0.001-alpha.3e38d4a`, including search match
-evidence and retained request context, is published on all three platforms after
-both native matrices, archive verification and Mac preview/Details image review.
-See `../results/2026-10-03-search-match-context/DELIVERY.md`. That package still
-requires the protected profile for filesystem mutations. No catalogue substring
-capability, general preview-provider coverage, or thumbnail availability is
-advertised.
+**Latest verified delivery:** `v0.001-alpha.31d1319` is published for Windows x64,
+macOS arm64 and Linux x64 after both native matrices and independent archive
+verification. See `../results/2026-10-03-operation-worker/DELIVERY.md`. Ordinary
+New Folder, same-parent Rename and their one-step Undo are available. The
+operation worker is separate from navigation/preview reads; queued navigation
+and Settings-return refresh have regression coverage. Copy progress remains
+within the protected profile. Ordinary Copy/Move/Delete, general preview
+coverage, thumbnails, index setup and installers remain unfinished.
+
+**Current source checkpoint:** regular-file Copy modification dates passed both
+native matrices and merged in PR27 (`8dd25cb`); that repair is newer than the
+published release. Postorder directory dates and ordinary permissions passed
+both native matrices at `c5fb4c6` and merged in PR28 (`d08e45c`). See
+`../results/2026-10-03-directory-copy-metadata/NATIVE_ACCEPTANCE.md`. These changes do not
+establish complete metadata fidelity or ordinary Copy availability.
+
+**Current responsiveness repair:** fixed-size Label measurement resolves and
+wraps text even though neither returned dimension uses those results. The new
+regression fails on the baseline, and the candidate removes that work while
+preserving measured sizes and the content-sized path. A real-HarfBuzz probe
+records zero resolver calls for fixed dimensions after the change; it measures
+layout only, not paint or complete input latency. See
+`../../gui_forms/results/2026-10-03-fixed-label-layout/README.md` for scope,
+raw results and integration status. Prepared-window shaping/adoption and
+broader preview formats remain separate work.
+
+The dated entries below retain historical checkpoints and pending states;
+the latest delivery/source paragraphs above take precedence.
 
 **2026-10-03 development review:** the new bounded-reader candidate passes
 correctness/race/vet but has not established the legacy no-regression gate.
