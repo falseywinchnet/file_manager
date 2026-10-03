@@ -1042,6 +1042,10 @@ void Application::install_command_surfaces() {
         "Publish the staged transfer in the current folder",
         std::bind_front(&Application::paste_transfer, this));
     (*command_paste_).set_shortcut("Cmd+V");
+    command_cancel_copy_ = make_command(
+        "transfer.cancel", "Cancel copy",
+        "Request cancellation of the active copy before publication",
+        std::bind_front(&Application::cancel_transfer, this));
     command_undo_ = make_command(
         "edit.undo", "Undo last operation",
         "Undo the last recoverable protected operation",
@@ -1192,6 +1196,7 @@ void Application::install_command_surfaces() {
             {"edit.copy", MenuItemKind::command, command_copy_},
             {"edit.move", MenuItemKind::command, command_move_},
             {"edit.paste", MenuItemKind::command, command_paste_},
+            {"edit.cancel-copy", MenuItemKind::command, command_cancel_copy_},
             {"edit.delete", MenuItemKind::command, command_delete_},
             {"edit.separator.undo", MenuItemKind::separator},
             {"edit.undo", MenuItemKind::command, command_undo_},
@@ -1908,6 +1913,19 @@ void Application::update_command_state() {
     (*command_copy_).set_enabled(mutation_ready && one);
     (*command_move_).set_enabled(mutation_ready && one);
     (*command_paste_).set_enabled(paste_ready);
+    const bool copy_active = transfer_in_flight_ && transfer_cancellable_;
+    const bool copy_cancel_requested = copy_active &&
+        cancelled_transfer_generation_.load() == transfer_generation_.load();
+    const bool copy_cancel_ready = copy_active && !copy_cancel_requested;
+    const std::string copy_cancel_text = copy_cancel_requested ? "Stopping…" : "Cancel copy";
+    (*command_cancel_copy_).set_enabled(copy_cancel_ready);
+    (*command_cancel_copy_).set_text(copy_cancel_text);
+    (*command_cancel_copy_).set_availability_reason(copy_cancel_ready ? std::string{}
+        : copy_cancel_requested ? "Waiting for the copy worker to finish cancellation"
+                                : "No cancellable copy is active");
+    (*form_.file_manager_app_shell_status_cancel_copy).set_visible(copy_active);
+    (*form_.file_manager_app_shell_status_cancel_copy).set_enabled(copy_cancel_ready);
+    (*form_.file_manager_app_shell_status_cancel_copy).set_text(copy_cancel_text);
     (*command_undo_).set_enabled(files_active && operations_ &&
                                undo_available_);
     (*command_delete_).set_enabled(mutation_ready && one);
@@ -2409,6 +2427,8 @@ void Application::install_handlers() {
           std::bind_front(&Application::capture_transfer, this, true));
     bind_button_action(form_.file_manager_app_shell_commands_paste,
           std::bind_front(&Application::paste_transfer, this));
+    bind_button_action(form_.file_manager_app_shell_status_cancel_copy,
+          CommandExecution{command_cancel_copy_, "fm.button.transfer.cancel"});
     bind_button_action(form_.file_manager_app_shell_commands_selection_group_actions_delete,
           CommandExecution{command_delete_, "fm.button.selection.delete"});
     bind_button_action(form_.file_manager_app_shell_commands_arrange_group_actions_settings,
@@ -4517,6 +4537,7 @@ void Application::paste_transfer() {
     const std::filesystem::path destination = location_;
     const std::uint64_t generation = transfer_generation_.fetch_add(1) + 1;
     transfer_in_flight_ = true;
+    transfer_cancellable_ = !transfer.move;
     pending_delete_id_.reset();
     update_mutation_controls();
     set_status(std::string(transfer.move ? "Moving " : "Copying ") +
@@ -4524,6 +4545,17 @@ void Application::paste_transfer() {
                transfer.move ? "same-volume identity-preserving publication"
                              : "staged no-follow copy · no overwrite");
     post_worker(TransferWork{shared_from_this(), transfer, destination, generation});
+}
+
+void Application::cancel_transfer() {
+    if (!transfer_in_flight_ || !transfer_cancellable_) return;
+    const std::uint64_t generation = transfer_generation_.load();
+    if (cancelled_transfer_generation_.load() == generation) return;
+    // Keep this job's identity and busy state until its authoritative result.
+    // A cancellation request that arrives after publication cannot undo a copy.
+    cancelled_transfer_generation_.store(generation);
+    update_mutation_controls();
+    set_status("Copy cancellation requested", "Waiting for current filesystem work");
 }
 
 void Application::observe_object_pointer(const gui_forms::PointerEvent& event) {
@@ -4591,6 +4623,7 @@ void Application::request_internal_drop(const DirectoryEntry& source,
     pending_transfer_.reset();
     const std::uint64_t generation = transfer_generation_.fetch_add(1) + 1;
     transfer_in_flight_ = true;
+    transfer_cancellable_ = copy;
     pending_delete_id_.reset();
     update_mutation_controls();
     set_status(std::string(copy ? "Copying " : "Moving ") + source.name +
@@ -4629,6 +4662,15 @@ void Application::apply_operation(OperationResult result) {
     // Result is the worker-owned service snapshot, published through the UI queue.
     undo_available_ = result.undo_available;
     update_mutation_controls();
+    if (result.terminal == OperationTerminal::cancelled) {
+        if (result.recoverable_object_retained) {
+            set_status("Copy cancelled · cleanup incomplete", path_utf8(result.resulting_path));
+            show_operation_failure(result);
+        } else {
+            set_status("Copy cancelled", result.message);
+        }
+        return;
+    }
     if (!result.succeeded()) {
         set_status("Operation refused · " + result.code, result.message);
         update_mutation_controls();
@@ -4650,6 +4692,7 @@ void Application::apply_operation(OperationResult result) {
 void Application::apply_transfer(OperationResult result,
                                  const std::uint64_t generation) {
     transfer_in_flight_ = false;
+    transfer_cancellable_ = false;
     if (generation == transfer_generation_.load() && result.succeeded()) {
         pending_transfer_.reset();
     }
@@ -4658,12 +4701,14 @@ void Application::apply_transfer(OperationResult result,
 }
 
 void Application::show_operation_failure(const OperationResult& result) {
-    if (result.terminal == OperationTerminal::cancelled || !window_ ||
+    if ((result.terminal == OperationTerminal::cancelled &&
+         !result.recoverable_object_retained) || !window_ ||
         !(*window_).host_services()) {
         return;
     }
     gui_forms::HostMessageDialogRequest message{};
-    message.title = "File operation refused";
+    message.title = result.terminal == OperationTerminal::cancelled
+        ? "Copy cleanup incomplete" : "File operation refused";
     message.message = result.message + "\n\nCode: " + result.code;
     if (!result.original_path.empty()) {
         message.message += "\nObject: " + path_utf8(result.original_path);

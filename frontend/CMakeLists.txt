@@ -90,6 +90,7 @@ add_library(file_manager_frontend_model STATIC
     src/checksum.cpp
     src/native_file.cpp
     src/native_publication.cpp
+    src/native_copy.cpp
     src/platform_paths.cpp
     src/filesystem_model.cpp
     src/file_operations.cpp
@@ -306,6 +307,16 @@ if(FILE_MANAGER_BUILD_TESTS)
     add_test(NAME file_manager_file_operations_tests
              COMMAND file_manager_file_operations_tests)
 
+    add_executable(file_manager_native_copy_tests tests/native_copy_tests.cpp)
+    target_link_libraries(file_manager_native_copy_tests PRIVATE file_manager_frontend_model)
+    target_compile_features(file_manager_native_copy_tests PRIVATE cxx_std_20)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(file_manager_native_copy_tests PRIVATE
+            -Wall -Wextra -Werror -Wpedantic)
+    endif()
+    add_test(NAME file_manager_native_copy_tests COMMAND file_manager_native_copy_tests)
+    set_tests_properties(file_manager_native_copy_tests PROPERTIES TIMEOUT 30)
+
     add_executable(file_manager_internal_drag_tests
         tests/internal_drag_tests.cpp)
     target_link_libraries(file_manager_internal_drag_tests PRIVATE
@@ -414,6 +425,18 @@ if(FILE_MANAGER_BUILD_TESTS)
     endif()
     add_test(NAME file_manager_application_interaction_tests
              COMMAND file_manager_application_interaction_tests)
+
+    add_executable(file_manager_application_transfer_tests
+        tests/application_transfer_tests.cpp)
+    target_link_libraries(file_manager_application_transfer_tests PRIVATE file_manager_application)
+    target_compile_features(file_manager_application_transfer_tests PRIVATE cxx_std_20)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(file_manager_application_transfer_tests PRIVATE
+            -Wall -Wextra -Werror -Wpedantic)
+    endif()
+    add_test(NAME file_manager_application_transfer_tests
+             COMMAND file_manager_application_transfer_tests)
+    set_tests_properties(file_manager_application_transfer_tests PROPERTIES TIMEOUT 30)
 
     if(APPLE)
         enable_language(OBJCXX)

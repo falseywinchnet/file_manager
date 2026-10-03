@@ -648,7 +648,7 @@ button {
   height: 26px;
   min-height: 26px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr auto;
   color: #f1f5f6;
   background-color: #4b5459;
   background-image:
@@ -671,3 +671,11 @@ button {
 }
 
 .hidden-control { display: none; background-color: transparent; }
+
+.copy-cancel {
+  display: none;
+  min-width: 96px;
+  height: 22px;
+  margin: 1px 3px;
+  padding: 1px 8px;
+}

@@ -769,7 +769,8 @@ struct Application::TransferCancelled final {
     std::uint64_t generation{};
     bool operator()() const {
         const bool cancelled = (*self).stopping_.load() ||
-            (*self).transfer_generation_.load() != generation;
+            (*self).transfer_generation_.load() != generation ||
+            (*self).cancelled_transfer_generation_.load() == generation;
         return cancelled;
     }
 };
@@ -807,7 +808,8 @@ struct Application::InternalDropCancelled final {
     std::uint64_t generation{};
     bool operator()() const {
         const bool cancelled = (*self).stopping_.load() ||
-            (*self).transfer_generation_.load() != generation;
+            (*self).transfer_generation_.load() != generation ||
+            (*self).cancelled_transfer_generation_.load() == generation;
         return cancelled;
     }
 };
