@@ -339,6 +339,35 @@ void test_executor_and_existing_output(const std::span<const std::byte> font) {
         "Busy and wrong-executor refusals preserve completed geometry and its reservation");
 }
 
+void test_owner_context_budget(const std::span<const std::byte> font) {
+    std::size_t baseline_peak = 0U;
+    {
+        Fixture baseline(font);
+        text::PreparedWindowShaper shaper(baseline.fonts);
+        require(shaper.initialize() == gf::PreparedTextStatus::success, "baseline context initializes");
+        require(shaper.shape(*baseline.batch) == gf::PreparedTextStatus::success, "baseline context shapes");
+        baseline_peak = (*baseline.batch).workspace_peak_bytes;
+    }
+    Fixture fixture(font);
+    constexpr std::size_t owner_bytes = 4096U;
+    text::PreparedWindowShaper charged(fixture.fonts, owner_bytes);
+    require(charged.initialize() == gf::PreparedTextStatus::success, "charged context initializes");
+    require(charged.shape(*fixture.batch) == gf::PreparedTextStatus::success, "charged context shapes");
+    require((*fixture.batch).workspace_peak_bytes == baseline_peak + owner_bytes &&
+        (*fixture.batch).workspace_peak_bytes <= gf::PreparedTextLimits::workspace_bytes,
+        "external owner context is included in aggregate workspace reporting");
+    text::PreparedWindowShaper excessive(fixture.fonts, std::numeric_limits<std::size_t>::max());
+    gf::PreparedTextStatus refused = gf::PreparedTextStatus::success;
+    std::size_t allocations = 0U;
+    {
+        probe::Scope scope(0U);
+        refused = excessive.initialize();
+        allocations = probe::attempts;
+    }
+    require(refused == gf::PreparedTextStatus::budget_exceeded && allocations == 0U,
+        "oversized owner context refuses before allocation or overflowing addition");
+}
+
 void test_projection(const std::span<const std::byte> font) {
     Fixture fixture(font, 1U);
     fixture.batch.reset();
@@ -419,6 +448,7 @@ int main(const int argc, char** argv) {
         test_late_coverage(font);
         test_initialize_closing(font);
         test_executor_and_existing_output(font);
+        test_owner_context_budget(font);
         test_projection(font);
         std::cout << "Prepared window shaping fixtures passed\n";
         return EXIT_SUCCESS;

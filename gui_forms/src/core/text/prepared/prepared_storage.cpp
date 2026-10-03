@@ -75,6 +75,59 @@ std::span<const std::uint8_t> GrayTextMask::pixels() const noexcept {
 
 namespace detail {
 
+namespace {
+std::atomic<std::uint64_t> next_session_instance{1U};
+std::atomic<std::uint64_t> next_controller_instance{1U};
+}
+
+PreparedTextStatus acquire_prepared_identity(std::atomic<std::uint64_t>& next,
+    std::uint64_t& output) noexcept {
+    std::uint64_t observed = next.load(std::memory_order_relaxed);
+    for (;;) {
+        if (observed == 0U || observed == std::numeric_limits<std::uint64_t>::max())
+            return PreparedTextStatus::generation_exhausted;
+        const std::uint64_t successor = observed + 1U;
+        const bool exchanged = next.compare_exchange_weak(observed, successor,
+            std::memory_order_relaxed, std::memory_order_relaxed);
+        if (exchanged) {
+            output = observed;
+            return PreparedTextStatus::success;
+        }
+    }
+}
+
+PreparedTextStatus acquire_prepared_session_instance(std::uint64_t& output) noexcept {
+    const PreparedTextStatus status = acquire_prepared_identity(next_session_instance, output);
+    return status;
+}
+
+PreparedTextStatus acquire_prepared_controller_instance(std::uint64_t& output) noexcept {
+    const PreparedTextStatus status = acquire_prepared_identity(next_controller_instance, output);
+    return status;
+}
+
+PreparedSessionClaim::~PreparedSessionClaim() { release(); }
+
+PreparedTextStatus PreparedSessionClaim::acquire(std::shared_ptr<PreparedLedger> ledger) {
+    if (ledger_) return PreparedTextStatus::busy;
+    if (!ledger) return PreparedTextStatus::invalid_input;
+    std::lock_guard<std::mutex> lock((*ledger).mutex);
+    if ((*ledger).closing) return PreparedTextStatus::closing;
+    if ((*ledger).session_claimed) return PreparedTextStatus::busy;
+    (*ledger).session_claimed = true;
+    ledger_ = std::move(ledger);
+    return PreparedTextStatus::success;
+}
+
+void PreparedSessionClaim::release() noexcept {
+    if (!ledger_) return;
+    {
+        std::lock_guard<std::mutex> lock((*ledger_).mutex);
+        (*ledger_).session_claimed = false;
+    }
+    ledger_.reset();
+}
+
 PreparedReservation::~PreparedReservation() { release(); }
 PreparedReservation::PreparedReservation(PreparedReservation&& other) noexcept
     : ledger_(std::move(other.ledger_)), resource_(other.resource_), bytes_(std::exchange(other.bytes_, 0)) {}

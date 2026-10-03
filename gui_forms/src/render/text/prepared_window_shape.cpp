@@ -41,14 +41,18 @@ bool finite_geometry(const BoundedShapedText& geometry, const std::size_t text_b
 
 } // namespace
 
-PreparedWindowShaper::PreparedWindowShaper(std::shared_ptr<const detail::PreparedFontBank> fonts)
-    : fonts_(std::move(fonts)) {}
+PreparedWindowShaper::PreparedWindowShaper(std::shared_ptr<const detail::PreparedFontBank> fonts,
+    const std::size_t owner_bytes)
+    : fonts_(std::move(fonts)), owner_bytes_(owner_bytes) {}
 
 PreparedTextStatus PreparedWindowShaper::initialize() {
     if (executor_ != std::this_thread::get_id()) return PreparedTextStatus::wrong_executor;
     if (engine_) return PreparedTextStatus::busy;
     if (!fonts_ || !(*fonts_).ledger || (*fonts_).face_count == 0U ||
         (*fonts_).face_count > PreparedTextLimits::font_faces) return PreparedTextStatus::invalid_input;
+    if (owner_bytes_ > PreparedTextLimits::workspace_bytes - context_bytes)
+        return PreparedTextStatus::budget_exceeded;
+    const std::size_t reserved_context = context_bytes + owner_bytes_;
     {
         std::lock_guard<std::mutex> lock((*(*fonts_).ledger).mutex);
         if ((*(*fonts_).ledger).closing) return PreparedTextStatus::closing;
@@ -56,7 +60,7 @@ PreparedTextStatus PreparedWindowShaper::initialize() {
     try {
         std::unique_ptr<HarfBuzzFontEngine> candidate = std::make_unique<HarfBuzzFontEngine>();
         ShapeStorageLimits limits{};
-        limits.workspace_bytes -= context_bytes;
+        limits.workspace_bytes -= reserved_context;
         const detail::PreparedFontBank& bank = *fonts_;
         const std::size_t registration = (*candidate).configure_bounded_registration(bank.face_count, limits.workspace_bytes);
         static_cast<void>(registration); // Already included by workspace preparation; do not charge twice.
@@ -85,6 +89,9 @@ PreparedTextStatus PreparedWindowShaper::shape(detail::PreparedWindowBatchStorag
     if (batch.geometry) return PreparedTextStatus::busy;
     if (!engine_ || !batch.input || !batch.rows || batch.row_count == 0U ||
         batch.row_count > 512U) return PreparedTextStatus::invalid_input;
+    // initialize established that this sum fits the allowance; both fields
+    // are fixed for the lifetime of the worker context.
+    const std::size_t reserved_context = context_bytes + owner_bytes_;
     if (batch.fonts != fonts_ || batch.ledger != (*fonts_).ledger ||
         batch.key.text.font_set != (*fonts_).identity ||
         batch.key.text.font_generation != (*fonts_).generation) return PreparedTextStatus::incompatible_font;
@@ -137,7 +144,7 @@ PreparedTextStatus PreparedWindowShaper::shape(detail::PreparedWindowBatchStorag
             limits.output_bytes = payload_limit - bytes;
             limits.runs = ceiling.runs - runs;
             limits.glyphs = ceiling.glyphs - glyphs;
-            limits.workspace_bytes -= context_bytes;
+            limits.workspace_bytes -= reserved_context;
             std::unique_ptr<BoundedShapedText> shaped = (*engine_).shape_with_workspace(text, device_font, limits, workspace_);
             current = detail::prepared_window_worker_current(batch);
             if (current != PreparedTextStatus::success) return current;
@@ -158,7 +165,7 @@ PreparedTextStatus PreparedWindowShaper::shape(detail::PreparedWindowBatchStorag
             // shape_with_workspace precharged its temporary owner and arrays.
             // Arrays transfer without copying; the temporary owner retires here.
             bytes += geometry.controlled_output_bytes - sizeof(BoundedShapedText);
-            workspace_peak = std::max(workspace_peak, geometry.controlled_workspace_peak + context_bytes);
+            workspace_peak = std::max(workspace_peak, geometry.controlled_workspace_peak + reserved_context);
             row.runs = std::move(geometry.runs);
             row.glyphs = std::move(geometry.glyphs);
         }
