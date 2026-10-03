@@ -1,0 +1,19 @@
+Start testing: Oct 03 04:07 Pacific Daylight Time
+----------------------------------------------------------
+29/72 Testing: gui_forms_basic_controls_tests
+29/72 Test: gui_forms_basic_controls_tests
+Command: "C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows/gui_forms_basic_controls_tests.exe"
+Directory: C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows
+"gui_forms_basic_controls_tests" start time: Oct 03 04:07 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+gui_forms_basic_controls_tests: repeated short candidates must not be reshaped for each visible line
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Failed.
+"gui_forms_basic_controls_tests" end time: Oct 03 04:07 Pacific Daylight Time
+"gui_forms_basic_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 04:07 Pacific Daylight Time

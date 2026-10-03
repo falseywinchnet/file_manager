@@ -1,0 +1,18 @@
+[
+  {
+    "path": "gui_forms/src/controls/basic/basic_control_rendering.cpp",
+    "sha256_utf8_lf": "0bfdadc194bccf606f99467ab36c2c2174b8e4795e711bd65d9297a866428470"
+  },
+  {
+    "path": "gui_forms/src/controls/basic/basic_control_rendering.hpp",
+    "sha256_utf8_lf": "28e2d39565689c12d537ad5352bd0084aa150fa411d436238696b38e0a49231c"
+  },
+  {
+    "path": "gui_forms/tests/basic_controls_tests.cpp",
+    "sha256_utf8_lf": "476075979f144cd38e03532ada6b452b672d5282576268ab732a192c06cbf141"
+  },
+  {
+    "path": "gui_forms/benchmarks/label_layout_probe.cpp",
+    "sha256_utf8_lf": "5d43d4a1e1214e649c61249ab7defae8058e0426bf35246992c0c6070740dd6c"
+  }
+]
