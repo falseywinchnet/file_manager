@@ -1,6 +1,7 @@
 #include "fixture_links.hpp"
 #include "file_manager/file_operations.hpp"
 #include "../src/native_file.hpp"
+#include "../src/native_publication.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -76,6 +77,93 @@ bool has_copy_stage(const std::filesystem::path& parent) {
 
 bool cancel_immediately() { return true; }
 
+std::string read_fixture_text(const std::filesystem::path& path) {
+    std::ifstream input{path};
+    if (!input) throw std::runtime_error("cannot open publication fixture");
+    std::string text{};
+    std::getline(input, text);
+    if (input.bad()) throw std::runtime_error("cannot read publication fixture");
+    return text;
+}
+
+// Directly verify the primitive's no-replace contract with owned fixture data.
+bool test_native_publication(const std::filesystem::path& root) {
+    const std::filesystem::path parent = root / "native-publication";
+    std::filesystem::create_directory(parent);
+    const std::filesystem::path source = parent / "source.txt";
+    const std::filesystem::path destination = parent / "destination.txt";
+    write_file(source, "source contents");
+    write_file(destination, "destination contents");
+    const file_manager::ObjectIdentity source_identity = file_manager::observe_identity(source);
+    const file_manager::ObjectIdentity destination_identity = file_manager::observe_identity(destination);
+    const std::error_code occupied = file_manager::check_destination_vacant(destination);
+    if (!require(occupied == std::errc::file_exists, "existing destination must be occupied")) return false;
+    const std::error_code refused = file_manager::rename_no_replace(source, destination);
+    if (!require(refused == std::errc::file_exists &&
+        file_manager::observe_identity(source) == source_identity &&
+        file_manager::observe_identity(destination) == destination_identity &&
+        read_fixture_text(source) == "source contents" &&
+        read_fixture_text(destination) == "destination contents",
+        "native no-replace publication must preserve both occupied regular files")) return false;
+
+    const std::filesystem::path vacant = parent / "published.txt";
+    const std::error_code vacancy = file_manager::check_destination_vacant(vacant);
+    if (!require(!vacancy, "missing leaf under an existing parent must be vacant")) return false;
+    const std::error_code published = file_manager::rename_no_replace(source, vacant);
+    if (!require(!published && !std::filesystem::exists(source) &&
+        file_manager::observe_identity(vacant) == source_identity &&
+        read_fixture_text(vacant) == "source contents",
+        "native no-replace publication must move the same file to a vacant leaf")) return false;
+
+    const std::filesystem::path directory = parent / "source-directory";
+    const std::filesystem::path occupied_directory = parent / "occupied-directory";
+    const std::filesystem::path moved_directory = parent / "moved-directory";
+    std::filesystem::create_directory(directory);
+    std::filesystem::create_directory(occupied_directory);
+    const std::filesystem::path marker = directory / "marker.txt";
+    write_file(marker, "directory contents");
+    const file_manager::ObjectIdentity occupied_directory_identity =
+        file_manager::observe_identity(occupied_directory);
+    const std::error_code directory_refusal = file_manager::rename_no_replace(directory, occupied_directory);
+    if (!require(static_cast<bool>(directory_refusal) &&
+        file_manager::observe_identity(occupied_directory) == occupied_directory_identity &&
+        read_fixture_text(marker) == "directory contents",
+        "native publication must not replace even an empty destination directory")) return false;
+    const std::error_code directory_move = file_manager::rename_no_replace(directory, moved_directory);
+    const std::filesystem::path moved_marker = moved_directory / "marker.txt";
+    if (!require(!directory_move && !std::filesystem::exists(directory) &&
+        read_fixture_text(moved_marker) == "directory contents",
+        "directory publication must preserve the child without traversal copying")) return false;
+
+    const std::filesystem::path invalid_child = destination / "child.txt";
+    const std::error_code invalid_parent = file_manager::check_destination_vacant(invalid_child);
+    if (!require(static_cast<bool>(invalid_parent) && invalid_parent != std::errc::file_exists,
+        "a file used as a destination parent must be an observation failure, not vacancy")) return false;
+    const std::filesystem::path missing_source = parent / "missing-source";
+    const std::filesystem::path missing_result = parent / "missing-result";
+    const std::error_code missing = file_manager::rename_no_replace(missing_source, missing_result);
+    if (!require(static_cast<bool>(missing) && !std::filesystem::exists(missing_result),
+        "failed publication must not fabricate a destination")) return false;
+
+    const std::filesystem::path link = parent / "dangling-link";
+    const std::filesystem::path link_target_path = parent / "absent-link-target";
+    if (create_fixture_link(link_target_path, link, false)) {
+        const file_manager::ObjectIdentity link_identity = file_manager::observe_identity(link);
+        const std::error_code link_occupied = file_manager::check_destination_vacant(link);
+        const std::error_code link_refusal = file_manager::rename_no_replace(vacant, link);
+        if (!require(link_occupied == std::errc::file_exists && static_cast<bool>(link_refusal) &&
+            file_manager::observe_identity(link) == link_identity &&
+            file_manager::observe_identity(vacant) == source_identity,
+            "a dangling destination link must remain occupied and untouched")) return false;
+        const std::filesystem::path moved_link = parent / "moved-link";
+        const std::error_code link_move = file_manager::rename_no_replace(link, moved_link);
+        if (!require(!link_move && file_manager::observe_identity(moved_link) == link_identity &&
+            link_target(moved_link) == link_target_path && !std::filesystem::exists(link_target_path),
+            "publishing a source symlink must move the leaf without touching its target")) return false;
+    }
+    return true;
+}
+
 // Service-owned callables borrow counters that are declared before their service.
 struct CancelAfterFourChecks final {
     std::size_t& checks;
@@ -115,6 +203,7 @@ struct DiskFullAfterThirdNode final {
 
 int main() {
     TestArea area{};
+    if (!test_native_publication(area.source())) return 1;
     file_manager::FileOperationService disabled(
         area.source(), area.quarantine(), false);
     const file_manager::OperationResult disabled_create = disabled.create_folder(area.source());

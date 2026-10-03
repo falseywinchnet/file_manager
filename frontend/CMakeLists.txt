@@ -89,6 +89,7 @@ add_custom_command(
 add_library(file_manager_frontend_model STATIC
     src/checksum.cpp
     src/native_file.cpp
+    src/native_publication.cpp
     src/platform_paths.cpp
     src/filesystem_model.cpp
     src/file_operations.cpp

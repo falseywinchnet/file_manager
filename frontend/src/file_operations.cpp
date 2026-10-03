@@ -1,21 +1,13 @@
 #include "file_manager/platform_paths.hpp"
 #include "file_manager/file_operations.hpp"
 #include "native_file.hpp"
+#include "native_publication.hpp"
 
 #include <cstdlib>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
 #include <system_error>
-
-#if defined(_WIN32)
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#undef near
-#undef far
-#endif
 
 namespace file_manager {
 namespace {
@@ -66,9 +58,28 @@ std::string identity_changed_message() {
 struct CopyOutcome final {
     bool success{};
     bool cancelled{};
-    std::string code;
-    std::string message;
+    std::string code{};
+    std::string message{};
 };
+
+OperationTerminal publication_failure_terminal(const std::error_code& error) {
+    if (error == std::errc::file_exists) return OperationTerminal::conflict;
+    if (error == std::errc::cross_device_link ||
+        error == std::errc::not_supported ||
+        error == std::errc::operation_not_supported ||
+        error == std::errc::function_not_supported) return OperationTerminal::unavailable;
+    return OperationTerminal::failed;
+}
+
+std::string publication_failure_code(const std::error_code& error,
+                                     const char* fallback) {
+    if (error == std::errc::file_exists) return "destination_exists";
+    if (error == std::errc::cross_device_link) return "cross_volume_unsupported";
+    if (error == std::errc::not_supported || error == std::errc::operation_not_supported ||
+        error == std::errc::function_not_supported) return "no_replace_unsupported";
+    const std::string code{fallback};
+    return code;
+}
 
 CopyOutcome copy_node_no_follow(const std::filesystem::path& source,
                                 const std::filesystem::path& destination,
@@ -301,22 +312,6 @@ std::optional<std::string> FileOperationService::validate_basename(
     return std::nullopt;
 }
 
-bool FileOperationService::destination_exists_no_follow(
-    const std::filesystem::path& path) {
-#if defined(_WIN32)
-    if (GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES) return true;
-    const DWORD error = GetLastError();
-    // An unobservable destination is occupied for overwrite prevention.
-    const bool exists = error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND;
-    return exists;
-#else
-    std::error_code error{};
-    const std::filesystem::file_status status = std::filesystem::symlink_status(path, error);
-    const bool exists = !error && status.type() != std::filesystem::file_type::not_found;
-    return exists;
-#endif
-}
-
 std::filesystem::path FileOperationService::available_quarantine_path(
     const std::filesystem::path& source) {
     const std::string basename = path_utf8(source.filename());
@@ -325,7 +320,11 @@ std::filesystem::path FileOperationService::available_quarantine_path(
         name << "fm-q-" << std::setw(8) << std::setfill('0') << next_id_ << '-'
              << std::setw(5) << attempt << '-' << basename;
         const std::filesystem::path candidate = quarantine_root_ / path_from_utf8(name.str());
-        if (!destination_exists_no_follow(candidate)) return candidate;
+        const std::error_code vacancy = check_destination_vacant(candidate);
+        if (!vacancy) return candidate;
+        if (vacancy != std::errc::file_exists) {
+            throw std::system_error(vacancy, "cannot observe quarantine destination");
+        }
     }
     throw std::runtime_error("quarantine name space is exhausted");
 }
@@ -354,9 +353,17 @@ OperationResult FileOperationService::create_folder(
         const std::string name = suffix == 1 ? "New folder"
                                       : "New folder " + std::to_string(suffix);
         const std::filesystem::path candidate = parent / path_from_utf8(name);
-        if (!destination_exists_no_follow(candidate)) {
+        const std::error_code vacancy = check_destination_vacant(candidate);
+        if (!vacancy) {
             destination = candidate;
             break;
+        }
+        if (vacancy != std::errc::file_exists) {
+            OperationResult value = result(OperationKind::create_folder,
+                OperationTerminal::failed, "destination_unavailable", vacancy.message(),
+                parent, candidate);
+            value.operation_id = operation_id;
+            return value;
         }
     }
     if (destination.empty()) {
@@ -381,10 +388,12 @@ OperationResult FileOperationService::create_folder(
         }
     }
     if (!std::filesystem::create_directory(destination, error) || error) {
+        // create_directory reports false without an error for an existing directory.
+        if (!error) error = std::make_error_code(std::errc::file_exists);
         OperationResult value = result(OperationKind::create_folder,
-                            OperationTerminal::failed,
-                            "create_failed",
-                            error ? error.message() : "directory was not created",
+                            publication_failure_terminal(error),
+                            publication_failure_code(error, "create_failed"),
+                            error.message(),
                             parent, destination);
         value.operation_id = operation_id;
         return value;
@@ -430,21 +439,23 @@ OperationResult FileOperationService::rename_object(
         return value;
     }
     const std::filesystem::path destination = source.parent_path() / path_from_utf8(new_basename);
-    if (destination_exists_no_follow(destination)) {
+    const std::error_code vacancy = check_destination_vacant(destination);
+    if (vacancy) {
         OperationResult value = result(OperationKind::rename_object,
-                            OperationTerminal::conflict,
-                            "destination_exists",
-                            "rename never overwrites an existing destination",
+                            vacancy == std::errc::file_exists
+                                ? OperationTerminal::conflict : OperationTerminal::failed,
+                            vacancy == std::errc::file_exists
+                                ? "destination_exists" : "destination_unavailable",
+                            vacancy.message(),
                             source, destination, expected);
         value.operation_id = operation_id;
         return value;
     }
-    std::error_code error{};
-    std::filesystem::rename(source, destination, error);
+    const std::error_code error = rename_no_replace(source, destination);
     if (error) {
         OperationResult value = result(OperationKind::rename_object,
-                            OperationTerminal::failed,
-                            "rename_failed", error.message(),
+                            publication_failure_terminal(error),
+                            publication_failure_code(error, "rename_failed"), error.message(),
                             source, destination, expected);
         value.operation_id = operation_id;
         return value;
@@ -500,13 +511,11 @@ OperationResult FileOperationService::quarantine_object(
         value.operation_id = operation_id;
         return value;
     }
-    std::error_code error{};
-    std::filesystem::rename(source, destination, error);
+    const std::error_code error = rename_no_replace(source, destination);
     if (error) {
         OperationResult value = result(OperationKind::quarantine_object,
-                            OperationTerminal::failed,
-                            error == std::errc::cross_device_link
-                                ? "cross_volume_unsupported" : "quarantine_failed",
+                            publication_failure_terminal(error),
+                            publication_failure_code(error, "quarantine_failed"),
                             error.message(), source, destination, expected);
         value.operation_id = operation_id;
         return value;
@@ -575,22 +584,28 @@ OperationResult FileOperationService::copy_object(
         return value;
     }
     const std::filesystem::path destination = destination_parent / source.filename();
-    if (destination_exists_no_follow(destination)) {
+    const std::error_code vacancy = check_destination_vacant(destination);
+    if (vacancy) {
         OperationResult value = result(OperationKind::copy_object,
-                            OperationTerminal::conflict,
-                            "destination_exists",
-                            "copy never overwrites an existing destination",
+                            vacancy == std::errc::file_exists
+                                ? OperationTerminal::conflict : OperationTerminal::failed,
+                            vacancy == std::errc::file_exists
+                                ? "destination_exists" : "destination_unavailable",
+                            vacancy.message(),
                             source, destination, expected);
         value.operation_id = operation_id;
         return value;
     }
     const std::filesystem::path stage = destination_parent /
         (".fm-stage-" + operation_id + '-' + path_utf8(source.filename()));
-    if (destination_exists_no_follow(stage)) {
+    const std::error_code stage_vacancy = check_destination_vacant(stage);
+    if (stage_vacancy) {
         OperationResult value = result(OperationKind::copy_object,
-                            OperationTerminal::conflict,
-                            "stage_exists",
-                            "the exact copy stage already exists",
+                            stage_vacancy == std::errc::file_exists
+                                ? OperationTerminal::conflict : OperationTerminal::failed,
+                            stage_vacancy == std::errc::file_exists
+                                ? "stage_exists" : "stage_unavailable",
+                            stage_vacancy.message(),
                             source, stage, expected);
         value.operation_id = operation_id;
         return value;
@@ -645,14 +660,14 @@ OperationResult FileOperationService::copy_object(
             return value;
         }
     }
-    std::error_code error{};
-    std::filesystem::rename(stage, destination, error);
+    const std::error_code error = rename_no_replace(stage, destination);
     if (error) {
         const bool cleaned = cleanup_stage(stage, stage_identity);
+        std::filesystem::path reported_path = cleaned ? destination : stage;
         OperationResult value = result(OperationKind::copy_object,
-                            OperationTerminal::failed,
-                            "publication_failed", error.message(),
-                            source, stage, expected);
+                            publication_failure_terminal(error),
+                            publication_failure_code(error, "publication_failed"), error.message(),
+                            source, std::move(reported_path), expected);
         value.operation_id = operation_id;
         value.recoverable_object_retained = !cleaned;
         return value;
@@ -718,11 +733,14 @@ OperationResult FileOperationService::move_object(
         value.operation_id = operation_id;
         return value;
     }
-    if (destination_exists_no_follow(destination)) {
+    const std::error_code vacancy = check_destination_vacant(destination);
+    if (vacancy) {
         OperationResult value = result(OperationKind::move_object,
-                            OperationTerminal::conflict,
-                            "destination_exists",
-                            "move never overwrites an existing destination",
+                            vacancy == std::errc::file_exists
+                                ? OperationTerminal::conflict : OperationTerminal::failed,
+                            vacancy == std::errc::file_exists
+                                ? "destination_exists" : "destination_unavailable",
+                            vacancy.message(),
                             source, destination, expected);
         value.operation_id = operation_id;
         return value;
@@ -754,11 +772,11 @@ OperationResult FileOperationService::move_object(
             return value;
         }
     }
-    std::filesystem::rename(source, destination, error);
+    error = rename_no_replace(source, destination);
     if (error) {
         OperationResult value = result(OperationKind::move_object,
-                            OperationTerminal::failed,
-                            "move_failed", error.message(),
+                            publication_failure_terminal(error),
+                            publication_failure_code(error, "move_failed"), error.message(),
                             source, destination, expected);
         value.operation_id = operation_id;
         return value;
@@ -830,10 +848,14 @@ OperationResult FileOperationService::undo_last() {
         value.operation_id = operation_id;
         return value;
     }
-    if (destination_exists_no_follow(record.original_path)) {
-        OperationResult value = result(OperationKind::undo, OperationTerminal::conflict,
-                            "destination_exists",
-                            "undo never overwrites an occupied original path",
+    const std::error_code vacancy = check_destination_vacant(record.original_path);
+    if (vacancy) {
+        OperationResult value = result(OperationKind::undo,
+                            vacancy == std::errc::file_exists
+                                ? OperationTerminal::conflict : OperationTerminal::failed,
+                            vacancy == std::errc::file_exists
+                                ? "destination_exists" : "destination_unavailable",
+                            vacancy.message(),
                             record.current_path, record.original_path,
                             record.identity);
         value.operation_id = operation_id;
@@ -847,10 +869,10 @@ OperationResult FileOperationService::undo_last() {
         value.operation_id = operation_id;
         return value;
     }
-    std::filesystem::rename(record.current_path, record.original_path, error);
+    error = rename_no_replace(record.current_path, record.original_path);
     if (error) {
-        OperationResult value = result(OperationKind::undo, OperationTerminal::failed,
-                            "undo_rename_failed", error.message(),
+        OperationResult value = result(OperationKind::undo, publication_failure_terminal(error),
+                            publication_failure_code(error, "undo_rename_failed"), error.message(),
                             record.current_path, record.original_path,
                             record.identity);
         value.operation_id = operation_id;
