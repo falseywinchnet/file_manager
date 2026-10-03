@@ -72,7 +72,53 @@ and path publication are separate operations; parent rechecks are not an atomic
 snapshot or complete concurrent-substitution guarantee. Undo remains one step,
 in memory, and ends when the app exits.
 
-## Source review
+## Native rejection and repair follow-up
+
+**REJECTED checkpoint `922e0fc`:** both macOS native runs failed while Linux
+passed. The retained `MacRejected922e0fcLastTest.log` comes from push run
+`37110019348`, job `111165956703`; the PR run `37110027712` reproduced the same
+two failures. Frontend passed 14 of 16 tests. The failures are retained rather
+than treating a successful build as native acceptance.
+
+- The ordinary interaction fixture tried to navigate from its generated
+  `Documents` launch directory to its temporary parent. macOS admits Home,
+  `/Volumes` and the launch directory, so that parent was not admitted. The
+  test probe now explicitly admits the generated second location before window
+  creation and verifies that it is outside the unchanged launch root. Product
+  navigation and file-operation authority are unchanged. The sibling rebuilt
+  and ran the Windows interaction suite successfully (3.18 s).
+- The real macOS window completed text/PNG/unsupported previews, Details sort,
+  New Folder and its Undo, then failed F2 basename Rename. Source tracing found
+  that explicit semantic item actions retained Details' internal header focus
+  after F6/sort. The header consumed F2 despite the object control being focused.
+  The focused regression exercises select, focus, press and show-menu actions
+  after header focus; each must publish focused item semantics and leave F2
+  available to the application. The original native test remains unchanged in
+  its acceptance assertions, with separate focus/key/editor diagnostics added.
+
+**MEASURED local regression:** before the control correction, the new collection
+test failed with `semantic item action must retire internal header focus`.
+`WindowsRejectedSemanticFocusLastTest.log` preserves that result. After the
+correction, collection controls and the Details allocation-failure suite passed
+(0.31 s and 0.12 s respectively) in `.build/prepared-window-input`, Windows
+MinGW GCC 16.2.0 Release, one compiler job. `WindowsSemanticFocusLastTest.log`
+preserves the rerun. These are correctness durations, not latency measurements.
+
+**House-style review:** root reviewed the complete added navigation probe,
+setup and outside-root assertion; native failure diagnostics; internal focus
+reset; and named four-action regression against the complete programming house
+style. Types and state are explicit, the focus state is committed before focus
+notification, no new callback or retained borrow is introduced, and the four
+semantic snapshots have local owners. The control correction adds no item loop,
+allocation or model replacement. No remaining violation was identified in this
+authored scope. The separate spelling scan reports four files, zero candidates;
+it does not certify unchanged code. `focus-repair-source-sha256.json` identifies
+the reviewed source with LF-normalized UTF-8 hashes; the original receipt remains
+historical evidence.
+
+Native rerun remains pending. No packaged release is promoted by these changes.
+
+## Original checkpoint source review
 
 Root independently reviewed all authored hunks in the eight sibling-owned files:
 `file_operations.hpp`, `file_operations.cpp`, `application.hpp`,

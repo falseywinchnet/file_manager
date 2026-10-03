@@ -1,0 +1,48 @@
+Start testing: Oct 03 01:51 Pacific Daylight Time
+----------------------------------------------------------
+41/74 Testing: gui_forms_collection_controls_tests
+41/74 Test: gui_forms_collection_controls_tests
+Command: "C:/Users/Shadow/file_manager/.build/prepared-window-input/gui_forms_collection_controls_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/prepared-window-input
+"gui_forms_collection_controls_tests" start time: Oct 03 01:51 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+Details fractional row: handled=1 top=1 selected=detail.2 height=102
+Details fixture rows=1000 visited_rows=6 cells=12 prepared=14
+Details fixture rows=100000 visited_rows=6 cells=12 prepared=14
+Details cold bytes=65536 nonmonotonic=0 queries=21 measured_bytes=131152
+Details cold bytes=65536 nonmonotonic=1 queries=21 measured_bytes=131144
+gui_forms_collection_controls_tests: all tests passed
+<end of output>
+Test time =   0.31 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_collection_controls_tests" end time: Oct 03 01:51 Pacific Daylight Time
+"gui_forms_collection_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+42/74 Testing: gui_forms_object_details_failure_tests
+42/74 Test: gui_forms_object_details_failure_tests
+Command: "C:/Users/Shadow/file_manager/.build/prepared-window-input/gui_forms_object_details_failure_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/prepared-window-input
+"gui_forms_object_details_failure_tests" start time: Oct 03 01:51 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+Details allocation operation=0 capture=0 sites=62 old_failures=52 new_failures=10
+Details allocation operation=0 capture=1 sites=63 old_failures=52 new_failures=11
+Details allocation operation=4 capture=0 sites=62 old_failures=52 new_failures=10
+Details allocation operation=4 capture=1 sites=63 old_failures=52 new_failures=11
+Details allocation operation=1 capture=0 sites=28 old_failures=18 new_failures=10
+Details allocation operation=1 capture=1 sites=28 old_failures=18 new_failures=10
+Details allocation operation=2 capture=0 sites=92 old_failures=72 new_failures=20
+Details allocation operation=3 capture=0 sites=11 old_failures=5 new_failures=6
+gui_forms_object_details_failure_tests: all tests passed
+<end of output>
+Test time =   0.12 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_object_details_failure_tests" end time: Oct 03 01:51 Pacific Daylight Time
+"gui_forms_object_details_failure_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 01:51 Pacific Daylight Time

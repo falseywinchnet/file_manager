@@ -1512,6 +1512,39 @@ void test_details_keyboard_sort_with_pending_layout() {
             "pending layout must resolve before keyboard sort captures its context revision");
 }
 
+void test_details_semantic_item_returns_keyboard_to_body() {
+    const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.semantic-focus"));
+    ObjectView& view = *owner;
+    view.set_requested_bounds({0.0, 0.0, 400.0, 190.0});
+    view.set_view_mode(ObjectViewMode::details);
+    view.set_details_model(details_test_columns(), details_test_items(3U));
+    Window window(owner, {400.0, 190.0});
+    window.flush();
+    const bool focused = window.request_focus(owner);
+    require(focused, "Details fixture must receive keyboard focus");
+    const std::array<SemanticAction, 4U> actions{
+        SemanticAction::select, SemanticAction::focus,
+        SemanticAction::press, SemanticAction::show_menu};
+    for (const SemanticAction action : actions) {
+        const bool header = window.dispatch_key({KeyAction::down, PhysicalKey::f6});
+        require(header, "F6 must enter the Details header before each semantic item action");
+        const bool selected = window.perform_semantic_action("detail.1", action);
+        require(selected && view.focused_id() == "detail.1",
+            "semantic item action must focus the addressed row");
+        const std::vector<SemanticNode> nodes = view.semantic_virtual_children();
+        bool row_focused = false;
+        for (const SemanticNode& node : nodes) {
+            if (node.stable_id == "detail.1") {
+                row_focused = has_semantic_state(node.states, SemanticState::focused);
+                break;
+            }
+        }
+        require(row_focused, "semantic item action must retire internal header focus");
+        const bool consumed = window.dispatch_key({KeyAction::down, PhysicalKey::f2});
+        require(!consumed, "item-focused Details must leave F2 available to the application accelerator");
+    }
+}
+
 void test_details_header_input_resize_and_cache() {
     const std::shared_ptr<ObjectView> owner = make_control<ObjectView>(StableId("details.input"));
     ObjectView& view = *owner;
@@ -1713,6 +1746,7 @@ int main() {
         test_details_mode_release_reentrancy();
         test_details_sort_retires_capture();
         test_details_keyboard_sort_with_pending_layout();
+        test_details_semantic_item_returns_keyboard_to_body();
         test_details_scroll_fills_available_page();
         test_details_header_input_resize_and_cache();
         test_details_bounded_work();

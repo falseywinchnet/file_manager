@@ -34,6 +34,11 @@ class ApplicationInteractionProbe final {
     static void navigate(Application& application, const std::filesystem::path& path) {
         application.request_navigation(path, true);
     }
+    static void admit_fixture_navigation_root(Application& application,
+                                               const std::filesystem::path& path) {
+        const std::filesystem::path root = canonical_existing_directory(path);
+        application.navigation_roots_.push_back(root);
+    }
     static void attempt_protected_commands(Application& application) {
         application.capture_transfer(false);
         application.capture_transfer(true);
@@ -4530,6 +4535,10 @@ void test_ordinary_local_actions_outside_launch_root() {
         std::make_shared<file_manager::Application>(launch, std::nullopt,
             file_manager::OperationPolicy::ordinary_local, std::string{});
     ApplicationStopGuard guard{*application};
+    // macOS admits Home, /Volumes and the launch location, not every temporary
+    // directory. Admit this generated second location through the test probe;
+    // keep the launch root unchanged so ordinary actions must work beyond it.
+    file_manager::ApplicationInteractionProbe::admit_fixture_navigation_root(*application, fixture.root());
     const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
     (*application).bind_host(host_noop, host_noop);
     (*window).perform_layout();
@@ -4551,6 +4560,9 @@ void test_ordinary_local_actions_outside_launch_root() {
     };
     require_eventually(*application, NamedEntryReady{*objects, "root.txt", true},
         "ordinary navigation must leave launch root and enumerate repository contents");
+    const std::filesystem::path displayed = file_manager::ApplicationInteractionProbe::location(*application);
+    require(displayed == fixture.root() && !file_manager::path_is_within(launch, displayed),
+        "ordinary fixture must display the admitted location outside its launch root");
     const std::shared_ptr<gui_forms::Command> create =
         file_manager::ApplicationInteractionProbe::command(*application, "file.new-folder");
     const std::shared_ptr<gui_forms::Command> undo =

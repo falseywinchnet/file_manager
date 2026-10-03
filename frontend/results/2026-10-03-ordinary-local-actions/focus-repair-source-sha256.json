@@ -1,0 +1,9 @@
+{
+  "encoding": "UTF-8 without BOM, normalized LF",
+  "sha256": {
+    "frontend/tests/application_interaction_tests.cpp": "65e08b915def56c940351abceb1b5099a780f25248d0d87aeb4eeb718ba6b36a",
+    "frontend/tests/macos_preview_tests.mm": "d265472e341fe7922f34d8fe34e65f18eee1590b12467010aec32af9c44bb5c3",
+    "gui_forms/src/controls/panel/object_view/object_view.cpp": "d98510f03e77277dadc816cb97f87d8a63413db1ef3ff92f4cb8d67ef8f168e7",
+    "gui_forms/tests/collection_controls_tests.cpp": "606f2c05648844f3105d477a6a12cc67d103567178b2c5b7276bd95d2e3c9431"
+  }
+}
