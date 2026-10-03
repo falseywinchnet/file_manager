@@ -149,6 +149,12 @@ bool test_native_publication(const std::filesystem::path& root) {
     const std::filesystem::path link_target_path = parent / "absent-link-target";
     if (create_fixture_link(link_target_path, link, false)) {
         const file_manager::ObjectIdentity link_identity = file_manager::observe_identity(link);
+        // The native reader preserves Windows extended-namespace spelling.
+        // Compare the stored target across the move, not with its input spelling.
+        const std::filesystem::path stored_link_target = link_target(link);
+        if (!require(link_identity.available() &&
+            link_identity.type == std::filesystem::file_type::symlink,
+            "the source link fixture must have an observable leaf identity")) return false;
         const std::error_code link_occupied = file_manager::check_destination_vacant(link);
         const std::error_code link_refusal = file_manager::rename_no_replace(vacant, link);
         if (!require(link_occupied == std::errc::file_exists && static_cast<bool>(link_refusal) &&
@@ -157,9 +163,18 @@ bool test_native_publication(const std::filesystem::path& root) {
             "a dangling destination link must remain occupied and untouched")) return false;
         const std::filesystem::path moved_link = parent / "moved-link";
         const std::error_code link_move = file_manager::rename_no_replace(link, moved_link);
-        if (!require(!link_move && file_manager::observe_identity(moved_link) == link_identity &&
-            link_target(moved_link) == link_target_path && !std::filesystem::exists(link_target_path),
-            "publishing a source symlink must move the leaf without touching its target")) return false;
+        if (link_move) {
+            std::cerr << "source symlink publication failed: " << link_move.message() << '\n';
+            return false;
+        }
+        if (!require(file_manager::observe_identity(moved_link) == link_identity,
+            "publishing a source symlink must retain its leaf identity")) return false;
+        const std::filesystem::path moved_link_target = link_target(moved_link);
+        if (!require(moved_link_target == stored_link_target,
+            "publishing a source symlink must preserve its stored target")) return false;
+        const std::error_code old_link_status = file_manager::check_destination_vacant(link);
+        if (!require(!old_link_status && !std::filesystem::exists(link_target_path),
+            "source link publication must vacate the old name and leave its target absent")) return false;
     }
     return true;
 }

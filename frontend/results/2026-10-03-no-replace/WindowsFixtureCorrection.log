@@ -1,0 +1,24 @@
+Start testing: Oct 02 22:09 Pacific Daylight Time
+----------------------------------------------------------
+3/13 Testing: file_manager_file_operations_tests
+3/13 Test: file_manager_file_operations_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_file_operations_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_file_operations_tests" start time: Oct 02 22:09 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+<end of output>
+Test time =   0.19 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_file_operations_tests" end time: Oct 02 22:09 Pacific Daylight Time
+"file_manager_file_operations_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 02 22:09 Pacific Daylight Time
