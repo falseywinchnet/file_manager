@@ -195,6 +195,8 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
 endif()
 
 if(GUI_FORMS_BUILD_PREPARED_TEXT)
+    target_sources(gui_forms_core PRIVATE
+        src/core/text/prepared_window/prepared_window_input.cpp)
     if(NOT TARGET gui_forms_text_engine)
         message(FATAL_ERROR "GUI_FORMS_BUILD_PREPARED_TEXT requires GUI_FORMS_ENABLE_HARFBUZZ_TEXT")
     endif()
@@ -1636,6 +1638,9 @@ if(GUI_FORMS_BUILD_TESTS)
         set_tests_properties(gui_forms_text_mask_lifecycle_tests PROPERTIES TIMEOUT 30)
     endif()
     if(TARGET gui_forms_prepared_text)
+        add_executable(gui_forms_prepared_window_input_tests tests/prepared_window_input_tests.cpp)
+        target_link_libraries(gui_forms_prepared_window_input_tests PRIVATE gui_forms_core)
+        add_test(NAME gui_forms_prepared_window_input_tests COMMAND gui_forms_prepared_window_input_tests)
         add_executable(gui_forms_prepared_text_service_tests tests/prepared_text_service_tests.cpp)
         target_link_libraries(gui_forms_prepared_text_service_tests PRIVATE gui_forms_prepared_text)
         add_test(NAME gui_forms_prepared_text_service_tests
