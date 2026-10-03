@@ -1,0 +1,272 @@
+Start testing: Oct 03 09:22 UTC
+----------------------------------------------------------
+1/16 Testing: file_manager_frontend_model_tests
+1/16 Test: file_manager_frontend_model_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/file_manager_frontend_model_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend
+"file_manager_frontend_model_tests" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+Signed pre-epoch calendar: 1969-12-31 23:59
+Metadata link fixtures run=2 skipped=0
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_frontend_model_tests" end time: Oct 03 09:22 UTC
+"file_manager_frontend_model_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/16 Testing: file_manager_file_operations_tests
+2/16 Test: file_manager_file_operations_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/file_manager_file_operations_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend
+"file_manager_file_operations_tests" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.08 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_file_operations_tests" end time: Oct 03 09:22 UTC
+"file_manager_file_operations_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/16 Testing: file_manager_native_copy_tests
+3/16 Test: file_manager_native_copy_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/file_manager_native_copy_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend
+"file_manager_native_copy_tests" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+owned_temp=/private/var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/file-manager-native-copy-3326994492
+PASS empty/small/multichunk; contents and identities
+PASS existing destination preserved; no ownership
+PASS before-create cancellation; post-write cancellation and callback exception
+PASS source revision mismatch before creation
+PASS ordinary and read-only permissions
+PASS metadata equivalence org.filemanager.native-copy present=0
+PASS metadata equivalence com.apple.quarantine present=1
+owned_cleanup=verified and removed
+PASS native copy fixtures; workspace reused
+<end of output>
+Test time =   0.07 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_native_copy_tests" end time: Oct 03 09:22 UTC
+"file_manager_native_copy_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/16 Testing: file_manager_internal_drag_tests
+4/16 Test: file_manager_internal_drag_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/file_manager_internal_drag_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend
+"file_manager_internal_drag_tests" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+internal drag tests passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_internal_drag_tests" end time: Oct 03 09:22 UTC
+"file_manager_internal_drag_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/16 Testing: file_manager_checksum_tests
+5/16 Test: file_manager_checksum_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/file_manager_checksum_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend
+"file_manager_checksum_tests" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+checksum tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_checksum_tests" end time: Oct 03 09:22 UTC
+"file_manager_checksum_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/16 Testing: file_manager_platform_commands_tests
+6/16 Test: file_manager_platform_commands_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/file_manager_platform_commands_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend
+"file_manager_platform_commands_tests" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+platform command tests passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_platform_commands_tests" end time: Oct 03 09:22 UTC
+"file_manager_platform_commands_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/16 Testing: file_manager_preview_tests
+7/16 Test: file_manager_preview_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/file_manager_preview_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend
+"file_manager_preview_tests" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+preview tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_preview_tests" end time: Oct 03 09:22 UTC
+"file_manager_preview_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+8/16 Testing: file_manager_document_picker_tests
+8/16 Test: file_manager_document_picker_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/file_manager_document_picker_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend
+"file_manager_document_picker_tests" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+document picker tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_document_picker_tests" end time: Oct 03 09:22 UTC
+"file_manager_document_picker_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+9/16 Testing: file_manager_document_picker_view_tests
+9/16 Test: file_manager_document_picker_view_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/file_manager_document_picker_view_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend
+"file_manager_document_picker_view_tests" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+document picker view tests passed
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_document_picker_view_tests" end time: Oct 03 09:22 UTC
+"file_manager_document_picker_view_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+10/16 Testing: file_manager_house_art_tests
+10/16 Test: file_manager_house_art_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/file_manager_house_art_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend
+"file_manager_house_art_tests" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_house_art_tests" end time: Oct 03 09:22 UTC
+"file_manager_house_art_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+11/16 Testing: file_manager_object_order_tests
+11/16 Test: file_manager_object_order_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/file_manager_object_order_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend
+"file_manager_object_order_tests" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_object_order_tests" end time: Oct 03 09:22 UTC
+"file_manager_object_order_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+12/16 Testing: file_manager_application_interaction_tests
+12/16 Test: file_manager_application_interaction_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/file_manager_application_interaction_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend
+"file_manager_application_interaction_tests" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+file manager application interaction tests passed
+<end of output>
+Test time =   1.47 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_application_interaction_tests" end time: Oct 03 09:22 UTC
+"file_manager_application_interaction_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+13/16 Testing: file_manager_application_transfer_tests
+13/16 Test: file_manager_application_transfer_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/file_manager_application_transfer_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend
+"file_manager_application_transfer_tests" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+Application transfer and new-folder tests passed
+<end of output>
+Test time =   0.58 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_application_transfer_tests" end time: Oct 03 09:22 UTC
+"file_manager_application_transfer_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+14/16 Testing: file_manager_macos_preview_tests
+14/16 Test: file_manager_macos_preview_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/file_manager_macos_preview_tests.app/Contents/MacOS/file_manager_macos_preview_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend
+"file_manager_macos_preview_tests" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+macOS TXT coverage: caption_pixels=235 outside_body=passed
+macOS TXT preview: readable_pixels=1078
+macOS PNG preview: matching_pixels=12544
+macOS unsupported explanation: readable_pixels=1291
+macOS Details: name_header_pixels=24 columns=4 synthetic_header_sort=passed selection=preserved
+macOS ordinary local actions: menu_create=passed create_undo=passed F2_basename_rename=passed rename_undo=passed inspector_names=passed protected_commands=unavailable quarantine=absent delivery=synthetic_native_window
+{"window":{"control_count":142,"stable_id_count":142,"mutations":499,"dirty_marks":503,"measure_passes":29,"arrange_passes":29,"paint_passes":25,"controls_measured":511,"controls_arranged":521,"controls_painted":1364,"measure_nodes_visited":594,"arrange_nodes_visited":525,"paint_nodes_visited":5586,"paint_invalidations_consumed":226,"display_chunks_rebuilt":226,"display_chunks_reused":1138,"display_commands_replayed":8943,"display_cache_entries":68,"display_generation":226,"requested_damage_area":5.53691e+07,"painted_damage_area":1.45582e+07,"full_window_paints":17,"partial_paints":8,"input_events":6,"focus_transitions":19,"focus_scopes_opened":3,"focus_scopes_closed":3,"focus_scope_restorations":3,"focus_scope_rejections":0,"focus_scope_depth":0,"maximum_focus_scope_depth":1,"activations":0,"disposals":0,"rejected_wrong_thread_operations":0,"subscriptions_connected":0,"subscriptions_disconnected":0,"callbacks_emitted":88,"focus_revocations":2,"capture_revocations":0,"press_revocations":0,"undeclared_mutations":0,"damage_region_compactions":1780,"damage_region_collapses":0,"maximum_damage_rectangles":9,"update_scopes_started":1,"update_scope_depth":0,"maximum_update_scope_depth":1,"flush_count":27,"read_barrier_flushes":27,"bounded_pass_limit_hits":0,"callback_arbitration_retries":0,"callback_arbitration_limit_hits":0,"scheduled_frame_requests":3,"scheduler_wakes":0,"frame_deadlines_fired":0,"active_surface_ticks":0,"frame_requests_coalesced":0,"frame_callback_faults":0,"reentrant_frame_polls_deferred":0,"active_surface_count":0,"maximum_active_surface_count":0,"occlusion_suspensions":1,"occlusion_resumes":1,"occluded_frame_polls":5,"frames_presented":18,"present_duration_nanoseconds":361750333,"worst_present_duration_nanoseconds":59382125,"renderer_name":"Skia CPU m152 · HarfBuzz 14.2.1 · FreeType 2.14.2 · bundled fonts (optional Unicode fallback)","cpu_only":true},"host":{"session":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"phase":"closed","last_sequence":10,"events_accepted":9,"events_rejected":2,"callback_faults":0,"close_requests":1,"close_cancellations":0,"display_changes":2,"monitor_count":1,"modal_transitions":0,"modal_input_suppressions":0,"drag_events":0,"drag_drops":0,"modal_depth":0,"attached":false,"active":false,"occluded":false,"closed":true,"shutdown":false},"services":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"cursor":"arrow","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":2,"cursor_updates":0,"pointer_capture_updates":0,"clipboard_reads":0,"clipboard_writes":0,"clipboard_generation":0,"dialog_requests":0,"dialog_completions":0,"dialog_cancellations":0,"sound_requests":0,"sound_playbacks":0,"sound_coalesced":0,"sound_muted":0,"sound_coalescing_window_nanoseconds":50000000,"modal_depth":0,"maximum_modal_depth":0,"rejected_requests":0,"shutdown":false},"titlebar_presentation":"transparent_full_size_content","native_full_size_content":true,"native_title_hidden":true,"native_titlebar_transparent":true,"native_close_button_present":true,"native_minimize_button_present":true,"native_zoom_button_present":true,"native_system_title_present":true,"window_drag_region_configured":false,"window_drag_region_resolved":false,"window_drag_region_count":0,"window_drag_region_resolved_count":0,"initial_host_occluded":true,"host_occluded":false,"scheduled_wake_count":0,"damage_collection_count":48,"native_draw_count":26,"display_tick_count":0,"paint_raster_prepare_calls":26,"paint_raster_prepare_nanoseconds":12602752,"paint_raster_prepare_maximum_nanoseconds":12171000,"paint_raster_prepare_saturated":false,"paint_retained_calls":26,"paint_retained_nanoseconds":443989958,"paint_retained_maximum_nanoseconds":59249291,"paint_retained_saturated":false,"paint_raster_finish_calls":26,"paint_raster_finish_nanoseconds":17249,"paint_raster_finish_maximum_nanoseconds":2292,"paint_raster_finish_saturated":false,"paint_cg_setup_calls":25,"paint_cg_setup_nanoseconds":438082,"paint_cg_setup_maximum_nanoseconds":42125,"paint_cg_setup_saturated":false,"paint_cg_draw_calls":25,"paint_cg_draw_nanoseconds":57356544,"paint_cg_draw_maximum_nanoseconds":11353833,"paint_cg_draw_saturated":false,"paint_cg_release_calls":25,"paint_cg_release_nanoseconds":77541,"paint_cg_release_maximum_nanoseconds":5458,"paint_cg_release_saturated":false,"last_native_dirty_area":533504.000000,"last_frame_damage_bounds_area":537600.000000,"last_cg_destination_area":690176.000000,"last_cg_clip_bounds_area":533504.000000,"last_cg_source_bytes":2760704,"native_callback_faults":0}}
+<end of output>
+Test time =   3.74 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_macos_preview_tests" end time: Oct 03 09:22 UTC
+"file_manager_macos_preview_tests" time elapsed: 00:00:03
+----------------------------------------------------------
+
+15/16 Testing: file_manager_dogfood_launcher_tests
+15/16 Test: file_manager_dogfood_launcher_tests
+Command: "/bin/sh" "/Users/runner/work/file_manager/file_manager/frontend/tests/dogfood_launcher_tests.sh" "/Users/runner/work/file_manager/file_manager/frontend"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend
+"file_manager_dogfood_launcher_tests" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+/var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T//file-manager-launcher-tests.AubWQQ/home/Developer/CodexRuns/file-manager-test.app: replacing existing signature
+file manager dogfood launcher tests passed
+<end of output>
+Test time =   1.01 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_dogfood_launcher_tests" end time: Oct 03 09:22 UTC
+"file_manager_dogfood_launcher_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+16/16 Testing: orchestrator-cpp-search-checks
+16/16 Test: orchestrator-cpp-search-checks
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/orchestrator-cpp-client/orchestrator-cpp-search-checks"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/frontend/orchestrator-cpp-client
+"orchestrator-cpp-search-checks" start time: Oct 03 09:22 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"orchestrator-cpp-search-checks" end time: Oct 03 09:22 UTC
+"orchestrator-cpp-search-checks" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 09:22 UTC

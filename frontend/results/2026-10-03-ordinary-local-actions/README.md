@@ -165,8 +165,10 @@ The focused Windows rerun passed interaction and transfer suites (3.16 s and
 1.35 s) using MinGW GCC 16.2.0 Release with at most two compiler jobs. These are
 correctness durations, not latency measurements. `WindowsInspectorLastTest.log`
 records the run; `inspector-repair-source-sha256.json` identifies reviewed source.
-Native Windows/macOS/Linux rerun and new Mac screenshot review remain pending.
-These checks do not establish physical-input or packaged-entry-point acceptance.
+Native Windows/macOS/Linux reruns and both new Mac screenshot reviews passed
+at `fc6312c`; the portable alpha was published. See `DELIVERY.md` for the exact
+source/merge trees, archives and verification. These checks do not establish
+physical-input or full packaged-entry-point workflow acceptance.
 
 ## Original checkpoint source review
 
