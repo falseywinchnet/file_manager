@@ -1,0 +1,1730 @@
+[
+  {
+    "pair": 0,
+    "arm": "same_binary",
+    "control": "Path",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2028.2,
+      "allocated_bytes": 18242248,
+      "mallocs": 500020
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2127.2,
+      "allocated_bytes": 18242760,
+      "mallocs": 500028
+    },
+    "percent_change": 4.881175426486539
+  },
+  {
+    "pair": 0,
+    "arm": "same_binary",
+    "control": "Name",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 45247.2,
+      "allocated_bytes": 96751504,
+      "mallocs": 1060157
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 48011.8,
+      "allocated_bytes": 96748304,
+      "mallocs": 1060123
+    },
+    "percent_change": 6.109991336480514
+  },
+  {
+    "pair": 0,
+    "arm": "same_binary",
+    "control": "Pipeline",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 58091.7,
+      "allocated_bytes": 130914792,
+      "mallocs": 1141054
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 56541.6,
+      "allocated_bytes": 130911136,
+      "mallocs": 1141026
+    },
+    "percent_change": -2.668367425983398
+  },
+  {
+    "pair": 0,
+    "arm": "candidate",
+    "control": "Path",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2054.5,
+      "allocated_bytes": 18242512,
+      "mallocs": 500023
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2075.6,
+      "allocated_bytes": 18242808,
+      "mallocs": 500028
+    },
+    "percent_change": 1.0270138719883137
+  },
+  {
+    "pair": 0,
+    "arm": "candidate",
+    "control": "Name",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 47916.1,
+      "allocated_bytes": 96750464,
+      "mallocs": 1060143
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 44804.8,
+      "allocated_bytes": 96748928,
+      "mallocs": 1060119
+    },
+    "percent_change": -6.493224615525883
+  },
+  {
+    "pair": 0,
+    "arm": "candidate",
+    "control": "Pipeline",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 59459.6,
+      "allocated_bytes": 130884800,
+      "mallocs": 1140816
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 56426.0,
+      "allocated_bytes": 130891552,
+      "mallocs": 1140869
+    },
+    "percent_change": -5.101951577205366
+  },
+  {
+    "pair": 1,
+    "arm": "candidate",
+    "control": "Path",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2029.1,
+      "allocated_bytes": 18248040,
+      "mallocs": 500037
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2102.8,
+      "allocated_bytes": 18242496,
+      "mallocs": 500025
+    },
+    "percent_change": 3.632152185698101
+  },
+  {
+    "pair": 1,
+    "arm": "candidate",
+    "control": "Name",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 46914.4,
+      "allocated_bytes": 96747080,
+      "mallocs": 1060105
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 43094.9,
+      "allocated_bytes": 96747376,
+      "mallocs": 1060099
+    },
+    "percent_change": -8.141423528809922
+  },
+  {
+    "pair": 1,
+    "arm": "candidate",
+    "control": "Pipeline",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 55999.7,
+      "allocated_bytes": 130904928,
+      "mallocs": 1140971
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 59652.6,
+      "allocated_bytes": 130888000,
+      "mallocs": 1140839
+    },
+    "percent_change": 6.523070659307106
+  },
+  {
+    "pair": 1,
+    "arm": "same_binary",
+    "control": "Path",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2056.7,
+      "allocated_bytes": 18242792,
+      "mallocs": 500025
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2086.2,
+      "allocated_bytes": 18243056,
+      "mallocs": 500032
+    },
+    "percent_change": 1.4343365585646861
+  },
+  {
+    "pair": 1,
+    "arm": "same_binary",
+    "control": "Name",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 46292.8,
+      "allocated_bytes": 96750120,
+      "mallocs": 1060134
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 43743.8,
+      "allocated_bytes": 96750336,
+      "mallocs": 1060142
+    },
+    "percent_change": -5.506255832440465
+  },
+  {
+    "pair": 1,
+    "arm": "same_binary",
+    "control": "Pipeline",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 60709.8,
+      "allocated_bytes": 130883056,
+      "mallocs": 1140804
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 58536.4,
+      "allocated_bytes": 130898896,
+      "mallocs": 1140927
+    },
+    "percent_change": -3.579982144563154
+  },
+  {
+    "pair": 2,
+    "arm": "same_binary",
+    "control": "Path",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2104.4,
+      "allocated_bytes": 18243040,
+      "mallocs": 500029
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2012.7,
+      "allocated_bytes": 18242248,
+      "mallocs": 500020
+    },
+    "percent_change": -4.357536590001898
+  },
+  {
+    "pair": 2,
+    "arm": "same_binary",
+    "control": "Name",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 45769.8,
+      "allocated_bytes": 96750712,
+      "mallocs": 1060140
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 46986.8,
+      "allocated_bytes": 96754256,
+      "mallocs": 1060133
+    },
+    "percent_change": 2.6589585272384753
+  },
+  {
+    "pair": 2,
+    "arm": "same_binary",
+    "control": "Pipeline",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 57406.0,
+      "allocated_bytes": 130877808,
+      "mallocs": 1140757
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 63920.9,
+      "allocated_bytes": 130867736,
+      "mallocs": 1140680
+    },
+    "percent_change": 11.348813712852323
+  },
+  {
+    "pair": 2,
+    "arm": "candidate",
+    "control": "Path",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2075.4,
+      "allocated_bytes": 18242912,
+      "mallocs": 500028
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2157.4,
+      "allocated_bytes": 18242400,
+      "mallocs": 500022
+    },
+    "percent_change": 3.9510455815746415
+  },
+  {
+    "pair": 2,
+    "arm": "candidate",
+    "control": "Name",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 49129.5,
+      "allocated_bytes": 96749904,
+      "mallocs": 1060137
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 47675.9,
+      "allocated_bytes": 96749912,
+      "mallocs": 1060133
+    },
+    "percent_change": -2.95871116131855
+  },
+  {
+    "pair": 2,
+    "arm": "candidate",
+    "control": "Pipeline",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 56752.8,
+      "allocated_bytes": 130875760,
+      "mallocs": 1140740
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 58911.3,
+      "allocated_bytes": 130884216,
+      "mallocs": 1140811
+    },
+    "percent_change": 3.8033365754641224
+  },
+  {
+    "pair": 3,
+    "arm": "candidate",
+    "control": "Path",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2182.1,
+      "allocated_bytes": 18242416,
+      "mallocs": 500022
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2223.4,
+      "allocated_bytes": 18242664,
+      "mallocs": 500026
+    },
+    "percent_change": 1.8926721965079496
+  },
+  {
+    "pair": 3,
+    "arm": "candidate",
+    "control": "Name",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 51625.3,
+      "allocated_bytes": 96749856,
+      "mallocs": 1060138
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 45136.3,
+      "allocated_bytes": 96749048,
+      "mallocs": 1060124
+    },
+    "percent_change": -12.569418482798167
+  },
+  {
+    "pair": 3,
+    "arm": "candidate",
+    "control": "Pipeline",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 58664.4,
+      "allocated_bytes": 130882904,
+      "mallocs": 1140803
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 61672.9,
+      "allocated_bytes": 130880192,
+      "mallocs": 1140779
+    },
+    "percent_change": 5.128323139757662
+  },
+  {
+    "pair": 3,
+    "arm": "same_binary",
+    "control": "Path",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2545.8,
+      "allocated_bytes": 18242384,
+      "mallocs": 500022
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2282.6,
+      "allocated_bytes": 18242680,
+      "mallocs": 500024
+    },
+    "percent_change": -10.338596904705799
+  },
+  {
+    "pair": 3,
+    "arm": "same_binary",
+    "control": "Name",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 50013.8,
+      "allocated_bytes": 96747512,
+      "mallocs": 1060102
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 55178.3,
+      "allocated_bytes": 96750696,
+      "mallocs": 1060145
+    },
+    "percent_change": 10.326149982604793
+  },
+  {
+    "pair": 3,
+    "arm": "same_binary",
+    "control": "Pipeline",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 64618.3,
+      "allocated_bytes": 130890096,
+      "mallocs": 1140856
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 62187.3,
+      "allocated_bytes": 130868520,
+      "mallocs": 1140687
+    },
+    "percent_change": -3.7620921627464665
+  },
+  {
+    "pair": 4,
+    "arm": "same_binary",
+    "control": "Path",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2110.1,
+      "allocated_bytes": 18242744,
+      "mallocs": 500028
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2007.1,
+      "allocated_bytes": 18242624,
+      "mallocs": 500025
+    },
+    "percent_change": -4.881285247144684
+  },
+  {
+    "pair": 4,
+    "arm": "same_binary",
+    "control": "Name",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 50491.4,
+      "allocated_bytes": 96750200,
+      "mallocs": 1060139
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 43579.4,
+      "allocated_bytes": 96750120,
+      "mallocs": 1060136
+    },
+    "percent_change": -13.689459987245357
+  },
+  {
+    "pair": 4,
+    "arm": "same_binary",
+    "control": "Pipeline",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 64660.2,
+      "allocated_bytes": 130890704,
+      "mallocs": 1140867
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 56696.0,
+      "allocated_bytes": 130900016,
+      "mallocs": 1140935
+    },
+    "percent_change": -12.317004896365924
+  },
+  {
+    "pair": 4,
+    "arm": "candidate",
+    "control": "Path",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2023.7,
+      "allocated_bytes": 18242760,
+      "mallocs": 500028
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2184.4,
+      "allocated_bytes": 18242496,
+      "mallocs": 500022
+    },
+    "percent_change": 7.94090033107675
+  },
+  {
+    "pair": 4,
+    "arm": "candidate",
+    "control": "Name",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 53518.8,
+      "allocated_bytes": 96746520,
+      "mallocs": 1060101
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 44624.8,
+      "allocated_bytes": 96750216,
+      "mallocs": 1060135
+    },
+    "percent_change": -16.61845930775727
+  },
+  {
+    "pair": 4,
+    "arm": "candidate",
+    "control": "Pipeline",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 60087.8,
+      "allocated_bytes": 130877896,
+      "mallocs": 1140763
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 57528.4,
+      "allocated_bytes": 130887792,
+      "mallocs": 1140835
+    },
+    "percent_change": -4.259433695359127
+  },
+  {
+    "pair": 5,
+    "arm": "candidate",
+    "control": "Path",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2269.0,
+      "allocated_bytes": 18242248,
+      "mallocs": 500020
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2100.5,
+      "allocated_bytes": 18242248,
+      "mallocs": 500020
+    },
+    "percent_change": -7.4261789334508554
+  },
+  {
+    "pair": 5,
+    "arm": "candidate",
+    "control": "Name",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 43880.5,
+      "allocated_bytes": 96749440,
+      "mallocs": 1060127
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 44463.3,
+      "allocated_bytes": 96749968,
+      "mallocs": 1060131
+    },
+    "percent_change": 1.3281525962557383
+  },
+  {
+    "pair": 5,
+    "arm": "candidate",
+    "control": "Pipeline",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 57852.7,
+      "allocated_bytes": 130892688,
+      "mallocs": 1140878
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 56429.2,
+      "allocated_bytes": 130884072,
+      "mallocs": 1140804
+    },
+    "percent_change": -2.4605593170241025
+  },
+  {
+    "pair": 5,
+    "arm": "same_binary",
+    "control": "Path",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 1981.8,
+      "allocated_bytes": 18242912,
+      "mallocs": 500028
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2056.4,
+      "allocated_bytes": 18242776,
+      "mallocs": 500027
+    },
+    "percent_change": 3.764254717933202
+  },
+  {
+    "pair": 5,
+    "arm": "same_binary",
+    "control": "Name",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 47932.7,
+      "allocated_bytes": 96748256,
+      "mallocs": 1060122
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 47989.9,
+      "allocated_bytes": 96750232,
+      "mallocs": 1060137
+    },
+    "percent_change": 0.11933398285512986
+  },
+  {
+    "pair": 5,
+    "arm": "same_binary",
+    "control": "Pipeline",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 58789.2,
+      "allocated_bytes": 130888416,
+      "mallocs": 1140842
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 57825.9,
+      "allocated_bytes": 130874536,
+      "mallocs": 1140732
+    },
+    "percent_change": -1.638566267273578
+  },
+  {
+    "pair": 6,
+    "arm": "same_binary",
+    "control": "Path",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2034.3,
+      "allocated_bytes": 18242400,
+      "mallocs": 500020
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2083.7,
+      "allocated_bytes": 18242152,
+      "mallocs": 500019
+    },
+    "percent_change": 2.428353733470967
+  },
+  {
+    "pair": 6,
+    "arm": "same_binary",
+    "control": "Name",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 46924.8,
+      "allocated_bytes": 96748864,
+      "mallocs": 1060127
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 47996.4,
+      "allocated_bytes": 96748240,
+      "mallocs": 1060118
+    },
+    "percent_change": 2.2836538461538325
+  },
+  {
+    "pair": 6,
+    "arm": "same_binary",
+    "control": "Pipeline",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 55387.5,
+      "allocated_bytes": 130893296,
+      "mallocs": 1140880
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 56557.2,
+      "allocated_bytes": 130892976,
+      "mallocs": 1140842
+    },
+    "percent_change": 2.111848341232214
+  },
+  {
+    "pair": 6,
+    "arm": "candidate",
+    "control": "Path",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2106.7,
+      "allocated_bytes": 18242664,
+      "mallocs": 500027
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2057.0,
+      "allocated_bytes": 18242248,
+      "mallocs": 500020
+    },
+    "percent_change": -2.359139887027095
+  },
+  {
+    "pair": 6,
+    "arm": "candidate",
+    "control": "Name",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 46970.7,
+      "allocated_bytes": 96748680,
+      "mallocs": 1060115
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 42681.2,
+      "allocated_bytes": 96748928,
+      "mallocs": 1060123
+    },
+    "percent_change": -9.132288852412252
+  },
+  {
+    "pair": 6,
+    "arm": "candidate",
+    "control": "Pipeline",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 59545.7,
+      "allocated_bytes": 130905800,
+      "mallocs": 1140952
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 56646.7,
+      "allocated_bytes": 130883744,
+      "mallocs": 1140808
+    },
+    "percent_change": -4.8685295495728536
+  },
+  {
+    "pair": 7,
+    "arm": "candidate",
+    "control": "Path",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2068.0,
+      "allocated_bytes": 18242232,
+      "mallocs": 500020
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2168.5,
+      "allocated_bytes": 18242216,
+      "mallocs": 500022
+    },
+    "percent_change": 4.859767891682787
+  },
+  {
+    "pair": 7,
+    "arm": "candidate",
+    "control": "Name",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 51012.2,
+      "allocated_bytes": 96748488,
+      "mallocs": 1060120
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 48492.2,
+      "allocated_bytes": 96749720,
+      "mallocs": 1060131
+    },
+    "percent_change": -4.939994746354792
+  },
+  {
+    "pair": 7,
+    "arm": "candidate",
+    "control": "Pipeline",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 59507.8,
+      "allocated_bytes": 130900288,
+      "mallocs": 1140932
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 61918.2,
+      "allocated_bytes": 130897088,
+      "mallocs": 1140908
+    },
+    "percent_change": 4.0505614390046185
+  },
+  {
+    "pair": 7,
+    "arm": "same_binary",
+    "control": "Path",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2037.5,
+      "allocated_bytes": 18242792,
+      "mallocs": 500027
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2068.8,
+      "allocated_bytes": 18242648,
+      "mallocs": 500026
+    },
+    "percent_change": 1.5361963190184236
+  },
+  {
+    "pair": 7,
+    "arm": "same_binary",
+    "control": "Name",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 45572.8,
+      "allocated_bytes": 96748912,
+      "mallocs": 1060125
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 45310.7,
+      "allocated_bytes": 96748104,
+      "mallocs": 1060107
+    },
+    "percent_change": -0.5751237580311153
+  },
+  {
+    "pair": 7,
+    "arm": "same_binary",
+    "control": "Pipeline",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 71485.0,
+      "allocated_bytes": 130892664,
+      "mallocs": 1140879
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 58308.7,
+      "allocated_bytes": 130888160,
+      "mallocs": 1140811
+    },
+    "percent_change": -18.43225851577255
+  },
+  {
+    "pair": 8,
+    "arm": "same_binary",
+    "control": "Path",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2006.5,
+      "allocated_bytes": 18243072,
+      "mallocs": 500029
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2078.3,
+      "allocated_bytes": 18242496,
+      "mallocs": 500021
+    },
+    "percent_change": 3.5783702965362707
+  },
+  {
+    "pair": 8,
+    "arm": "same_binary",
+    "control": "Name",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 45972.2,
+      "allocated_bytes": 96748800,
+      "mallocs": 1060122
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 51473.2,
+      "allocated_bytes": 96748024,
+      "mallocs": 1060121
+    },
+    "percent_change": 11.965927234285068
+  },
+  {
+    "pair": 8,
+    "arm": "same_binary",
+    "control": "Pipeline",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 58555.1,
+      "allocated_bytes": 130890632,
+      "mallocs": 1140860
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 58052.2,
+      "allocated_bytes": 130881864,
+      "mallocs": 1140793
+    },
+    "percent_change": -0.8588491864927272
+  },
+  {
+    "pair": 8,
+    "arm": "candidate",
+    "control": "Path",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2178.7,
+      "allocated_bytes": 18241872,
+      "mallocs": 500018
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2231.9,
+      "allocated_bytes": 18242760,
+      "mallocs": 500026
+    },
+    "percent_change": 2.4418231055216566
+  },
+  {
+    "pair": 8,
+    "arm": "candidate",
+    "control": "Name",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 53783.6,
+      "allocated_bytes": 96755344,
+      "mallocs": 1060143
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 57385.2,
+      "allocated_bytes": 96749872,
+      "mallocs": 1060134
+    },
+    "percent_change": 6.696465093448567
+  },
+  {
+    "pair": 8,
+    "arm": "candidate",
+    "control": "Pipeline",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 75444.1,
+      "allocated_bytes": 130911456,
+      "mallocs": 1141028
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 69585.2,
+      "allocated_bytes": 130903656,
+      "mallocs": 1140958
+    },
+    "percent_change": -7.7658822890060435
+  },
+  {
+    "pair": 9,
+    "arm": "candidate",
+    "control": "Path",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2045.5,
+      "allocated_bytes": 18242496,
+      "mallocs": 500024
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2381.2,
+      "allocated_bytes": 18242960,
+      "mallocs": 500028
+    },
+    "percent_change": 16.41163529699339
+  },
+  {
+    "pair": 9,
+    "arm": "candidate",
+    "control": "Name",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 45096.3,
+      "allocated_bytes": 96754472,
+      "mallocs": 1060134
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 48030.3,
+      "allocated_bytes": 96755048,
+      "mallocs": 1060141
+    },
+    "percent_change": 6.506076995230203
+  },
+  {
+    "pair": 9,
+    "arm": "candidate",
+    "control": "Pipeline",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 57548.8,
+      "allocated_bytes": 130889184,
+      "mallocs": 1140847
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 55896.8,
+      "allocated_bytes": 130886960,
+      "mallocs": 1140830
+    },
+    "percent_change": -2.8706072064056953
+  },
+  {
+    "pair": 9,
+    "arm": "same_binary",
+    "control": "Path",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2100.6,
+      "allocated_bytes": 18242416,
+      "mallocs": 500022
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2410.8,
+      "allocated_bytes": 18242888,
+      "mallocs": 500027
+    },
+    "percent_change": 14.7672093687518
+  },
+  {
+    "pair": 9,
+    "arm": "same_binary",
+    "control": "Name",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 46284.1,
+      "allocated_bytes": 96749296,
+      "mallocs": 1060132
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 47871.9,
+      "allocated_bytes": 96749424,
+      "mallocs": 1060125
+    },
+    "percent_change": 3.430551744551602
+  },
+  {
+    "pair": 9,
+    "arm": "same_binary",
+    "control": "Pipeline",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 58104.3,
+      "allocated_bytes": 130884696,
+      "mallocs": 1140777
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 61001.6,
+      "allocated_bytes": 130884424,
+      "mallocs": 1140811
+    },
+    "percent_change": 4.986377944489462
+  },
+  {
+    "pair": 10,
+    "arm": "same_binary",
+    "control": "Path",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2186.9,
+      "allocated_bytes": 18242416,
+      "mallocs": 500023
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2083.1,
+      "allocated_bytes": 18242384,
+      "mallocs": 500022
+    },
+    "percent_change": -4.746444739128453
+  },
+  {
+    "pair": 10,
+    "arm": "same_binary",
+    "control": "Name",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 47548.1,
+      "allocated_bytes": 96745728,
+      "mallocs": 1060091
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 46121.6,
+      "allocated_bytes": 96753760,
+      "mallocs": 1060121
+    },
+    "percent_change": -3.0001198786071326
+  },
+  {
+    "pair": 10,
+    "arm": "same_binary",
+    "control": "Pipeline",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 57268.3,
+      "allocated_bytes": 130901344,
+      "mallocs": 1140946
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 61155.0,
+      "allocated_bytes": 130883576,
+      "mallocs": 1140811
+    },
+    "percent_change": 6.7868262197411156
+  },
+  {
+    "pair": 10,
+    "arm": "candidate",
+    "control": "Path",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2003.7,
+      "allocated_bytes": 18242624,
+      "mallocs": 500025
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2130.3,
+      "allocated_bytes": 18242512,
+      "mallocs": 500023
+    },
+    "percent_change": 6.318311124419829
+  },
+  {
+    "pair": 10,
+    "arm": "candidate",
+    "control": "Name",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 47728.8,
+      "allocated_bytes": 96749792,
+      "mallocs": 1060142
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 44600.6,
+      "allocated_bytes": 96749176,
+      "mallocs": 1060122
+    },
+    "percent_change": -6.554114077873329
+  },
+  {
+    "pair": 10,
+    "arm": "candidate",
+    "control": "Pipeline",
+    "execution_order": [
+      0,
+      1
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 59079.7,
+      "allocated_bytes": 130905936,
+      "mallocs": 1140948
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 57931.3,
+      "allocated_bytes": 130878744,
+      "mallocs": 1140763
+    },
+    "percent_change": -1.9438148805765665
+  },
+  {
+    "pair": 11,
+    "arm": "candidate",
+    "control": "Path",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2005.6,
+      "allocated_bytes": 18242416,
+      "mallocs": 500022
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2226.6,
+      "allocated_bytes": 18241984,
+      "mallocs": 500016
+    },
+    "percent_change": 11.019146390107704
+  },
+  {
+    "pair": 11,
+    "arm": "candidate",
+    "control": "Name",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 50133.8,
+      "allocated_bytes": 96749344,
+      "mallocs": 1060135
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 48489.8,
+      "allocated_bytes": 96749688,
+      "mallocs": 1060135
+    },
+    "percent_change": -3.279224794450053
+  },
+  {
+    "pair": 11,
+    "arm": "candidate",
+    "control": "Pipeline",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 57491.9,
+      "allocated_bytes": 130888248,
+      "mallocs": 1140841
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 60328.6,
+      "allocated_bytes": 130887400,
+      "mallocs": 1140831
+    },
+    "percent_change": 4.934086366949075
+  },
+  {
+    "pair": 11,
+    "arm": "same_binary",
+    "control": "Path",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 1981.9,
+      "allocated_bytes": 18242232,
+      "mallocs": 500020
+    },
+    "after": {
+      "control": "Path",
+      "calls": 20000,
+      "nanoseconds_per_query": 2208.1,
+      "allocated_bytes": 18242496,
+      "mallocs": 500025
+    },
+    "percent_change": 11.413290277006904
+  },
+  {
+    "pair": 11,
+    "arm": "same_binary",
+    "control": "Name",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 45768.6,
+      "allocated_bytes": 96748400,
+      "mallocs": 1060117
+    },
+    "after": {
+      "control": "Name",
+      "calls": 2000,
+      "nanoseconds_per_query": 47724.2,
+      "allocated_bytes": 96749264,
+      "mallocs": 1060138
+    },
+    "percent_change": 4.272798381423071
+  },
+  {
+    "pair": 11,
+    "arm": "same_binary",
+    "control": "Pipeline",
+    "execution_order": [
+      1,
+      0
+    ],
+    "before": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 57257.0,
+      "allocated_bytes": 130881120,
+      "mallocs": 1140784
+    },
+    "after": {
+      "control": "Pipeline",
+      "calls": 2000,
+      "nanoseconds_per_query": 56792.6,
+      "allocated_bytes": 130906000,
+      "mallocs": 1140986
+    },
+    "percent_change": -0.8110798679637488
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "baseline": "C:\\Users\\Shadow\\file_manager\\engine\\.build\\bounded-scan-reader-2026-10-03\\baseline.test.exe",
+  "baseline_sha256": "5f945a6d5d2f5b7bff6ce263e4026cc3b77b275543af88785fd0ba1c3ae19b85",
+  "candidate": "C:\\Users\\Shadow\\file_manager\\engine\\.build\\bounded-scan-reader-2026-10-03\\candidate.test.exe",
+  "candidate_sha256": "e0f84ca82754797dce621dc840f3e6db2abbfe7e574b68f01ac405bb73148a2b",
+  "platform": "Windows-11-10.0.22621-SP0",
+  "python": "3.14.7 (main, Aug  9 2026, 02:08:46)  [MINGW GCC 16.2.0 64 bit (AMD64)]",
+  "logical_cpus": 8,
+  "pairs": 12,
+  "records": 10000,
+  "gomaxprocs": 2,
+  "status": "completed",
+  "started_unix_seconds": 1791013382.4769611,
+  "interpretation": "Aggregate-control noise check; no per-query tail or candidate admission claim.",
+  "finished_unix_seconds": 1791013401.522204
+}

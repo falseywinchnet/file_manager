@@ -74,6 +74,15 @@ regression. A fuzz crash becomes a permanent minimal fixture.
 Report distributions, not averages alone. Preserve CPU and storage saturation
 markers rather than attributing every stall to the engine.
 
+Before interpreting short-operation percentiles, measure the clock's observed
+resolution and instrumentation allocation/overhead. Zero-heavy quantized samples
+do not establish microsecond query tails. Pair candidate/baseline processes with
+same-binary controls, retain all samples and preserve run order. Do not subtract
+an instrumentation median as a fabricated latency correction or treat host noise
+as proof that a candidate passes. The Windows calibration and test-only QPC path
+are recorded in `../results/control-measurement-2026-10-03/README.md`; no resource
+or regression threshold is relaxed by that measurement repair.
+
 ## Sandbox validation
 
 - process refuses an empty sandbox root;
