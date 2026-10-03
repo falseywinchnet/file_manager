@@ -18,6 +18,8 @@
 
 namespace gui_forms::render::text {
 
+class BoundedShapeWorkspace;
+
 struct ShapedFontRun final {
     FontFaceId face{};
     Utf8Range source_range{};
@@ -88,6 +90,16 @@ public:
     // owner survives until it explicitly adopts the complete returned owner.
     [[nodiscard]] std::unique_ptr<BoundedShapedText> shape_bounded(
         std::string_view utf8, FontSpec font, ShapeStorageLimits limits);
+    // Private experiment: requires bounded font registration. Prepare explicitly
+    // before repeated calls; includes engine records and simultaneous replacement.
+    void prepare_workspace(BoundedShapeWorkspace& workspace, const ShapeStorageLimits& limits);
+    // No scratch growth. Input is borrowed only until return and must not alias
+    // workspace arrays. Returned arrays own exact active counts independently.
+    // output_bytes is remaining aggregate allowance, already excluding retained
+    // old outputs/input/row metadata. Failures preserve caller-owned old output.
+    [[nodiscard]] std::unique_ptr<BoundedShapedText> shape_with_workspace(
+        std::string_view utf8, FontSpec font, const ShapeStorageLimits& limits,
+        BoundedShapeWorkspace& workspace);
     [[nodiscard]] ResolvedTextLayout resolve(std::string_view utf8,
                                              FontSpec font);
     [[nodiscard]] std::size_t face_count() const noexcept;

@@ -11,17 +11,17 @@
 #include <vector>
 
 namespace gui_forms::detail {
-namespace {
-
-using unicode_data::GraphemeBreak;
-using unicode_data::IndicConjunctBreak;
-
-struct Scalar final {
+struct GraphemeWorkspaceScalar final {
   std::size_t byte_offset{};
-  GraphemeBreak grapheme_break{GraphemeBreak::Other};
-  IndicConjunctBreak indic_break{IndicConjunctBreak::None};
+  unicode_data::GraphemeBreak grapheme_break{unicode_data::GraphemeBreak::Other};
+  unicode_data::IndicConjunctBreak indic_break{unicode_data::IndicConjunctBreak::None};
   bool extended_pictographic{};
 };
+
+namespace {
+using unicode_data::GraphemeBreak;
+using unicode_data::IndicConjunctBreak;
+using Scalar = GraphemeWorkspaceScalar;
 
 template <typename Value>
 struct ScalarBeforeUnicodeRange final {
@@ -162,12 +162,47 @@ lookup(char32_t scalar,
   return true; // GB999
 }
 
+// Input is validated; scalars spans the exact decoded count, boundaries has
+// at least scalars.size()+1 elements. The arrays and input are disjoint.
+// Writes only active elements and returns the active boundary count.
+std::size_t fill_grapheme_arrays(const std::string_view utf8,
+    const std::span<Scalar> scalars, const std::span<std::size_t> boundaries) noexcept {
+  std::size_t offset = 0U;
+  for (std::size_t index = 0U; index < scalars.size(); ++index) {
+    const std::size_t byte_offset = offset;
+    const char32_t value = decode(utf8, offset);
+    const GraphemeBreak grapheme = lookup(value, unicode_data::grapheme_break_ranges, GraphemeBreak::Other);
+    const IndicConjunctBreak indic = lookup(value, unicode_data::indic_conjunct_break_ranges, IndicConjunctBreak::None);
+    const bool pictographic = lookup(value, unicode_data::extended_pictographic_ranges, false);
+    scalars[index] = Scalar{.byte_offset = byte_offset, .grapheme_break = grapheme,
+        .indic_break = indic, .extended_pictographic = pictographic};
+  }
+  boundaries[0] = 0U;
+  std::size_t count = 1U;
+  const std::span<const Scalar> decoded(scalars);
+  for (std::size_t index = 1U; index < scalars.size(); ++index) {
+    if (should_break(decoded, index)) {
+      boundaries[count] = decoded[index].byte_offset;
+      ++count;
+    }
+  }
+  if (utf8.size() != boundaries[count - 1U]) {
+    boundaries[count] = utf8.size();
+    ++count;
+  }
+  return count;
+}
+
 } // namespace
 
 GraphemeStorageRequirement grapheme_storage_requirement(std::string_view utf8) noexcept {
   const Utf8ValidationResult validation = validate_utf8(utf8);
   if (!validation.valid()) return {};
-  const std::size_t count = validation.scalar_count;
+  const GraphemeStorageRequirement result = grapheme_workspace_requirement(validation.scalar_count);
+  return result;
+}
+
+GraphemeStorageRequirement grapheme_workspace_requirement(const std::size_t count) noexcept {
   const std::size_t maximum = std::numeric_limits<std::size_t>::max();
   if (count == maximum || count > maximum / sizeof(Scalar)) {
     return {.status = GraphemeStorageStatus::budget_exceeded};
@@ -186,6 +221,64 @@ GraphemeStorageRequirement grapheme_storage_requirement(std::string_view utf8) n
       .scalar_bytes = scalar_bytes, .boundary_capacity = capacity,
       .boundary_bytes = boundary_bytes, .peak_bytes = scalar_bytes + boundary_bytes};
   return result;
+}
+
+GraphemeWorkspace::GraphemeWorkspace() = default;
+GraphemeWorkspace::~GraphemeWorkspace() = default;
+
+GraphemeWorkspace::GraphemeWorkspace(GraphemeWorkspace&& other) noexcept
+    : scalars_(std::move(other.scalars_)), boundaries_(std::move(other.boundaries_)),
+      scalar_capacity_(std::exchange(other.scalar_capacity_, 0U)),
+      count_(std::exchange(other.count_, 0U)), bytes_(std::exchange(other.bytes_, 0U)) {}
+
+GraphemeWorkspace& GraphemeWorkspace::operator=(GraphemeWorkspace&& other) noexcept {
+  if (this != &other) {
+    scalars_ = std::move(other.scalars_);
+    boundaries_ = std::move(other.boundaries_);
+    scalar_capacity_ = std::exchange(other.scalar_capacity_, 0U);
+    count_ = std::exchange(other.count_, 0U);
+    bytes_ = std::exchange(other.bytes_, 0U);
+  }
+  return *this;
+}
+
+GraphemeStorageStatus GraphemeWorkspace::prepare(const std::size_t scalar_capacity,
+    const std::size_t maximum_live_bytes) {
+  if (bytes_ > maximum_live_bytes) return GraphemeStorageStatus::budget_exceeded;
+  if (boundaries_ && scalar_capacity <= scalar_capacity_) return GraphemeStorageStatus::success;
+  const GraphemeStorageRequirement requirement = grapheme_workspace_requirement(scalar_capacity);
+  if (requirement.status != GraphemeStorageStatus::success) return requirement.status;
+  if (requirement.peak_bytes > maximum_live_bytes - bytes_) return GraphemeStorageStatus::budget_exceeded;
+  GraphemeWorkspace candidate{};
+  try {
+    if (scalar_capacity != 0U) candidate.scalars_ = std::make_unique<Scalar[]>(scalar_capacity);
+    candidate.boundaries_ = std::make_unique<std::size_t[]>(requirement.boundary_capacity);
+  } catch (const std::bad_alloc&) {
+    return GraphemeStorageStatus::resource_failure;
+  }
+  candidate.scalar_capacity_ = scalar_capacity;
+  candidate.bytes_ = requirement.peak_bytes;
+  *this = std::move(candidate);
+  return GraphemeStorageStatus::success;
+}
+
+GraphemeStorageStatus GraphemeWorkspace::fill(const std::string_view utf8) noexcept {
+  const Utf8ValidationResult validation = validate_utf8(utf8);
+  if (!validation.valid()) return GraphemeStorageStatus::invalid_utf8;
+  if (!boundaries_ || validation.scalar_count > scalar_capacity_) return GraphemeStorageStatus::budget_exceeded;
+  const std::span<Scalar> scalars(scalars_.get(), validation.scalar_count);
+  const std::span<std::size_t> boundaries(boundaries_.get(), scalar_capacity_ + 1U);
+  count_ = fill_grapheme_arrays(utf8, scalars, boundaries);
+  return GraphemeStorageStatus::success;
+}
+
+std::span<const std::size_t> GraphemeWorkspace::boundaries() const noexcept {
+  const std::span<const std::size_t> result(boundaries_.get(), count_);
+  return result;
+}
+
+std::size_t GraphemeWorkspace::capacity_bytes() const noexcept {
+  return bytes_;
 }
 
 GraphemeBoundaryBuffer::GraphemeBoundaryBuffer(GraphemeBoundaryBuffer&& other) noexcept
@@ -225,29 +318,9 @@ GraphemeStorageStatus bounded_grapheme_boundaries(std::string_view utf8,
     if (requirement.scalar_count != 0U) scalars = std::make_unique<Scalar[]>(requirement.scalar_count);
     candidate.values_ = std::make_unique<std::size_t[]>(requirement.boundary_capacity);
     candidate.capacity_ = requirement.boundary_capacity;
-    std::size_t offset = 0U;
-    for (std::size_t index = 0U; index < requirement.scalar_count; ++index) {
-      const std::size_t byte_offset = offset;
-      const char32_t value = decode(utf8, offset);
-      scalars[index] = Scalar{
-          .byte_offset = byte_offset,
-          .grapheme_break = lookup(value, unicode_data::grapheme_break_ranges, GraphemeBreak::Other),
-          .indic_break = lookup(value, unicode_data::indic_conjunct_break_ranges, IndicConjunctBreak::None),
-          .extended_pictographic = lookup(value, unicode_data::extended_pictographic_ranges, false)};
-    }
-    candidate.values_[0] = 0U;
-    candidate.count_ = 1U;
-    const std::span<const Scalar> decoded(scalars.get(), requirement.scalar_count);
-    for (std::size_t index = 1U; index < requirement.scalar_count; ++index) {
-      if (should_break(decoded, index)) {
-        candidate.values_[candidate.count_] = decoded[index].byte_offset;
-        ++candidate.count_;
-      }
-    }
-    if (utf8.size() != candidate.values_[candidate.count_ - 1U]) {
-      candidate.values_[candidate.count_] = utf8.size();
-      ++candidate.count_;
-    }
+    const std::span<Scalar> scalar_storage(scalars.get(), requirement.scalar_count);
+    const std::span<std::size_t> boundary_storage(candidate.values_.get(), candidate.capacity_);
+    candidate.count_ = fill_grapheme_arrays(utf8, scalar_storage, boundary_storage);
   } catch (const std::bad_alloc&) {
     return GraphemeStorageStatus::resource_failure;
   }

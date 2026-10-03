@@ -1,0 +1,38 @@
+[
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\gui_forms\\CMakeLists.txt",
+    "Hash": "95B59AC5E31116BFD21D9704A0EB2D58441F7FA3DC1B063BBD74A3356F4F3736"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\gui_forms\\src\\core\\text\\unicode\\unicode_grapheme.cpp",
+    "Hash": "2850C2A86C7CD0A24B5DC05AE382DE2E2D321050BC724893E63E40CBD2BE5C3E"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\gui_forms\\src\\core\\text\\unicode\\unicode_grapheme.hpp",
+    "Hash": "385D049DEE7EFC7A63C11D41B80FDECDFCF238AA6118AC857BA0125237A9BB7F"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\gui_forms\\src\\render\\text\\harfbuzz\\harfbuzz_font_engine.cpp",
+    "Hash": "6CA88F3C9C4CBD012DB91C897A1E124C7B506FBDEB2E5E44E5C1965AC7F55C61"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\gui_forms\\src\\render\\text\\harfbuzz\\harfbuzz_font_engine.hpp",
+    "Hash": "5F508CC855155E998FEECAB688FABB6545B30DDD8FCDB958F80EECD4F455D1FD"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\gui_forms\\tests\\bounded_grapheme_tests.cpp",
+    "Hash": "C3112016FF7D55CE3E5A9D8D1D5C941BD31F26068D97B39DB3F6FA3FF6740AD7"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\gui_forms\\src\\render\\text\\harfbuzz\\bounded_shape_workspace.cpp",
+    "Hash": "F09FFE39849AFBCF93E7615CDF0D65E276AAD396CA620B4C0E99133DAE6C66E8"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\gui_forms\\src\\render\\text\\harfbuzz\\bounded_shape_workspace.hpp",
+    "Hash": "7616A5A1AE9680F72080D648E5D7CCC85E60FF25191D64A9D3EF93E516356FFA"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\gui_forms\\tests\\bounded_shape_workspace_tests.cpp",
+    "Hash": "82DD422D26841A625BA08A3A741DAC7049C97DEACCEE7923FD1C554225B26B08"
+  }
+]
