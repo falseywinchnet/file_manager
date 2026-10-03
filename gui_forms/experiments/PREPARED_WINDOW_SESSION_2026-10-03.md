@@ -55,3 +55,35 @@ identity, generation and source coverage, three retained payload generations,
 one replacement slot, all-row adoption, truthful revoked/current distinctions,
 and owner-executor teardown. Wrapping, tab/long-paragraph policy, retained batch
 rendering, physical-input dogfood and installed consumer evidence remain open.
+
+## Follow-up native source review
+
+**OBSERVED:** the existing platform option records are in public
+`include/gui_forms/platform/`; adding a field there is not a private-only
+experiment. `src/runtime/application/application.cpp` has named `HostReady`,
+`DispatchPending` and `WindowBridge` boundaries, but no typed connection-health
+contract. Windows' multi-window loop truncates its frame-clock wait array to
+`MAXIMUM_WAIT_OBJECTS - 1`; reserving another wait slot cannot silently reduce
+the advertised 64-window behavior. Windows modal/move-size loops also require
+an explicit delivery policy beyond the outer loop. Linux retained dialogs call
+`Runtime::step`, a concrete nested-loop integration point.
+
+**CANDIDATE, not selected architecture:** one application-owned native signal
+and a bounded registry of lifetime-owned connections. Workers would retain
+connections rather than raw controls, native handles, views or descriptors.
+A Windows shared event, macOS named run-loop source and Linux owned pipe are
+adapter candidates. Windows may need a shared application frame clock to retain
+its full window bound; that is a separate scheduler change needing evidence.
+Run-loop modes, signal failures and close during a nested loop remain unresolved.
+
+The proposed clear/recheck law consumes the native signal before the final
+pending recheck. A bounded drain leaves or reasserts readiness for remaining
+work. It never clears a new completion after invoking a reentrant target.
+Failure/closure must be sticky and prevent admission without requiring another
+successful wake. UI registrations revoke before target destruction, while signal
+resources survive racing calls and confirmed worker join. Source-private native
+harnesses should prove these laws before negotiation of any public option.
+
+The visible Details-review sibling performed this read-only source review
+against the full house style and component instructions. No implementation,
+native test, public availability or blanket legacy-style acceptance is claimed.

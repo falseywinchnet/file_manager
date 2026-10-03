@@ -47,6 +47,13 @@ struct ShapeStorageLimits final {
     std::size_t workspace_bytes{16U * 1024U * 1024U};
 };
 
+struct PrimaryLineMetrics final {
+    FontFaceId face{};
+    double ascent_device{};
+    double descent_device{};
+    double line_gap_device{};
+};
+
 // Private portable text engine. It owns every encoded face and never consults
 // a host font catalog. The renderer maps returned face IDs to its own private
 // raster objects; HarfBuzz/FreeType objects never cross this boundary.
@@ -85,6 +92,11 @@ public:
     // Native setup/allocation failures throw; a call-owned partial result never
     // becomes a successful return. Callers retain old state until return succeeds.
     [[nodiscard]] ShapedText shape(std::string_view utf8, FontSpec font);
+    // Exact role/weight/italic only, first registered matching primary. No
+    // fallback or text shaping. Sets that owned FT face's size once using the
+    // same 26.6 rounding as shape; caller confines native mutation to executor.
+    // Nullopt means no exact primary. Invalid font/native failures throw.
+    [[nodiscard]] std::optional<PrimaryLineMetrics> primary_line_metrics(const FontSpec font);
     // Throws length_error before a controlled allocation would exceed limits;
     // invalid input and native/resource failures also throw. The caller's old
     // owner survives until it explicitly adopts the complete returned owner.

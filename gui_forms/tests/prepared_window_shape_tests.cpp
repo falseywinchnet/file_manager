@@ -1,6 +1,10 @@
 #include "../src/render/text/prepared_window_shape.hpp"
 #include "prepared_text_test_support.hpp"
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
+#include <algorithm>
 #include <iostream>
 #include <cstdlib>
 #include <limits>
@@ -75,7 +79,8 @@ struct Fixture final {
 
     explicit Fixture(const std::span<const std::byte> encoded, const std::size_t count = 3U,
         const bool missing_last = false, const std::span<const std::byte> arabic = {},
-        const std::span<const std::byte> hebrew = {}) {
+        const std::span<const std::byte> hebrew = {}, const bool all_blank = false,
+        const double logical_size = 16.0, const double scale = 1.25) {
         require(count >= 1U && count <= 512U, "bounded fixture row count");
         paragraphs.reserve(count);
         endpoints.reserve(1U + 2U * count);
@@ -91,7 +96,7 @@ struct Fixture final {
         endpoints.push_back({gf::SourceByteOffset(100U), gf::DisplayByteOffset(7U)});
         for (std::size_t index = 0U; index < count; ++index) {
             const std::size_t begin = display.size();
-            if (index + 1U != count && index % 3U != 1U) {
+            if (!all_blank && index + 1U != count && index % 3U != 1U) {
                 if (!arabic.empty() && index % 6U == 0U) display.append("العربية 123");
                 else if (!hebrew.empty() && index % 3U == 2U) display.append("שלום ABC");
                 else display.append("office á");
@@ -118,7 +123,7 @@ struct Fixture final {
                 gf::DisplayByteOffset(7U + static_cast<std::uint32_t>(after))};
             paragraphs.push_back(paragraph);
         }
-        key.text = prepared_test::make_key(service, lease, display, 16.0, 1.25);
+        key.text = prepared_test::make_key(service, lease, display, logical_size, scale);
         key.controller_instance = 1U;
         key.projection_generation = 1U;
         key.authority = {1U, 1U};
@@ -143,6 +148,43 @@ struct Worker final {
     }
 };
 
+struct MetricFaceOwner final {
+    FT_Library library{};
+    FT_Face face{};
+    MetricFaceOwner() = default;
+    ~MetricFaceOwner() {
+        if (face != nullptr) FT_Done_Face(face);
+        if (library != nullptr) FT_Done_FreeType(library);
+    }
+    MetricFaceOwner(const MetricFaceOwner&) = delete;
+    MetricFaceOwner& operator=(const MetricFaceOwner&) = delete;
+};
+
+text::PrimaryLineMetrics reference_primary_metrics(const detail::PreparedFontFace& source,
+    const std::int64_t device_size) {
+    MetricFaceOwner owner{};
+    const FT_Error initialized = FT_Init_FreeType(&owner.library);
+    require(initialized == 0, "independent font metric library");
+    require(source.size <= static_cast<std::size_t>(std::numeric_limits<FT_Long>::max()), "native font length fits");
+    const FT_Byte* const bytes = reinterpret_cast<const FT_Byte*>(source.bytes.get());
+    const FT_Long length = static_cast<FT_Long>(source.size);
+    const FT_Long face_index = static_cast<FT_Long>(source.index);
+    const FT_Error opened = FT_New_Memory_Face(owner.library, bytes, length, face_index, &owner.face);
+    require(opened == 0 && owner.face != nullptr, "independent admitted font face");
+    require(device_size > 0 && device_size <= std::numeric_limits<FT_F26Dot6>::max(), "native metric size fits");
+    const FT_F26Dot6 size = static_cast<FT_F26Dot6>(device_size);
+    const FT_Error sized = FT_Set_Char_Size(owner.face, 0, size, 72U, 72U);
+    require(sized == 0 && (*owner.face).size != nullptr, "independent rounded native size");
+    const FT_Size_Metrics& native = (*(*owner.face).size).metrics;
+    text::PrimaryLineMetrics result{};
+    result.ascent_device = static_cast<double>(native.ascender) / 64.0;
+    result.descent_device = -static_cast<double>(native.descender) / 64.0;
+    const double height = static_cast<double>(native.height) / 64.0;
+    const double gap = height - result.ascent_device - result.descent_device;
+    result.line_gap_device = std::max(0.0, gap);
+    return result;
+}
+
 void compare_rows(Fixture& fixture) {
     text::HarfBuzzFontEngine reference{};
     const detail::PreparedFontBank& bank = *fixture.fonts;
@@ -157,9 +199,12 @@ void compare_rows(Fixture& fixture) {
     gf::FontSpec font = fixture.key.text.font;
     font.size = static_cast<double>(metrics.device_size_26_6) / 64.0;
     font.letter_spacing *= fixture.key.text.scale;
+    const text::PrimaryLineMetrics primary = reference_primary_metrics(bank.faces[0], metrics.device_size_26_6);
     const detail::PreparedWindowBatchStorage& batch = *fixture.batch;
     std::size_t requested = (*batch.input).charged_bytes + sizeof(batch) +
         batch.row_count * (sizeof(detail::PreparedWindowRowStorage) + sizeof(detail::PreparedWindowGeometryRow));
+    double top = 0.0;
+    double width = 0.0;
     for (std::size_t index = 0U; index < batch.row_count; ++index) {
         const detail::PreparedWindowParagraph& paragraph = fixture.paragraphs[index];
         const std::size_t begin = paragraph.display_begin.value - fixture.key.text.display_begin.value;
@@ -174,6 +219,13 @@ void compare_rows(Fixture& fixture) {
             actual.metrics.ascent_dip == (*expected).ascent / fixture.key.text.scale &&
             actual.metrics.descent_dip == (*expected).descent / fixture.key.text.scale &&
             actual.metrics.device_size_26_6 == metrics.device_size_26_6, "row metrics and device rounding");
+        const double ascent = std::max(primary.ascent_device, (*expected).ascent);
+        const double descent = std::max(primary.descent_device, (*expected).descent);
+        const double height = std::max((*expected).height, ascent + descent + primary.line_gap_device);
+        require(actual.top_device == top && actual.baseline_device == top + ascent &&
+            actual.height_device == height && height > 0.0, "device row placement matches independent primary metrics");
+        top += height;
+        width = std::max(width, (*expected).width);
         for (std::size_t run = 0U; run < actual.run_count; ++run) {
             require(actual.runs[run].source_range == (*expected).runs[run].source_range &&
                 actual.runs[run].face == (*expected).runs[run].face &&
@@ -185,6 +237,61 @@ void compare_rows(Fixture& fixture) {
         requested += actual.run_count * sizeof(text::BoundedFontRun) + actual.glyph_count * sizeof(text::ShapedGlyph);
     }
     require(requested == batch.requested_bytes, "exact retained bytes exclude retired temporary shape owners");
+    require(batch.height_device == top && batch.width_device == width, "complete logical device extent");
+}
+
+void test_blank_placement(const std::span<const std::byte> font) {
+    Fixture fixture(font, 512U, false, {}, {}, true);
+    text::PreparedWindowShaper shaper(fixture.fonts);
+    require(shaper.initialize() == gf::PreparedTextStatus::success, "blank-row shaper");
+    require(shaper.shape(*fixture.batch) == gf::PreparedTextStatus::success, "all consecutive blanks positioned");
+    compare_rows(fixture);
+    const detail::PreparedWindowBatchStorage& batch = *fixture.batch;
+    require(batch.row_count == 512U && batch.height_device > 4096.0 && batch.width_device == 0.0,
+        "logical extent retains all rows beyond any later raster crop");
+    for (std::size_t index = 0U; index < batch.row_count; ++index) {
+        const detail::PreparedWindowGeometryRow& row = batch.geometry[index];
+        require(row.glyph_count == 0U && row.run_count == 0U && row.metrics.ascent_dip == 0.0 &&
+            row.metrics.descent_dip == 0.0 && row.baseline_device > row.top_device,
+            "blank row has real baseline without mutating empty shaping semantics");
+    }
+}
+
+void test_placement_sizes(const std::span<const std::byte> font) {
+    struct Setting final { double size{}; double scale{}; };
+    const std::array<Setting, 3U> settings{{{4.0, 0.5}, {16.123, 1.333}, {128.0, 4.0}}};
+    for (const Setting setting : settings) {
+        Fixture fixture(font, 1U, false, {}, {}, true, setting.size, setting.scale);
+        text::PreparedWindowShaper shaper(fixture.fonts);
+        require(shaper.initialize() == gf::PreparedTextStatus::success, "size-bound shaper");
+        require(shaper.shape(*fixture.batch) == gf::PreparedTextStatus::success, "admitted size/scale placement");
+        compare_rows(fixture);
+        require(fixture.display.empty() && (*fixture.batch).row_count == 1U &&
+            (*fixture.batch).height_device > 0.0, "empty EOF retains one positive line box");
+    }
+}
+
+void test_exact_primary_metrics(const std::span<const std::byte> font) {
+    text::HarfBuzzFontEngine engine{};
+    const std::optional<gf::FontFaceId> fallback = engine.register_fallback_typeface(400U, false, font);
+    require(fallback.has_value(), "fallback-only metrics fixture");
+    gf::FontSpec specification{gf::FontRole::content, 20.0, 400U, false};
+    require(!engine.primary_line_metrics(specification), "fallback cannot supply exact primary line metrics");
+    const std::optional<gf::FontFaceId> primary = engine.register_typeface(gf::FontRole::content, 400U, false, font);
+    require(primary.has_value(), "exact primary metrics face");
+    const std::optional<text::PrimaryLineMetrics> metrics = engine.primary_line_metrics(specification);
+    require(metrics && (*metrics).face == *primary, "exact admitted primary chosen ahead of fallback");
+    specification.weight = 700U;
+    require(!engine.primary_line_metrics(specification), "nearby weight is not an exact primary");
+    specification.weight = 400U;
+    specification.size = std::numeric_limits<double>::quiet_NaN();
+    bool refused = false;
+    try {
+        const std::optional<text::PrimaryLineMetrics> invalid = engine.primary_line_metrics(specification);
+        static_cast<void>(invalid);
+    }
+    catch (const std::invalid_argument&) { refused = true; }
+    require(refused, "nonfinite metric size refused before native conversion");
 }
 
 void test_rows(const std::span<const std::byte> font, const std::span<const std::byte> arabic,
@@ -219,7 +326,8 @@ void test_failures(const std::span<const std::byte> font) {
         require(status == gf::PreparedTextStatus::resource_failure && !(*fixture.batch).geometry,
             "late allocation failure publishes no partial rows");
         require((*fixture.batch).requested_bytes == base && (*(*fixture.batch).input).display.get() == original &&
-            (*fixture.ledger).usage.payload_generations == 1U, "failure preserves input/base/reservation");
+            (*fixture.ledger).usage.payload_generations == 1U && (*fixture.batch).width_device == 0.0 &&
+            (*fixture.batch).height_device == 0.0, "failure preserves input/base/reservation/extent");
     }
     {
         probe::Scope scope(std::numeric_limits<std::size_t>::max());
@@ -443,6 +551,9 @@ int main(const int argc, char** argv) {
         const std::vector<std::byte> arabic = read_fallback(arabic_path);
         const std::vector<std::byte> hebrew = read_fallback(hebrew_path);
         test_rows(font, arabic, hebrew);
+        test_blank_placement(font);
+        test_placement_sizes(font);
+        test_exact_primary_metrics(font);
         test_failures(font);
         test_zero_limits(font);
         test_late_coverage(font);

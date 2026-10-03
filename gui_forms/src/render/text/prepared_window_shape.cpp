@@ -117,6 +117,8 @@ PreparedTextStatus PreparedWindowShaper::shape(detail::PreparedWindowBatchStorag
     std::size_t runs = 0U;
     std::size_t glyphs = 0U;
     std::size_t workspace_peak = 0U;
+    double width_device = 0.0;
+    double height_device = 0.0;
     const ShapeStorageLimits ceiling{};
     try {
         std::unique_ptr<detail::PreparedWindowGeometryRow[]> rows =
@@ -126,6 +128,15 @@ PreparedTextStatus PreparedWindowShaper::shape(detail::PreparedWindowBatchStorag
         FontSpec device_font = key.font;
         device_font.size = static_cast<double>(base_metrics.device_size_26_6) / 64.0;
         device_font.letter_spacing *= key.scale;
+        // Invariant font/scale: one exact-primary metrics lookup for the whole
+        // batch, including empty rows. Native sizing is never done for placement
+        // inside the row loop; ordinary glyph shaping retains its own setup.
+        const std::optional<PrimaryLineMetrics> primary = (*engine_).primary_line_metrics(device_font);
+        if (!primary) return PreparedTextStatus::incompatible_font;
+        const PrimaryLineMetrics& line = *primary;
+        if (!std::isfinite(line.ascent_device) || !std::isfinite(line.descent_device) ||
+            !std::isfinite(line.line_gap_device) || line.ascent_device < 0.0 || line.descent_device < 0.0 ||
+            line.line_gap_device < 0.0) return PreparedTextStatus::invalid_geometry;
         const std::span<const FontFaceId> faces(face_ids_.data(), (*fonts_).face_count);
         for (std::size_t index = 0U; index < batch.row_count; ++index) {
             current = detail::prepared_window_worker_current(batch);
@@ -151,8 +162,22 @@ PreparedTextStatus PreparedWindowShaper::shape(detail::PreparedWindowBatchStorag
             BoundedShapedText& geometry = *shaped;
             if (geometry.missing_primary_face || geometry.missing_clusters != 0U) return PreparedTextStatus::missing_font_coverage;
             if (!finite_geometry(geometry, length, faces)) return PreparedTextStatus::invalid_geometry;
+            if (geometry.ascent < 0.0 || geometry.descent < 0.0) return PreparedTextStatus::invalid_geometry;
+            const double ascent = std::max(line.ascent_device, geometry.ascent);
+            const double descent = std::max(line.descent_device, geometry.descent);
+            const double line_height = std::max(geometry.height, ascent + descent + line.line_gap_device);
+            const double baseline = height_device + ascent;
+            const double next_top = height_device + line_height;
+            if (!std::isfinite(line_height) || line_height <= 0.0 || !std::isfinite(baseline) ||
+                !std::isfinite(next_top) || next_top <= height_device || baseline > next_top)
+                return PreparedTextStatus::invalid_geometry;
             detail::PreparedWindowGeometryRow& row = rows[index];
             row.paragraph_index = paragraph_index;
+            row.top_device = height_device;
+            row.baseline_device = baseline;
+            row.height_device = line_height;
+            height_device = next_top;
+            width_device = std::max(width_device, geometry.width);
             row.metrics = base_metrics;
             row.metrics.advance_dip = geometry.width / key.scale;
             row.metrics.height_dip = geometry.height / key.scale;
@@ -179,6 +204,8 @@ PreparedTextStatus PreparedWindowShaper::shape(detail::PreparedWindowBatchStorag
         batch.glyph_count = glyphs;
         batch.workspace_peak_bytes = workspace_peak;
         batch.requested_bytes = bytes;
+        batch.width_device = width_device;
+        batch.height_device = height_device;
     } catch (const std::length_error&) { return PreparedTextStatus::budget_exceeded; }
     catch (const std::bad_alloc&) { return PreparedTextStatus::resource_failure; }
     catch (...) { return PreparedTextStatus::native_failure; }

@@ -38,6 +38,7 @@ jobs:
           python3 -B tools/check_house_style.py frontend/include frontend/src frontend/tests frontend/examples orchestrator/conformance/clients/cpp
           python3 -B tools/check_house_style.py gui_forms/include/gui_forms/text_mask.hpp gui_forms/include/gui_forms/text_mask gui_forms/src/core/text/text_mask gui_forms/src/render/text/text_mask gui_forms/tests/text_mask_lifecycle_tests.cpp gui_forms/tests/text_mask_native_tests.cpp gui_forms/tests/text_mask_wrapping_tests.cpp gui_forms/tests/text_mask_cost_probe.cpp
           python3 -B tools/check_house_style.py gui_forms/src/core/text/prepared_window gui_forms/tests/prepared_window_input_tests.cpp gui_forms/tests/prepared_window_batch_tests.cpp
+          python3 -B tools/check_house_style.py gui_forms/src/render/text/harfbuzz/harfbuzz_font_engine.hpp gui_forms/src/render/text/harfbuzz/harfbuzz_font_engine.cpp
           python3 -B tools/check_house_style.py gui_forms/src/render/text/prepared_window_shape.hpp gui_forms/src/render/text/prepared_window_shape.cpp gui_forms/tests/prepared_window_shape_tests.cpp gui_forms/src/render/text/prepared_window_session.hpp gui_forms/src/render/text/prepared_window_session.cpp gui_forms/tests/prepared_window_session_tests.cpp gui_forms/src/core/text/prepared/prepared_storage.hpp gui_forms/src/core/text/prepared/prepared_storage.cpp gui_forms/src/render/text/prepared_service.cpp gui_forms/tests/prepared_text_service_tests.cpp
   native:
     name: ${{ matrix.platform }}

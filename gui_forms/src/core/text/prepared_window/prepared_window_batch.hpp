@@ -26,6 +26,11 @@ struct PreparedWindowRowStorage final {
 struct PreparedWindowGeometryRow final {
     std::size_t paragraph_index{};
     PreparedTextMetrics metrics{};
+    // Candidate screen line boxes, all in device pixels relative to batch top.
+    // Original shaped metrics above remain unchanged; these are not caret data.
+    double top_device{};
+    double baseline_device{};
+    double height_device{};
     std::unique_ptr<const render::text::BoundedFontRun[]> runs{};
     std::unique_ptr<const render::text::ShapedGlyph[]> glyphs{};
     std::size_t run_count{};
@@ -46,6 +51,9 @@ struct PreparedWindowBatchStorage final {
     std::size_t run_count{};
     std::size_t glyph_count{};
     std::size_t workspace_peak_bytes{};
+    // Logical advance/line extent, not ink bounds or a raster allocation/crop.
+    double width_device{};
+    double height_device{};
 };
 // After the first desire, session/controller remain fixed and epoch must
 // strictly increase, even for identical text. Exhaustion cannot wrap or revive.

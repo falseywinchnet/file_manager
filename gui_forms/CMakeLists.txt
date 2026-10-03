@@ -1658,7 +1658,7 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_prepared_window_batch_tests PRIVATE gui_forms_core)
         add_test(NAME gui_forms_prepared_window_batch_tests COMMAND gui_forms_prepared_window_batch_tests)
         add_executable(gui_forms_prepared_window_shape_tests tests/prepared_window_shape_tests.cpp)
-        target_link_libraries(gui_forms_prepared_window_shape_tests PRIVATE gui_forms_prepared_text gui_forms_text_engine)
+        target_link_libraries(gui_forms_prepared_window_shape_tests PRIVATE gui_forms_prepared_text gui_forms_text_engine freetype)
         add_test(NAME gui_forms_prepared_window_shape_tests
             COMMAND gui_forms_prepared_window_shape_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
         add_executable(gui_forms_prepared_window_session_tests tests/prepared_window_session_tests.cpp)
