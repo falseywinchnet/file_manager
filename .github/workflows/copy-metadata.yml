@@ -1,0 +1,77 @@
+name: File Manager copy metadata evidence
+on:
+  push:
+    branches: ['codex/file-manager-copy-metadata']
+    paths:
+      - 'frontend/experiments/copy_metadata/**'
+      - '.github/workflows/copy-metadata.yml'
+  pull_request:
+    paths:
+      - 'frontend/experiments/copy_metadata/**'
+      - '.github/workflows/copy-metadata.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: copy-metadata-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  baseline:
+    name: Copy metadata on ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-26
+            platform: macos-arm64
+          - runner: ubuntu-24.04
+            platform: linux-x64
+          - runner: windows-2022
+            platform: windows-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check specimen C++ spelling
+        if: runner.os == 'Linux'
+        run: python3 -B tools/check_house_style.py frontend/experiments/copy_metadata/copy_metadata_probe.cpp
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: MINGW64
+          update: true
+          path-type: inherit
+          install: mingw-w64-x86_64-gcc
+      - name: Compile and measure POSIX baseline
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p .build/copy-metadata
+          git rev-parse HEAD > .build/copy-metadata/source.txt
+          c++ --version > .build/copy-metadata/compiler.txt
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            frontend/experiments/copy_metadata/copy_metadata_probe.cpp \
+            -o .build/copy-metadata/probe 2>&1 | tee .build/copy-metadata/compile.txt
+          .build/copy-metadata/probe | tee .build/copy-metadata/observations.tsv
+      - name: Compile and measure Windows baseline
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          mkdir -p .build/copy-metadata
+          git rev-parse HEAD > .build/copy-metadata/source.txt
+          c++ --version > .build/copy-metadata/compiler.txt
+          c++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            frontend/experiments/copy_metadata/copy_metadata_probe.cpp \
+            -o .build/copy-metadata/probe.exe 2>&1 | tee .build/copy-metadata/compile.txt
+          .build/copy-metadata/probe.exe | tee .build/copy-metadata/observations.tsv
+      - name: Preserve observations and failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: copy-metadata-${{ matrix.platform }}
+          path: |
+            .build/copy-metadata/*.txt
+            .build/copy-metadata/*.tsv
+          include-hidden-files: true
+          if-no-files-found: warn

@@ -1,0 +1,13 @@
+frontend/experiments/copy_metadata/copy_metadata_probe.cpp:18:9: error: 'NOMINMAX' redefined [-Werror]
+   18 | #define NOMINMAX
+      |         ^~~~~~~~
+In file included from C:/Users/Shadow/plan-paint/build-deps/msys64/mingw64/include/c++/16.2.0/x86_64-w64-mingw32/bits/c++config.h:733,
+                 from C:/Users/Shadow/plan-paint/build-deps/msys64/mingw64/include/c++/16.2.0/bits/version.h:51,
+                 from C:/Users/Shadow/plan-paint/build-deps/msys64/mingw64/include/c++/16.2.0/compare:40,
+                 from C:/Users/Shadow/plan-paint/build-deps/msys64/mingw64/include/c++/16.2.0/array:40,
+                 from frontend/experiments/copy_metadata/copy_metadata_probe.cpp:1:
+C:/Users/Shadow/plan-paint/build-deps/msys64/mingw64/include/c++/16.2.0/x86_64-w64-mingw32/bits/os_defines.h:45:9: note: this is the location of the previous definition
+   45 | #define NOMINMAX 1
+      |         ^~~~~~~~
+cc1plus.exe: all warnings being treated as errors
+compiler_exit=1

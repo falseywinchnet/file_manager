@@ -1,0 +1,20 @@
+
+Caption        : Microsoft Windows 11 Home
+Version        : 10.0.22621
+BuildNumber    : 22621
+OSArchitecture : 64-bit
+
+
+
+DriveLetter        : C
+FileSystemType     : NTFS
+AllocationUnitSize : 4096
+
+
+2026-10-02T22:11:01.2385667-07:00
+
+Algorithm : SHA256
+Hash      : 106E63E887CD27AC8832665D2322C3F308CBEAC9F179CF5C06244021A6DD0A4A
+Path      : C:\Users\Shadow\file_manager\frontend\experiments\copy_metadata\copy_metadata_probe.cpp
+
+
