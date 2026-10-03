@@ -36,6 +36,15 @@ preservation cannot be inferred on that filesystem. An allocation-query error
 likewise leaves allocation behavior unmeasured. Unsupported capabilities must
 remain visible in CI output rather than being interpreted as preservation.
 
+Timestamp reporting supports signed integral file-clock representations with
+at least 63 value bits. Each count is compared with signed 64-bit bounds in its
+original representation before conversion and decimal formatting. Counts
+outside that range fail the run explicitly; no truncation, rounding, epoch
+conversion, or tick-period conversion occurs. The recorded clock period remains
+necessary for interpreting these implementation-specific counts. A wider clock
+representation, such as libc++ uses on macOS, is not passed directly to
+`std::to_string`.
+
 ## Build and run
 
 Run from the repository root. No CMake target or third-party dependency is

@@ -181,6 +181,25 @@ private:
     }
 }
 
+// Compare in the original representation before narrowing. No epoch or tick
+// period conversion is performed; out-of-range observations fail explicitly.
+[[nodiscard]] std::string format_file_clock_ticks(const fs::file_time_type time) {
+    using FileClockRep = fs::file_time_type::duration::rep;
+    static_assert(std::numeric_limits<FileClockRep>::is_integer);
+    static_assert(std::numeric_limits<FileClockRep>::is_signed);
+    static_assert(std::numeric_limits<FileClockRep>::digits >=
+                  std::numeric_limits<std::int64_t>::digits);
+    const FileClockRep minimum = static_cast<FileClockRep>(std::numeric_limits<std::int64_t>::min());
+    const FileClockRep maximum = static_cast<FileClockRep>(std::numeric_limits<std::int64_t>::max());
+    const fs::file_time_type::duration elapsed = time.time_since_epoch();
+    const FileClockRep original = elapsed.count();
+    require(original >= minimum && original <= maximum,
+            "file clock ticks outside signed 64-bit reporting range");
+    const std::int64_t ticks = static_cast<std::int64_t>(original);
+    const std::string result = std::to_string(ticks);
+    return result;
+}
+
 void copy_and_report(const std::string& name, const fs::path& source,
                      const fs::path& destination) {
     const fs::perms source_permissions = fs::status(source).permissions();
@@ -197,8 +216,10 @@ void copy_and_report(const std::string& name, const fs::path& source,
     report(name, "destination_permissions_decimal", std::to_string(static_cast<unsigned int>(destination_permissions)));
     report(name, "permissions_equal", source_permissions == destination_permissions ? "yes" : "no");
     const fs::file_time_type destination_time = fs::last_write_time(destination);
-    report(name, "source_mtime_clock_ticks", std::to_string(source_time.time_since_epoch().count()));
-    report(name, "destination_mtime_clock_ticks", std::to_string(destination_time.time_since_epoch().count()));
+    const std::string source_ticks = format_file_clock_ticks(source_time);
+    const std::string destination_ticks = format_file_clock_ticks(destination_time);
+    report(name, "source_mtime_clock_ticks", source_ticks);
+    report(name, "destination_mtime_clock_ticks", destination_ticks);
     report(name, "mtime_equal", source_time == destination_time ? "yes" : "no");
 }
 

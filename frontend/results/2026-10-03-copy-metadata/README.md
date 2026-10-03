@@ -71,11 +71,65 @@ is a source review, not a claim of macOS/Linux compilation or runtime proof.
 Existing product source, other experiments, generated code, and dependencies
 were not reviewed or modified for this assignment.
 
+## Native workflow failure and clock-reporting repair
+
+**OBSERVED:** Native workflow run `37099310256` at `0964c58` produced a macOS
+compile failure: both direct `std::to_string(file_time_duration.count())` calls
+were ambiguous in libc++. The full supplied diagnostic artifact is preserved
+unchanged as `macos-0964c58-compile-failed.txt`. No macOS runtime metadata
+observation resulted from that run. The earlier local-only limitations above
+describe the original receipt; the Linux evidence below arrived subsequently.
+
+**MEASURED:** The supplied Linux artifact from that same revision is preserved
+as `linux-0964c58.tsv`. It records GCC 13.3.0, libstdc++ date 20240904,
+x86_64 Linux kernel 6.17.0-1022-azure, matching contents and permission masks
+for all five copies, an unpreserved old timestamp, an absent destination user
+xattr (errno 61), and sparse allocation increasing from 8,192 to 8,388,608
+bytes. It records successful exact-scope cleanup and completion. Filesystem
+identity is not present in that TSV; no filesystem type is inferred. These are
+baseline observations, not accepted metadata policy.
+
+The repair adds `format_file_clock_ticks`, a named checked formatting boundary.
+Its explicitly typed original count is compared to signed 64-bit bounds in the
+original `file_time_type::duration::rep`. Static assertions require a signed
+integral representation with at least 63 value bits, making both bound
+conversions exact. Only after both comparisons pass is the count converted to
+`std::int64_t` and formatted. Out-of-range values fail explicitly through the
+existing exception/cleanup path. Tick precision and epoch are unchanged.
+
+**MEASURED:** The repaired source compiled locally with the same one-process
+GCC command and warning-as-error flags documented above. Compile and probe
+exited zero (`clock-repair-compile.txt`, `clock-repair-checks.txt`). The new raw
+run is `clock-repair-windows.tsv`; measured preservation outcomes match the
+original Windows receipt. Its exact reported temporary path was independently
+checked absent after successful owned cleanup. The repair source SHA-256 is
+recorded in `clock-repair-checks.txt`; the earlier `environment.txt` hash applies
+only to the original source. Native macOS compilation and execution of the
+repair remain pending; the wider representation's out-of-range branch was not
+runtime-exercised on this Windows host.
+
+**OBSERVED:** Semantic review of the complete changed scope against
+`planning/PROGRAMMING_HOUSE_STYLE.md` covered the new formatter, both changed
+reporting call sites, the experiment README addition, and this receipt addition.
+Types, initialization, signed-width bounds, compare-before-convert order,
+allocation of the returned string, value ownership, and existing failure cleanup
+were reviewed. No callback, retained borrow, mutable shared state, or repeated
+element-loop work was introduced. No known house-style violations remain in
+this changed scope. The repository spelling check was run as
+`C:/Users/Shadow/plan-paint/build-deps/msys64/mingw64/bin/python.exe tools/check_house_style.py frontend/experiments/copy_metadata/copy_metadata_probe.cpp`;
+it reported one file, zero findings, and exit zero. Its output and exit status
+are in `clock-repair-spelling.txt`, including the preceding failed attempt via
+the unavailable default `python` launcher (exit 9009). An additional
+`rg` spelling scan found no prohibited spellings. Neither spelling scan
+substitutes for the semantic review. No workflow, production source, or Git
+state was changed by this repair assignment.
+
 ## Coordinator integration
 
 The coordinator reviewed the complete probe, owned-fixture cleanup, native
 handle closure, metadata failure states, and the platform-specific baseline
-limits. The source SHA-256 matches `environment.txt`; the independent spelling
+limits. The initial source SHA-256 matched `environment.txt`; the corrected
+source hash is recorded in `clock-repair-checks.txt`. The independent spelling
 check reports zero candidates. This does not establish platform execution.
 
 `.github/workflows/copy-metadata.yml` runs the standalone specimen on the same

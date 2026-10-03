@@ -1,0 +1,61 @@
+frontend/experiments/copy_metadata/copy_metadata_probe.cpp:200:46: error: call to 'to_string' is ambiguous
+  200 |     report(name, "source_mtime_clock_ticks", std::to_string(source_time.time_since_epoch().count()));
+      |                                              ^~~~~~~~~~~~~~
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3871:34: note: candidate function
+ 3871 | _LIBCPP_EXPORTED_FROM_ABI string to_string(int __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3872:34: note: candidate function
+ 3872 | _LIBCPP_EXPORTED_FROM_ABI string to_string(unsigned __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3873:34: note: candidate function
+ 3873 | _LIBCPP_EXPORTED_FROM_ABI string to_string(long __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3874:34: note: candidate function
+ 3874 | _LIBCPP_EXPORTED_FROM_ABI string to_string(unsigned long __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3875:34: note: candidate function
+ 3875 | _LIBCPP_EXPORTED_FROM_ABI string to_string(long long __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3876:34: note: candidate function
+ 3876 | _LIBCPP_EXPORTED_FROM_ABI string to_string(unsigned long long __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3877:34: note: candidate function
+ 3877 | _LIBCPP_EXPORTED_FROM_ABI string to_string(float __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3878:34: note: candidate function
+ 3878 | _LIBCPP_EXPORTED_FROM_ABI string to_string(double __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3879:34: note: candidate function
+ 3879 | _LIBCPP_EXPORTED_FROM_ABI string to_string(long double __val);
+      |                                  ^
+frontend/experiments/copy_metadata/copy_metadata_probe.cpp:201:51: error: call to 'to_string' is ambiguous
+  201 |     report(name, "destination_mtime_clock_ticks", std::to_string(destination_time.time_since_epoch().count()));
+      |                                                   ^~~~~~~~~~~~~~
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3871:34: note: candidate function
+ 3871 | _LIBCPP_EXPORTED_FROM_ABI string to_string(int __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3872:34: note: candidate function
+ 3872 | _LIBCPP_EXPORTED_FROM_ABI string to_string(unsigned __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3873:34: note: candidate function
+ 3873 | _LIBCPP_EXPORTED_FROM_ABI string to_string(long __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3874:34: note: candidate function
+ 3874 | _LIBCPP_EXPORTED_FROM_ABI string to_string(unsigned long __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3875:34: note: candidate function
+ 3875 | _LIBCPP_EXPORTED_FROM_ABI string to_string(long long __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3876:34: note: candidate function
+ 3876 | _LIBCPP_EXPORTED_FROM_ABI string to_string(unsigned long long __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3877:34: note: candidate function
+ 3877 | _LIBCPP_EXPORTED_FROM_ABI string to_string(float __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3878:34: note: candidate function
+ 3878 | _LIBCPP_EXPORTED_FROM_ABI string to_string(double __val);
+      |                                  ^
+/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:3879:34: note: candidate function
+ 3879 | _LIBCPP_EXPORTED_FROM_ABI string to_string(long double __val);
+      |                                  ^
+2 errors generated.
