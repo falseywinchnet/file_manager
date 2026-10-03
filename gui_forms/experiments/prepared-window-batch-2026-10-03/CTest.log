@@ -1,0 +1,15 @@
+Test project C:/Users/Shadow/file_manager/.build/prepared-window-input
+    Start 1: gui_forms_prepared_window_input_tests
+1/5 Test #1: gui_forms_prepared_window_input_tests ...   Passed    0.04 sec
+    Start 2: gui_forms_prepared_window_batch_tests
+2/5 Test #2: gui_forms_prepared_window_batch_tests ...   Passed    0.03 sec
+    Start 3: gui_forms_prepared_text_service_tests
+3/5 Test #3: gui_forms_prepared_text_service_tests ...   Passed    0.24 sec
+    Start 4: gui_forms_prepared_text_raster_tests
+4/5 Test #4: gui_forms_prepared_text_raster_tests ....   Passed    0.34 sec
+    Start 5: gui_forms_prepared_display_tests
+5/5 Test #5: gui_forms_prepared_display_tests ........   Passed    0.11 sec
+
+100% tests passed out of 5
+
+Total Test time (real) =   0.78 sec
