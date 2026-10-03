@@ -14,13 +14,38 @@
 
 namespace gui_forms::detail {
 
+// Private monotonic identity sources. Zero and the terminal maximum are never
+// issued; refusal preserves output. The counter helper admits a local source
+// for exhaustion fixtures, without resetting either process-wide source.
+[[nodiscard]] PreparedTextStatus acquire_prepared_identity(std::atomic<std::uint64_t>& next,
+    std::uint64_t& output) noexcept;
+[[nodiscard]] PreparedTextStatus acquire_prepared_session_instance(std::uint64_t& output) noexcept;
+[[nodiscard]] PreparedTextStatus acquire_prepared_controller_instance(std::uint64_t& output) noexcept;
+
 enum class PreparedResource { font_bank, input, payload, mask };
 
 struct PreparedLedger final {
     std::mutex mutex{};
     PreparedTextBudgetSnapshot usage{};
     std::uint64_t next_bank{1};
+    bool session_claimed{};
     bool closing{};
+};
+
+// One shaping session per ledger, including source-private batch sessions.
+// Acquire before starting a worker. The owner releases only after joining it
+// or when worker creation fails; cancellation/exit alone do not release it.
+// This owner is executor-confined; the ledger arbitrates competing owners.
+class PreparedSessionClaim final {
+public:
+    PreparedSessionClaim() = default;
+    ~PreparedSessionClaim();
+    PreparedSessionClaim(const PreparedSessionClaim&) = delete;
+    PreparedSessionClaim& operator=(const PreparedSessionClaim&) = delete;
+    [[nodiscard]] PreparedTextStatus acquire(std::shared_ptr<PreparedLedger> ledger);
+    void release() noexcept;
+private:
+    std::shared_ptr<PreparedLedger> ledger_{};
 };
 
 class PreparedReservation final {
@@ -114,6 +139,7 @@ struct PreparedServiceState final {
 };
 
 struct PreparedSessionState final {
+    PreparedSessionClaim claim{};
     std::shared_ptr<PreparedServiceState> service{};
     std::shared_ptr<const PreparedFontBank> fonts{};
     std::shared_ptr<PreparedAuthorityState> authority{};

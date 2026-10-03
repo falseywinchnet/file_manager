@@ -11,18 +11,6 @@ namespace gui_forms {
 namespace {
 
 std::atomic<std::uint64_t> next_service_instance{1};
-std::atomic<std::uint64_t> next_session_instance{1};
-
-PreparedTextStatus acquire_session_instance(std::uint64_t& output) noexcept {
-    std::uint64_t observed = next_session_instance.load(std::memory_order_relaxed);
-    for (;;) {
-        if (observed == std::numeric_limits<std::uint64_t>::max()) return PreparedTextStatus::generation_exhausted;
-        const std::uint64_t successor = observed + 1U;
-        const bool exchanged = next_session_instance.compare_exchange_weak(observed, successor,
-            std::memory_order_relaxed, std::memory_order_relaxed);
-        if (exchanged) { output = observed; return PreparedTextStatus::success; }
-    }
-}
 
 std::uint64_t acquire_service_instance() {
     std::uint64_t observed = next_service_instance.load(std::memory_order_relaxed);
@@ -175,10 +163,12 @@ PreparedTextStatus PreparedTextService::open_session(const EncodedFontLease& fon
         std::lock_guard<std::mutex> lock(ledger.mutex);
         if (ledger.closing) return PreparedTextStatus::closing;
     }
-    const PreparedTextStatus identified = acquire_session_instance(session_id);
+    const PreparedTextStatus identified = detail::acquire_prepared_session_instance(session_id);
     if (identified != PreparedTextStatus::success) return identified;
     try {
         std::shared_ptr<detail::PreparedSessionState> state = std::make_shared<detail::PreparedSessionState>();
+        const PreparedTextStatus claimed = (*state).claim.acquire((*state_).ledger);
+        if (claimed != PreparedTextStatus::success) return claimed;
         (*state).service = state_;
         (*state).fonts = bank;
         (*state).authority = std::make_shared<detail::PreparedAuthorityState>();
@@ -342,11 +332,14 @@ void PreparedSessionState::close() {
 }
 void PreparedSessionState::join() {
     if (worker.joinable()) worker.join();
-    std::lock_guard<std::mutex> lock(mutex);
-    job.reset();
-    ready.reset();
-    snapshot.slot = PreparedTextSlot::empty;
-    snapshot.joined = true;
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        job.reset();
+        ready.reset();
+        snapshot.slot = PreparedTextSlot::empty;
+        snapshot.joined = true;
+    }
+    claim.release();
 }
 
 void PreparedSessionState::run() noexcept {
