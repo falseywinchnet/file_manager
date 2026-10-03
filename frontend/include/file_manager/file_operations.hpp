@@ -134,8 +134,6 @@ private:
         const ObjectIdentity& expected) const;
     [[nodiscard]] static std::optional<std::string> validate_basename(
         std::string_view basename);
-    [[nodiscard]] static bool destination_exists_no_follow(
-        const std::filesystem::path& path);
     [[nodiscard]] std::filesystem::path available_quarantine_path(
         const std::filesystem::path& source);
 

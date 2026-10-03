@@ -39,6 +39,11 @@ complete race resistance merely because publication becomes no-replace.
 
 ## Second repair: cancellable regular-file copy
 
+The first repair now has a source implementation and Windows test receipt in
+`../results/2026-10-03-no-replace/README.md`; native Mac/Linux CI remains pending.
+This supersedes the earlier observation of ordinary rename at publication, not
+the open source-identity/parent-route race, broader mutation or recovery scope.
+
 **OBSERVED:** `copy_node_no_follow` checks cancellation per node, but a regular
 file uses one blocking `std::filesystem::copy_file`. Cancellation can prevent
 final publication while waiting for that call. The UI has no explicit transfer
