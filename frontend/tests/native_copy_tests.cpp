@@ -1,4 +1,5 @@
 #include "../src/native_copy.hpp"
+#include "copy_time_fixture.hpp"
 
 #include <algorithm>
 #include <array>
@@ -186,6 +187,7 @@ void successful_files(FixtureOwner& owner, file_manager::NativeCopyWorkspace& wo
         const fs::path source = owner.file(prefix + "-source");
         const fs::path stage = owner.file(prefix + "-stage");
         write_fixture(source, length);
+        require(copy_time_fixture::set_modified(source), "old timestamp fixture setup failed");
         const ObjectIdentity expected = file_manager::observe_identity(source);
         ProgressProbe probe{static_cast<std::uint64_t>(length)};
         const NativeCopyProgressObserver progress{std::ref(probe)};
@@ -198,10 +200,12 @@ void successful_files(FixtureOwner& owner, file_manager::NativeCopyWorkspace& wo
         verify_owned(result, stage);
         require(file_manager::observe_identity(source).same_revision(expected), "source revision changed");
         require(!(expected == result.stage_identity), "copy reused source identity");
+        require(copy_time_fixture::same_modified(source, stage),
+            "copy must retain the source's old subsecond modification date after close");
         verify_contents(source, length);
         verify_contents(stage, length);
     }
-    std::cout << "PASS empty/small/multichunk; monotone bounded progress, contents and identities\n";
+    std::cout << "PASS empty/small/multichunk; bounded progress, contents, identities and modification dates\n";
 }
 
 void progress_interruptions(FixtureOwner& owner, file_manager::NativeCopyWorkspace& workspace) {
@@ -368,12 +372,14 @@ void permissions(FixtureOwner& owner, file_manager::NativeCopyWorkspace& workspa
         const fs::path stage = owner.file(prefix + "-stage");
         write_fixture(source, 37U);
         fs::permissions(source, mode);
+        require(copy_time_fixture::set_modified(source), "permission timestamp fixture setup failed");
         const fs::perms observed = fs::status(source).permissions();
         const ObjectIdentity expected = file_manager::observe_identity(source);
         const NativeCopyResult result = file_manager::copy_regular_file_to_stage(source, stage, expected, {}, workspace);
         require(result.terminal == NativeCopyTerminal::complete && !result.error, "permission copy failed");
         verify_owned(result, stage);
         require(fs::status(stage).permissions() == observed, "ordinary/read-only mode mismatch");
+        require(copy_time_fixture::same_modified(source, stage), "read-only copy lost modification date");
         verify_contents(stage, 37U);
     }
     std::cout << "PASS ordinary and read-only permissions\n";

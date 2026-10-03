@@ -1,4 +1,5 @@
 #include "fixture_links.hpp"
+#include "copy_time_fixture.hpp"
 #include "file_manager/file_operations.hpp"
 #include "../src/native_file.hpp"
 #include "../src/native_publication.hpp"
@@ -565,6 +566,7 @@ int main() {
     const std::filesystem::path alpha = area.source() / "alpha.txt";
     const std::filesystem::path beta = area.source() / "beta.txt";
     write_file(alpha, "alpha");
+    if (!require(copy_time_fixture::set_modified(alpha), "set old regular-file fixture time")) return 1;
     const file_manager::ObjectIdentity alpha_identity = file_manager::observe_identity(alpha);
     const file_manager::OperationResult renamed = operations.rename_object(alpha, alpha_identity, "beta.txt");
     if (!require(renamed.succeeded() && renamed.resulting_path == beta &&
@@ -585,6 +587,8 @@ int main() {
                  file_manager::observe_identity(copy_destination / "alpha.txt") !=
                      alpha_identity,
                  "file copy must stage and publish a distinct object")) return 1;
+    if (!require(copy_time_fixture::same_modified(alpha, copied_file.resulting_path),
+                 "published regular copy must retain modification date")) return 1;
     const file_manager::OperationResult copy_collision = operations.copy_object(
         alpha, alpha_identity, copy_destination);
     if (!require(copy_collision.terminal ==
@@ -608,6 +612,8 @@ int main() {
     const std::filesystem::path copy_tree = area.source() / "copy-tree";
     std::filesystem::create_directories(copy_tree / "nested");
     write_file(copy_tree / "nested" / "value.txt", "tree value");
+    const std::filesystem::path nested_source = copy_tree / "nested" / "value.txt";
+    if (!require(copy_time_fixture::set_modified(nested_source), "set nested fixture time")) return 1;
     const bool copy_link_available = create_fixture_link(area.outside(), copy_tree / "outside-link");
     const bool directory_link_available = create_fixture_link(
         std::filesystem::path("missing-directory"), copy_tree / "directory-link", true);
@@ -624,6 +630,9 @@ int main() {
                      copy_destination / "copy-tree" / "outside-link").type ==
                      std::filesystem::file_type::symlink),
                  "directory copy must preserve nested files and symlink leaves")) return 1;
+    const std::filesystem::path nested_copy = copied_tree.resulting_path / "nested" / "value.txt";
+    if (!require(copy_time_fixture::same_modified(nested_source, nested_copy),
+                 "recursive copy must retain nested file modification dates")) return 1;
     if (copy_link_available && !require(
             link_target(copy_destination / "copy-tree" / "outside-link") ==
                 link_target(copy_tree / "outside-link") &&

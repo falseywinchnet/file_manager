@@ -51,6 +51,12 @@ private:
 // an unavailable identity means preserve the uncertain path. Identity revision
 // is the last handle observation, not a post-close timestamp guarantee.
 // complete requires exact extent, source revision/path checks, and clean closes.
+// Successful regular files receive the opened source's modification time after
+// writing, with the destination filesystem's supported timestamp precision.
+// Access/creation/status-change timestamps are not cloned. Existing permission
+// handling is unchanged; this does not promise complete metadata preservation.
+// Nonpositive Windows native times are refused before staging because they
+// cannot be passed as ordinary absolute times to the basic-information setter.
 // Close errors are retained separately even when cancellation/failure wins.
 // Windows/Linux poll between bounded I/O calls; macOS uses native write
 // callbacks. No hard I/O deadline, parent-route pin, or filesystem snapshot.

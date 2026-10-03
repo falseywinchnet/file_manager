@@ -1,0 +1,40 @@
+Start testing: Oct 03 03:13 Pacific Daylight Time
+----------------------------------------------------------
+3/15 Testing: file_manager_file_operations_tests
+3/15 Test: file_manager_file_operations_tests
+Command: "C:/Users/Shadow/file_manager/frontend/.build/shadow-windows/file_manager_file_operations_tests.exe"
+Directory: C:/Users/Shadow/file_manager/frontend/.build/shadow-windows
+"file_manager_file_operations_tests" start time: Oct 03 03:13 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+published regular copy must retain modification date
+<end of output>
+Test time =   0.33 sec
+----------------------------------------------------------
+Test Failed.
+"file_manager_file_operations_tests" end time: Oct 03 03:13 Pacific Daylight Time
+"file_manager_file_operations_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/15 Testing: file_manager_native_copy_tests
+4/15 Test: file_manager_native_copy_tests
+Command: "C:/Users/Shadow/file_manager/frontend/.build/shadow-windows/file_manager_native_copy_tests.exe"
+Directory: C:/Users/Shadow/file_manager/frontend/.build/shadow-windows
+"file_manager_native_copy_tests" start time: Oct 03 03:13 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+owned_temp=C:/Users/Shadow/AppData/Local/Temp/file-manager-native-copy-2143276876
+owned_cleanup=verified and removed
+FAIL copy must retain the source's old subsecond modification date after close
+<end of output>
+Test time =   0.07 sec
+----------------------------------------------------------
+Test Failed.
+"file_manager_native_copy_tests" end time: Oct 03 03:13 Pacific Daylight Time
+"file_manager_native_copy_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 03:13 Pacific Daylight Time
