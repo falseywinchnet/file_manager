@@ -1,0 +1,21 @@
+Start testing: Oct 02 21:54 Pacific Daylight Time
+----------------------------------------------------------
+12/13 Testing: file_manager_application_interaction_tests
+12/13 Test: file_manager_application_interaction_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_application_interaction_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_application_interaction_tests" start time: Oct 02 21:54 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+file manager application interaction tests failed: rename fixture controls must exist
+<end of output>
+Test time =   2.13 sec
+----------------------------------------------------------
+Test Failed.
+"file_manager_application_interaction_tests" end time: Oct 02 21:54 Pacific Daylight Time
+"file_manager_application_interaction_tests" time elapsed: 00:00:02
+----------------------------------------------------------
+
+End testing: Oct 02 21:54 Pacific Daylight Time

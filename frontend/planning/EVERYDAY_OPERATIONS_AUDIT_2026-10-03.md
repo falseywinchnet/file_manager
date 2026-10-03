@@ -59,8 +59,9 @@ file cancellation and queued-navigation delay before claiming responsiveness.
 ## Other concrete gaps
 
 - Command rename selects the entire filename; the interview asks for basename-
-  only initial selection with the extension visible. Its current interaction
-  test preserves the mismatch. Unchanged command rename reports a collision;
+  only initial selection with the extension visible. The existing Ctrl+A test
+  correctly expects full selection, but did not assert initial F2 selection.
+  Unchanged command rename reports a collision;
   property rename already treats unchanged text as a no-op.
 - POSIX launcher `waitpid(..., 0)` can occupy the shared worker without a deadline.
   This is an observed dependency, not a measured freeze.

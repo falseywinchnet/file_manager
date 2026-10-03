@@ -65,6 +65,16 @@ bool selection_group_collapsed(const gui_forms::CommandOverflowGroupResult& grou
         "file-manager-app.shell.commands.selection-group" && group.collapsed;
     return collapsed;
 }
+std::size_t rename_basename_extent(const DirectoryEntry& entry) {
+    const std::size_t full_extent = entry.name.size();
+    if (entry.directory) return full_extent;
+    const std::size_t dot = entry.name.find_last_of('.');
+    // A leading dot alone is a filename; an empty trailing suffix is not an
+    // extension. Otherwise retain the final extension, including its dot.
+    if (dot == std::string::npos || dot == 0U || dot + 1U == full_extent) return full_extent;
+    // The ASCII separator is a UTF-8 boundary; no byte/code-point conversion.
+    return dot;
+}
 int decimal_digit(const char character) {
     const int value = character >= '0' && character <= '9' ? character - '0' : -1;
     return value;
@@ -4423,7 +4433,8 @@ void Application::begin_rename() {
     (*rename_box_).set_visible(true);
     compact_search_active_ = false;
     update_adaptive_layout((*form_.file_manager_app_shell).committed_arranged_bounds());
-    (*rename_box_).select_all();
+    const std::size_t basename_extent = rename_basename_extent((*found).second);
+    (*rename_box_).select(gui_forms::Utf8Offset{0U}, gui_forms::Utf8Offset{basename_extent});
     update_mutation_controls();
     if (window_) (*window_).request_focus(rename_box_);
     set_status("Rename " + (*found).second.name,
@@ -4443,6 +4454,10 @@ void Application::commit_rename(std::string basename) {
     set_path_editing(false);
     update_mutation_controls();
     focus_active_object_surface();
+    if (basename == entry.name) {
+        set_status("Name unchanged", entry.name);
+        return;
+    }
     set_status("Renaming " + entry.name,
                "revalidating no-follow filesystem identity");
     post_worker(RenameWork{shared_from_this(), entry, std::move(basename)});
