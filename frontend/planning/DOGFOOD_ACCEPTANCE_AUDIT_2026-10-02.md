@@ -181,7 +181,9 @@ pairs, 500-result UI apply p50/p95 fell from 41.259/52.063 ms to 2.593/4.326 ms;
 100-result p50/p95 fell from 7.484/12.794 to 0.413/0.712 ms. Preparation still
 performs the filesystem work outside the UI; this is not an end-to-end speedup.
 Local 12/12 tests pass, including cancellation, native facts, path refusal and
-ownership checks. New native integration remains pending. Source review,
+ownership checks. Release `v0.001-alpha.8147368` now includes this source after
+two passing native matrices, independent archive verification and Mac preview
+screenshot review. Source review,
 workload, raw measurements, limits and the initial test-fixture correction are
 recorded in `../results/2026-10-02-search-publication/README.md`.
 
@@ -192,6 +194,17 @@ and profiler evidence and raw paired observations are retained under
 candidate. Public substring semantics, identity projection and bounds remain open.
 
 ## Authority and evidence
+
+The follow-up search coverage projection preserves existing provider warnings
+and stale/unavailable coverage through the C++ client and application status.
+It is tracked in PR10 and `../results/2026-10-03-search-coverage/README.md`;
+it is not in the release above. Current native CI is pending after a retained
+intermittent Linux display failure and explicit Xvfb lifetime configuration.
+
+JPEG pixel preparation is a standalone **CANDIDATE** experiment at
+`../experiments/jpeg_decode/README.md`, with generated-fixture Windows results
+in `../results/2026-10-03-jpeg-decode/README.md`. It changes no shipped format
+support and does not supply the missing preview/thumbnail provider contract.
 
 - **GIVEN:** owner reports macOS previews fail across multiple file types,
   thumbnails absent, interaction slow and unsmooth, Details missing planned

@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 3.25)
+project(FileManagerJpegExperiment LANGUAGES CXX)
+
+# Research target only. No application/GUI.Forms dependency or install rule.
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(TURBOJPEG REQUIRED IMPORTED_TARGET libturbojpeg=3.2.0)
+add_executable(file_manager_jpeg_experiment jpeg_experiment.cpp)
+target_link_libraries(file_manager_jpeg_experiment PRIVATE PkgConfig::TURBOJPEG)
+target_compile_features(file_manager_jpeg_experiment PRIVATE cxx_std_20)
+set_target_properties(file_manager_jpeg_experiment PROPERTIES CXX_EXTENSIONS OFF)
+if(MSVC)
+    target_compile_options(file_manager_jpeg_experiment PRIVATE /W4 /WX /permissive-)
+else()
+    target_compile_options(file_manager_jpeg_experiment PRIVATE -Wall -Wextra -Werror -Wpedantic)
+endif()
