@@ -1,0 +1,10 @@
+{
+  "encoding": "UTF-8 without BOM, normalized LF",
+  "sha256": {
+    "frontend/src/file_operations.cpp": "e2d821eb43d28a9776253ecb2f561563bbd0d68df91db5b950fad539a22f864f",
+    "frontend/src/native_copy.cpp": "2dc9e78ef87a7c9ee1c07a0388c8f21963bf31bd48dd2a18692b7b926b5f43a4",
+    "frontend/src/native_copy.hpp": "7f0e77e6e5770f4b18d6cfd1e4e6a2bfdb3d4fd7b1277819385427a828af73c0",
+    "frontend/tests/file_operations_tests.cpp": "6f5c165a907cace295e82e173c20fa688f0be9e7c24a1c1c5416c18a248d9e50",
+    "frontend/tests/copy_time_fixture.hpp": "5c1f73817b102b5ba72f80359c9554cb7b7c717e43fb38a25a9cc54c00858a8a"
+  }
+}

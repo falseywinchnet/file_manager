@@ -20,7 +20,7 @@ namespace copy_time_fixture {
         static_cast<DWORD>(ticks >> 32U)};
     const HANDLE handle = CreateFileW(path.c_str(), FILE_WRITE_ATTRIBUTES,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
-        OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+        OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr);
     if (handle == INVALID_HANDLE_VALUE) return false;
     const BOOL changed = SetFileTime(handle, nullptr, nullptr, &modified);
     const BOOL closed = CloseHandle(handle);

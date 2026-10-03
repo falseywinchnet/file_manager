@@ -1,0 +1,21 @@
+Start testing: Oct 03 03:26 Pacific Daylight Time
+----------------------------------------------------------
+3/15 Testing: file_manager_file_operations_tests
+3/15 Test: file_manager_file_operations_tests
+Command: "C:/Users/Shadow/file_manager/frontend/.build/shadow-windows/file_manager_file_operations_tests.exe"
+Directory: C:/Users/Shadow/file_manager/frontend/.build/shadow-windows
+"file_manager_file_operations_tests" start time: Oct 03 03:26 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+directory copy must retain child data and final ordinary permissions
+<end of output>
+Test time =   0.30 sec
+----------------------------------------------------------
+Test Failed.
+"file_manager_file_operations_tests" end time: Oct 03 03:26 Pacific Daylight Time
+"file_manager_file_operations_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 03:26 Pacific Daylight Time

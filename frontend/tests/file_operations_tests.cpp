@@ -3,8 +3,10 @@
 #include "file_manager/file_operations.hpp"
 #include "../src/native_file.hpp"
 #include "../src/native_publication.hpp"
+#include "../src/native_copy.hpp"
 
 #include <filesystem>
+#include <array>
 #include <fstream>
 #include <iostream>
 #include <random>
@@ -409,6 +411,148 @@ struct DiskFullAfterThirdNode final {
     }
 };
 
+// Only the four named directories created by this fixture can be made writable
+// for cleanup. Capture identity before restricting access; preserve replacements.
+class RestoreDirectoryAccess final {
+public:
+    explicit RestoreDirectoryAccess(const std::filesystem::path& root)
+        : root_(root), identity_(file_manager::observe_identity(root)) {
+        if (!root_.is_absolute() || !identity_.available()) {
+            throw std::runtime_error("directory access fixture root is not owned");
+        }
+    }
+    RestoreDirectoryAccess(const RestoreDirectoryAccess&) = delete;
+    RestoreDirectoryAccess& operator=(const RestoreDirectoryAccess&) = delete;
+    ~RestoreDirectoryAccess() {
+        try { restore(); }
+        catch (...) { std::cerr << "Directory access fixture restore failed; owned scope retained\n"; }
+    }
+    void remember(const std::filesystem::path& path) {
+        if (!path.is_absolute() || !file_manager::path_is_within(root_, path)) {
+            throw std::runtime_error("directory access fixture path is outside its owned root");
+        }
+        const file_manager::ObjectIdentity identity = file_manager::observe_identity(path);
+        if (!identity.available()) return;
+        if (identity.type != std::filesystem::file_type::directory || count_ >= entries_.size()) {
+            throw std::runtime_error("directory access fixture exceeded its named scope");
+        }
+        entries_[count_] = Entry{path, identity};
+        ++count_;
+    }
+private:
+    struct Entry final {
+        std::filesystem::path path{};
+        file_manager::ObjectIdentity identity{};
+    };
+    void restore() {
+        if (file_manager::observe_identity(root_) != identity_) return;
+        for (std::size_t index = 0; index < count_; ++index) {
+            const Entry& entry = entries_[index];
+            if (file_manager::observe_identity(entry.path) != entry.identity) continue;
+            std::error_code error{};
+            std::filesystem::permissions(entry.path, std::filesystem::perms::owner_all,
+                std::filesystem::perm_options::add, error);
+            if (error) std::cerr << "Owned directory access restore failed; fixture retained\n";
+        }
+    }
+    std::filesystem::path root_{};
+    file_manager::ObjectIdentity identity_{};
+    std::array<Entry, 4U> entries_{};
+    std::size_t count_{};
+};
+
+bool test_directory_copy_metadata(const TestArea& area) {
+    namespace fs = std::filesystem;
+    const fs::path source = area.source() / "readonly-tree";
+    const fs::path nested = source / "nested";
+    const fs::path destination = area.source() / "directory-metadata-destination";
+    fs::create_directories(nested);
+    fs::create_directory(destination);
+    const fs::path leaf = nested / "value.txt";
+    write_file(leaf, "directory metadata fixture");
+    RestoreDirectoryAccess restore(area.source());
+    restore.remember(source);
+    restore.remember(nested);
+    constexpr fs::perms readonly = fs::perms::owner_read | fs::perms::owner_exec |
+        fs::perms::group_read | fs::perms::group_exec;
+    fs::permissions(nested, readonly);
+    fs::permissions(source, readonly);
+    if (!require(copy_time_fixture::set_modified(nested) && copy_time_fixture::set_modified(source),
+                 "set old directory fixture modification dates")) return false;
+    const file_manager::ObjectIdentity expected = file_manager::observe_identity(source);
+    const fs::perms source_permissions = fs::status(source).permissions();
+    const fs::perms nested_permissions = fs::status(nested).permissions();
+    file_manager::FileOperationService operations(area.source(), area.quarantine(), true);
+    const file_manager::OperationResult copied = operations.copy_object(source, expected, destination);
+    // A failed copy may report its retained owned stage rather than the final
+    // path. Restore only that named result and its known nested directory.
+    const fs::path copied_nested = copied.resulting_path / "nested";
+    restore.remember(copied.resulting_path);
+    restore.remember(copied_nested);
+    if (!require(copied.succeeded(), "read-only directory copy must fill children before restoring permissions")) {
+        std::cerr << copied.code << ": " << copied.message << '\n';
+        return false;
+    }
+    if (!require(fs::is_regular_file(copied_nested / "value.txt") &&
+                 fs::status(copied.resulting_path).permissions() == source_permissions &&
+                 fs::status(copied_nested).permissions() == nested_permissions,
+                 "directory copy must retain child data and final ordinary permissions")) return false;
+    if (!require(copy_time_fixture::same_modified(source, copied.resulting_path) &&
+                 copy_time_fixture::same_modified(nested, copied_nested),
+                 "directory dates must be restored after children and final publication")) return false;
+    if (!require(file_manager::observe_identity(source).same_revision(expected),
+                 "copy must not change the source directory revision")) return false;
+    return true;
+}
+
+bool test_directory_metadata_refusal(const TestArea& area) {
+    namespace fs = std::filesystem;
+    const fs::path source = area.source() / "metadata-refusal-source";
+    const fs::path stage = area.source() / "metadata-refusal-stage";
+    fs::create_directory(source);
+    const std::error_code created = file_manager::create_copy_directory_stage(stage);
+    if (!require(!created, "directory metadata stage creation must succeed")) return false;
+    const file_manager::ObjectIdentity stage_identity = file_manager::observe_identity(stage);
+    const fs::perms stage_permissions = fs::status(stage).permissions();
+#if !defined(_WIN32)
+    if (!require((stage_permissions & fs::perms::group_all) == fs::perms::none &&
+                 (stage_permissions & fs::perms::others_all) == fs::perms::none,
+                 "unpublished POSIX directory stage must request owner-only access")) return false;
+#endif
+    const std::error_code collision = file_manager::create_copy_directory_stage(stage);
+    if (!require(collision && file_manager::observe_identity(stage) == stage_identity,
+                 "stage creation must preserve an occupied directory")) return false;
+    if (!require(copy_time_fixture::set_modified(source), "set refusal source time")) return false;
+    const file_manager::ObjectIdentity source_identity = file_manager::observe_identity(source);
+    const file_manager::DirectoryCopyMetadataResult stale_source = file_manager::finish_copy_directory_metadata(
+        source, stage, {}, stage_identity);
+    const file_manager::DirectoryCopyMetadataResult stale_stage = file_manager::finish_copy_directory_metadata(
+        source, stage, source_identity, source_identity);
+    if (!require(stale_source.identity_changed && !stale_source.succeeded() &&
+                 stale_stage.identity_changed && !stale_stage.succeeded() &&
+                 file_manager::observe_identity(stage).same_revision(stage_identity) &&
+                 fs::status(stage).permissions() == stage_permissions,
+                 "unavailable source or mismatched stage identity must refuse metadata without changing stage")) return false;
+    const fs::path absent = area.source() / "metadata-refusal-absent";
+    const file_manager::DirectoryCopyMetadataResult missing = file_manager::finish_copy_directory_metadata(
+        source, absent, source_identity, stage_identity);
+    if (!require(missing.error && !missing.applied && !fs::exists(absent),
+                 "metadata finalization must not create an absent stage")) return false;
+    const file_manager::DirectoryCopyMetadataResult finished = file_manager::finish_copy_directory_metadata(
+        source, stage, source_identity, stage_identity);
+    if (!require(finished.succeeded() && copy_time_fixture::same_modified(source, stage),
+                 "matching empty directories must finalize metadata and close successfully")) return false;
+    const file_manager::ObjectIdentity finalized_stage = file_manager::observe_identity(stage);
+    const fs::path changed_child = source / "new-child.txt";
+    write_file(changed_child, "source changed after observation");
+    const file_manager::DirectoryCopyMetadataResult changed = file_manager::finish_copy_directory_metadata(
+        source, stage, source_identity, stage_identity);
+    if (!require(changed.identity_changed && !changed.applied &&
+                 file_manager::observe_identity(stage).same_revision(finalized_stage),
+                 "source directory revision change must refuse finalization without editing stage")) return false;
+    return true;
+}
+
 bool test_ordinary_actions(const TestArea& area) {
     using file_manager::ObjectIdentity;
     using file_manager::OperationResult;
@@ -519,6 +663,8 @@ int main() {
     if (!test_native_publication(area.source())) return 1;
     if (!test_copy_cancellation_after_bytes(area)) return 1;
     if (!test_copy_progress(area)) return 1;
+    if (!test_directory_copy_metadata(area)) return 1;
+    if (!test_directory_metadata_refusal(area)) return 1;
     file_manager::FileOperationService disabled(
         area.source(), area.quarantine(), false);
     const file_manager::OperationResult disabled_create = disabled.create_folder(area.source());
