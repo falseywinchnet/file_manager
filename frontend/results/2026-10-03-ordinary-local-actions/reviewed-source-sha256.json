@@ -1,0 +1,18 @@
+{
+  "encoding": "UTF-8 without BOM, normalized LF",
+  "sha256": {
+    "frontend/include/file_manager/file_operations.hpp": "83199c6190e35055ad8a9cc74ae4ceef2b89ace242c96e1dea22be4a1e267b8b",
+    "frontend/src/file_operations.cpp": "9294600e125aadc4d4953337a4c76195fd29953a8be31204ae8201824762f1b1",
+    "frontend/src/application.hpp": "05de83dd1a0301f93edb90f99d1a3b6cf99015d7698d6cecc622997580ca83c2",
+    "frontend/src/application.cpp": "ddb4e97dc45a2eadc4b900ad29e444aa93384ba2fd3592b729275fb0cf755e7e",
+    "frontend/src/application_jobs.hpp": "3970887e19a1f91198b7dca4e8ca30e6edd99c6c2c8b5592a202f6bb16cdacbe",
+    "frontend/src/main.cpp": "245e7f3df57d613fc13f185875dc44fe75f6ec239364d08e972fe39ec41cd067",
+    "frontend/tests/file_operations_tests.cpp": "c7377bb32f2c88af7e605a94762ccc85a344c5b3ba75ca3b68f5cf4b8ca4efc1",
+    "frontend/tests/application_interaction_tests.cpp": "d6d0cc7e9a99231ebd167986e7ba93193875b65703da3221f293cbf4d0edbfd5",
+    "frontend/tests/macos_preview_tests.mm": "5a7574e22c65bf623811fbd74d33592b2344c6a982014e57129d644d0c83dc15",
+    "frontend/tools/launch_m4_dogfood.sh": "8cd8fb794f49ac7c95db2e74744ba25bcfe5c97ad3196f3e4133396270e02fc6",
+    "frontend/tests/dogfood_launcher_tests.sh": "7ca1e324d0516424de86895d3bccf0514fa06b8d9f75e27a7477c944fec86670",
+    "tools/package_native.py": "b66845ba686018c724c90bf0132cc9c4895245faad2b44d08426ed5b8f7648b5",
+    ".github/workflows/native-builds.yml": "3f15ffd0c754e7c1187e8c3c4139f98417dbbd54642dcf53c55328cf4930462f"
+  }
+}

@@ -557,3 +557,21 @@ provider claims. Current path observations and operation validation remain separ
 optional values, inert details, lifetime and presentation before implementation.
 This extends the source-record repair, with no new query capability or wire method.
 Provider speed, current-identity comparison and thumbnail eligibility remain open.
+
+### Ordinary local New Folder/Rename — 2026-10-03
+
+**Orchestrator request:** honor the existing core-local-operation failure law
+without making ordinary New Folder/Rename depend on an Engine grant or the
+protected fixture quarantine. Preserve independent source/parent observation,
+no-replace publication, explicit results, and honest one-step undo lifetime.
+
+**Observed frontend reply:** the read-only launch audit found that controller
+creation, command availability, and source/destination validation all use the
+protected profile. A launch-flag change alone is insufficient. Browsing,
+operation authority, and indexing consent must remain distinct.
+
+**Reconciliation:** `../../orchestrator/spec/FRONTEND_ORDINARY_LOCAL_ACTIONS.md`
+opens development of ordinary New Folder, same-parent Rename, and their Undo;
+ordinary transfers, native Trash, root setup, and package acceptance remain
+separate work. No new wire method or stable ABI is declared. The source-only
+implementation and semantic review must precede any availability/delivery claim.

@@ -9,7 +9,9 @@ existing local root you choose:
 
 The launcher opens File Manager with real, separate Engine and Orchestrator
 processes. Ordinary text searches filenames and root-relative paths without a
-catalogue. Browsing remains read-only by default. Closing this File Manager
+catalogue. New Folder, same-parent Rename and their one-step Undo use the
+ordinary application policy independently of search. Copy, Move and Delete
+remain unavailable in ordinary mode. Closing this File Manager
 window gracefully stops both services created for this run; other processes
 are not touched. Keep the launcher running until the application closes.
 

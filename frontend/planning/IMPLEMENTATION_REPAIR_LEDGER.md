@@ -2,14 +2,13 @@
 
 Status: **ACTIVE WORKING RECORD — 0.001-alpha repair toward real daily use**.
 
-**Latest verified delivery:** `v0.001-alpha.d4dcb24`, including New Folder naming
-and search source-record retention, is published on all three platforms after
+**Latest verified delivery:** `v0.001-alpha.3e38d4a`, including search match
+evidence and retained request context, is published on all three platforms after
 both native matrices, archive verification and Mac preview/Details image review.
-See `../results/2026-10-03-search-source-records/DELIVERY.md`. Current development
-includes the reconciled substring profile and a bounded-reader experiment;
-the reserved cursor namespace guard refuses the unavailable predicate rather
-than treating it as a legacy exact-name continuation. No catalogue substring
-capability or thumbnail availability is advertised.
+See `../results/2026-10-03-search-match-context/DELIVERY.md`. That package still
+requires the protected profile for filesystem mutations. No catalogue substring
+capability, general preview-provider coverage, or thumbnail availability is
+advertised.
 
 **2026-10-03 development review:** the new bounded-reader candidate passes
 correctness/race/vet but has not established the legacy no-regression gate.
@@ -18,8 +17,23 @@ experiment evidence; the active legacy reader remains unchanged. Private
 prepared-window ownership/admission now passes five local suites, including
 retained payload lifetime and a fixed epoch-revival defect. See
 `../../gui_forms/experiments/PREPARED_WINDOW_BATCH_2026-10-03.md`.
-Native CI is pending. This is not yet shaping, rendering, indexed-search
+Those foundations subsequently passed the native matrices and are included in
+the release above. They are not shaping activation, indexed-search
 availability, thumbnail delivery or a new dogfood release.
+
+**2026-10-03 ordinary-action follow-up:** ordinary New Folder, same-parent
+Rename, and their one-step Undo now have a separate source policy that requires
+neither quarantine nor search services. Explicit read-only startup remains;
+protected Copy/Move/Delete and drag are not enabled by this policy. Request-time
+parent identity travels with queued work; no-replace publication and source
+identity checks remain. Windows operation, application-interaction, and transfer
+regression suites pass, including navigation outside the launch root and queued
+parent replacement. Windows link fixtures were skipped for missing symlink
+privilege; native macOS/Linux acceptance and packaged daily-use checks remain
+pending. The macOS native-window test now exercises menu New Folder/Undo and
+F2 basename Rename/Undo with filesystem observations. See
+`../../orchestrator/spec/FRONTEND_ORDINARY_LOCAL_ACTIONS.md` and
+`ORDINARY_LAUNCH_AUDIT_2026-10-03.md`. This follow-up is not in the release above.
 
 ## Current owner dogfood correction — 2026-10-02
 

@@ -290,10 +290,113 @@ struct DiskFullAfterThirdNode final {
     }
 };
 
+bool test_ordinary_actions(const TestArea& area) {
+    using file_manager::ObjectIdentity;
+    using file_manager::OperationResult;
+    using file_manager::OperationTerminal;
+    const std::filesystem::path parent = area.source() / "ordinary";
+    std::filesystem::create_directory(parent);
+    // A generated repository-category location must not need a protected grant.
+    const std::filesystem::path git_marker = parent / ".git";
+    std::filesystem::create_directory(git_marker);
+    const ObjectIdentity parent_identity = file_manager::observe_identity(parent);
+    file_manager::FileOperationService ordinary(file_manager::OperationPolicy::ordinary_local);
+    file_manager::FileOperationService readonly(file_manager::OperationPolicy::read_only);
+    const OperationResult disabled = readonly.create_folder(parent, parent_identity);
+    const OperationResult missing_parent = ordinary.create_folder(parent);
+    if (!require(disabled.terminal == OperationTerminal::unavailable &&
+                 missing_parent.code == "parent_identity_changed",
+                 "ordinary requests must carry parent identity; explicit read-only refuses")) return false;
+    const OperationResult created = ordinary.create_folder(parent, parent_identity);
+    if (!require(created.succeeded() && created.undo_available && created.identity.available(),
+                 "ordinary create must grant identity-checked undo without quarantine")) return false;
+    const std::filesystem::path child = created.resulting_path / "child.txt";
+    write_file(child, "retained");
+    const OperationResult nonempty = ordinary.undo_last();
+    if (!require(nonempty.code == "created_folder_not_empty" && nonempty.undo_available,
+                 "ordinary undo must retain nonempty folders and retry authority")) return false;
+    std::filesystem::remove(child);
+    const OperationResult removed = ordinary.undo_last();
+    if (!require(removed.succeeded(), "ordinary empty-folder undo must succeed")) return false;
+
+    const std::filesystem::path source = parent / "source.txt";
+    const std::filesystem::path renamed = parent / "renamed.txt";
+    write_file(source, "ordinary source");
+    const ObjectIdentity source_identity = file_manager::observe_identity(source);
+    const OperationResult unchanged = ordinary.rename_object(source, source_identity, "source.txt", parent_identity);
+    const OperationResult invalid = ordinary.rename_object(source, source_identity, "../escape", parent_identity);
+    const OperationResult rename = ordinary.rename_object(source, source_identity, "renamed.txt", parent_identity);
+    if (!require(unchanged.code == "name_unchanged" && invalid.code == "invalid_name" &&
+                 rename.succeeded() && rename.identity == source_identity,
+                 "ordinary rename must validate basename and preserve identity")) return false;
+    write_file(source, "occupied");
+    const OperationResult occupied = ordinary.undo_last();
+    if (!require(occupied.code == "destination_exists" && occupied.undo_available,
+                 "ordinary rename undo must refuse an occupied original name")) return false;
+    std::filesystem::remove(source);
+    const OperationResult restored = ordinary.undo_last();
+    if (!require(restored.succeeded(), "ordinary rename undo must remain retryable")) return false;
+    write_file(renamed, "occupied destination");
+    const OperationResult collision = ordinary.rename_object(source, source_identity, "renamed.txt", parent_identity);
+    const OperationResult copy = ordinary.copy_object(source, source_identity, area.quarantine());
+    const OperationResult move = ordinary.move_object(source, source_identity, area.quarantine());
+    const OperationResult erase = ordinary.quarantine_object(source, source_identity);
+    if (!require(collision.code == "destination_exists" &&
+                 copy.terminal == OperationTerminal::unavailable &&
+                 move.terminal == OperationTerminal::unavailable &&
+                 erase.terminal == OperationTerminal::unavailable,
+                 "ordinary policy must not admit protected transfers or overwrite collisions")) return false;
+    std::filesystem::remove(renamed);
+    std::filesystem::rename(source, renamed);
+    write_file(source, "replacement");
+    const OperationResult stale_source = ordinary.rename_object(source, source_identity, "wrong.txt", parent_identity);
+    if (!require(stale_source.code == "identity_changed", "ordinary rename must reject source replacement")) return false;
+
+    const std::filesystem::path held_parent = area.source() / "ordinary-held";
+    std::filesystem::rename(parent, held_parent);
+    std::filesystem::create_directory(parent);
+    const OperationResult stale_parent = ordinary.create_folder(parent, parent_identity);
+    if (!require(stale_parent.code == "parent_identity_changed",
+                 "ordinary create must reject parent replacement before execution")) return false;
+    std::filesystem::remove(parent);
+    std::filesystem::rename(held_parent, parent);
+    const OperationResult undo_target = ordinary.create_folder(parent, parent_identity);
+    if (!require(undo_target.succeeded(), "parent-undo fixture must create")) return false;
+    std::filesystem::rename(parent, held_parent);
+    std::filesystem::create_directory(parent);
+    const OperationResult stale_undo = ordinary.undo_last();
+    if (!require(stale_undo.code == "parent_identity_changed" && stale_undo.undo_available,
+                 "ordinary folder undo must reject replaced parent before removal")) return false;
+    std::filesystem::remove(parent);
+    std::filesystem::rename(held_parent, parent);
+    const OperationResult retry_undo = ordinary.undo_last();
+    if (!require(retry_undo.succeeded(), "restoring the exact parent must permit undo retry")) return false;
+
+    const std::filesystem::path root = parent.root_path();
+    const ObjectIdentity root_identity = file_manager::observe_identity(root);
+    const OperationResult root_rename = ordinary.rename_object(root, root_identity, "forbidden", root_identity);
+    if (!require(root_rename.code == "invalid_source", "filesystem root rename must be refused")) return false;
+    const std::filesystem::path linked_parent = area.source() / "ordinary-link";
+    if (create_fixture_link(parent, linked_parent, true)) {
+        const ObjectIdentity link_identity = file_manager::observe_identity(linked_parent);
+        const OperationResult linked_create = ordinary.create_folder(linked_parent, link_identity);
+        if (!require(linked_create.code == "invalid_parent", "link parent routes must be refused")) return false;
+        const std::filesystem::path source_parent = area.source();
+        const ObjectIdentity source_parent_identity = file_manager::observe_identity(source_parent);
+        const OperationResult leaf_rename = ordinary.rename_object(linked_parent, link_identity,
+            "ordinary-link-renamed", source_parent_identity);
+        const OperationResult leaf_undo = ordinary.undo_last();
+        if (!require(leaf_rename.succeeded() && leaf_undo.succeeded() && std::filesystem::exists(parent),
+                     "ordinary link-leaf rename and undo must preserve the target")) return false;
+    }
+    return true;
+}
+
 } // namespace
 
 int main() {
     TestArea area{};
+    if (!test_ordinary_actions(area)) return 1;
     if (!test_native_publication(area.source())) return 1;
     if (!test_copy_cancellation_after_bytes(area)) return 1;
     file_manager::FileOperationService disabled(

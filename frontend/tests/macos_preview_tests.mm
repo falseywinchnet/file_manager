@@ -41,18 +41,30 @@ public:
             std::chrono::steady_clock::now().time_since_epoch();
         const std::filesystem::path temporary_parent =
             std::filesystem::canonical(std::filesystem::temp_directory_path());
+        parent_ = temporary_parent;
         root_ = temporary_parent /
             ("file-manager-native-preview-" + std::to_string(getpid()) + "-" +
              std::to_string(stamp.count()));
         if (!std::filesystem::create_directory(root_)) {
             throw std::runtime_error("cannot acquire native preview fixture directory");
         }
+        identity_ = file_manager::observe_identity(root_);
+        if (!identity_.available()) {
+            throw std::runtime_error("native fixture identity unavailable; directory retained");
+        }
         acquired_ = true;
     }
     ~PreviewFixture() {
-        if (acquired_) {
-            std::error_code ignored{};
-            std::filesystem::remove_all(root_, ignored);
+        try {
+            if (acquired_ && root_.is_absolute() && root_.parent_path() == parent_ &&
+                file_manager::observe_identity(root_) == identity_) {
+                std::error_code ignored{};
+                const std::filesystem::path current = std::filesystem::canonical(root_, ignored);
+                if (!ignored && current == root_) std::filesystem::remove_all(root_, ignored);
+            }
+        } catch (const std::exception&) {
+            // Cleanup cannot replace a test failure with termination. Retain the
+            // generated directory if even validation cannot acquire its storage.
         }
     }
     PreviewFixture(const PreviewFixture&) = delete;
@@ -89,10 +101,15 @@ public:
     }
 private:
     std::filesystem::path root_{};
+    std::filesystem::path parent_{};
+    file_manager::ObjectIdentity identity_{};
     bool acquired_{};
 };
 
-enum class PreviewStage { listing, text, image, unsupported, details, finished };
+enum class PreviewStage {
+    listing, text, image, unsupported, details,
+    folder_created, folder_undone, file_renamed, rename_undone, finished,
+};
 
 struct PreviewState final {
     std::shared_ptr<file_manager::Application> application{};
@@ -103,6 +120,8 @@ struct PreviewState final {
     std::chrono::steady_clock::time_point deadline{};
     PreviewStage stage{PreviewStage::listing};
     std::string failure{};
+    std::filesystem::path fixture_root{};
+    file_manager::ObjectIdentity renamed_identity{};
     bool closed{};
 
     ~PreviewState() { if (application) (*application).stop(); }
@@ -210,9 +229,129 @@ void queue_step(const std::shared_ptr<PreviewState>& state) {
     dispatch_after_f(next, dispatch_get_main_queue(), context, run_step);
 }
 
+void press_menu_command(PreviewState& state, const std::string_view menu,
+                        const std::string_view row) {
+    const bool opened = (*state.model).perform_semantic_action(menu, gui_forms::SemanticAction::expand);
+    if (!opened) throw std::runtime_error("native local-action menu did not open");
+    const bool pressed = (*state.model).perform_semantic_action(row, gui_forms::SemanticAction::press);
+    if (!pressed) throw std::runtime_error("native local-action command was unavailable");
+}
+
+bool contains_file(const gui_forms::ObjectView& objects, const std::string_view name) {
+    for (const gui_forms::ObjectViewItem& item : objects.items()) {
+        if (item.name == name) return true;
+    }
+    return false;
+}
+
+void require_protected_commands_unavailable(gui_forms::Window& model) {
+    const std::shared_ptr<gui_forms::MenuStrip> menu =
+        std::dynamic_pointer_cast<gui_forms::MenuStrip>(model.find("fm.application.menu"));
+    if (!menu) throw std::runtime_error("native application menu disappeared");
+    std::size_t checked = 0U;
+    for (const gui_forms::MenuStripItemSpec& category : (*menu).items()) {
+        if (category.stable_id != "fm.menu.edit") continue;
+        for (const gui_forms::MenuItemSpec& item : category.items) {
+            if (item.stable_id != "edit.copy" && item.stable_id != "edit.move" &&
+                item.stable_id != "edit.paste" && item.stable_id != "edit.delete") continue;
+            if (!item.command || (*item.command).state().enabled) {
+                throw std::runtime_error("ordinary native actions enabled an unfinished protected command");
+            }
+            ++checked;
+        }
+    }
+    if (checked != 4U) throw std::runtime_error("native transfer/deletion policy coverage is incomplete");
+}
+
+// Synthetic menu/key delivery through the actual native window model. Filesystem
+// observations and visible rows must both converge; no private mutation method is
+// invoked. This does not prove physical input or the packaged main() entry point.
+void exercise_local_actions(PreviewState& state, NSWindow* const native) {
+    const std::shared_ptr<gui_forms::ObjectView> objects =
+        std::dynamic_pointer_cast<gui_forms::ObjectView>((*state.model).find("fm.objects.current-folder"));
+    const std::shared_ptr<gui_forms::TextBox> rename =
+        std::dynamic_pointer_cast<gui_forms::TextBox>((*state.model).find("fm.operations.rename"));
+    if (!objects || !rename) throw std::runtime_error("native action controls disappeared");
+    const std::filesystem::path folder = state.fixture_root / "New folder";
+    const std::filesystem::path original = state.fixture_root / "native-preview.txt";
+    const std::filesystem::path renamed = state.fixture_root / "renamed-preview.txt";
+    if (state.stage == PreviewStage::folder_created) {
+        if (!contains_file(*objects, "New folder") || !(*rename).effectively_visible()) return;
+        const file_manager::ObjectIdentity created = file_manager::observe_identity(folder);
+        if (!created.available() || created.type != std::filesystem::file_type::directory ||
+            (*rename).text() != "New folder") {
+            throw std::runtime_error("native New Folder did not create and begin naming the directory");
+        }
+        const bool cancelled = (*state.model).dispatch_key(
+            {gui_forms::KeyAction::down, gui_forms::PhysicalKey::escape});
+        if (!cancelled || (*rename).visible()) throw std::runtime_error("native initial naming did not cancel");
+        press_menu_command(state, "fm.menu.edit", "fm.application.menu.menu.popup.row.edit.undo");
+        state.stage = PreviewStage::folder_undone;
+        return;
+    }
+    if (state.stage == PreviewStage::folder_undone) {
+        if (contains_file(*objects, "New folder")) return;
+        if (file_manager::observe_identity(folder).available()) {
+            throw std::runtime_error("native New Folder Undo left the generated folder behind");
+        }
+        if (!select_file(state, "native-preview.txt")) return;
+        state.renamed_identity = file_manager::observe_identity(original);
+        if (!state.renamed_identity.available()) throw std::runtime_error("native rename source unavailable");
+        const bool focused = (*state.model).request_focus(objects);
+        const bool began = (*state.model).dispatch_key(
+            {gui_forms::KeyAction::down, gui_forms::PhysicalKey::f2});
+        if (!focused || !began || !(*rename).effectively_visible() ||
+            (*rename).selected_text() != "native-preview") {
+            throw std::runtime_error("native F2 did not select the filename basename");
+        }
+        const bool typed = (*state.model).dispatch_text({"renamed-preview"});
+        if (!typed || (*rename).text() != "renamed-preview.txt") {
+            throw std::runtime_error("native basename edit did not preserve the extension");
+        }
+        const bool committed = (*state.model).dispatch_key(
+            {gui_forms::KeyAction::down, gui_forms::PhysicalKey::enter});
+        if (!committed) throw std::runtime_error("native Rename Enter was not handled");
+        state.stage = PreviewStage::file_renamed;
+        return;
+    }
+    if (state.stage == PreviewStage::file_renamed) {
+        if (!contains_file(*objects, "renamed-preview.txt") || (*rename).visible()) return;
+        const file_manager::ObjectIdentity observed = file_manager::observe_identity(renamed);
+        if (observed != state.renamed_identity || file_manager::observe_identity(original).available()) {
+            throw std::runtime_error("native Rename did not preserve the selected filesystem object");
+        }
+        require_protected_commands_unavailable(*state.model);
+        NSView* const view = native.contentView;
+        NSBitmapImageRep* const bitmap = [view bitmapImageRepForCachingDisplayInRect:view.bounds];
+        if (bitmap == nil) throw std::runtime_error("native local-action snapshot unavailable");
+        [view cacheDisplayInRect:view.bounds toBitmapImageRep:bitmap];
+        NSData* const encoded = [bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+        const BOOL saved = [encoded writeToFile:@"native-local-actions.png" atomically:YES];
+        if (saved != YES) throw std::runtime_error("cannot save native local-action evidence");
+        press_menu_command(state, "fm.menu.edit", "fm.application.menu.menu.popup.row.edit.undo");
+        state.stage = PreviewStage::rename_undone;
+        return;
+    }
+    if (!contains_file(*objects, "native-preview.txt") || contains_file(*objects, "renamed-preview.txt")) return;
+    if (file_manager::observe_identity(original) != state.renamed_identity ||
+        file_manager::observe_identity(renamed).available()) {
+        throw std::runtime_error("native Rename Undo did not restore the original object and name");
+    }
+    std::cout << "macOS ordinary local actions: menu_create=passed create_undo=passed "
+                 "F2_basename_rename=passed rename_undo=passed protected_commands=unavailable "
+                 "quarantine=absent delivery=synthetic_native_window\n";
+    state.stage = PreviewStage::finished;
+    state.close();
+}
+
 void exercise(PreviewState& state) {
     NSWindow* const native = preview_window();
     if (native == nil || !native.isVisible) return;
+    if (state.stage == PreviewStage::folder_created || state.stage == PreviewStage::folder_undone ||
+        state.stage == PreviewStage::file_renamed || state.stage == PreviewStage::rename_undone) {
+        exercise_local_actions(state, native);
+        return;
+    }
     if (state.stage == PreviewStage::details) {
         const std::shared_ptr<gui_forms::ObjectView> objects =
             std::dynamic_pointer_cast<gui_forms::ObjectView>((*state.model).find("fm.objects.current-folder"));
@@ -250,8 +389,9 @@ void exercise(PreviewState& state) {
         std::cout << "macOS Details: name_header_pixels=" << pixels
                   << " columns=" << (*objects).details_columns().size()
                   << " synthetic_header_sort=passed selection=preserved\n";
-        state.stage = PreviewStage::finished;
-        state.close();
+        require_protected_commands_unavailable(*state.model);
+        press_menu_command(state, "fm.menu.file", "fm.application.menu.menu.popup.row.file.new-folder");
+        state.stage = PreviewStage::folder_created;
         return;
     }
     if (state.stage == PreviewStage::listing) {
@@ -373,7 +513,8 @@ int main() {
             fixture.populate();
             const std::shared_ptr<PreviewState> state = std::make_shared<PreviewState>();
             (*state).application = std::make_shared<file_manager::Application>(
-                fixture.root(), std::nullopt, false, std::string{});
+                fixture.root(), std::nullopt, file_manager::OperationPolicy::ordinary_local, std::string{});
+            (*state).fixture_root = fixture.root();
             std::unique_ptr<gui_forms::Window> model = (*(*state).application).make_window();
             (*state).model = model.get();
             gui_forms::host::MacHostOptions options{};

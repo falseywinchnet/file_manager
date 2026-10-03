@@ -210,7 +210,9 @@ def main() -> None:
     readme_path.write_text(
         'File Manager 0.001-alpha development build\n\n'
         'Extract the complete folder. Open File Manager.app on macOS, File Manager.exe on Windows, '
-        'or ./File Manager on Linux. Read-only browsing is the default.\n'
+        'or ./File Manager on Linux. New Folder, same-parent Rename and their one-step Undo '
+        'are available without search services or quarantine setup. Copy, Move and Delete '
+        'are not yet available in ordinary mode. Pass --read-only for observation-only use.\n'
         'Mac: the bundle is ad-hoc signed and is not notarized. Windows: unsigned development executable.\n'
         'Linux: built on Ubuntu 24.04; requires an X11/XWayland display, system X11/ATK libraries '
         'and xdg-utils for default Open. Terminal Here is unavailable until a terminal contract is configured.\n'

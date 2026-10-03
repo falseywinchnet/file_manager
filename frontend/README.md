@@ -22,14 +22,18 @@ Product startup uses the live Orchestrator; deterministic Core fixtures remain
 test doubles only. Engine and later providers open through their own negotiated
 contracts. Orchestrator itself has no GUI.
 
-The current protected-root prototype compiles the checked-in browser-valid
+The current application compiles the checked-in browser-valid
 Web.Forms source into a retained public GUI.Forms tree and has no browser or
 Python runtime. It supplies asynchronous navigation, paged installed-Engine
 search through Orchestrator, typed settings/service control, bounded text/PNG
 previews, identity-checked default Open, fixed-argv Terminal Here, streamed
 SHA-256 with cancellation/expected-digest comparison, clipboard path/digest
-copy, and explicit-opt-in recoverable operations. Read-only remains the
-default. The mutation profile requires a separate same-volume quarantine and
+copy, and local file actions. Normal launch enables New Folder, same-parent
+inline Rename, and their identity-checked one-step Undo under native filesystem
+permissions. These actions require no quarantine or search service. Pass
+`--read-only` for observation-only operation. Ordinary Copy, Move and Delete
+remain unavailable while their daily-use behavior is completed.
+The separate protected mutation profile requires a same-volume quarantine and
 implements New Folder, inline Rename, internal drag, staged no-overwrite Copy,
 same-volume Move, two-step recoverable Delete, and one-step identity-checked
 Undo under ADR-017 and ADR-020.
@@ -86,8 +90,9 @@ those components does not activate a service or admit an indexing root; ordinary
 launch still reports actual negotiated availability. See the
 [Windows Engine deployment profile](../engine/docs/WINDOWS_LOCAL_DEPLOYMENT.md)
 and [Orchestrator projection](../orchestrator/spec/WINDOWS_LOCAL_PROJECTION.md).
-Read-only remains the default and the protected mutation profile is explicit
-opt-in. Installed service management, settings and platform promotion retain
+Ordinary New Folder/Rename/Undo follow the same launch policy with or without
+search services; the protected mutation profile is explicit opt-in.
+Installed service management, settings and platform promotion retain
 their documented gates.
 The authored Web.Forms controls and retained GUI.Forms composition are preserved;
 Windows currently uses its standard native outer frame. Native visual and
@@ -118,7 +123,8 @@ and installs three plainly separated launchers:
 ```
 
 Run `~/Developer/CodexRuns/run-file-manager-daily.command` from Terminal inside
-the M4 Screen Sharing desktop for ordinary read-only Home and Volumes browsing.
+the M4 Screen Sharing desktop for ordinary Home and Volumes browsing with
+New Folder, Rename and their Undo.
 Use `run-file-manager-protected-read-only.command` for the contained
 `fmsandbox` plus `fm1-contained` Engine profile. Each launcher refuses a
 missing, hash-mismatched, or invalidly signed candidate before asking

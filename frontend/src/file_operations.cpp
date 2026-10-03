@@ -251,12 +251,20 @@ bool cleanup_stage(const std::filesystem::path& stage,
 
 } // namespace
 
+FileOperationService::FileOperationService(const OperationPolicy policy)
+    : policy_(policy) {
+    if (policy == OperationPolicy::protected_profile) {
+        throw std::invalid_argument("protected operations require explicit roots");
+    }
+}
+
 FileOperationService::FileOperationService(
     std::filesystem::path protected_root,
     std::filesystem::path quarantine_root,
     const bool mutations_enabled,
     OperationFaultCheck injected_fault)
-    : mutations_enabled_(mutations_enabled),
+    : policy_(mutations_enabled ? OperationPolicy::protected_profile : OperationPolicy::read_only),
+      mutations_enabled_(mutations_enabled),
       injected_fault_(std::move(injected_fault)) {
     if (!protected_root.is_absolute() || !quarantine_root.is_absolute()) {
         throw std::invalid_argument("operation roots must be absolute");
@@ -321,6 +329,23 @@ std::optional<std::string> FileOperationService::validate_parent(
     const std::filesystem::path& parent) const {
     if (!parent.is_absolute()) return "parent path must be absolute";
     const std::filesystem::path lexical = parent.lexically_normal();
+    if (policy_ == OperationPolicy::ordinary_local) {
+        if (parent != lexical) return "parent path must be lexically normalized";
+        try {
+            if (absolute_route_has_symlink(lexical)) {
+                return "parent route traverses a symbolic link or reparse point";
+            }
+        } catch (const std::exception& error) {
+            const std::string message = error.what();
+            return message;
+        }
+        const ObjectIdentity parent_identity = observe_identity(lexical);
+        if (!parent_identity.available() ||
+            parent_identity.type != std::filesystem::file_type::directory) {
+            return "parent must be an observable directory";
+        }
+        return std::nullopt;
+    }
     if (!path_is_within(protected_root_, lexical)) {
         return "parent path is outside the protected root";
     }
@@ -344,7 +369,12 @@ std::optional<std::string> FileOperationService::validate_source(
     const ObjectIdentity& expected) const {
     if (!source.is_absolute()) return "source path must be absolute";
     const std::filesystem::path lexical = source.lexically_normal();
-    if (lexical == protected_root_ || !path_is_within(protected_root_, lexical)) {
+    if (policy_ == OperationPolicy::ordinary_local && source != lexical) {
+        return "source path must be lexically normalized";
+    }
+    if (lexical == lexical.root_path()) return "filesystem root cannot be renamed";
+    if (policy_ != OperationPolicy::ordinary_local &&
+        (lexical == protected_root_ || !path_is_within(protected_root_, lexical))) {
         return "source path is outside the mutable protected contents";
     }
     if (const std::optional<std::string> parent_error = validate_parent(lexical.parent_path())) {
@@ -386,9 +416,10 @@ std::filesystem::path FileOperationService::available_quarantine_path(
 }
 
 OperationResult FileOperationService::create_folder(
-    const std::filesystem::path& parent) {
+    const std::filesystem::path& parent,
+    const ObjectIdentity& expected_parent) {
     const std::string operation_id = next_operation_id();
-    if (!mutations_enabled_) {
+    if (!mutations_enabled_ && policy_ != OperationPolicy::ordinary_local) {
         OperationResult value = result(OperationKind::create_folder,
                             OperationTerminal::unavailable,
                             "mutations_disabled",
@@ -401,6 +432,14 @@ OperationResult FileOperationService::create_folder(
         OperationResult value = result(OperationKind::create_folder,
                             OperationTerminal::failed,
                             "invalid_parent", *parent_error, parent);
+        value.operation_id = operation_id;
+        return value;
+    }
+    if (policy_ == OperationPolicy::ordinary_local &&
+        (!expected_parent.available() || observe_identity(parent) != expected_parent)) {
+        OperationResult value = result(OperationKind::create_folder,
+            OperationTerminal::conflict, "parent_identity_changed",
+            "parent directory changed after the command was requested", parent);
         value.operation_id = operation_id;
         return value;
     }
@@ -443,6 +482,14 @@ OperationResult FileOperationService::create_folder(
             return value;
         }
     }
+    if (policy_ == OperationPolicy::ordinary_local &&
+        (validate_parent(parent) || observe_identity(parent) != expected_parent)) {
+        OperationResult value = result(OperationKind::create_folder,
+            OperationTerminal::conflict, "parent_identity_changed",
+            "parent directory changed before folder creation", parent, destination);
+        value.operation_id = operation_id;
+        return value;
+    }
     if (!std::filesystem::create_directory(destination, error) || error) {
         // create_directory reports false without an error for an existing directory.
         if (!error) error = std::make_error_code(std::errc::file_exists);
@@ -455,8 +502,18 @@ OperationResult FileOperationService::create_folder(
         return value;
     }
     const ObjectIdentity identity = observe_identity(destination);
+    if (!identity.available() || identity.type != std::filesystem::file_type::directory) {
+        undo_.reset();
+        OperationResult value = result(OperationKind::create_folder,
+            OperationTerminal::failed, "postcondition_failed",
+            "folder was created but its identity is unavailable; it may remain",
+            parent, destination, identity);
+        value.operation_id = operation_id;
+        value.recoverable_object_retained = true;
+        return value;
+    }
     undo_ = UndoRecord{UndoKind::remove_created_directory,
-                       destination, {}, identity};
+                       destination, {}, identity, expected_parent};
     OperationResult value = result(OperationKind::create_folder, OperationTerminal::success,
                         "created", "folder created", parent, destination, identity);
     value.operation_id = operation_id;
@@ -466,9 +523,10 @@ OperationResult FileOperationService::create_folder(
 OperationResult FileOperationService::rename_object(
     const std::filesystem::path& source,
     const ObjectIdentity& expected,
-    const std::string_view new_basename) {
+    const std::string_view new_basename,
+    const ObjectIdentity& expected_parent) {
     const std::string operation_id = next_operation_id();
-    if (!mutations_enabled_) {
+    if (!mutations_enabled_ && policy_ != OperationPolicy::ordinary_local) {
         OperationResult value = result(OperationKind::rename_object,
                             OperationTerminal::unavailable,
                             "mutations_disabled",
@@ -494,7 +552,24 @@ OperationResult FileOperationService::rename_object(
         value.operation_id = operation_id;
         return value;
     }
-    const std::filesystem::path destination = source.parent_path() / path_from_utf8(new_basename);
+    const std::filesystem::path parent = source.parent_path();
+    if (policy_ == OperationPolicy::ordinary_local &&
+        (!expected_parent.available() || observe_identity(parent) != expected_parent)) {
+        OperationResult value = result(OperationKind::rename_object,
+            OperationTerminal::conflict, "parent_identity_changed",
+            "parent directory changed after the command was requested", source);
+        value.operation_id = operation_id;
+        return value;
+    }
+    const std::filesystem::path basename = path_from_utf8(new_basename);
+    const std::filesystem::path destination = parent / basename;
+    if (destination == source) {
+        OperationResult value = result(OperationKind::rename_object,
+            OperationTerminal::success, "name_unchanged", "name unchanged",
+            source, source, expected);
+        value.operation_id = operation_id;
+        return value;
+    }
     const std::error_code vacancy = check_destination_vacant(destination);
     if (vacancy) {
         OperationResult value = result(OperationKind::rename_object,
@@ -504,6 +579,14 @@ OperationResult FileOperationService::rename_object(
                                 ? "destination_exists" : "destination_unavailable",
                             vacancy.message(),
                             source, destination, expected);
+        value.operation_id = operation_id;
+        return value;
+    }
+    if (policy_ == OperationPolicy::ordinary_local &&
+        (validate_parent(parent) || observe_identity(parent) != expected_parent)) {
+        OperationResult value = result(OperationKind::rename_object,
+            OperationTerminal::conflict, "parent_identity_changed",
+            "parent directory changed before rename", source, destination, expected);
         value.operation_id = operation_id;
         return value;
     }
@@ -518,15 +601,17 @@ OperationResult FileOperationService::rename_object(
     }
     const ObjectIdentity observed = observe_identity(destination);
     if (observed != expected) {
+        undo_.reset();
         OperationResult value = result(OperationKind::rename_object,
                             OperationTerminal::failed,
                             "postcondition_failed",
-                            "renamed object identity did not match the commit",
+                            "object was renamed but its identity did not match; it may remain at the new path",
                             source, destination, observed);
         value.operation_id = operation_id;
+        value.recoverable_object_retained = true;
         return value;
     }
-    undo_ = UndoRecord{UndoKind::rename_back, destination, source, observed};
+    undo_ = UndoRecord{UndoKind::rename_back, destination, source, observed, expected_parent};
     OperationResult value = result(OperationKind::rename_object, OperationTerminal::success,
                         "renamed", "object renamed", source, destination, observed);
     value.operation_id = operation_id;
@@ -861,7 +946,7 @@ OperationResult FileOperationService::move_object(
 
 OperationResult FileOperationService::undo_last() {
     const std::string operation_id = next_operation_id();
-    if (!mutations_enabled_) {
+    if (!mutations_enabled_ && policy_ != OperationPolicy::ordinary_local) {
         OperationResult value = result(OperationKind::undo, OperationTerminal::unavailable,
                             "mutations_disabled",
                             "mutations require explicit protected-profile opt-in");
@@ -875,6 +960,20 @@ OperationResult FileOperationService::undo_last() {
         return value;
     }
     const UndoRecord record = *undo_;
+    if (policy_ == OperationPolicy::ordinary_local) {
+        const std::filesystem::path parent = record.current_path.parent_path();
+        const std::optional<std::string> parent_error = validate_parent(parent);
+        const ObjectIdentity observed_parent = observe_identity(parent);
+        if (parent_error || !record.parent_identity.available() ||
+            observed_parent != record.parent_identity) {
+            OperationResult value = result(OperationKind::undo,
+                OperationTerminal::conflict, "parent_identity_changed",
+                parent_error ? *parent_error : "undo parent identity changed",
+                record.current_path, record.original_path, record.identity);
+            value.operation_id = operation_id;
+            return value;
+        }
+    }
     if (observe_identity(record.current_path) != record.identity) {
         OperationResult value = result(OperationKind::undo, OperationTerminal::conflict,
                             "identity_changed", identity_changed_message(),
@@ -893,6 +992,16 @@ OperationResult FileOperationService::undo_last() {
                                 record.current_path, {}, record.identity);
             value.operation_id = operation_id;
             return value;
+        }
+        if (policy_ == OperationPolicy::ordinary_local) {
+            const std::filesystem::path parent = record.current_path.parent_path();
+            if (validate_parent(parent) || observe_identity(parent) != record.parent_identity) {
+                OperationResult value = result(OperationKind::undo,
+                    OperationTerminal::conflict, "parent_identity_changed",
+                    "parent directory changed before folder removal", record.current_path);
+                value.operation_id = operation_id;
+                return value;
+            }
         }
         if (!std::filesystem::remove(record.current_path, error) || error) {
             OperationResult value = result(OperationKind::undo, OperationTerminal::failed,
@@ -930,6 +1039,19 @@ OperationResult FileOperationService::undo_last() {
         value.operation_id = operation_id;
         return value;
     }
+    if (policy_ == OperationPolicy::ordinary_local) {
+        const std::filesystem::path parent = record.current_path.parent_path();
+        const std::filesystem::path original_parent = record.original_path.parent_path();
+        if (parent != original_parent || validate_parent(parent) ||
+            observe_identity(parent) != record.parent_identity) {
+            OperationResult value = result(OperationKind::undo,
+                OperationTerminal::conflict, "parent_identity_changed",
+                "parent directory changed before rename undo",
+                record.current_path, record.original_path, record.identity);
+            value.operation_id = operation_id;
+            return value;
+        }
+    }
     error = rename_no_replace(record.current_path, record.original_path);
     if (error) {
         OperationResult value = result(OperationKind::undo, publication_failure_terminal(error),
@@ -940,12 +1062,14 @@ OperationResult FileOperationService::undo_last() {
         return value;
     }
     if (observe_identity(record.original_path) != record.identity) {
+        undo_.reset();
         OperationResult value = result(OperationKind::undo, OperationTerminal::failed,
                             "postcondition_failed",
-                            "restored object identity did not match the inverse",
+                            "object was restored but its identity did not match; it may remain at the original path",
                             record.current_path, record.original_path,
                             record.identity);
         value.operation_id = operation_id;
+        value.recoverable_object_retained = true;
         return value;
     }
     undo_.reset();

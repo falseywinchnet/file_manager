@@ -716,8 +716,9 @@ struct Application::CreateFolderWork final {
     std::shared_ptr<Application> self{};
     std::filesystem::path parent{};
     CreateFolderContext context{};
+    ObjectIdentity parent_identity{};
     void operator()() const {
-        OperationResult result = (*(*self).operations_).create_folder(parent);
+        OperationResult result = (*(*self).operations_).create_folder(parent, parent_identity);
         (*self).post_ui(CreateFolderReady{self, std::move(result), context});
     }
 };
@@ -734,9 +735,10 @@ struct Application::RenameWork final {
     std::shared_ptr<Application> self{};
     DirectoryEntry entry{};
     std::string basename{};
+    ObjectIdentity parent_identity{};
     void operator()() {
         OperationResult result = (*(*self).operations_).rename_object(
-            entry.path, entry.identity, basename);
+            entry.path, entry.identity, basename, parent_identity);
         (*self).post_ui(RenameReady{self, std::move(result)});
     }
 };
@@ -763,9 +765,10 @@ struct Application::PropertyRenameWork final {
     std::shared_ptr<Application> self{};
     DirectoryEntry entry{};
     std::string basename{};
+    ObjectIdentity parent_identity{};
     void operator()() {
         OperationResult result = (*(*self).operations_).rename_object(
-            entry.path, entry.identity, basename);
+            entry.path, entry.identity, basename, parent_identity);
         (*self).post_ui(PropertyRenameReady{self, std::move(entry), std::move(result)});
     }
 };

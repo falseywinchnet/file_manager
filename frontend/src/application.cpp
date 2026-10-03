@@ -477,6 +477,14 @@ Application::Application(std::filesystem::path protected_root,
                          std::optional<std::filesystem::path> quarantine_root,
                          const bool mutations_enabled,
                          std::string engine_root_id)
+    : Application(std::move(protected_root), std::move(quarantine_root),
+          mutations_enabled ? OperationPolicy::protected_profile : OperationPolicy::read_only,
+          std::move(engine_root_id)) {}
+
+Application::Application(std::filesystem::path protected_root,
+                         std::optional<std::filesystem::path> quarantine_root,
+                         const OperationPolicy policy,
+                         std::string engine_root_id)
     : protected_root_(canonical_existing_directory(protected_root)),
       home_root_(protected_root_),
       navigation_root_(protected_root_),
@@ -504,13 +512,20 @@ Application::Application(std::filesystem::path protected_root,
     }
     navigation_root_ = (*initial_target).root;
     tree_root_mode_ = navigation_root_;
-    if (mutations_enabled) {
+    if (policy == OperationPolicy::protected_profile) {
         if (!quarantine_root) {
             throw std::invalid_argument(
                 "--allow-mutations requires --quarantine DIRECTORY");
         }
         operations_ = std::make_unique<FileOperationService>(
             protected_root_, std::move(*quarantine_root), true);
+    } else {
+        if (quarantine_root) {
+            throw std::invalid_argument("quarantine requires the protected operation policy");
+        }
+        if (policy == OperationPolicy::ordinary_local) {
+            operations_ = std::make_unique<FileOperationService>(policy);
+        }
     }
     install_dynamic_controls();
     install_handlers();
@@ -917,24 +932,26 @@ void Application::install_dynamic_controls() {
     (*form_.file_manager_app_shell_commands_arrange_group_actions_settings).set_accessible_description(
         "Reveal and focus the factual Selection and Properties pane");
     const std::string mutation_description = operations_
-        ? "Available only inside the explicit protected mutation profile"
-        : "Read-only launch; use an explicit protected mutation profile";
+        ? "Create or rename using revalidated local filesystem identity"
+        : "Read-only launch";
+    const bool protected_operations = operations_ && (*operations_).mutations_enabled();
+    const std::string protected_description = "Requires an explicit protected mutation profile";
     (*form_.file_manager_app_shell_commands_new_folder).set_accessible_description(
         mutation_description);
     (*form_.file_manager_app_shell_commands_rename).set_accessible_description(
         mutation_description);
     (*form_.file_manager_app_shell_commands_selection_group_actions_copy).set_accessible_description(
-        operations_ ? "Capture one selected object for collision-safe staged copy"
-                    : mutation_description);
+        protected_operations ? "Capture one selected object for collision-safe staged copy"
+                             : protected_description);
     (*form_.file_manager_app_shell_commands_move).set_accessible_description(
-        operations_ ? "Capture one selected object for same-volume move"
-                    : mutation_description);
+        protected_operations ? "Capture one selected object for same-volume move"
+                             : protected_description);
     (*form_.file_manager_app_shell_commands_paste).set_accessible_description(
-        operations_ ? "Publish the captured transfer in the current folder"
-                    : mutation_description);
+        protected_operations ? "Publish the captured transfer in the current folder"
+                             : protected_description);
     (*form_.file_manager_app_shell_commands_selection_group_actions_delete).set_accessible_description(
-        operations_ ? "Two-step recoverable quarantine; never permanent deletion"
-                    : mutation_description);
+        protected_operations ? "Two-step recoverable quarantine; never permanent deletion"
+                             : protected_description);
 
     (*form_.file_manager_app_shell_workspace_selection_content_heading).set_visible(false);
     rebuild_breadcrumb();
@@ -1048,7 +1065,7 @@ void Application::install_command_surfaces() {
         std::bind_front(&Application::cancel_transfer, this));
     command_undo_ = make_command(
         "edit.undo", "Undo last operation",
-        "Undo the last recoverable protected operation",
+        "Undo the last recoverable local operation",
         std::bind_front(&Application::request_undo, this));
     command_delete_ = make_command(
         "selection.delete", "Delete",
@@ -1884,6 +1901,13 @@ void Application::update_command_state() {
     const bool mutation_ready = files_active && mutation_scope_active() &&
         !(*rename_box_).visible() &&
         !transfer_in_flight_ && !property_rename_in_flight_;
+    const bool local_action_ready = files_active && local_action_scope_active() &&
+        !(*rename_box_).visible() && !transfer_in_flight_ && !property_rename_in_flight_;
+    const std::string local_action_reason = !files_active
+        ? "Return to Files before using file workspace commands"
+        : !local_action_scope_active()
+            ? "Local actions are unavailable in this launch or location"
+            : "Finish the active edit or operation first";
     const bool paste_ready = mutation_ready && pending_transfer_ &&
         (*pending_transfer_).entry.path.parent_path() != location_;
     const std::string hidden_workspace_reason =
@@ -1891,9 +1915,9 @@ void Application::update_command_state() {
     const std::string mutation_authority_reason = !files_active
         ? hidden_workspace_reason
         : !operations_
-        ? "This launch is read-only; protected mutations were not enabled"
+        ? "This launch is read-only"
         : !mutation_scope_active()
-            ? "Mutations are available only inside the explicitly protected root"
+            ? "Copy, Move and Delete require the protected profile and its root"
             : (*rename_box_).visible()
                 ? "Finish or cancel the active rename first"
                 : transfer_in_flight_ || property_rename_in_flight_
@@ -1909,7 +1933,7 @@ void Application::update_command_state() {
         ? hidden_workspace_reason : !entry
             ? "Select one visible object" : (*entry).kind == EntryKind::symlink
                 ? "Symbolic-link activation is not admitted" : std::string{});
-    (*command_new_folder_).set_enabled(mutation_ready);
+    (*command_new_folder_).set_enabled(local_action_ready);
     (*command_copy_).set_enabled(mutation_ready && one);
     (*command_move_).set_enabled(mutation_ready && one);
     (*command_paste_).set_enabled(paste_ready);
@@ -1929,14 +1953,15 @@ void Application::update_command_state() {
     (*command_undo_).set_enabled(files_active && operations_ &&
                                undo_available_);
     (*command_delete_).set_enabled(mutation_ready && one);
-    (*command_rename_).set_enabled(mutation_ready && one);
+    (*command_rename_).set_enabled(local_action_ready && one);
     (*command_new_folder_).set_availability_reason((*command_new_folder_).state().enabled
-        ? std::string{} : mutation_authority_reason);
+        ? std::string{} : local_action_reason);
+    (*command_rename_).set_availability_reason((*command_rename_).state().enabled
+        ? std::string{} : local_action_ready ? "Select one object" : local_action_reason);
     const std::string selection_mutation_reason =
         !mutation_authority_reason.empty()
             ? mutation_authority_reason : "Select one object";
-    for (const std::shared_ptr<gui_forms::Command>& command : {command_copy_, command_move_, command_delete_,
-                                command_rename_}) {
+    for (const std::shared_ptr<gui_forms::Command>& command : {command_copy_, command_move_, command_delete_}) {
         (*command).set_availability_reason((*command).state().enabled
             ? std::string{} : selection_mutation_reason);
     }
@@ -1948,7 +1973,7 @@ void Application::update_command_state() {
     (*command_undo_).set_availability_reason((*command_undo_).state().enabled
         ? std::string{} : !files_active
             ? hidden_workspace_reason : !operations_
-                ? "This launch is read-only; protected mutations were not enabled"
+                ? "This launch is read-only"
                 : "No recoverable operation is available to undo");
     (*command_properties_).set_enabled(files_active);
     (*command_properties_).set_availability_reason(
@@ -2746,7 +2771,8 @@ void Application::hide_settings() {
     set_status("Files", "direct filesystem · " +
         navigation_label(navigation_root_) +
         (mutation_scope_active() ? " · protected operations admitted"
-                                 : " · read-only observation"));
+            : local_action_scope_active() ? " · New Folder and Rename available"
+                                          : " · read-only observation"));
 }
 
 void Application::select_settings_tab(std::string tab, std::string title) {
@@ -3562,7 +3588,14 @@ std::string Application::navigation_label(
 }
 
 bool Application::mutation_scope_active() const {
-    const bool active = operations_ && path_is_within(protected_root_, location_);
+    const bool active = operations_ && (*operations_).mutations_enabled() &&
+        path_is_within(protected_root_, location_);
+    return active;
+}
+
+bool Application::local_action_scope_active() const {
+    const bool active = operations_ &&
+        ((*operations_).policy() == OperationPolicy::ordinary_local || mutation_scope_active());
     return active;
 }
 
@@ -4252,11 +4285,14 @@ void Application::update_mutation_controls() {
     const std::optional<DirectoryEntry> entry = selected_entry();
     const bool available = mutation_scope_active() && !(*rename_box_).visible() &&
         !transfer_in_flight_ && !property_rename_in_flight_;
+    const bool local_available = !settings_open_ && local_action_scope_active() &&
+        !(*rename_box_).visible() && !transfer_in_flight_ && !property_rename_in_flight_;
     if (const gui_forms::Control::Ptr editor = (*property_list_).editor("fm.property.name")) {
-        (*editor).set_enabled(available && one_selected);
+        (*editor).set_enabled(local_available && one_selected);
     }
     (*form_.file_manager_app_shell_commands_rename).set_enabled(
-        available && one_selected);
+        local_available && one_selected);
+    (*form_.file_manager_app_shell_commands_new_folder).set_enabled(local_available);
     (*form_.file_manager_app_shell_commands_selection_group_actions_copy).set_enabled(
         available && one_selected);
     (*form_.file_manager_app_shell_commands_move).set_enabled(
@@ -4468,14 +4504,15 @@ void Application::apply_platform_command(const PlatformCommandKind kind,
 }
 
 void Application::request_create_folder() {
-    if (!mutation_scope_active()) return;
+    if (!local_action_scope_active()) return;
     const std::filesystem::path parent = location_;
+    const ObjectIdentity parent_identity = observe_identity(parent);
     ++create_folder_request_generation_;
     const CreateFolderContext context{requested_generation_.load(),
         search_generation_.load(), create_folder_request_generation_};
     created_folder_rename_.reset();
-    set_status("Creating a folder", "protected operation · collision-safe");
-    post_worker(CreateFolderWork{shared_from_this(), parent, context});
+    set_status("Creating a folder", "local operation · collision-safe");
+    post_worker(CreateFolderWork{shared_from_this(), parent, context, parent_identity});
 }
 
 void Application::apply_created_folder(OperationResult result, const CreateFolderContext& context) {
@@ -4505,7 +4542,7 @@ void Application::apply_created_folder(OperationResult result, const CreateFolde
 }
 
 void Application::begin_rename() {
-    if (!mutation_scope_active() || (*objects_).selected_ids().size() != 1) return;
+    if (!local_action_scope_active() || (*objects_).selected_ids().size() != 1) return;
     const std::string stable_id = std::string((*objects_).selected_ids().front());
     const EntryMap::const_iterator found = entries_.find(stable_id);
     if (found == entries_.end()) return;
@@ -4525,7 +4562,7 @@ void Application::begin_rename() {
 }
 
 void Application::commit_rename(std::string basename) {
-    if (!mutation_scope_active() || !rename_target_id_) return;
+    if (!local_action_scope_active() || !rename_target_id_) return;
     const EntryMap::const_iterator found = entries_.find(*rename_target_id_);
     if (found == entries_.end()) {
         cancel_rename();
@@ -4543,7 +4580,9 @@ void Application::commit_rename(std::string basename) {
     }
     set_status("Renaming " + entry.name,
                "revalidating no-follow filesystem identity");
-    post_worker(RenameWork{shared_from_this(), entry, std::move(basename)});
+    const std::filesystem::path parent = entry.path.parent_path();
+    const ObjectIdentity parent_identity = observe_identity(parent);
+    post_worker(RenameWork{shared_from_this(), entry, std::move(basename), parent_identity});
 }
 
 void Application::commit_property_name(std::string basename) {
@@ -4552,7 +4591,7 @@ void Application::commit_property_name(std::string basename) {
         (*property_list_).set_value("fm.property.name", "—");
         return;
     }
-    if (!mutation_scope_active() || property_rename_in_flight_) {
+    if (!local_action_scope_active() || property_rename_in_flight_) {
         (*property_list_).set_value("fm.property.name", (*entry).name);
         return;
     }
@@ -4563,7 +4602,9 @@ void Application::commit_property_name(std::string basename) {
     update_mutation_controls();
     set_status("Renaming " + (*entry).name,
                "property edit · revalidating no-follow filesystem identity");
-    post_worker(PropertyRenameWork{shared_from_this(), *entry, std::move(basename)});
+    const std::filesystem::path parent = (*entry).path.parent_path();
+    const ObjectIdentity parent_identity = observe_identity(parent);
+    post_worker(PropertyRenameWork{shared_from_this(), *entry, std::move(basename), parent_identity});
 }
 
 void Application::cancel_rename() {
@@ -4741,7 +4782,7 @@ void Application::apply_operation(OperationResult result) {
         return;
     }
     if (result.identity.available() && !result.resulting_path.empty() &&
-        path_is_within(protected_root_, result.resulting_path)) {
+        result.resulting_path.parent_path() == location_) {
         pending_selection_identity_ = result.identity;
     } else {
         pending_selection_identity_.reset();
@@ -4843,7 +4884,9 @@ void Application::update_browsing_status() {
         if (unavailable) text += " · some sizes unavailable";
     }
     const std::string summary = path_utf8(location_) + " · direct filesystem" +
-        (mutation_scope_active() ? " · protected operations admitted" : " · read-only observation");
+        (mutation_scope_active() ? " · protected operations admitted"
+            : local_action_scope_active() ? " · New Folder and Rename available"
+                                          : " · read-only observation");
     set_status(std::move(text), summary);
     (*form_.file_manager_app_shell_status_summary).set_accessible_description(
         "Current folder: " + path_utf8(location_));
