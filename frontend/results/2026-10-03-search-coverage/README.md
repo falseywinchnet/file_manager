@@ -97,7 +97,34 @@ a passing run alone will not establish that the intermittent issue is eliminated
 The two workflow invocations and this evidence record were reviewed for explicit
 execution order and unchanged test scope. No GUI.Forms runtime change is made.
 
-## Source house-style review
+## Published checkpoint
+
+**MEASURED:** source `8a13ba17be42969c205578fb18d6f8d1c5f28b91` passed both
+complete native matrices `37096007239` and `37096009267`. PR10 rebase-merged
+as `6cad57b744cba41d7690299fc6d249b7af6c6ed7`; the complete source trees match
+`cd910227ee856d31df905580863e6a72db460bfa`. Both new Linux runs passed with the
+explicit Xvfb setting; that does not establish elimination of an intermittent
+failure or prove its hypothesized cause.
+
+Release `v0.001-alpha.8a13ba1` is published at
+`https://github.com/falseywinchnet/file_manager/releases/tag/v0.001-alpha.8a13ba1`.
+Independent archive checks verified clean source, SHA-256 sidecars and all 40
+Linux / 42 Mac / 44 Windows receipt-listed files. Published asset digests read
+back from GitHub match the downloaded archives:
+
+- Linux: `7b417b4ee7db6287eeb4aaa8891d46e0c71a1361a0bbf43a00dcf7a715f13ac6`
+- Mac: `fff2cb650a8c3d8bf362930bb1bbb41e3a2278c73312587f8c0c934d84b1fad6`
+- Windows: `5a09cb7e39e6ae801ddf4189aa5c1eed12bdab79cda8bdb2b252187ac47d9052`
+
+The real Mac application probe passed text, PNG, unavailable explanation and
+four-column Details checks. Its text screenshot was visually reviewed with a
+readable separate limit caption. These are preview fixtures, not native live
+search coverage interaction. All 14 Mac frontend tests, including the new
+C++ projection and application coverage scenarios, passed. The release remains
+a portable alpha with the same platform/signing/mutation limits; JPEG research
+and local paint measurements are excluded.
+
+## Reviewed source scope
 
 Reviewed against `planning/PROGRAMMING_HOUSE_STYLE.md`: new coverage records and
 private projection header/tests; `optional_string_list` and the moved/extended

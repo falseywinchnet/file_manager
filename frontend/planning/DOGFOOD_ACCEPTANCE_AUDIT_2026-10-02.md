@@ -4,6 +4,27 @@ Status: **ACTIVE; first source pass, not a completed whole-product audit**.
 
 ## Current checkpoint — 2026-10-02
 
+**Latest delivery, 2026-10-03 UTC:** `v0.001-alpha.8a13ba1` is the downloadable
+Windows/macOS/Linux checkpoint. It includes worker-side search preparation and
+provider coverage/currentness disclosure, plus the earlier TXT/PNG and Details
+repairs. Both native matrices passed; archives were independently verified and
+the Mac text screenshot reviewed. The exact source/tree/release evidence is in
+`../results/2026-10-03-search-coverage/README.md`.
+
+The initial tables below describe the original audit baseline. Current source
+does have a Show/Hide preview control, a separate text coverage caption, four
+sortable/resizable Details columns and modal operation errors. Their limited
+fixture acceptance is recorded below; this is not whole-product acceptance or
+confirmation of the owner's macOS retest. Broad preview formats, thumbnails,
+folder aggregates, ribbon ergonomics and everyday operations remain incomplete.
+
+The latest native Windows diagnostic is
+`../results/2026-10-03-native-paint/README.md`: settled small-control repaints are
+under 1 ms in a short local run, while full-window presentations remain roughly
+26–41 ms after the first frame. It provides no physical-input or Mac speed claim.
+The next operations priority is enforcing the existing no-overwrite publication
+law, followed by bounded cancellable regular-file copy and visible progress.
+
 The initial register and first-repair narrative below retain baseline evidence.
 Preview release `v0.001-alpha.b1986ad` is published for Windows, macOS arm64 and
 Linux after native CI and independent archive-content/checksum verification.
