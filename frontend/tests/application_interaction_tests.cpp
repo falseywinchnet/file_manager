@@ -31,6 +31,9 @@ class ApplicationInteractionProbe final {
     static void post_worker(Application& application, std::function<void()> work) {
         application.post_worker(std::move(work));
     }
+    static void post_operation(Application& application, std::function<void()> work) {
+        application.post_operation(std::move(work));
+    }
     static void navigate(Application& application, const std::filesystem::path& path) {
         application.request_navigation(path, true);
     }
@@ -4725,11 +4728,11 @@ void test_ordinary_queued_parent_identity() {
     const std::shared_ptr<OrdinaryWorkerGate> gate = std::make_shared<OrdinaryWorkerGate>();
     const ReleaseOrdinaryWorker release{gate};
     // Both callbacks retain the gate. The release guard runs before application
-    // shutdown even when an assertion throws, so the existing worker can drain.
-    file_manager::ApplicationInteractionProbe::post_worker(*application,
+    // shutdown even when an assertion throws, so the operation worker can drain.
+    file_manager::ApplicationInteractionProbe::post_operation(*application,
         std::bind_front(&OrdinaryWorkerGate::wait, gate));
     require_eventually(*application, std::bind_front(&OrdinaryWorkerGate::ready, gate),
-        "existing application worker must reach the test gate");
+        "application operation worker must reach the test gate");
     const std::shared_ptr<gui_forms::Command> create =
         file_manager::ApplicationInteractionProbe::command(*application, "file.new-folder");
     require(create != nullptr, "queued ordinary New Folder command must exist");

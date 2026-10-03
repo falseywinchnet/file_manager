@@ -1,0 +1,19 @@
+Start testing: Oct 03 02:44 Pacific Daylight Time
+----------------------------------------------------------
+14/15 Testing: file_manager_application_transfer_tests
+14/15 Test: file_manager_application_transfer_tests
+Command: "C:/Users/Shadow/file_manager/frontend/.build/shadow-windows/file_manager_application_transfer_tests.exe"
+Directory: C:/Users/Shadow/file_manager/frontend/.build/shadow-windows
+"file_manager_application_transfer_tests" start time: Oct 03 02:44 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+navigation must complete while the operation queue remains blocked
+<end of output>
+Test time =   5.32 sec
+----------------------------------------------------------
+Test Failed.
+"file_manager_application_transfer_tests" end time: Oct 03 02:44 Pacific Daylight Time
+"file_manager_application_transfer_tests" time elapsed: 00:00:05
+----------------------------------------------------------
+
+End testing: Oct 03 02:44 Pacific Daylight Time

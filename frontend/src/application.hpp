@@ -249,8 +249,10 @@ private:
     void show_about();
     void show_open_picker();
     void post_worker(std::function<void()> work);
+    void post_operation(std::function<void()> work);
     void post_ui(std::function<void()> work);
     void worker_loop();
+    void operation_loop();
     void navigate_breadcrumb(const std::filesystem::path& target, const gui_forms::CommandInvocation&);
     void on_path_suggestion_activated(const std::size_t index);
     void on_path_suggestion_dismissed(const gui_forms::PopupDismissReason reason);
@@ -258,6 +260,7 @@ private:
     void on_services_refresh(gui_forms::ButtonBase&);
     void on_service_command(const std::string& service_id, const std::string& command_id, const std::optional<std::string>& root, gui_forms::ButtonBase&);
     bool worker_ready();
+    bool operation_ready();
     void on_worker_failed(const std::string& message);
     void request_bootstrap();
     void request_settings();
@@ -287,6 +290,7 @@ private:
     void update_settings_actions();
     void apply_runtime_settings();
     void request_navigation(std::filesystem::path path, bool add_history);
+    void refresh_after_operation();
     void request_tree_expansion(std::filesystem::path path);
     void apply_directory(DirectorySnapshot snapshot, bool add_history);
     void navigate_back();
@@ -387,6 +391,12 @@ private:
     std::atomic_uint64_t checksum_generation_{};
     std::atomic_uint64_t path_suggestion_generation_{};
     std::uint64_t applied_generation_{};
+    struct PendingNavigation final {
+        std::filesystem::path path{};
+        bool add_history{};
+    };
+    // UI-owned latest request; operation refreshes preserve its destination.
+    std::optional<PendingNavigation> pending_navigation_{};
     std::vector<std::filesystem::path> history_{};
     std::size_t history_index_{};
     EntryMap entries_{};
@@ -396,7 +406,8 @@ private:
     std::unordered_set<std::string> tree_expanded_paths_{};
     std::atomic_uint64_t tree_generation_{};
     std::filesystem::path tree_root_mode_{};
-    // UI-owned projection; FileOperationService remains confined to the worker.
+    // UI-owned projection; mutable FileOperationService state belongs to the
+    // operation worker. The UI only reads its immutable policy/root fields.
     bool undo_available_{};
     std::unique_ptr<FileOperationService> operations_{};
     std::optional<ObjectIdentity> pending_selection_identity_{};
@@ -429,6 +440,8 @@ private:
     std::optional<gui_forms::ControlStateRecipes> settings_tab_normal_recipes_{};
     std::optional<gui_forms::ControlStateRecipes> settings_tab_selected_recipes_{};
     bool settings_open_{};
+    // UI-owned: refresh direct browsing on return after a hidden mutation.
+    bool refresh_after_settings_{};
     bool settings_loading_{};
     bool settings_apply_in_flight_{};
     bool services_loading_{};
@@ -556,6 +569,10 @@ private:
     std::mutex worker_mutex_{};
     std::condition_variable worker_cv_{};
     std::queue<std::function<void()>> worker_queue_{};
+    std::thread operation_worker_{};
+    std::mutex operation_mutex_{};
+    std::condition_variable operation_cv_{};
+    std::queue<std::function<void()>> operation_queue_{};
     std::atomic_bool stopping_{};
     bool details_mode_{};
 

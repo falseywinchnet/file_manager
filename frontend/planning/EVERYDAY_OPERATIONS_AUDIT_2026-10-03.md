@@ -16,6 +16,21 @@ see `../results/2026-10-03-new-folder/README.md`. These supersede the correspond
 missing-behavior observations below. Byte progress, broader operation admission,
 parent/source authority, metadata policy and durable recovery remain open.
 
+**Subsequent checkpoints:** ordinary New Folder, same-parent Rename and their
+one-step Undo are delivered in `v0.001-alpha.fc6312c`; see
+`../results/2026-10-03-ordinary-local-actions/DELIVERY.md`. PR25's confirmed Copy
+progress passed the complete native matrices and merged as `b328529`; its
+follow-up receipt is `../results/2026-10-03-copy-progress/NATIVE_ACCEPTANCE.md`.
+Copy remains limited to the protected operation profile.
+
+The operation-worker change has local Windows correctness evidence in
+`../results/2026-10-03-operation-worker/README.md`: reads proceed while the
+operation queue is held, mutations and Undo remain ordered, operation completion
+preserves pending navigation/history, and returning from Settings refreshes
+mutations completed while hidden. Native checks and package promotion for this
+later change are pending. The older source observations below remain historical;
+they do not override these receipts or certify broader daily-use acceptance.
+
 ## Present behavior
 
 Native default Open, regular-file/property rename, deterministic New Folder,

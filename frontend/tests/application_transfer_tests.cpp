@@ -48,6 +48,21 @@ public:
     static void post_worker(Application& application, std::function<void()> work) {
         application.post_worker(std::move(work));
     }
+    static void post_operation(Application& application, std::function<void()> work) {
+        application.post_operation(std::move(work));
+    }
+    static void request_undo(Application& application) {
+        application.request_undo();
+    }
+    static bool stopping(const Application& application) {
+        const bool stopped = application.stopping_.load();
+        return stopped;
+    }
+    static std::size_t pending_operations(Application& application) {
+        const std::lock_guard<std::mutex> lock(application.operation_mutex_);
+        const std::size_t count = application.operation_queue_.size();
+        return count;
+    }
     static void navigate(Application& application, const std::filesystem::path& path) {
         application.request_navigation(path, true);
     }
@@ -312,6 +327,152 @@ struct SourceListed final {
     }
 };
 
+struct DirectoryCreated final {
+    const fs::path& path;
+    bool operator()() const {
+        const bool created = fs::is_directory(path);
+        return created;
+    }
+};
+
+struct OperationCompleted final {
+    std::atomic_bool completed{};
+    void mark() { completed.store(true); }
+    bool ready() const {
+        const bool value = completed.load();
+        return value;
+    }
+};
+
+struct ReleaseOnStop final {
+    std::shared_ptr<file_manager::Application> application{};
+    std::shared_ptr<WorkerGate> gate{};
+    std::atomic_bool& observed_stop;
+
+    void operator()() const {
+        const Clock::time_point deadline = Clock::now() + std::chrono::seconds(5);
+        while (!Probe::stopping(*application) && Clock::now() < deadline) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        observed_stop.store(Probe::stopping(*application));
+        (*gate).release();
+    }
+};
+
+void test_operation_order_and_shutdown() {
+    Fixture fixture{};
+    fixture.create();
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(fixture.root(), fixture.quarantine(), true, "");
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
+    StopApplication stop(*application);
+    (*application).bind_host(noop, noop);
+    const std::shared_ptr<gui_forms::ObjectView> objects = std::dynamic_pointer_cast<gui_forms::ObjectView>(
+        (*window).find("fm.objects.current-folder"));
+    const std::shared_ptr<gui_forms::Command> create = Probe::command(*application, "file.new-folder");
+    require(objects && create, "operation-order fixture controls absent");
+    wait_for(*application, SourceListed{*objects}, "operation-order source listing timed out");
+    const std::shared_ptr<WorkerGate> gate = std::make_shared<WorkerGate>();
+    ReleaseGate release(gate);
+    Probe::post_operation(*application, GateWork{gate});
+    wait_for(*application, GateStarted{*gate}, "operation-order gate did not start");
+    const bool first = (*create).execute("fixture.operation-order.first-create");
+    Probe::request_undo(*application);
+    const bool second = (*create).execute("fixture.operation-order.second-create");
+    require(first && second && Probe::pending_operations(*application) == 3U,
+        "Create, Undo and Create must share one FIFO operation queue");
+    std::atomic_bool observed_stop{};
+    // jthread joins before the borrowed observation and fixture can be destroyed.
+    // The helper releases the queue only after stop has revoked admission.
+    std::jthread release_thread(ReleaseOnStop{application, gate, observed_stop});
+    (*application).stop();
+    release_thread.join();
+    const fs::path created = fixture.root() / "New folder";
+    const fs::path duplicate = fixture.root() / "New folder 2";
+    require(observed_stop.load() && !(*gate).expired() && fs::is_directory(created) && !fs::exists(duplicate),
+        "shutdown must drain admitted mutations and Undo in order before returning");
+    Probe::request_undo(*application);
+    (*application).drain_ui();
+    require(Probe::pending_operations(*application) == 0U && fs::is_directory(created),
+        "post-stop Undo must neither retain a job nor mutate the completed result");
+    fixture.cleanup();
+}
+
+void test_operation_completion_preserves_pending_navigation() {
+    Fixture fixture{};
+    fixture.create();
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(fixture.root(), fixture.quarantine(), true, "");
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
+    StopApplication stop(*application);
+    (*application).bind_host(noop, noop);
+    const std::shared_ptr<gui_forms::ObjectView> objects = std::dynamic_pointer_cast<gui_forms::ObjectView>(
+        (*window).find("fm.objects.current-folder"));
+    const std::shared_ptr<gui_forms::TextBox> rename = std::dynamic_pointer_cast<gui_forms::TextBox>(
+        (*window).find("fm.operations.rename"));
+    const std::shared_ptr<gui_forms::Command> create = Probe::command(*application, "file.new-folder");
+    const std::shared_ptr<gui_forms::Command> undo = Probe::command(*application, "edit.undo");
+    require(objects && rename && create && undo, "pending-navigation fixture controls absent");
+    wait_for(*application, SourceListed{*objects}, "pending-navigation source listing timed out");
+    const bool created = (*create).execute("fixture.pending-navigation.create");
+    require(created, "pending-navigation fixture creation refused");
+    struct NamingReady final {
+        const gui_forms::TextBox& rename;
+        const gui_forms::Command& undo;
+        bool operator()() const {
+            const bool ready = rename.visible() && undo.state().enabled;
+            return ready;
+        }
+    };
+    wait_for(*application, NamingReady{*rename, *undo}, "created folder naming did not become ready");
+    const bool naming_cancelled = (*window).dispatch_key(
+        {gui_forms::KeyAction::down, gui_forms::PhysicalKey::escape});
+    require(naming_cancelled, "default folder naming must cancel before navigating");
+    const std::shared_ptr<WorkerGate> gate = std::make_shared<WorkerGate>();
+    ReleaseGate release(gate);
+    Probe::post_worker(*application, GateWork{gate});
+    wait_for(*application, GateStarted{*gate}, "pending-navigation read gate did not start");
+    Probe::navigate(*application, fixture.destination());
+    const bool undone = (*undo).execute("fixture.pending-navigation.undo");
+    require(undone, "Undo must execute while navigation is held");
+    const std::shared_ptr<OperationCompleted> completion = std::make_shared<OperationCompleted>();
+    Probe::post_operation(*application, std::bind_front(&OperationCompleted::mark, completion));
+    wait_for(*application, std::bind_front(&OperationCompleted::ready, completion),
+        "Undo must complete independently of the held navigation");
+    (*application).drain_ui();
+    const fs::path removed = fixture.root() / "New folder";
+    require(!fs::exists(removed) && Probe::location(*application) == fixture.root(),
+        "Undo must commit while the old location is still displayed");
+    (*gate).release();
+    struct RequestedLocationReady final {
+        const file_manager::Application& application;
+        const fs::path& requested;
+        bool operator()() const {
+            const bool ready = Probe::location(application) == requested;
+            return ready;
+        }
+    };
+    wait_for(*application, RequestedLocationReady{*application, fixture.destination()},
+        "operation completion must preserve the pending user navigation destination");
+    require(!(*gate).expired(), "navigation preservation must not depend on gate timeout");
+    const std::shared_ptr<gui_forms::Command> back = Probe::command(*application, "go.back");
+    const std::shared_ptr<gui_forms::Command> forward = Probe::command(*application, "go.forward");
+    require(back && forward && (*back).state().enabled && !(*forward).state().enabled,
+        "operation refresh must retain the destination's history entry");
+    const bool went_back = (*back).execute("fixture.pending-navigation.back");
+    require(went_back, "Back must return from the operation-refreshed destination");
+    wait_for(*application, RequestedLocationReady{*application, fixture.root()},
+        "Back lost the preceding location after operation refresh");
+    require(!(*back).state().enabled && (*forward).state().enabled,
+        "operation refresh must not duplicate the destination in history");
+    const bool went_forward = (*forward).execute("fixture.pending-navigation.forward");
+    require(went_forward, "Forward must retain the operation-refreshed destination");
+    wait_for(*application, RequestedLocationReady{*application, fixture.destination()},
+        "Forward lost the operation-refreshed destination");
+    (*application).stop();
+    fixture.cleanup();
+}
+
 void test_transfer_cancellation(const bool move) {
     Fixture fixture{};
     fixture.create();
@@ -350,12 +511,42 @@ void test_transfer_cancellation(const bool move) {
 
     const std::shared_ptr<WorkerGate> gate = std::make_shared<WorkerGate>();
     ReleaseGate release(gate);
-    Probe::post_worker(*application, GateWork{gate});
+    Probe::post_operation(*application, GateWork{gate});
     wait_for(*application, GateStarted{*gate}, "worker gate did not start");
     const bool pasted = (*paste).execute("fixture.transfer.paste");
     require(pasted && Probe::active(*application), "Paste must remain active while queued");
     const std::uint64_t generation = Probe::generation(*application);
     const fs::path destination = fixture.destination() / "source.txt";
+    Probe::navigate(*application, fixture.root());
+    wait_for(*application, SourceListed{*objects},
+        "navigation must complete while the operation queue remains blocked");
+    const bool preview_selected = (*window).perform_semantic_action(source_id, gui_forms::SemanticAction::select);
+    require(preview_selected, "source must remain selectable during a queued transfer");
+    const std::shared_ptr<gui_forms::Label> preview = std::dynamic_pointer_cast<gui_forms::Label>(
+        (*window).find("fm.inspector.preview.text"));
+    require(preview != nullptr, "preview control must exist during a queued transfer");
+    struct PreviewReady final {
+        const gui_forms::Label& preview;
+        bool operator()() const {
+            const bool ready = preview.visible() && preview.text() == "copy fixture\n";
+            return ready;
+        }
+    };
+    wait_for(*application, PreviewReady{*preview},
+        "preview must complete while the operation queue remains blocked");
+    require(Probe::active(*application) && !(*gate).expired() && !fs::exists(destination),
+        "read completion must not release the queued operation or fabricate its terminal result");
+    Probe::navigate(*application, fixture.destination());
+    struct DestinationReady final {
+        const file_manager::Application& application;
+        const fs::path& path;
+        bool operator()() const {
+            const bool ready = Probe::location(application) == path;
+            return ready;
+        }
+    };
+    wait_for(*application, DestinationReady{*application, fixture.destination()},
+        "return navigation must complete before cancelling the queued transfer");
     if (move) {
         require(!(*cancel).visible() && !(*cancel_command).state().enabled,
             "atomic move must not advertise cancellation");
@@ -402,7 +593,10 @@ void test_transfer_cancellation(const bool move) {
     fixture.cleanup();
 }
 
-enum class NewFolderCase { commit_name, cancel_name, navigate_queued, navigate_after_create, edit_location_after_create };
+enum class NewFolderCase {
+    commit_name, cancel_name, navigate_queued, navigate_after_create,
+    edit_location_after_create, settings_queued
+};
 
 struct RenameVisible final {
     const gui_forms::TextBox& editor;
@@ -454,25 +648,52 @@ void test_new_folder_naming(const NewFolderCase scenario) {
         scenario == NewFolderCase::navigate_after_create;
     const std::shared_ptr<WorkerGate> gate = std::make_shared<WorkerGate>();
     ReleaseGate release(gate);
-    if (scenario == NewFolderCase::navigate_queued) {
-        Probe::post_worker(*application, GateWork{gate});
+    if (scenario == NewFolderCase::navigate_queued || scenario == NewFolderCase::settings_queued) {
+        Probe::post_operation(*application, GateWork{gate});
         wait_for(*application, GateStarted{*gate}, "new-folder gate did not start");
+    }
+    const bool hold_refresh = scenario == NewFolderCase::navigate_after_create ||
+        scenario == NewFolderCase::edit_location_after_create;
+    if (hold_refresh) {
+        // Hold reads before mutation starts. Creation can proceed independently;
+        // its authoritative refreshed listing must remain behind this barrier.
+        Probe::post_worker(*application, GateWork{gate});
+        wait_for(*application, GateStarted{*gate}, "refresh gate did not start");
     }
     const bool requested = (*create).execute("fixture.new-folder");
     require(requested, "New folder command refused");
-    if (scenario == NewFolderCase::navigate_after_create || scenario == NewFolderCase::edit_location_after_create) {
-        // Creation precedes this barrier; its refresh remains behind it.
-        Probe::post_worker(*application, GateWork{gate});
-        wait_for(*application, GateStarted{*gate}, "created-folder gate did not start");
+    const fs::path created = fixture.root() / "New folder 2";
+    if (hold_refresh) {
+        wait_for(*application, DirectoryCreated{created}, "creation must complete while reads are held");
         (*application).drain_ui();
-        require(fs::exists(fixture.root() / "New folder 2") && !(*rename).visible(),
+        require(!(*rename).visible(),
             "created folder must await the authoritative refreshed listing");
     }
-    const fs::path created = fixture.root() / "New folder 2";
-    if (navigating) {
+    if (scenario == NewFolderCase::settings_queued) {
+        const std::shared_ptr<gui_forms::Command> settings = Probe::command(*application, "file.settings");
+        const gui_forms::Control::Ptr settings_surface = (*window).find("file-manager-app.shell.settings");
+        require(settings && settings_surface, "settings completion fixture controls absent");
+        const bool opened = (*settings).execute("fixture.new-folder.settings");
+        require(opened && (*settings_surface).visible(), "Settings must open while creation is queued");
+        const std::shared_ptr<OperationCompleted> completion = std::make_shared<OperationCompleted>();
+        Probe::post_operation(*application, std::bind_front(&OperationCompleted::mark, completion));
+        (*gate).release();
+        wait_for(*application, std::bind_front(&OperationCompleted::ready, completion),
+            "creation must finish while Settings is open");
+        (*application).drain_ui();
+        require(fs::is_directory(created) && (*settings_surface).visible() && !(*rename).visible(),
+            "creation must preserve the Settings surface without opening a name editor");
+        const bool returned = (*settings).execute("fixture.new-folder.files");
+        require(returned && !(*settings_surface).visible(), "Back to files must close Settings");
+        wait_for(*application, ObjectNamed{*objects, "New folder 2"},
+            "Back to files must refresh a creation completed while Settings was open");
+        require(!(*rename).visible() && !(*gate).expired(),
+            "deferred refresh must not reopen the abandoned name editor");
+    } else if (navigating) {
         Probe::navigate(*application, fixture.destination());
         (*gate).release();
         wait_for(*application, LocationReady{*application, fixture.destination()}, "newer navigation was lost");
+        wait_for(*application, DirectoryCreated{created}, "queued creation must complete after its operation gate releases");
         require(fs::is_directory(created) && !(*rename).visible() && !(*gate).expired(),
             "completed creation must preserve newer navigation without opening an editor");
     } else if (scenario == NewFolderCase::edit_location_after_create) {
@@ -514,6 +735,8 @@ void test_new_folder_naming(const NewFolderCase scenario) {
 int main() {
     try {
         require(Probe::progress_coalesces(), "copy progress must retain one notification and the latest snapshot");
+        test_operation_order_and_shutdown();
+        test_operation_completion_preserves_pending_navigation();
         test_transfer_cancellation(false);
         test_transfer_cancellation(true);
         test_new_folder_naming(NewFolderCase::commit_name);
@@ -521,6 +744,7 @@ int main() {
         test_new_folder_naming(NewFolderCase::navigate_queued);
         test_new_folder_naming(NewFolderCase::navigate_after_create);
         test_new_folder_naming(NewFolderCase::edit_location_after_create);
+        test_new_folder_naming(NewFolderCase::settings_queued);
         std::cout << "Application transfer and new-folder tests passed\n";
         return 0;
     } catch (const std::exception& error) {

@@ -1,0 +1,10 @@
+{
+  "encoding": "UTF-8 without BOM, normalized LF",
+  "sha256": {
+    "frontend/src/application.hpp": "7facef76fe7e5f0f132d2eb8d8c1dcf8d702ac5d2543ce865a4059c2dcf8caba",
+    "frontend/src/application.cpp": "cdd9dec1ab2d5ce04a21861379f73415d039b111e88047b633d5c775f6b0c85f",
+    "frontend/src/application_jobs.hpp": "3f6eb84aad0d09309703eec3c21ec52f7027f5bdd04432f0961625b923245941",
+    "frontend/tests/application_interaction_tests.cpp": "a5d1dbe799d60f08dfda9c813e12e04e0a54c53e76ca4b3f33d8d0d7626d1610",
+    "frontend/tests/application_transfer_tests.cpp": "f8b70c5f95ddd18dbdf58da112658f0720a3991144da7c4cea1aee635b1b16dc"
+  }
+}
