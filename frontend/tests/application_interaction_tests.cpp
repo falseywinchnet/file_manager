@@ -187,6 +187,10 @@ class ApplicationInteractionProbe final {
                            const gui_forms::ObjectSortDirection direction) {
         application.apply_object_sort(std::move(mode), direction);
     }
+    static void include_hidden_entries(Application& application) {
+        application.show_hidden_ = true;
+        application.request_navigation(application.location_, false);
+    }
     static bool sort_is(const Application& application, const std::string_view mode,
                          const gui_forms::ObjectSortDirection direction) {
         const bool matches = application.sort_mode_ == mode && application.sort_direction_ == direction;
@@ -2360,6 +2364,8 @@ void test_application_command_truth_across_files_search_and_settings() {
             (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::f2});
         require(key_handled, diagnostic);
         require((*rename).visible() && (*window).focused_control() == rename, diagnostic);
+        require((*rename).text() == "root.txt" && (*rename).selected_text() == "root",
+                "F2 must reveal the extension but initially select only the basename");
     }
     std::shared_ptr<gui_forms::TextBox> expected_sha =
         std::dynamic_pointer_cast<gui_forms::TextBox>(
@@ -3402,6 +3408,95 @@ void test_settings_tabs_and_transaction_actions_are_truthful() {
     (*application).stop();
 }
 
+void test_rename_initial_selection_and_unchanged_name() {
+    TemporaryTree fixture{};
+    struct RenameCase final {
+        std::string name{};
+        std::string selection{};
+        bool directory{};
+    };
+    const std::array<RenameCase, 7U> cases{{
+        {"root.txt", "root", false}, {"archive.tar.gz", "archive.tar", false},
+        {"README", "README", false}, {".gitignore", ".gitignore", false},
+        {".config.json", ".config", false}, {"café.txt", "café", false},
+        {"Folder.with.dots", "Folder.with.dots", true}
+    }};
+    for (const RenameCase& item : cases) {
+        const std::filesystem::path path = fixture.root() / file_manager::path_from_utf8(item.name);
+        if (item.directory) {
+            std::filesystem::create_directory(path);
+        } else {
+            std::ofstream output{path};
+            output << "rename fixture\n";
+            output.close();
+            require(output.good(), "rename fixture must be written completely");
+        }
+    }
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(fixture.root(), fixture.quarantine(), true, std::string{});
+    ApplicationStopGuard guard{*application};
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
+    (*application).bind_host(host_noop, host_noop);
+    (*window).perform_layout();
+    const std::shared_ptr<gui_forms::ObjectView> objects = std::dynamic_pointer_cast<gui_forms::ObjectView>(
+        (*window).find("fm.objects.current-folder"));
+    const std::shared_ptr<gui_forms::TextBox> rename = std::dynamic_pointer_cast<gui_forms::TextBox>(
+        (*window).find("fm.operations.rename"));
+    const std::shared_ptr<gui_forms::Label> status = std::dynamic_pointer_cast<gui_forms::Label>(
+        (*window).find("file-manager-app.shell.status.ready"));
+    require(objects && rename && status, "rename fixture controls must exist");
+    file_manager::ApplicationInteractionProbe::include_hidden_entries(*application);
+    struct RenameEntriesReady final {
+        const gui_forms::ObjectView& objects;
+        bool operator()() const {
+            const bool ready = has_object_named(objects, ".config.json") &&
+                               has_object_named(objects, "Folder.with.dots");
+            return ready;
+        }
+    };
+    require_eventually(*application, RenameEntriesReady{*objects}, "rename corpus must be visible");
+    for (const RenameCase& item : cases) {
+        const std::string id = object_id(*objects, item.name);
+        const std::filesystem::path path = fixture.root() / file_manager::path_from_utf8(item.name);
+        const file_manager::ObjectIdentity before = file_manager::observe_identity(path);
+        require(!id.empty(), "rename fixture must have a stable object identity");
+        const bool selected = (*window).perform_semantic_action(id, gui_forms::SemanticAction::select);
+        require(selected, "rename fixture must accept selection");
+        const bool opened = (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::f2});
+        require(opened && (*rename).visible() && (*window).focused_control() == rename,
+                "F2 must focus the rename editor");
+        require((*rename).text() == item.name && (*rename).selected_text() == item.selection,
+                "rename must preserve visible suffixes and select the expected UTF-8 basename");
+        const bool committed = (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::enter});
+        require(committed && !(*rename).visible() && (*window).focused_control() == objects &&
+                (*status).text() == "Name unchanged" &&
+                file_manager::observe_identity(path).same_revision(before),
+                "unchanged rename must close quietly, restore focus and preserve the object");
+    }
+    const std::filesystem::path original_path = fixture.root() / "root.txt";
+    const std::filesystem::path renamed_path = fixture.root() / "renamed.txt";
+    const file_manager::ObjectIdentity original_identity = file_manager::observe_identity(original_path);
+    const std::string original_id = object_id(*objects, "root.txt");
+    const bool selected = (*window).perform_semantic_action(original_id, gui_forms::SemanticAction::select);
+    const bool opened = (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::f2});
+    require(selected && opened, "regular-file rename must reopen for keyboard editing");
+    const bool typed = (*window).dispatch_text({"renamed"});
+    require(typed && (*rename).text() == "renamed.txt", "typing the basename must preserve the extension");
+    const bool committed = (*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::enter});
+    require(committed, "edited rename must accept Enter");
+    struct RenamedEntryReady final {
+        const gui_forms::ObjectView& objects;
+        bool operator()() const {
+            const bool ready = has_object_named(objects, "renamed.txt") && !has_object_named(objects, "root.txt");
+            return ready;
+        }
+    };
+    require_eventually(*application, RenamedEntryReady{*objects}, "renamed item must appear in the refreshed folder");
+    require(file_manager::observe_identity(renamed_path) == original_identity &&
+            !std::filesystem::exists(original_path) && (*objects).selected_id() == original_id,
+            "keyboard rename must preserve identity, extension and selected object");
+}
+
 void test_property_name_rename_is_protected_and_collision_safe() {
     TemporaryTree tree_fixture{};
     std::shared_ptr<file_manager::Application> application =
@@ -4177,6 +4272,7 @@ int main() {
         test_application_command_truth_across_files_search_and_settings();
         test_criteria_virtual_folder_is_retained_exact_and_catalogue_only();
         test_settings_tabs_and_transaction_actions_are_truthful();
+        test_rename_initial_selection_and_unchanged_name();
         test_property_name_rename_is_protected_and_collision_safe();
         test_adaptive_layout_preserves_fields_commands_and_selection();
         test_installed_criteria_route_when_requested();
