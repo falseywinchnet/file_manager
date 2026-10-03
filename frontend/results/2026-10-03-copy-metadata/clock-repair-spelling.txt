@@ -1,0 +1,4 @@
+Python was not found; run without arguments to install from the Microsoft Store, or disable this shortcut from Settings > Apps > Advanced app settings > App execution aliases.
+spelling_exit=9009
+1 files; 0 spelling findings/review candidates. Semantic review still required.
+adjacent_python_spelling_exit=0

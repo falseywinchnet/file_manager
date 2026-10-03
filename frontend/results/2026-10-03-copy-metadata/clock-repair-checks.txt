@@ -1,0 +1,9 @@
+probe_exit=0
+spelling_rg_exit=1 (1 means no prohibited spelling matches)
+reported_owned_temp_exists=False
+
+Algorithm : SHA256
+Hash      : 27C31252CF8B55E58019050AE5E15BA9AA06C386ACF45D15B5E4C39E5BB52B36
+Path      : C:\Users\Shadow\file_manager\frontend\experiments\copy_metadata\copy_metadata_probe.cpp
+
+
