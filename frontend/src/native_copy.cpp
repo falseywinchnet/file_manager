@@ -122,6 +122,22 @@ public:
         return result;
     }
 
+    [[nodiscard]] std::error_code open_directory_stage(const std::filesystem::path& path) noexcept {
+#if defined(_WIN32)
+        handle = CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+            OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+#else
+        do { handle = ::open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW); }
+        while (handle < 0 && errno == EINTR);
+#endif
+        if (!available()) {
+            const std::error_code error = native_error();
+            return error;
+        }
+        return {};
+    }
+
     [[nodiscard]] NativeObjectObservation observe() const noexcept {
 #if defined(_WIN32)
         if (GetFileType(handle) != FILE_TYPE_DISK) {
@@ -189,6 +205,7 @@ struct CopyMetadata final {
     if ((information.FileAttributes & FILE_ATTRIBUTE_READONLY) != 0) {
         metadata.attributes = FILE_ATTRIBUTE_READONLY;
     }
+
     metadata.modified = information.LastWriteTime;
     // Do not pass zero/negative timestamps as setter control values. This
     // writer supports positive absolute Windows times; refuse before staging.
@@ -461,7 +478,65 @@ void perform_copy(const std::filesystem::path& source_path,
     const std::error_code metadata_error = apply_metadata(stage, metadata);
     if (metadata_error) fail(result, metadata_error);
 }
+
+void apply_directory_metadata(const std::filesystem::path& source_path,
+                              const std::filesystem::path& stage_path,
+                              const ObjectIdentity& expected_source,
+                              const ObjectIdentity& expected_stage,
+                              CopyFile& source, CopyFile& stage,
+                              DirectoryCopyMetadataResult& result) noexcept {
+    result.error = source.open_source(source_path);
+    if (result.error) return;
+    const NativeObjectObservation source_observation = source.observe();
+    result.error = source_observation.error;
+    if (result.error) return;
+    if (!expected_source.available() || source_observation.identity.type != std::filesystem::file_type::directory ||
+        !source_observation.identity.same_revision(expected_source)) {
+        result.identity_changed = true;
+        return;
+    }
+    CopyMetadata metadata{};
+    result.error = read_metadata(source, metadata);
+    if (result.error) return;
+    result.error = stage.open_directory_stage(stage_path);
+    if (result.error) return;
+    const NativeObjectObservation stage_observation = stage.observe();
+    result.error = stage_observation.error;
+    if (result.error) return;
+    if (!expected_stage.available() || stage_observation.identity.type != std::filesystem::file_type::directory ||
+        stage_observation.identity != expected_stage) {
+        result.identity_changed = true;
+        return;
+    }
+    result.error = apply_metadata(stage, metadata);
+    result.applied = !result.error;
+}
 } // namespace
+
+std::error_code create_copy_directory_stage(const std::filesystem::path& stage) noexcept {
+#if defined(_WIN32)
+    const bool created = CreateDirectoryW(stage.c_str(), nullptr) != FALSE;
+#else
+    const bool created = ::mkdir(stage.c_str(), 0700) == 0;
+#endif
+    if (!created) {
+        const std::error_code error = native_error();
+        return error;
+    }
+    return {};
+}
+
+DirectoryCopyMetadataResult finish_copy_directory_metadata(
+    const std::filesystem::path& source_path, const std::filesystem::path& stage_path,
+    const ObjectIdentity& expected_source, const ObjectIdentity& expected_stage) noexcept {
+    DirectoryCopyMetadataResult result{};
+    CopyFile source{};
+    CopyFile stage{};
+    apply_directory_metadata(source_path, stage_path, expected_source, expected_stage, source, stage, result);
+    result.stage_close_error = stage.close();
+    result.source_close_error = source.close();
+    return result;
+}
 
 NativeCopyResult copy_regular_file_to_stage(
     const std::filesystem::path& source_path, const std::filesystem::path& stage_path,

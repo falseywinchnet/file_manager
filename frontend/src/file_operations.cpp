@@ -206,7 +206,8 @@ CopyOutcome copy_node_no_follow(const std::filesystem::path& source,
     std::error_code error{};
     switch (identity.type) {
         case std::filesystem::file_type::directory: {
-            if (!std::filesystem::create_directory(destination, source, error) || error) {
+            error = create_copy_directory_stage(destination);
+            if (error) {
                 const CopyOutcome outcome{false, false, "stage_create_failed",
                         error ? error.message() : "copy stage directory was not created"};
                 return outcome;
@@ -238,6 +239,21 @@ CopyOutcome copy_node_no_follow(const std::filesystem::path& source,
                     const CopyOutcome outcome{false, false, "source_enumeration_failed", error.message()};
                     return outcome;
                 }
+            }
+            if (cancelled && cancelled()) {
+                const CopyOutcome outcome{false, true, "cancelled", "copy cancelled before directory metadata"};
+                return outcome;
+            }
+            const DirectoryCopyMetadataResult metadata = finish_copy_directory_metadata(
+                source, destination, identity, created_stage.identity);
+            if (!metadata.succeeded()) {
+                std::string message = metadata.identity_changed ? identity_changed_message()
+                    : metadata.error ? metadata.error.message() : "directory metadata finalization failed";
+                if (metadata.source_close_error) message += " · source close: " + metadata.source_close_error.message();
+                if (metadata.stage_close_error) message += " · stage close: " + metadata.stage_close_error.message();
+                const CopyOutcome outcome{false, false,
+                    metadata.identity_changed ? "identity_changed" : "directory_metadata_failed", std::move(message)};
+                return outcome;
             }
             progress.complete_node(source);
             const CopyOutcome outcome{true, false, "copied", "directory copied to stage"};

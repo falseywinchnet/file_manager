@@ -31,6 +31,34 @@ struct NativeCopyProgress final {
 
 using NativeCopyProgressObserver = std::function<void(NativeCopyProgress)>;
 
+struct DirectoryCopyMetadataResult final {
+    bool applied{};
+    bool identity_changed{};
+    std::error_code error{};
+    std::error_code source_close_error{};
+    std::error_code stage_close_error{};
+
+    [[nodiscard]] bool succeeded() const noexcept {
+        const bool success = applied && !identity_changed && !error && !source_close_error && !stage_close_error;
+        return success;
+    }
+};
+
+// Exclusively creates a writable traversal stage: POSIX requests owner-only
+// 0700 (subject to umask); Windows inherits the destination parent's security.
+// No source attributes are applied until children have been copied.
+[[nodiscard]] std::error_code create_copy_directory_stage(
+    const std::filesystem::path& stage) noexcept;
+
+// Finalize only after child creation. Opens no-follow source/stage handles,
+// checks source revision and stage identity, then applies modification time and
+// ordinary permissions. Never creates, publishes or deletes. Failure can leave
+// metadata partly applied; caller retains cleanup ownership. Paths are borrowed
+// synchronously; no handle survives return and both close errors are reported.
+[[nodiscard]] DirectoryCopyMetadataResult finish_copy_directory_metadata(
+    const std::filesystem::path& source, const std::filesystem::path& stage,
+    const ObjectIdentity& expected_source, const ObjectIdentity& expected_stage) noexcept;
+
 // Construct once before a batch; allocation failure throws before any I/O.
 // A workspace is exclusively borrowed for one synchronous invocation at a time.
 class NativeCopyWorkspace final {
