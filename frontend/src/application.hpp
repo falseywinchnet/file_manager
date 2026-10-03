@@ -104,6 +104,9 @@ private:
     struct PropertyRenameReady;
     struct PropertyRenameWork;
     struct TransferReady;
+    struct TransferProgressState;
+    struct TransferProgressReady;
+    struct TransferProgressReport;
     struct TransferCancelled;
     struct TransferWork;
     struct InternalDropReady;

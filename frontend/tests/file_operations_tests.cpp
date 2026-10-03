@@ -9,6 +9,7 @@
 #include <random>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -265,6 +266,123 @@ bool test_copy_cancellation_after_bytes(const TestArea& area) {
     return true;
 }
 
+struct RecordCopyProgress final {
+    std::vector<file_manager::CopyProgress>& records;
+    void operator()(const file_manager::CopyProgress& progress) const {
+        records.push_back(progress);
+    }
+};
+
+enum class ObserverFailurePoint { bytes, finalizing, publishing };
+
+struct FailCopyObserver final {
+    ObserverFailurePoint point{ObserverFailurePoint::bytes};
+    void operator()(const file_manager::CopyProgress& progress) const {
+        const bool fail_bytes = point == ObserverFailurePoint::bytes && progress.copied_bytes > 0U;
+        const bool fail_finalizing = point == ObserverFailurePoint::finalizing &&
+            progress.phase == file_manager::CopyPhase::finalizing;
+        const bool fail_publishing = point == ObserverFailurePoint::publishing &&
+            progress.phase == file_manager::CopyPhase::publishing;
+        if (fail_bytes || fail_finalizing || fail_publishing) throw std::runtime_error("fixture observer failure");
+    }
+};
+
+struct CancelAtPublication final {
+    bool& requested;
+    void operator()(const file_manager::CopyProgress& progress) const {
+        if (progress.phase == file_manager::CopyPhase::publishing) requested = true;
+    }
+};
+
+struct CopyCancellationFlag final {
+    const bool& requested;
+    bool operator()() const { return requested; }
+};
+
+bool test_copy_progress(const TestArea& area) {
+    using file_manager::CopyPhase;
+    using file_manager::CopyProgress;
+    const std::filesystem::path root = area.source();
+    const std::filesystem::path tree = root / "progress-tree";
+    const std::filesystem::path nested = tree / "nested";
+    const std::filesystem::path destination = root / "progress-destination";
+    std::filesystem::create_directories(nested);
+    std::filesystem::create_directory(destination);
+    const std::filesystem::path first = tree / "first.txt";
+    const std::filesystem::path second = nested / "second.txt";
+    const std::string first_contents(600U * 1024U, 'p');
+    write_file(first, first_contents);
+    write_file(second, "abc");
+    file_manager::FileOperationService operations(root, area.quarantine(), true);
+    std::vector<CopyProgress> records{};
+    const file_manager::ObjectIdentity tree_identity = file_manager::observe_identity(tree);
+    const file_manager::OperationResult copied = operations.copy_object(
+        tree, tree_identity, destination, {}, RecordCopyProgress{records});
+    if (!require(copied.succeeded() && !records.empty(), "tree copy must report progress and publish")) return false;
+    std::uint64_t previous_bytes{};
+    std::uint64_t previous_objects{};
+    bool saw_finalizing{};
+    for (const CopyProgress& progress : records) {
+        if (!require(!progress.total_bytes && progress.copied_bytes >= previous_bytes &&
+            progress.completed_objects >= previous_objects &&
+            file_manager::path_is_within(tree, progress.current_source),
+            "tree progress must be monotone with unknown total and a source inside its traversal")) return false;
+        previous_bytes = progress.copied_bytes;
+        previous_objects = progress.completed_objects;
+        if (progress.phase == CopyPhase::finalizing) saw_finalizing = true;
+    }
+    const CopyProgress& complete = records.back();
+    const std::uint64_t expected_bytes = static_cast<std::uint64_t>(first_contents.size()) + 3U;
+    if (!require(complete.copied_bytes == expected_bytes && complete.completed_objects == 4U &&
+        complete.phase == CopyPhase::publishing && saw_finalizing,
+        "tree progress must count both files and both directories without a preliminary scan")) return false;
+
+    records.clear();
+    const file_manager::ObjectIdentity first_identity = file_manager::observe_identity(first);
+    const file_manager::OperationResult file_copy = operations.copy_object(
+        first, first_identity, destination, {}, RecordCopyProgress{records});
+    if (!require(file_copy.succeeded() && !records.empty(), "regular copy must report progress")) return false;
+    for (const CopyProgress& progress : records) {
+        if (!require(progress.total_bytes == first_identity.size &&
+            progress.copied_bytes <= first_identity.size,
+            "regular-file progress must retain its known extent")) return false;
+    }
+    const std::filesystem::path published_file = destination / "first.txt";
+    if (!require(read_fixture_text(published_file) == first_contents,
+        "progress reporting must preserve copied contents")) return false;
+
+    const std::filesystem::path failure_destination = root / "progress-failure-destination";
+    std::filesystem::create_directory(failure_destination);
+    for (const ObserverFailurePoint point : {ObserverFailurePoint::bytes,
+            ObserverFailurePoint::finalizing, ObserverFailurePoint::publishing}) {
+        const file_manager::OperationResult failed = operations.copy_object(
+            first, first_identity, failure_destination, {}, FailCopyObserver{point});
+        if (!require(failed.terminal == file_manager::OperationTerminal::failed &&
+            failed.code == "copy_callback_failed" && !failed.recoverable_object_retained &&
+            !has_copy_stage(failure_destination) &&
+            !std::filesystem::exists(failure_destination / "first.txt"),
+            "observer failure must report failure and clean owned stages before publication")) return false;
+    }
+    bool cancel_requested{};
+    const file_manager::OperationResult cancelled = operations.copy_object(
+        first, first_identity, failure_destination, CopyCancellationFlag{cancel_requested},
+        CancelAtPublication{cancel_requested});
+    if (!require(cancelled.terminal == file_manager::OperationTerminal::cancelled &&
+        !cancelled.recoverable_object_retained && !has_copy_stage(failure_destination) &&
+        !std::filesystem::exists(failure_destination / "first.txt"),
+        "cancellation observed at publication progress must still prevent publication")) return false;
+    records.clear();
+    const std::string changed_contents(first_contents.size() + 1U, 'q');
+    write_file(first, changed_contents);
+    const file_manager::OperationResult changed = operations.copy_object(
+        first, first_identity, failure_destination, {}, RecordCopyProgress{records});
+    if (!require(changed.terminal == file_manager::OperationTerminal::conflict &&
+        changed.code == "identity_changed" && records.empty() && !has_copy_stage(failure_destination) &&
+        !std::filesystem::exists(failure_destination / "first.txt"),
+        "changed request revision must be refused before progress advertises a stale total")) return false;
+    return true;
+}
+
 struct PublicationFault final {
     file_manager::OperationFaultPoint point;
     std::errc error;
@@ -399,6 +517,7 @@ int main() {
     if (!test_ordinary_actions(area)) return 1;
     if (!test_native_publication(area.source())) return 1;
     if (!test_copy_cancellation_after_bytes(area)) return 1;
+    if (!test_copy_progress(area)) return 1;
     file_manager::FileOperationService disabled(
         area.source(), area.quarantine(), false);
     const file_manager::OperationResult disabled_create = disabled.create_folder(area.source());

@@ -20,6 +20,8 @@ namespace {
 namespace fs = std::filesystem;
 using file_manager::NativeCopyResult;
 using file_manager::NativeCopyTerminal;
+using file_manager::NativeCopyProgress;
+using file_manager::NativeCopyProgressObserver;
 using file_manager::ObjectIdentity;
 
 void require(const bool condition, const char* const message) {
@@ -139,6 +141,42 @@ void verify_owned(const NativeCopyResult& result, const fs::path& stage) {
     verify_closed(result);
 }
 
+enum class ProgressAction : std::uint8_t {
+    observe, cancel_after_data, throw_after_data, throw_initial,
+};
+
+// The synchronous observer and cancellation check borrow this stack owner.
+// Only aggregate observations are retained; delivery never grows storage.
+struct ProgressProbe final {
+    std::uint64_t expected_size{};
+    ProgressAction action{ProgressAction::observe};
+    std::uint64_t last_bytes{};
+    std::size_t observations{};
+    bool cancel_requested{};
+    bool valid{true};
+
+    void operator()(const NativeCopyProgress progress) {
+        if (observations == 0 && progress.copied_bytes != 0) valid = false;
+        if (progress.total_bytes != expected_size || progress.copied_bytes < last_bytes ||
+            progress.copied_bytes > expected_size) valid = false;
+        last_bytes = progress.copied_bytes;
+        ++observations;
+        if (action == ProgressAction::throw_initial) {
+            throw std::runtime_error("generated initial progress exception");
+        }
+        if (last_bytes == 0) return;
+        if (action == ProgressAction::cancel_after_data) cancel_requested = true;
+        if (action == ProgressAction::throw_after_data) {
+            throw std::runtime_error("generated post-write progress exception");
+        }
+    }
+};
+
+struct ProgressCancellation final {
+    const ProgressProbe& probe;
+    bool operator()() const { return probe.cancel_requested; }
+};
+
 void successful_files(FixtureOwner& owner, file_manager::NativeCopyWorkspace& workspace) {
     const std::array<std::size_t, 3> lengths{0U, 37U, 3U * file_manager::NativeCopyWorkspace::capacity + 17U};
     unsigned int ordinal{};
@@ -149,16 +187,81 @@ void successful_files(FixtureOwner& owner, file_manager::NativeCopyWorkspace& wo
         const fs::path stage = owner.file(prefix + "-stage");
         write_fixture(source, length);
         const ObjectIdentity expected = file_manager::observe_identity(source);
-        const NativeCopyResult result = file_manager::copy_regular_file_to_stage(source, stage, expected, {}, workspace);
+        ProgressProbe probe{static_cast<std::uint64_t>(length)};
+        const NativeCopyProgressObserver progress{std::ref(probe)};
+        const NativeCopyResult result = file_manager::copy_regular_file_to_stage(source, stage, expected, {}, workspace, progress);
         require(result.terminal == NativeCopyTerminal::complete && !result.error &&
                 result.copied_bytes == length, "successful copy result mismatch");
+        require(probe.valid && probe.observations != 0 && probe.last_bytes == length,
+                "successful progress was not monotone, bounded, or complete");
+        if (length != 0) require(probe.observations >= 2U, "initial zero progress missing");
         verify_owned(result, stage);
         require(file_manager::observe_identity(source).same_revision(expected), "source revision changed");
         require(!(expected == result.stage_identity), "copy reused source identity");
         verify_contents(source, length);
         verify_contents(stage, length);
     }
-    std::cout << "PASS empty/small/multichunk; contents and identities\n";
+    std::cout << "PASS empty/small/multichunk; monotone bounded progress, contents and identities\n";
+}
+
+void progress_interruptions(FixtureOwner& owner, file_manager::NativeCopyWorkspace& workspace) {
+    const fs::path source = owner.file("progress-source");
+    constexpr std::size_t length = 16U * 1024U * 1024U;
+    write_fixture(source, length);
+    const ObjectIdentity expected = file_manager::observe_identity(source);
+    const std::array<ProgressAction, 3> actions{
+        ProgressAction::cancel_after_data, ProgressAction::throw_after_data, ProgressAction::throw_initial};
+    unsigned int ordinal{};
+    for (const ProgressAction action : actions) {
+        const std::string suffix = std::to_string(ordinal);
+        const std::string name = "progress-stage-" + suffix;
+        ++ordinal;
+        const fs::path stage = owner.file(name);
+        ProgressProbe probe{static_cast<std::uint64_t>(length), action};
+        const NativeCopyProgressObserver progress{std::ref(probe)};
+        const ProgressCancellation cancellation{probe};
+        const file_manager::CancellationCheck check{cancellation};
+        const NativeCopyResult result = file_manager::copy_regular_file_to_stage(
+            source, stage, expected, check, workspace, progress);
+        const NativeCopyTerminal terminal = action == ProgressAction::cancel_after_data
+            ? NativeCopyTerminal::cancelled : NativeCopyTerminal::callback_failed;
+        require(result.terminal == terminal && result.error, "progress interruption terminal mismatch");
+        require(probe.valid && probe.observations != 0 && probe.last_bytes == result.copied_bytes,
+                "interrupted progress count mismatch");
+        if (action == ProgressAction::throw_initial) {
+            require(result.copied_bytes == 0 && probe.observations == 1U,
+                    "initial observer exception allowed data copying or another callback");
+        } else {
+            require(result.copied_bytes > 0 && result.copied_bytes < length && probe.observations >= 2U,
+                    "observer did not stop after partial progress");
+#if !defined(__APPLE__)
+            require(result.copied_bytes <= file_manager::NativeCopyWorkspace::capacity,
+                    "progress interruption exceeded bounded first write");
+#endif
+        }
+        verify_owned(result, stage);
+        require(fs::file_size(stage) == result.copied_bytes, "progress stage size mismatch");
+        const std::size_t copied = static_cast<std::size_t>(result.copied_bytes);
+        verify_contents(stage, copied);
+        const ObjectIdentity unchanged = file_manager::observe_identity(source);
+        require(unchanged.same_revision(expected), "progress interruption modified source");
+    }
+    verify_contents(source, length);
+    const fs::path small_source = owner.file("progress-full-source");
+    const fs::path small_stage = owner.file("progress-full-stage");
+    write_fixture(small_source, 37U);
+    const ObjectIdentity small_expected = file_manager::observe_identity(small_source);
+    ProgressProbe full_probe{37U, ProgressAction::throw_after_data};
+    const NativeCopyProgressObserver full_progress{std::ref(full_probe)};
+    const NativeCopyResult full = file_manager::copy_regular_file_to_stage(
+        small_source, small_stage, small_expected, {}, workspace, full_progress);
+    require(full_probe.valid && full_probe.last_bytes == 37U && full.copied_bytes == 37U &&
+            full.terminal == NativeCopyTerminal::callback_failed && full.error,
+            "full byte progress incorrectly established success after observer failure");
+    verify_owned(full, small_stage);
+    verify_contents(small_source, 37U);
+    verify_contents(small_stage, 37U);
+    std::cout << "PASS progress-driven partial cancellation and observer exceptions; owned stages and closes\n";
 }
 
 void existing_destination(FixtureOwner& owner, file_manager::NativeCopyWorkspace& workspace) {
@@ -168,10 +271,13 @@ void existing_destination(FixtureOwner& owner, file_manager::NativeCopyWorkspace
     write_fixture(stage, 19U);
     const ObjectIdentity expected = file_manager::observe_identity(source);
     const ObjectIdentity occupied = file_manager::observe_identity(stage);
-    const NativeCopyResult result = file_manager::copy_regular_file_to_stage(source, stage, expected, {}, workspace);
+    ProgressProbe probe{37U};
+    const NativeCopyProgressObserver progress{std::ref(probe)};
+    const NativeCopyResult result = file_manager::copy_regular_file_to_stage(source, stage, expected, {}, workspace, progress);
     require(result.terminal == NativeCopyTerminal::failed && result.error &&
             !result.stage_created && !result.stage_identity.available() && result.copied_bytes == 0,
             "create refusal claimed destination ownership");
+    require(probe.observations == 0, "refused create emitted progress");
     verify_closed(result);
     require(file_manager::observe_identity(stage).same_revision(occupied), "existing destination changed");
     verify_contents(stage, 19U);
@@ -238,10 +344,13 @@ void source_mismatch(FixtureOwner& owner, file_manager::NativeCopyWorkspace& wor
     write_fixture(source, 37U);
     ObjectIdentity expected = file_manager::observe_identity(source);
     ++expected.size;
-    const NativeCopyResult result = file_manager::copy_regular_file_to_stage(source, stage, expected, {}, workspace);
+    ProgressProbe probe{expected.size};
+    const NativeCopyProgressObserver progress{std::ref(probe)};
+    const NativeCopyResult result = file_manager::copy_regular_file_to_stage(source, stage, expected, {}, workspace, progress);
     require(result.terminal == NativeCopyTerminal::source_changed && !result.stage_created &&
             !result.stage_identity.available() && result.copied_bytes == 0 && !fs::exists(stage),
             "source mismatch created stage");
+    require(probe.observations == 0, "unvalidated source emitted progress");
     verify_closed(result);
     verify_contents(source, 37U);
     std::cout << "PASS source revision mismatch before creation\n";
@@ -330,6 +439,7 @@ int main() {
         file_manager::NativeCopyWorkspace workspace{};
         const std::byte* const initial_storage = workspace.bytes().data();
         successful_files(owner, workspace);
+        progress_interruptions(owner, workspace);
         existing_destination(owner, workspace);
         cancellation_files(owner, workspace);
         source_mismatch(owner, workspace);

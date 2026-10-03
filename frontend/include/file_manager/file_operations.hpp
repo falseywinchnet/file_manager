@@ -35,6 +35,23 @@ enum class OperationTerminal : std::uint8_t {
     failed,
 };
 
+enum class CopyPhase : std::uint8_t { copying, finalizing, publishing };
+
+struct CopyProgress final {
+    CopyPhase phase{CopyPhase::copying};
+    std::filesystem::path current_source{};
+    std::uint64_t copied_bytes{};
+    std::uint64_t completed_objects{};
+    // A regular-file request has a known extent; trees have no preliminary scan.
+    std::optional<std::uint64_t> total_bytes{};
+};
+
+// Synchronous observation only. The snapshot and its path are borrowed until
+// callback return. Bytes describe stage writes, not publication or durability.
+// Observer failure aborts before publication and uses the ordinary cleanup law.
+// Observers must not reenter this service or mutate source/destination objects.
+using CopyProgressObserver = std::function<void(const CopyProgress&)>;
+
 struct OperationResult final {
     std::string operation_id{};
     OperationKind kind{OperationKind::create_folder};
@@ -109,7 +126,8 @@ public:
         const std::filesystem::path& source,
         const ObjectIdentity& expected,
         const std::filesystem::path& destination_parent,
-        const CancellationCheck& cancelled = {});
+        const CancellationCheck& cancelled = {},
+        const CopyProgressObserver& progress = {});
     [[nodiscard]] OperationResult move_object(
         const std::filesystem::path& source,
         const ObjectIdentity& expected,

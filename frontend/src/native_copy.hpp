@@ -3,6 +3,7 @@
 #include "file_manager/filesystem_model.hpp"
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <span>
 #include <system_error>
@@ -22,6 +23,13 @@ struct NativeCopyResult final {
     bool stage_created{};
     ObjectIdentity stage_identity{};
 };
+
+struct NativeCopyProgress final {
+    std::uint64_t copied_bytes{};
+    std::uint64_t total_bytes{};
+};
+
+using NativeCopyProgressObserver = std::function<void(NativeCopyProgress)>;
 
 // Construct once before a batch; allocation failure throws before any I/O.
 // A workspace is exclusively borrowed for one synchronous invocation at a time.
@@ -46,11 +54,20 @@ private:
 // Close errors are retained separately even when cancellation/failure wins.
 // Windows/Linux poll between bounded I/O calls; macOS uses native write
 // callbacks. No hard I/O deadline, parent-route pin, or filesystem snapshot.
+// Progress is optional and synchronously borrowed, never retained or copied.
+// The caller keeps its target alive and must not reenter with this workspace.
+// Observations start at zero after source validation and stage creation, then
+// report confirmed bytes monotonically within the validated expected extent.
+// Empty files report zero of zero. Duplicate counts are permitted. No event
+// establishes revision validation, clean closes, publication, or durability.
+// Observer exceptions stop copying as callback_failed; identity and close
+// reporting still run. Delivery performs no per-buffer callable allocation.
 [[nodiscard]] NativeCopyResult copy_regular_file_to_stage(
     const std::filesystem::path& source,
     const std::filesystem::path& stage,
     const ObjectIdentity& expected,
     const CancellationCheck& cancelled,
-    NativeCopyWorkspace& workspace) noexcept;
+    NativeCopyWorkspace& workspace,
+    const NativeCopyProgressObserver& progress = {}) noexcept;
 
 } // namespace file_manager
