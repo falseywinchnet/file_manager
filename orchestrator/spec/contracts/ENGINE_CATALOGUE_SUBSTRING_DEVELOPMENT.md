@@ -127,8 +127,9 @@ Unverified cached matches remain visible with cached-generation/stale disclosure
 They must not be relabelled current when the frontend observes the path again.
 Stored identity/revision and current facts stay separate. Operations retain
 their own current identity validation. The source-record repair preserves the
-initial identity/metadata subset; full rank/evidence projection and retained
-request context are still required before frontend indexed-search acceptance.
+initial identity/metadata subset. The full rank/evidence projection and retained
+request context repair is specified in `../FRONTEND_SEARCH_MATCH_CONTEXT.md`;
+its native consumer acceptance remains required before indexed-search acceptance.
 No Engine 64-bit Windows ID is equated to frontend FILE_ID_128 by truncation.
 Current-verified criteria would additionally need identity compatibility and
 fresh predicate evaluation; this profile makes no such claim.
@@ -143,7 +144,9 @@ Measure 10k/100k/1m first-result/page distributions, allocations/read bytes and
 retained memory against the live path and exhaustive reference. No speed or
 million-row claim is established by this document.
 
-The bounded-reader candidate remains under evaluation. Code existence or an
+The bounded-reader candidate was rejected because its no-regression gate was
+not established; see `../../../engine/results/BOUNDED_SCAN_READER_2026-10-03.md`.
+Active Engine source is unchanged. Code existence or an
 available private experiment cannot promote this capability. Reversal keeps it
 unavailable and preserves live fallback and all rejected experiment evidence;
 no catalogue migration is involved. Any later accelerator must match this
