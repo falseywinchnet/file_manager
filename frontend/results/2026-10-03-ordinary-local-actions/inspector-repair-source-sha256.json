@@ -1,0 +1,8 @@
+{
+  "encoding": "UTF-8 without BOM, normalized LF",
+  "sha256": {
+    "frontend/src/application.cpp": "91dbdf46c2594494bc28ee38378230a75dbe8f8756b4d3b6c06498601be30804",
+    "frontend/tests/application_interaction_tests.cpp": "b3512d9db10475004b4af0b8f204ef230da27e841ee04bdce4fcdb9c06bcbb59",
+    "frontend/tests/macos_preview_tests.mm": "2d43bb37d92289b821abb4116d88d1650aa46469fdaa48425a1160dd5471048e"
+  }
+}

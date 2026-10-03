@@ -15,6 +15,7 @@
 #include <exception>
 #include <iomanip>
 #include <limits>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <thread>
@@ -3412,6 +3413,7 @@ void Application::apply_directory(DirectorySnapshot snapshot,
 
     const std::vector<std::string> previous_selection(
         (*objects_).selected_ids().begin(), (*objects_).selected_ids().end());
+    const std::string previous_primary((*objects_).selected_id());
     entries_.clear();
     search_sources_.clear();
     std::vector<gui_forms::ObjectViewItem> items{};
@@ -3447,6 +3449,14 @@ void Application::apply_directory(DirectorySnapshot snapshot,
         (*objects_).clear_selection();
         update_selection({});
     }
+    // Model replacement emits no selection event when identity is unchanged.
+    // The new snapshot can still change the name, facts and preview revision.
+    const std::span<const std::string> current_selection = (*objects_).selected_ids();
+    const bool selection_unchanged = !previous_primary.empty() &&
+        previous_primary == (*objects_).selected_id() &&
+        std::equal(previous_selection.begin(), previous_selection.end(),
+            current_selection.begin(), current_selection.end());
+    if (selection_unchanged) update_selection(previous_primary);
     rebuild_tree(snapshot);
 
     (*form_.file_manager_app_shell_location_navigation_back).set_enabled(

@@ -244,6 +244,17 @@ bool contains_file(const gui_forms::ObjectView& objects, const std::string_view 
     return false;
 }
 
+void require_inspector_name(gui_forms::Window& model, const std::string_view expected) {
+    const std::shared_ptr<gui_forms::PropertyList> properties =
+        std::dynamic_pointer_cast<gui_forms::PropertyList>(model.find("fm.selection.properties"));
+    const std::shared_ptr<gui_forms::Label> preview_name = std::dynamic_pointer_cast<gui_forms::Label>(
+        model.find("file-manager-app.shell.workspace.selection.inspector.facts.preview.name"));
+    if (!properties || !preview_name) throw std::runtime_error("native inspector controls disappeared");
+    if ((*properties).value("fm.property.name") != expected || (*preview_name).text() != expected) {
+        throw std::runtime_error("native inspector retained a stale name after Rename or Undo");
+    }
+}
+
 void require_protected_commands_unavailable(gui_forms::Window& model) {
     const std::shared_ptr<gui_forms::MenuStrip> menu =
         std::dynamic_pointer_cast<gui_forms::MenuStrip>(model.find("fm.application.menu"));
@@ -320,6 +331,10 @@ void exercise_local_actions(PreviewState& state, NSWindow* const native) {
     }
     if (state.stage == PreviewStage::file_renamed) {
         if (!contains_file(*objects, "renamed-preview.txt") || (*rename).visible()) return;
+        require_inspector_name(*state.model, "renamed-preview.txt");
+        const std::shared_ptr<gui_forms::Label> text = std::dynamic_pointer_cast<gui_forms::Label>(
+            (*state.model).find("fm.inspector.preview.text"));
+        if (!text || !(*text).effectively_visible() || !(*text).text().starts_with("NATIVE PREVIEW CHECK")) return;
         const file_manager::ObjectIdentity observed = file_manager::observe_identity(renamed);
         if (observed != state.renamed_identity || file_manager::observe_identity(original).available()) {
             throw std::runtime_error("native Rename did not preserve the selected filesystem object");
@@ -337,12 +352,13 @@ void exercise_local_actions(PreviewState& state, NSWindow* const native) {
         return;
     }
     if (!contains_file(*objects, "native-preview.txt") || contains_file(*objects, "renamed-preview.txt")) return;
+    require_inspector_name(*state.model, "native-preview.txt");
     if (file_manager::observe_identity(original) != state.renamed_identity ||
         file_manager::observe_identity(renamed).available()) {
         throw std::runtime_error("native Rename Undo did not restore the original object and name");
     }
     std::cout << "macOS ordinary local actions: menu_create=passed create_undo=passed "
-                 "F2_basename_rename=passed rename_undo=passed protected_commands=unavailable "
+                 "F2_basename_rename=passed rename_undo=passed inspector_names=passed protected_commands=unavailable "
                  "quarantine=absent delivery=synthetic_native_window\n";
     state.stage = PreviewStage::finished;
     state.close();
