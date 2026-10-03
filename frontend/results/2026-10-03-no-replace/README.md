@@ -1,6 +1,7 @@
 # No-replace filesystem publication — 2026-10-03 UTC
 
-Status: **implemented; Windows verified; Mac/Linux native CI pending**.
+Status: **implemented; local Windows and native Mac/Linux verified; Windows CI
+fixture correction awaiting its fresh run**.
 
 **GIVEN:** ADR-017 admits rename, move, staged copy, quarantine and restoration
 only with no destination replacement. **OBSERVED:** the previous implementation
@@ -58,6 +59,31 @@ admit broader mutation roots, enable merge/replace/cross-volume moves or provide
 durable crash recovery. Those remain separate requirements.
 
 ## House-style review
+
+### Native CI fixture correction
+
+**MEASURED:** native push run `37097850866` passed Linux and macOS. Windows
+compiled successfully but failed the new source-link publication assertion.
+`WindowsInitialCIFailure.log` preserves its CTest excerpt. Local Windows had
+skipped this case because symlink creation privilege is unavailable here.
+
+**OBSERVED:** `parse_windows_symlink_target` deliberately returns an absolute
+target using the Win32 extended namespace. The new test incorrectly compared
+that representation with the ordinary path passed to fixture creation. It now
+captures the stored target before the move and compares it afterward. Separate
+assertions retain the available symlink identity, exact stored target, vacancy
+of the old link name and absence of the dangling target. No production behavior
+or symlink skip rule was changed. The native Windows rerun must establish that
+the representation mismatch accounts for the reported failure.
+
+The focused local operation suite passes in 0.19 seconds; the unavailable-link
+skip remains explicit in `WindowsFixtureCorrection.log`. Reviewed the added
+observations and assertions against the house style: explicit initialized
+owned paths/statuses, synchronous observations, immediate failure exits and no
+retained borrows or new callbacks. One changed C++ file has zero spelling
+candidates; this does not substitute for native Windows link execution.
+
+### Initial implementation scope
 
 Reviewed against `planning/PROGRAMMING_HOUSE_STYLE.md`: the entire new private
 header/implementation; changed service preflight, publication, error projection,
