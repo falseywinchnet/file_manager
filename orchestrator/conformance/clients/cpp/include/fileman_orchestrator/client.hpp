@@ -202,6 +202,20 @@ struct SearchObjectIdentityInfo {
     std::optional<std::map<std::string, std::string, std::less<>>> platform_key{};
 };
 
+// Owned provider match observations. Unknown kinds/calibrations remain inert;
+// scores do not establish current-file verification or cross-channel ordering.
+struct SearchEvidenceInfo {
+    std::string kind{};
+    std::string channel{};
+    double score{};
+    bool exact{};
+    bool inferred{};
+    std::optional<std::string> calibration{};
+    std::optional<std::string> anchor{};
+    std::optional<std::string> observed_at{};
+    std::optional<std::string> details_json{};
+};
+
 struct SearchResultInfo {
     std::string name{};
     std::filesystem::path path{};
@@ -212,6 +226,9 @@ struct SearchResultInfo {
     std::optional<std::uint64_t> generation{};
     std::optional<std::uint32_t> mode{};
     std::optional<std::int64_t> modified_unix_nanoseconds{};
+    std::optional<std::uint64_t> rank{};
+    std::optional<double> certainty{};
+    std::optional<std::vector<SearchEvidenceInfo>> evidence{};
 };
 
 struct SearchCursorInfo {

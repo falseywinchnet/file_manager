@@ -299,7 +299,6 @@ private:
     void request_engine_criteria(bool next_page = false);
     void apply_engine_criteria(
         PreparedSearchPage prepared,
-        std::vector<fileman::orchestrator::SearchExactFilter> filters,
         std::uint64_t generation,
         bool append);
     void request_engine_search(bool next_page = false);

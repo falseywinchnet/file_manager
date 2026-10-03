@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <charconv>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -668,6 +669,127 @@ void project_search_revision(const JsonValue::Object& record,
     }
 }
 
+double finite_number(const JsonValue& value, const std::string_view context) {
+    const JsonNumber* number = std::get_if<JsonNumber>(&value.value);
+    if (number == nullptr) {
+        std::string message{context};
+        message += " must be a finite number";
+        fail(message);
+    }
+    const std::string& text = (*number).text;
+    const char* const begin = text.data();
+    const char* const end = begin + text.size();
+    double result{};
+    const std::from_chars_result parsed = std::from_chars(begin, end, result, std::chars_format::general);
+    if (parsed.ec != std::errc{} || parsed.ptr != end || !std::isfinite(result)) {
+        std::string message{context};
+        message += " is outside the finite double range";
+        fail(message);
+    }
+    return result;
+}
+
+// Traverse only the already validated, depth/value-bounded private parse tree.
+// Appends into one owned output; input and output never share storage. Number
+// lexemes are copied exactly, including values outside binary64's range.
+void append_inert_json(const JsonValue& value, std::string& output) {
+    if (std::holds_alternative<std::nullptr_t>(value.value)) {
+        output += "null";
+        return;
+    }
+    const bool* truth = std::get_if<bool>(&value.value);
+    if (truth != nullptr) {
+        if (*truth) output += "true";
+        else output += "false";
+        return;
+    }
+    const JsonNumber* number = std::get_if<JsonNumber>(&value.value);
+    if (number != nullptr) {
+        output += (*number).text;
+        return;
+    }
+    const std::string* text = std::get_if<std::string>(&value.value);
+    if (text != nullptr) {
+        const std::string escaped = json_escape(*text);
+        output += escaped;
+        return;
+    }
+    const JsonValue::Array* values = std::get_if<JsonValue::Array>(&value.value);
+    if (values != nullptr) {
+        output += '[';
+        const std::size_t count = (*values).size();
+        for (std::size_t index = 0; index < count; ++index) {
+            if (index != 0) output += ',';
+            append_inert_json((*values)[index], output);
+        }
+        output += ']';
+        return;
+    }
+    const JsonValue::Object& members = object(value, "inert details");
+    output += '{';
+    bool first = true;
+    for (const JsonValue::Object::value_type& member : members) {
+        if (!first) output += ',';
+        first = false;
+        const std::string key = json_escape(member.first);
+        output += key;
+        output += ':';
+        append_inert_json(member.second, output);
+    }
+    output += '}';
+}
+
+SearchEvidenceInfo project_search_evidence(const JsonValue& value) {
+    const JsonValue::Object& record = object(value, "search evidence");
+    SearchEvidenceInfo evidence{};
+    const JsonValue& kind = field(record, "kind");
+    evidence.kind = string(kind, "search evidence kind");
+    const JsonValue& channel = field(record, "channel");
+    evidence.channel = string(channel, "search evidence channel");
+    const JsonValue& score = field(record, "score");
+    evidence.score = finite_number(score, "search evidence score");
+    const JsonValue& exact = field(record, "exact");
+    evidence.exact = boolean(exact, "search evidence exact");
+    const JsonValue& inferred = field(record, "inferred");
+    evidence.inferred = boolean(inferred, "search evidence inferred");
+    evidence.calibration = optional_object_string(record, "calibration");
+    evidence.anchor = optional_object_string(record, "anchor");
+    evidence.observed_at = optional_object_string(record, "observed_at");
+    const JsonValue::Object::const_iterator details = record.find("details");
+    if (details != record.end() && !std::holds_alternative<std::nullptr_t>((*details).second.value)) {
+        const JsonValue& inert = (*details).second;
+        const JsonValue::Object& validated = object(inert, "search evidence details");
+        static_cast<void>(validated);
+        std::string encoded{};
+        append_inert_json(inert, encoded);
+        evidence.details_json = std::move(encoded);
+    }
+    return evidence;
+}
+
+// Fill only the current unpublished row. The page remains local until every
+// row/evidence entry succeeds, so a later failure cannot publish a partial page.
+void project_search_match(const JsonValue::Object& record, SearchResultInfo& projected) {
+    const JsonValue::Object::const_iterator rank = record.find("rank");
+    if (rank != record.end()) {
+        projected.rank = optional_unsigned_integer((*rank).second, "search rank");
+    }
+    const JsonValue::Object::const_iterator certainty = record.find("certainty");
+    if (certainty != record.end() && !std::holds_alternative<std::nullptr_t>((*certainty).second.value)) {
+        projected.certainty = finite_number((*certainty).second, "search certainty");
+    }
+    const JsonValue::Object::const_iterator found = record.find("evidence");
+    if (found == record.end() || std::holds_alternative<std::nullptr_t>((*found).second.value)) return;
+    const JsonValue::Array& entries = array((*found).second, "search evidence");
+    std::vector<SearchEvidenceInfo> evidence{};
+    evidence.reserve(entries.size());
+    for (const JsonValue& entry : entries) {
+        SearchEvidenceInfo item = project_search_evidence(entry);
+        evidence.push_back(std::move(item));
+    }
+    projected.evidence = std::move(evidence);
+}
+
 SettingValue parse_setting_value(const JsonValue& value,
                                  const std::string_view context) {
     if (const bool* boolean_value = std::get_if<bool>(&value.value)) {
@@ -996,6 +1118,7 @@ SearchPageInfo detail::project_search_response(
         };
         projected.object = project_search_identity(object_record);
         project_search_revision(record, metadata, projected);
+        project_search_match(record, projected);
         page.names.push_back(projected.name);
         page.results.push_back(std::move(projected));
     }

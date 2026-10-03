@@ -3859,7 +3859,6 @@ void Application::request_engine_search(const bool next_page) {
 
 void Application::apply_engine_criteria(
     PreparedSearchPage prepared,
-    std::vector<fileman::orchestrator::SearchExactFilter>,
     const std::uint64_t generation,
     const bool append) {
     if (prepared.cancelled || stopping_.load() || generation != search_generation_.load() || !criteria_showing_) return;
@@ -3997,16 +3996,12 @@ void Application::apply_engine_search(
     std::vector<gui_forms::CorrespondenceItem> correspondence_items{};
     items.reserve(search_order_.size());
     correspondence_items.reserve(search_order_.size());
-    const std::string evidence_source = page.source == "catalogue"
-        ? "Local index"
-        : "Live filesystem";
-    const std::string generation_detail = page.generation
-        ? "Engine generation " + std::to_string(*page.generation)
-        : "Live filesystem observation; no catalogue generation claimed";
     for (const std::string& stable_id : search_order_) {
         const EntryMap::const_iterator found = entries_.find(stable_id);
         if (found == entries_.end()) continue;
         const DirectoryEntry& entry = (*found).second;
+        const SearchResultSource& source = search_sources_.at(stable_id);
+        const SearchMatchPresentation match = describe_search_match(source);
         std::string display_name = entry.name;
         if (!show_extensions_ && !entry.directory &&
             entry.kind != EntryKind::symlink) {
@@ -4023,11 +4018,11 @@ void Application::apply_engine_search(
             entry.name,
             relative_path,
             kind_text(entry) + " · " + entry.secondary_text,
-            "No content claim. Provider matched local name or path data.",
-            page.source == "catalogue" ? "CATALOGUE" : "LIVE",
+            match.match_summary,
+            match.source_badge,
             "LOCAL EVIDENCE",
-            {evidence_source, "Filesystem observation"},
-            generation_detail,
+            {match.source_label, "Filesystem observation"},
+            match.generation_detail,
             object_glyph(entry.kind),
             true,
             false,

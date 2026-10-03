@@ -4,6 +4,15 @@ Status: **ACTIVE; first source pass, not a completed whole-product audit**.
 
 ## Current checkpoint — 2026-10-02
 
+**Search match/context development, 2026-10-03:** existing provider rank,
+certainty and ordered evidence now survive client projection. Submitted query,
+scope, filters and continuation have one immutable owner per page. Appended
+correspondence rows keep their own source/generation and do not substitute a
+later page's provenance. Windows integration passes 15 suites; native CI and
+delivery remain pending. See
+`../results/2026-10-03-search-match-context/README.md`. This is evidence integrity
+and presentation work, not indexed-substring activation or measured acceleration.
+
 **Latest delivery update:**
 [`v0.001-alpha.d4dcb24`](https://github.com/falseywinchnet/file_manager/releases/tag/v0.001-alpha.d4dcb24)
 is now published with New Folder naming and retained search source records.

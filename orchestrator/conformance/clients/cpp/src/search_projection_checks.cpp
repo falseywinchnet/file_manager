@@ -1,6 +1,8 @@
 #include "search_projection.hpp"
 
 #include <iostream>
+#include <array>
+#include <cmath>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -178,6 +180,137 @@ void test_invalid_source_records() {
     reject_source({}, "0", {}, R"(,"generation":18446744073709551616)");
     reject_source({}, "0", {}, R"(,"generation":-1)");
 }
+
+void test_owned_match_evidence() {
+    const std::string_view annotations = R"(,"rank":18446744073709551615,"certainty":-2.5e0,"evidence":[{"kind":"future-kind","channel":"unknown/channel","score":1.25e+2,"exact":false,"inferred":true,"calibration":"scale-v2","anchor":"a/b","observed_at":"provider-clock","details":{"nested":[null,true,false,"quote\" slash\\ newline\n nul\u0000 music\uD834\uDD1E",{"large":184467440737095516160001,"tiny":1.2300e-900,"negative_zero":-0.00,"empty":{}}],"empty":[]}},{"kind":"exact_path","channel":"exact","score":-0.0,"exact":true,"inferred":false}])";
+    std::string bytes = source_response({}, "42", {}, annotations);
+    const orc::SearchPageInfo page = orc::detail::project_search_response(bytes, "source-test");
+    bytes.assign(bytes.size(), 'x');
+    bytes.clear();
+    bytes.shrink_to_fit();
+    const orc::SearchResultInfo& row = page.results.at(0U);
+    require(row.rank == std::numeric_limits<std::uint64_t>::max() && row.certainty == -2.5,
+            "owned rank and certainty must preserve their domains without clamping");
+    require(row.evidence && (*row.evidence).size() == 2U, "ordered evidence must survive response retirement");
+    const orc::SearchEvidenceInfo& first = (*row.evidence)[0U];
+    const orc::SearchEvidenceInfo& second = (*row.evidence)[1U];
+    require(first.kind == "future-kind" && first.channel == "unknown/channel" && first.score == 125.0 &&
+                !first.exact && first.inferred && first.calibration == "scale-v2" && first.anchor == "a/b" &&
+                first.observed_at == "provider-clock", "unknown evidence and optional strings must remain owned observations");
+    require(second.kind == "exact_path" && second.channel == "exact" && second.score == 0.0 &&
+                std::signbit(second.score) && second.exact && !second.inferred && !second.calibration &&
+                !second.anchor && !second.observed_at && !second.details_json,
+            "ordered second evidence must retain signed zero and unreported fields");
+    // Canonical key ordering is permitted. Number spellings and every nested
+    // value/array position must survive, including values beyond binary64.
+    const std::string expected_details = R"({"empty":[],"nested":[null,true,false,"quote\" slash\\ newline\n nul\u0000 music)"
+        "\xF0\x9D\x84\x9E"
+        R"(",{"empty":{},"large":184467440737095516160001,"negative_zero":-0.00,"tiny":1.2300e-900}]})";
+    require(first.details_json == expected_details, "nested inert details lost values or numeric spelling");
+    const std::string expected_first = *first.details_json;
+    std::string replay_annotations = R"(,"evidence":[{"kind":"replay","channel":"inert","score":0,"exact":false,"inferred":false,"details":)";
+    replay_annotations += expected_first;
+    replay_annotations += "}]";
+    const std::string replay_bytes = source_response({}, "0", {}, replay_annotations);
+    const orc::SearchPageInfo replay = orc::detail::project_search_response(replay_bytes, "source-test");
+    const orc::SearchResultInfo& replay_row = replay.results.at(0U);
+    require(replay_row.evidence && (*replay_row.evidence)[0U].details_json == expected_first,
+            "retained details must remain valid JSON after response/tree destruction");
+}
+
+void test_optional_match_fields() {
+    const std::string missing_bytes = source_response({}, "0", {}, {});
+    const orc::SearchPageInfo missing = orc::detail::project_search_response(missing_bytes, "source-test");
+    const orc::SearchResultInfo& missing_row = missing.results.at(0U);
+    require(!missing_row.rank && !missing_row.certainty && !missing_row.evidence,
+            "missing match fields must not be synthesized");
+    const std::string null_bytes = source_response({}, "0", {}, R"(,"rank":null,"certainty":null,"evidence":null)");
+    const orc::SearchPageInfo nulls = orc::detail::project_search_response(null_bytes, "source-test");
+    const orc::SearchResultInfo& null_row = nulls.results.at(0U);
+    require(!null_row.rank && !null_row.certainty && !null_row.evidence, "null match fields must remain unreported");
+    const std::string empty_bytes = source_response({}, "0", {}, R"(,"rank":0,"certainty":0,"evidence":[])");
+    const orc::SearchPageInfo empty = orc::detail::project_search_response(empty_bytes, "source-test");
+    const orc::SearchResultInfo& empty_row = empty.results.at(0U);
+    require(empty_row.rank == 0U && empty_row.certainty == 0.0 && empty_row.evidence && (*empty_row.evidence).empty(),
+            "reported zero and empty evidence must remain distinguishable from absence");
+    const std::string evidence_bytes = source_response({}, "0", {}, R"(,"evidence":[{"kind":"","channel":"","score":0,"exact":false,"inferred":false,"calibration":"","anchor":"","observed_at":"","details":{}},{"kind":"k","channel":"c","score":0,"exact":true,"inferred":false,"calibration":null,"anchor":null,"observed_at":null,"details":null}])");
+    const orc::SearchPageInfo evidence_page = orc::detail::project_search_response(evidence_bytes, "source-test");
+    const orc::SearchResultInfo& row = evidence_page.results.at(0U);
+    require(row.evidence && (*row.evidence).size() == 2U, "optional evidence fixture missing");
+    const orc::SearchEvidenceInfo& reported = (*row.evidence)[0U];
+    const orc::SearchEvidenceInfo& unreported = (*row.evidence)[1U];
+    require(reported.kind.empty() && reported.channel.empty() && reported.calibration == "" &&
+                reported.anchor == "" && reported.observed_at == "" && reported.details_json == "{}",
+            "reported empty evidence strings and object must survive");
+    require(!unreported.calibration && !unreported.anchor && !unreported.observed_at && !unreported.details_json,
+            "null optional evidence values must remain unreported");
+}
+
+void test_match_numeric_boundaries() {
+    const std::string bytes = source_response({}, "0", {}, R"(,"certainty":1.7976931348623157e308,"evidence":[{"kind":"small","channel":"c","score":4.9406564584124654e-324,"exact":false,"inferred":false},{"kind":"negative","channel":"c","score":-1.7976931348623157e308,"exact":false,"inferred":true}])");
+    const orc::SearchPageInfo page = orc::detail::project_search_response(bytes, "source-test");
+    const orc::SearchResultInfo& row = page.results.at(0U);
+    require(row.certainty == std::numeric_limits<double>::max() && row.evidence && (*row.evidence).size() == 2U,
+            "finite double maximum must be accepted");
+    require((*row.evidence)[0U].score == std::numeric_limits<double>::denorm_min() &&
+                (*row.evidence)[1U].score == -std::numeric_limits<double>::max(),
+            "representable subnormal and negative maximum must survive");
+    const std::array<std::string_view, 8> ranks{{"-1", "-0", "1.0", "1e0", "18446744073709551616", "true", "[]", "\"1\""}};
+    for (const std::string_view rank : ranks) {
+        std::string revision = ",\"rank\":";
+        revision.append(rank);
+        reject_source({}, "0", {}, revision);
+    }
+    const std::array<std::string_view, 10> invalid{{"1e309", "-1e309", "1e-999", "NaN", "Infinity", "\"NaN\"", "\"0.5\"", "false", "[]", "{}"}};
+    for (const std::string_view number : invalid) {
+        std::string certainty = ",\"certainty\":";
+        certainty.append(number);
+        reject_source({}, "0", {}, certainty);
+        std::string evidence = R"(,"evidence":[{"kind":"k","channel":"c","score":)";
+        evidence.append(number);
+        evidence += R"(,"exact":true,"inferred":false}])";
+        reject_source({}, "0", {}, evidence);
+    }
+}
+
+void test_malformed_match_evidence() {
+    const std::array<std::string_view, 15> invalid{{
+        "null", "[]", "{}",
+        R"({"kind":0,"channel":"c","score":0,"exact":true,"inferred":false})",
+        R"({"kind":"k","channel":false,"score":0,"exact":true,"inferred":false})",
+        R"({"kind":"k","channel":"c","score":null,"exact":true,"inferred":false})",
+        R"({"kind":"k","channel":"c","score":0,"exact":1,"inferred":false})",
+        R"({"kind":"k","channel":"c","score":0,"exact":true,"inferred":"false"})",
+        R"({"kind":"k","channel":"c","score":0,"exact":true})",
+        R"({"kind":"k","channel":"c","score":0,"exact":true,"inferred":false,"calibration":3})",
+        R"({"kind":"k","channel":"c","score":0,"exact":true,"inferred":false,"anchor":[]})",
+        R"({"kind":"k","channel":"c","score":0,"exact":true,"inferred":false,"observed_at":{}})",
+        R"({"kind":"k","channel":"c","score":0,"exact":true,"inferred":false,"details":[]})",
+        R"({"kind":"k","channel":"c","score":0,"exact":true,"inferred":false,"details":1})",
+        R"({"kind":"k","channel":"c","score":0,"exact":true,"inferred":false,"details":"{}"})"
+    }};
+    for (const std::string_view entry : invalid) {
+        // A valid first entry ensures failure happens after useful local work.
+        std::string evidence = R"(,"evidence":[{"kind":"valid","channel":"c","score":1,"exact":true,"inferred":false},)";
+        evidence.append(entry);
+        evidence += ']';
+        reject_source({}, "0", {}, evidence);
+    }
+    reject_source({}, "0", {}, R"(,"evidence":{})");
+    reject_source({}, "0", {}, R"(,"evidence":false)");
+    // The first row is complete; a malformed later row must prevent assignment
+    // of the whole new page, retaining the caller's prior owned page unchanged.
+    std::string late = source_response({}, "0", {}, R"(,"rank":1,"evidence":[])");
+    late.resize(late.size() - 3U);
+    late += R"(,{"object":{"path":"/later"},"metadata":{"name":"later","kind":"file","size":0},"unavailable":false,"evidence":[{"kind":"bad","channel":"c","score":1e999,"exact":true,"inferred":false}]}]}})";
+    orc::SearchPageInfo prior{};
+    prior.source = "prior-page";
+    bool rejected = false;
+    try { prior = orc::detail::project_search_response(late, "source-test"); }
+    catch (const orc::ClientError&) { rejected = true; }
+    require(rejected && prior.source == "prior-page" && prior.results.empty(),
+            "late malformed evidence must not publish the preceding valid row");
+}
 } // namespace
 
 int main() {
@@ -188,6 +321,10 @@ int main() {
         test_owned_source_identity_and_integer_domains();
         test_source_optional_fields_and_aliases();
         test_invalid_source_records();
+        test_owned_match_evidence();
+        test_optional_match_fields();
+        test_match_numeric_boundaries();
+        test_malformed_match_evidence();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

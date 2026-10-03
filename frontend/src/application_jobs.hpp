@@ -451,12 +451,11 @@ struct Application::CriteriaUnavailable final {
 struct Application::CriteriaReady final {
     std::shared_ptr<Application> self{};
     PreparedSearchPage page{};
-    std::vector<fileman::orchestrator::SearchExactFilter> filters{};
     std::uint64_t generation{};
     bool append{};
     void operator()() {
         (*self).apply_engine_criteria(
-            std::move(page), std::move(filters), generation, append);
+            std::move(page), generation, append);
     }
 };
 
@@ -488,18 +487,25 @@ struct Application::CriteriaWork final {
             fileman::orchestrator::Client client = fileman::orchestrator::Client::connect_default(
                 "file-manager-criteria-1.0");
             if (cancelled()) return;
+            SearchRequestContext request_values{
+                .root_id = engine_root_id, .relative_path = relative_path,
+                .exact_filters = filters, .maximum_results = maximum_results,
+                .incoming_cursor = cursor};
+            const std::shared_ptr<const SearchRequestContext> request =
+                std::make_shared<const SearchRequestContext>(std::move(request_values));
+            const SearchRequestContext& submitted = *request;
             fileman::orchestrator::SearchPageInfo page = client.search_subtree(
-                engine_root_id, relative_path, {}, maximum_results, cursor,
-                filters);
+                submitted.root_id, submitted.relative_path, submitted.text,
+                submitted.maximum_results, submitted.incoming_cursor, submitted.exact_filters);
             if (cancelled()) return;
             PreparedSearchPage prepared{};
             if (page.source == "catalogue") {
-                prepared = prepare_search_page((*self).protected_root_, std::move(page), cancelled);
+                prepared = prepare_search_page((*self).protected_root_, std::move(page), cancelled, request);
             } else {
                 prepared.page = std::move(page);
             }
             if (prepared.cancelled || cancelled()) return;
-            (*self).post_ui(CriteriaReady{self, std::move(prepared), std::move(filters), generation, append});
+            (*self).post_ui(CriteriaReady{self, std::move(prepared), generation, append});
         } catch (const std::exception& error) {
             if (cancelled()) return;
             const std::string message = error.what();
@@ -549,11 +555,18 @@ struct Application::SearchWork final {
             fileman::orchestrator::Client client = fileman::orchestrator::Client::connect_default(
                 "file-manager-search-1.0");
             if (cancelled()) return;
+            SearchRequestContext request_values{
+                .root_id = engine_root_id, .relative_path = relative_path, .text = query,
+                .maximum_results = maximum_results, .incoming_cursor = cursor};
+            const std::shared_ptr<const SearchRequestContext> request =
+                std::make_shared<const SearchRequestContext>(std::move(request_values));
+            const SearchRequestContext& submitted = *request;
             fileman::orchestrator::SearchPageInfo page = client.search_subtree(
-                engine_root_id, relative_path, query, maximum_results, cursor);
+                submitted.root_id, submitted.relative_path, submitted.text,
+                submitted.maximum_results, submitted.incoming_cursor, submitted.exact_filters);
             if (cancelled()) return;
             PreparedSearchPage prepared = prepare_search_page(
-                (*self).protected_root_, std::move(page), cancelled);
+                (*self).protected_root_, std::move(page), cancelled, request);
             if (prepared.cancelled || cancelled()) return;
             (*self).post_ui(SearchReady{self, std::move(prepared), query, generation, append});
         } catch (const std::exception& error) {

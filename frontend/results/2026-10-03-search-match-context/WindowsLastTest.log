@@ -1,0 +1,268 @@
+Start testing: Oct 03 00:36 Pacific Daylight Time
+----------------------------------------------------------
+1/15 Testing: file_manager_windows_platform_tests
+1/15 Test: file_manager_windows_platform_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_windows_platform_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_windows_platform_tests" start time: Oct 03 00:36 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+Windows identity, Unicode, preview, checksum and launch-plan tests passed
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_windows_platform_tests" end time: Oct 03 00:36 Pacific Daylight Time
+"file_manager_windows_platform_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/15 Testing: file_manager_frontend_model_tests
+2/15 Test: file_manager_frontend_model_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_frontend_model_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_frontend_model_tests" start time: Oct 03 00:36 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+Signed pre-epoch calendar: Unavailable
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+Metadata link fixtures run=0 skipped=2
+<end of output>
+Test time =   0.07 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_frontend_model_tests" end time: Oct 03 00:36 Pacific Daylight Time
+"file_manager_frontend_model_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/15 Testing: file_manager_file_operations_tests
+3/15 Test: file_manager_file_operations_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_file_operations_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_file_operations_tests" start time: Oct 03 00:36 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+<end of output>
+Test time =   0.28 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_file_operations_tests" end time: Oct 03 00:36 Pacific Daylight Time
+"file_manager_file_operations_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/15 Testing: file_manager_native_copy_tests
+4/15 Test: file_manager_native_copy_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_native_copy_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_native_copy_tests" start time: Oct 03 00:36 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+owned_temp=C:/Users/Shadow/AppData/Local/Temp/file-manager-native-copy-644614449
+PASS empty/small/multichunk; contents and identities
+PASS existing destination preserved; no ownership
+PASS before-create cancellation; post-write cancellation and callback exception
+PASS source revision mismatch before creation
+PASS ordinary and read-only permissions
+owned_cleanup=verified and removed
+PASS native copy fixtures; workspace reused
+<end of output>
+Test time =   0.15 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_native_copy_tests" end time: Oct 03 00:36 Pacific Daylight Time
+"file_manager_native_copy_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/15 Testing: file_manager_internal_drag_tests
+5/15 Test: file_manager_internal_drag_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_internal_drag_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_internal_drag_tests" start time: Oct 03 00:36 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+internal drag tests passed
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_internal_drag_tests" end time: Oct 03 00:36 Pacific Daylight Time
+"file_manager_internal_drag_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/15 Testing: file_manager_checksum_tests
+6/15 Test: file_manager_checksum_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_checksum_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_checksum_tests" start time: Oct 03 00:36 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+SKIP symlink fixture assertions: Windows error 1314
+checksum tests passed
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_checksum_tests" end time: Oct 03 00:36 Pacific Daylight Time
+"file_manager_checksum_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/15 Testing: file_manager_platform_commands_tests
+7/15 Test: file_manager_platform_commands_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_platform_commands_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_platform_commands_tests" start time: Oct 03 00:36 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+SKIP symlink fixture assertions: Windows error 1314
+platform command tests passed
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_platform_commands_tests" end time: Oct 03 00:36 Pacific Daylight Time
+"file_manager_platform_commands_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+8/15 Testing: file_manager_preview_tests
+8/15 Test: file_manager_preview_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_preview_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_preview_tests" start time: Oct 03 00:36 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+SKIP symlink fixture assertions: Windows error 1314
+preview tests passed
+<end of output>
+Test time =   0.08 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_preview_tests" end time: Oct 03 00:36 Pacific Daylight Time
+"file_manager_preview_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+9/15 Testing: file_manager_document_picker_tests
+9/15 Test: file_manager_document_picker_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_document_picker_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_document_picker_tests" start time: Oct 03 00:36 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+document picker tests passed
+<end of output>
+Test time =   0.13 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_document_picker_tests" end time: Oct 03 00:36 Pacific Daylight Time
+"file_manager_document_picker_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+10/15 Testing: file_manager_document_picker_view_tests
+10/15 Test: file_manager_document_picker_view_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_document_picker_view_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_document_picker_view_tests" start time: Oct 03 00:36 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+document picker view tests passed
+<end of output>
+Test time =   0.11 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_document_picker_view_tests" end time: Oct 03 00:36 Pacific Daylight Time
+"file_manager_document_picker_view_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+11/15 Testing: file_manager_house_art_tests
+11/15 Test: file_manager_house_art_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_house_art_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_house_art_tests" start time: Oct 03 00:36 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_house_art_tests" end time: Oct 03 00:36 Pacific Daylight Time
+"file_manager_house_art_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+12/15 Testing: file_manager_object_order_tests
+12/15 Test: file_manager_object_order_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_object_order_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_object_order_tests" start time: Oct 03 00:36 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_object_order_tests" end time: Oct 03 00:36 Pacific Daylight Time
+"file_manager_object_order_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+13/15 Testing: file_manager_application_interaction_tests
+13/15 Test: file_manager_application_interaction_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_application_interaction_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_application_interaction_tests" start time: Oct 03 00:36 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+SKIP symlink fixture assertions: Windows error 1314
+SKIP symlink fixture assertions: Windows error 1314
+file manager application interaction tests passed
+<end of output>
+Test time =   2.80 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_application_interaction_tests" end time: Oct 03 00:36 Pacific Daylight Time
+"file_manager_application_interaction_tests" time elapsed: 00:00:02
+----------------------------------------------------------
+
+14/15 Testing: file_manager_application_transfer_tests
+14/15 Test: file_manager_application_transfer_tests
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/file_manager_application_transfer_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer
+"file_manager_application_transfer_tests" start time: Oct 03 00:36 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+Application transfer and new-folder tests passed
+<end of output>
+Test time =   1.49 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_application_transfer_tests" end time: Oct 03 00:36 Pacific Daylight Time
+"file_manager_application_transfer_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+15/15 Testing: orchestrator-cpp-search-checks
+15/15 Test: orchestrator-cpp-search-checks
+Command: "C:/Users/Shadow/file_manager/.build/details-consumer/orchestrator-cpp-client/orchestrator-cpp-search-checks.exe"
+Directory: C:/Users/Shadow/file_manager/.build/details-consumer/orchestrator-cpp-client
+"orchestrator-cpp-search-checks" start time: Oct 03 00:36 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"orchestrator-cpp-search-checks" end time: Oct 03 00:36 Pacific Daylight Time
+"orchestrator-cpp-search-checks" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 00:36 Pacific Daylight Time

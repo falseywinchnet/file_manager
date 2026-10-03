@@ -7,18 +7,42 @@
 
 namespace file_manager {
 
+// Exact arguments submitted by a worker, shared once per returned page. These
+// owned values are observations of the request, not current control contents.
+struct SearchRequestContext final {
+    std::string root_id{};
+    std::optional<std::string> relative_path{};
+    std::string text{};
+    std::vector<fileman::orchestrator::SearchExactFilter> exact_filters{};
+    bool descendants{true};
+    std::uint32_t maximum_results{};
+    std::optional<fileman::orchestrator::SearchCursorInfo> incoming_cursor{};
+};
+
 // Shared by rows from one page. Large source/scan strings are stored once;
 // the last displayed row releases them. Page and row generations stay distinct.
 struct SearchPageSource final {
     std::string lane{};
     std::optional<std::string> scan_id{};
     std::optional<std::uint64_t> generation{};
+    std::shared_ptr<const SearchRequestContext> request{};
 };
 
 struct SearchResultSource final {
     fileman::orchestrator::SearchResultInfo record{};
     std::shared_ptr<const SearchPageSource> page{};
 };
+
+// Presentation of provider claims only. It never establishes current identity,
+// compares differently calibrated scores, or changes result order.
+struct SearchMatchPresentation final {
+    std::string source_label{};
+    std::string source_badge{};
+    std::string generation_detail{};
+    std::string match_summary{};
+};
+
+[[nodiscard]] SearchMatchPresentation describe_search_match(const SearchResultSource& source);
 
 struct PreparedSearchEntry final {
     DirectoryEntry entry{};
@@ -59,6 +83,7 @@ struct SearchCoverageSummary final {
 [[nodiscard]] PreparedSearchPage prepare_search_page(
     const std::filesystem::path& canonical_root,
     fileman::orchestrator::SearchPageInfo page,
-    const CancellationCheck& cancelled = {});
+    const CancellationCheck& cancelled = {},
+    std::shared_ptr<const SearchRequestContext> request = {});
 
 } // namespace file_manager
