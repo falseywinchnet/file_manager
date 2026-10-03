@@ -1,0 +1,282 @@
+[
+  {
+    "archive": "file-manager-0.001-alpha-windows-x64-31d131949cf8.zip",
+    "sha256": "db3161340fa2fa72bf50a9e89e0f575e00666278e2d8d4e846fac71ee01fdc51",
+    "verified_files": 44,
+    "receipt": {
+      "product": "File Manager",
+      "version": "0.001-alpha",
+      "source_revision": "31d131949cf80ad82ea125ce1fa440c53ad199af",
+      "source_dirty": false,
+      "platform": "windows",
+      "architecture": "x64",
+      "source_status_porcelain": [],
+      "source_status_path_count": 0,
+      "source_status_truncated": false,
+      "build_os": "Windows-2022Server-10.0.20348-SP0",
+      "components": [
+        {
+          "name": "fileman-engine",
+          "state": "bundled, not installed or activated"
+        },
+        {
+          "name": "orchestrator",
+          "state": "bundled, not installed or activated"
+        }
+      ],
+      "service_availability": "Determined by live negotiation; bundling is not activation or readiness",
+      "explicit_windows_search_launcher": "launch_windows_search.ps1",
+      "signature": "unsigned",
+      "linux_baseline": null,
+      "macos_requirements": null,
+      "executable": "File Manager.exe",
+      "executable_sha256": "9cca119e7e8c8c2d5d3bc1fc9d5d56eb2d521fbd586a0c70330e608b677a4e0a",
+      "font_rights": "Portsmouth owner-supplied evaluation fonts; production redistribution-rights gate remains open; attribution retained",
+      "validation": {
+        "source_revision": "31d131949cf80ad82ea125ce1fa440c53ad199af",
+        "frontend_ctest": "passed",
+        "gui_forms_sdk_sha256": "61379a4da88626ac7c977b10d93c4c0a9640e71c781ef429c755685c48435b83",
+        "gui_forms_ctest": "passed",
+        "packaged_startup": "process stayed alive for 5 seconds on generated empty root; not GUI workflow acceptance"
+      },
+      "files": {
+        "collect_diagnostics.py": "36f8a11243d615b26993a5664e96936751dec6534c8cf611420ffe4304261b33",
+        "components/fileman-engine.exe": "20aa9f48b598d7bc9e588c705a6d412e37341c42eec233be96b7147a7ea5050c",
+        "components/orchestrator.exe": "896000125d1ac2c04eb42f7b2019702108be8503592071ee6a30f76e803ce279",
+        "File Manager.exe": "9cca119e7e8c8c2d5d3bc1fc9d5d56eb2d521fbd586a0c70330e608b677a4e0a",
+        "fonts/ATTRIBUTION.md": "17078a4f9cc639fd857f9568ec80ddc6e077b0c016d5add0ed4a4ed1bfb24109",
+        "fonts/Carlito-Bold.ttf": "bb5d20f79b82599ec72983597437373a80f2d2085fa91fc144fd74e876a594db",
+        "fonts/Carlito-BoldItalic.ttf": "b32928186c119599e03ca6a1ffc680fdcb7fac95772f4b95d989cf6cd3861517",
+        "fonts/Carlito-Italic.ttf": "0b019225e58d702bfedcbd35c21696769f8ee115cb6343f84c2f240312450d1c",
+        "fonts/Carlito-Regular.ttf": "f6418f708baede9789daef5d458c0f53d2a888af9820e8062934e504fedc6595",
+        "fonts/Cousine-Bold.ttf": "331215ec6445f41e98d8971251bb6237e722907f4101faae990583accfe79545",
+        "fonts/Cousine-BoldItalic.ttf": "7f804549c941ceaac0a9635389ed09c4bbc86e4bfe37589191dacd1b5b0e26a5",
+        "fonts/Cousine-Italic.ttf": "afb869eee8643d09915c3286edb61dad66278ceb1511c79b474ce21548421bcd",
+        "fonts/Cousine-Regular.ttf": "5a57f0184000371cb22fe3fcea4c500354cab1a69efaf7beaf3e6eca6ecfefea",
+        "fonts/language-font-provenance.json": "cc5a8c10dc7738ee6f7d681c0d888d1e8d5aea21dddb79bbfef0cec6a9063df0",
+        "fonts/NotoEmoji-Regular.ttf": "415dc6290378574135b64c808dc640c1df7531973290c4970c51fdeb849cb0c5",
+        "fonts/NotoSansArabic-Regular.ttf": "ceea25b464a656dc3b26849bab9356740401af62aedf1bfa8b7f0d9b75925b1b",
+        "fonts/NotoSansBengali-Regular.ttf": "6300c5370cd688b0641343de4c786de6d412bb6c578d129dae75e93a0322dcab",
+        "fonts/NotoSansCJKjp-Regular.otf": "68a3fc98800b2a27b371f2fb79991daf3633bd89309d4ffaa6946fd587f375b5",
+        "fonts/NotoSansDevanagari-Regular.ttf": "385e78e6359a9d88a0f243d53b1209d7548361ba2194e2b9ec779bcaa7e8949d",
+        "fonts/NotoSansGurmukhi-Regular.ttf": "bbde4d85fdfb998eff6921cb2c7a9a7924a1c95560a6aa9a06172530e4f596da",
+        "fonts/NotoSansHebrew-Regular.ttf": "a7fa16fffb27bedb060a0866267c29e9859aeb9c21cc33f5b3aaf6eb062eca85",
+        "fonts/OFL-Carlito.txt": "0fb802dc9a710a8d1878a0fdc7fc562f9da2e7576d629e3a1ed735addefb7e6c",
+        "fonts/OFL-Cousine.txt": "450deac65ec101075274f8867cfc960016f60446a69efb93cb87956a87d50224",
+        "fonts/OFL-Noto.txt": "3c05a56499a20ee045a6d36834b6a9e1108f359eede10d7c1613bc4524d01eef",
+        "fonts/OFL-NotoEmoji.txt": "88f117575237307bdd86a17ef15e21790fc9a662fe4dfb103ca1ca077f0d9982",
+        "fonts/OFL-NotoSansCJKjp.txt": "88f117575237307bdd86a17ef15e21790fc9a662fe4dfb103ca1ca077f0d9982",
+        "fonts/PortsmouthRapids-Bold.ttf": "f97d702778f5933b4ae138064a348499a6dba90d9e2e6bf75a6ab81a6730c03a",
+        "fonts/PortsmouthRapids.ttf": "88988bea222852c30e08a3629d9f929baacfec4844c85bb978dcc68e6f4d4add",
+        "gui-forms-consumption.json": "100346001710a505cdd38ee6c01e524dbb3d1d89306927f242b30f0934b3e60b",
+        "launch_windows_search.ps1": "f8d5a4aedb0e01912e305ef189a3e2ae26c25f30b2d454fe99a0383274679a30",
+        "libgcc_s_seh-1.dll": "d7e343dd266747177c3699bc3201ea36eceef158e98530e089263bc55bb2a6d7",
+        "libgui_forms_application.dll": "969ef640a1f91874b3c7db459c1934838ad83b609bfe54f24db62e10a327f7fa",
+        "libstdc++-6.dll": "494bd9045948198ef4d3bc838c7362d4cfd49c890b439c096b1817aa7c7fa6ff",
+        "libwinpthread-1.dll": "72bf8802de3a99d28f0bc2db9a11f281a9f9f3fa83dab2bc67e69fac3bd3d9c0",
+        "licenses/GUIForms/LICENSE": "92aeb22491b16403c1fe8d5be2b0b3fa07823bae2e1ab51f38bf2cbb51aac08e",
+        "licenses/GUIForms/SheenBidi-LICENSE.txt": "3ddf9be5c28fe27dad143a5dc76eea25222ad1dd68934a047064e56ed2fa40c5",
+        "licenses/GUIForms/Unicode-LICENSE.txt": "85d2c71ce603e6facf0029043f82992556f099eebe55417b456ec27332665fed",
+        "licenses/libgcc/COPYING.RUNTIME": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74",
+        "licenses/libgcc/COPYING3": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+        "licenses/libstdc++/COPYING.RUNTIME": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74",
+        "licenses/libstdc++/COPYING3": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+        "licenses/winpthreads/COPYING": "63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177",
+        "README.txt": "057176c1d4fc596dc3c991dce52a88b267736749974acde2613034c8399eac3a",
+        "WINDOWS_SEARCH_LAUNCH.md": "2ea9d45bbec94e462054bdebc286e24fac4ccc9948eab3b842a250ceb05f3681"
+      }
+    }
+  },
+  {
+    "archive": "file-manager-0.001-alpha-linux-x64-31d131949cf8.tar.gz",
+    "sha256": "d66d860beed7fb9f65b96fc0077dc0e1b8a310be66f5aeae678080d51d4c72fa",
+    "verified_files": 40,
+    "receipt": {
+      "product": "File Manager",
+      "version": "0.001-alpha",
+      "source_revision": "31d131949cf80ad82ea125ce1fa440c53ad199af",
+      "source_dirty": false,
+      "platform": "linux",
+      "architecture": "x64",
+      "source_status_porcelain": [],
+      "source_status_path_count": 0,
+      "source_status_truncated": false,
+      "build_os": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+      "components": [
+        {
+          "name": "fileman-engine",
+          "state": "bundled, not installed or activated"
+        },
+        {
+          "name": "orchestrator",
+          "state": "bundled, not installed or activated"
+        }
+      ],
+      "service_availability": "Determined by live negotiation; bundling is not activation or readiness",
+      "explicit_windows_search_launcher": null,
+      "signature": "unsigned",
+      "linux_baseline": "Ubuntu 24.04, X11 or XWayland, system X11/ATK/AT-SPI libraries; xdg-utils for default Open",
+      "macos_requirements": null,
+      "executable": "File Manager",
+      "executable_sha256": "50cd76006db68d22fe8a008a35a759b589210174ea4595cf85d88fde22bd088d",
+      "font_rights": "Portsmouth owner-supplied evaluation fonts; production redistribution-rights gate remains open; attribution retained",
+      "validation": {
+        "source_revision": "31d131949cf80ad82ea125ce1fa440c53ad199af",
+        "frontend_ctest": "passed",
+        "gui_forms_sdk_sha256": "50c689dd3160d2aee82a50d97a9df7df938dccbe3596744bab609ce27e9f5242",
+        "gui_forms_ctest": "passed",
+        "packaged_startup": "process stayed alive for 5 seconds on generated empty root; not GUI workflow acceptance"
+      },
+      "files": {
+        "File Manager": "50cd76006db68d22fe8a008a35a759b589210174ea4595cf85d88fde22bd088d",
+        "README.txt": "0e43c5d220369b60a977b583e1872347073cc325f044b12cdb9586e2ef0543e5",
+        "collect_diagnostics.py": "408fbcc473f36fdf3fecf62c0dda07b51d916b8c353c3692af62e9fc010647f4",
+        "components/fileman-engine": "8552a6628c3fafb1b31c965428af21bb69e12d29c5dc0ad4f6bb86d0b0c34581",
+        "components/orchestrator": "86f3a555e3a54458b9f9edb5b13fb225f6b8a4bba20a753a9cbe44f2f910f5e4",
+        "fonts/ATTRIBUTION.md": "95df9af2e0415bf235b09a7cf46b1fc9ffc1b388ed09b0ba0fc78ccc2156338e",
+        "fonts/Carlito-Bold.ttf": "bb5d20f79b82599ec72983597437373a80f2d2085fa91fc144fd74e876a594db",
+        "fonts/Carlito-BoldItalic.ttf": "b32928186c119599e03ca6a1ffc680fdcb7fac95772f4b95d989cf6cd3861517",
+        "fonts/Carlito-Italic.ttf": "0b019225e58d702bfedcbd35c21696769f8ee115cb6343f84c2f240312450d1c",
+        "fonts/Carlito-Regular.ttf": "f6418f708baede9789daef5d458c0f53d2a888af9820e8062934e504fedc6595",
+        "fonts/Cousine-Bold.ttf": "331215ec6445f41e98d8971251bb6237e722907f4101faae990583accfe79545",
+        "fonts/Cousine-BoldItalic.ttf": "7f804549c941ceaac0a9635389ed09c4bbc86e4bfe37589191dacd1b5b0e26a5",
+        "fonts/Cousine-Italic.ttf": "afb869eee8643d09915c3286edb61dad66278ceb1511c79b474ce21548421bcd",
+        "fonts/Cousine-Regular.ttf": "5a57f0184000371cb22fe3fcea4c500354cab1a69efaf7beaf3e6eca6ecfefea",
+        "fonts/NotoEmoji-Regular.ttf": "415dc6290378574135b64c808dc640c1df7531973290c4970c51fdeb849cb0c5",
+        "fonts/NotoSansArabic-Regular.ttf": "ceea25b464a656dc3b26849bab9356740401af62aedf1bfa8b7f0d9b75925b1b",
+        "fonts/NotoSansBengali-Regular.ttf": "6300c5370cd688b0641343de4c786de6d412bb6c578d129dae75e93a0322dcab",
+        "fonts/NotoSansCJKjp-Regular.otf": "68a3fc98800b2a27b371f2fb79991daf3633bd89309d4ffaa6946fd587f375b5",
+        "fonts/NotoSansDevanagari-Regular.ttf": "385e78e6359a9d88a0f243d53b1209d7548361ba2194e2b9ec779bcaa7e8949d",
+        "fonts/NotoSansGurmukhi-Regular.ttf": "bbde4d85fdfb998eff6921cb2c7a9a7924a1c95560a6aa9a06172530e4f596da",
+        "fonts/NotoSansHebrew-Regular.ttf": "a7fa16fffb27bedb060a0866267c29e9859aeb9c21cc33f5b3aaf6eb062eca85",
+        "fonts/OFL-Carlito.txt": "58402f82a7c332a700294988fe7554fbb0a63a8d27ccc1ee3bbc640311990a00",
+        "fonts/OFL-Cousine.txt": "b81c4d4dc0a9f72c9155e78187316e016e2012a8102468804173dc61468b906d",
+        "fonts/OFL-Noto.txt": "0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb",
+        "fonts/OFL-NotoEmoji.txt": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+        "fonts/OFL-NotoSansCJKjp.txt": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+        "fonts/PortsmouthRapids-Bold.ttf": "f97d702778f5933b4ae138064a348499a6dba90d9e2e6bf75a6ab81a6730c03a",
+        "fonts/PortsmouthRapids.ttf": "88988bea222852c30e08a3629d9f929baacfec4844c85bb978dcc68e6f4d4add",
+        "fonts/language-font-provenance.json": "e030a7ea214052be0735e22380e06160d34f8d6c400b68b05e15f4f9f093eed2",
+        "gui-forms-consumption.json": "40e315fdee16fd529c7f9070336032757a382d7d9e9554aeb28f446f7bae2309",
+        "libgui_forms_application.so.0": "8a25a849f7513eef38d32f735935fe72332b5491ab424f58c4e702866834bf85",
+        "licenses/GUIForms/FreeType-FTL.txt": "5a5ee54c5001bbad1cdc1a57cc3dd4c42199b2da09d39c7ee41fab002d02967f",
+        "licenses/GUIForms/HarfBuzz-COPYING.txt": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+        "licenses/GUIForms/LICENSE": "eed8ab2821054e7586f41aa840aa669d05c39245d82c2cd5778035ba9c71f454",
+        "licenses/GUIForms/SheenBidi-LICENSE.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "licenses/GUIForms/Skia-LICENSE.txt": "5f787c1dee3c56547f09ccc2906ab5f5293c4d8dd6c8654e573216c38e908dbd",
+        "licenses/GUIForms/Unicode-LICENSE.txt": "bfb121a2aaa8fa3d77f3429ae2aaed879cc53cacad6fbe42a2513043b80fcb9a",
+        "licenses/GUIForms/libpng-LICENSE.txt": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526",
+        "licenses/GUIForms/zlib-LICENSE.txt": "e1cfcc55c325b3f78cf55df9664abaa066e2271dffe8213347d9fccdfbac8f2c",
+        "linux-runtime-dependencies.txt": "445c5ffd8591a69d49176514b46caecc9f187207806a9ca7eb83742dd7e6b6cc"
+      }
+    }
+  },
+  {
+    "archive": "file-manager-0.001-alpha-macos-arm64-31d131949cf8.tar.gz",
+    "sha256": "77510030903d20db9c1f0ccaa8f8c22c61808675a83805c181e286229787bcfd",
+    "verified_files": 42,
+    "receipt": {
+      "product": "File Manager",
+      "version": "0.001-alpha",
+      "source_revision": "31d131949cf80ad82ea125ce1fa440c53ad199af",
+      "source_dirty": false,
+      "platform": "macos",
+      "architecture": "arm64",
+      "source_status_porcelain": [],
+      "source_status_path_count": 0,
+      "source_status_truncated": false,
+      "build_os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "components": [
+        {
+          "name": "fileman-engine",
+          "state": "bundled, not installed or activated"
+        },
+        {
+          "name": "orchestrator",
+          "state": "bundled, not installed or activated"
+        }
+      ],
+      "service_availability": "Determined by live negotiation; bundling is not activation or readiness",
+      "explicit_windows_search_launcher": null,
+      "signature": "ad-hoc, not Developer ID notarized",
+      "linux_baseline": null,
+      "macos_requirements": {
+        "mach_o_minima": {
+          "File Manager.app/Contents/MacOS/File Manager": [
+            "26.0"
+          ],
+          "File Manager.app/Contents/Frameworks/libgui_forms_application.0.dylib": [
+            "26.0"
+          ],
+          "File Manager.app/Contents/Frameworks/libgui_forms_application.0.1.0.dylib": [
+            "26.0"
+          ],
+          "components/fileman-engine": [
+            "26.0"
+          ],
+          "components/orchestrator": [
+            "11.0"
+          ]
+        },
+        "plist_minimum": null,
+        "required_minimum_from_load_commands_and_plist": "26.0",
+        "tested_host_macos": "26.6.2",
+        "scope": "Linker/plist requirement only; runtime tested on the named CI host, not on every OS at or above this minimum"
+      },
+      "executable": "File Manager.app/Contents/MacOS/File Manager",
+      "executable_sha256": "572fbc75cf48dbfea8a9b23576270475dac6c4c276fee8fc163889e48ca1e42a",
+      "font_rights": "Portsmouth owner-supplied evaluation fonts; production redistribution-rights gate remains open; attribution retained",
+      "validation": {
+        "source_revision": "31d131949cf80ad82ea125ce1fa440c53ad199af",
+        "frontend_ctest": "passed",
+        "gui_forms_sdk_sha256": "bd37ba7832daf1ccaebaff1f8382e88922070d25de158fee1c5dacc49b268f44",
+        "gui_forms_ctest": "passed",
+        "packaged_startup": "process stayed alive for 5 seconds on generated empty root; not GUI workflow acceptance"
+      },
+      "files": {
+        "File Manager.app/Contents/Frameworks/libgui_forms_application.0.1.0.dylib": "e015748e7cb3199c645cb316cb3d442d4214e200e33c0d5cf14e75c75ff6eb5f",
+        "File Manager.app/Contents/Frameworks/libgui_forms_application.0.dylib": "e015748e7cb3199c645cb316cb3d442d4214e200e33c0d5cf14e75c75ff6eb5f",
+        "File Manager.app/Contents/Info.plist": "dbec8a3f7321d49c8b8e57e2b80346f58fff541e029b158e001216f70e2ead6c",
+        "File Manager.app/Contents/MacOS/File Manager": "572fbc75cf48dbfea8a9b23576270475dac6c4c276fee8fc163889e48ca1e42a",
+        "File Manager.app/Contents/Resources/fonts/ATTRIBUTION.md": "95df9af2e0415bf235b09a7cf46b1fc9ffc1b388ed09b0ba0fc78ccc2156338e",
+        "File Manager.app/Contents/Resources/fonts/Carlito-Bold.ttf": "bb5d20f79b82599ec72983597437373a80f2d2085fa91fc144fd74e876a594db",
+        "File Manager.app/Contents/Resources/fonts/Carlito-BoldItalic.ttf": "b32928186c119599e03ca6a1ffc680fdcb7fac95772f4b95d989cf6cd3861517",
+        "File Manager.app/Contents/Resources/fonts/Carlito-Italic.ttf": "0b019225e58d702bfedcbd35c21696769f8ee115cb6343f84c2f240312450d1c",
+        "File Manager.app/Contents/Resources/fonts/Carlito-Regular.ttf": "f6418f708baede9789daef5d458c0f53d2a888af9820e8062934e504fedc6595",
+        "File Manager.app/Contents/Resources/fonts/Cousine-Bold.ttf": "331215ec6445f41e98d8971251bb6237e722907f4101faae990583accfe79545",
+        "File Manager.app/Contents/Resources/fonts/Cousine-BoldItalic.ttf": "7f804549c941ceaac0a9635389ed09c4bbc86e4bfe37589191dacd1b5b0e26a5",
+        "File Manager.app/Contents/Resources/fonts/Cousine-Italic.ttf": "afb869eee8643d09915c3286edb61dad66278ceb1511c79b474ce21548421bcd",
+        "File Manager.app/Contents/Resources/fonts/Cousine-Regular.ttf": "5a57f0184000371cb22fe3fcea4c500354cab1a69efaf7beaf3e6eca6ecfefea",
+        "File Manager.app/Contents/Resources/fonts/NotoEmoji-Regular.ttf": "415dc6290378574135b64c808dc640c1df7531973290c4970c51fdeb849cb0c5",
+        "File Manager.app/Contents/Resources/fonts/NotoSansArabic-Regular.ttf": "ceea25b464a656dc3b26849bab9356740401af62aedf1bfa8b7f0d9b75925b1b",
+        "File Manager.app/Contents/Resources/fonts/NotoSansBengali-Regular.ttf": "6300c5370cd688b0641343de4c786de6d412bb6c578d129dae75e93a0322dcab",
+        "File Manager.app/Contents/Resources/fonts/NotoSansCJKjp-Regular.otf": "68a3fc98800b2a27b371f2fb79991daf3633bd89309d4ffaa6946fd587f375b5",
+        "File Manager.app/Contents/Resources/fonts/NotoSansDevanagari-Regular.ttf": "385e78e6359a9d88a0f243d53b1209d7548361ba2194e2b9ec779bcaa7e8949d",
+        "File Manager.app/Contents/Resources/fonts/NotoSansGurmukhi-Regular.ttf": "bbde4d85fdfb998eff6921cb2c7a9a7924a1c95560a6aa9a06172530e4f596da",
+        "File Manager.app/Contents/Resources/fonts/NotoSansHebrew-Regular.ttf": "a7fa16fffb27bedb060a0866267c29e9859aeb9c21cc33f5b3aaf6eb062eca85",
+        "File Manager.app/Contents/Resources/fonts/OFL-Carlito.txt": "58402f82a7c332a700294988fe7554fbb0a63a8d27ccc1ee3bbc640311990a00",
+        "File Manager.app/Contents/Resources/fonts/OFL-Cousine.txt": "b81c4d4dc0a9f72c9155e78187316e016e2012a8102468804173dc61468b906d",
+        "File Manager.app/Contents/Resources/fonts/OFL-Noto.txt": "0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb",
+        "File Manager.app/Contents/Resources/fonts/OFL-NotoEmoji.txt": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+        "File Manager.app/Contents/Resources/fonts/OFL-NotoSansCJKjp.txt": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+        "File Manager.app/Contents/Resources/fonts/PortsmouthRapids-Bold.ttf": "f97d702778f5933b4ae138064a348499a6dba90d9e2e6bf75a6ab81a6730c03a",
+        "File Manager.app/Contents/Resources/fonts/PortsmouthRapids.ttf": "88988bea222852c30e08a3629d9f929baacfec4844c85bb978dcc68e6f4d4add",
+        "File Manager.app/Contents/Resources/fonts/language-font-provenance.json": "e030a7ea214052be0735e22380e06160d34f8d6c400b68b05e15f4f9f093eed2",
+        "File Manager.app/Contents/Resources/licenses/GUIForms/FreeType-FTL.txt": "5a5ee54c5001bbad1cdc1a57cc3dd4c42199b2da09d39c7ee41fab002d02967f",
+        "File Manager.app/Contents/Resources/licenses/GUIForms/HarfBuzz-COPYING.txt": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+        "File Manager.app/Contents/Resources/licenses/GUIForms/LICENSE": "eed8ab2821054e7586f41aa840aa669d05c39245d82c2cd5778035ba9c71f454",
+        "File Manager.app/Contents/Resources/licenses/GUIForms/SheenBidi-LICENSE.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "File Manager.app/Contents/Resources/licenses/GUIForms/Skia-LICENSE.txt": "5f787c1dee3c56547f09ccc2906ab5f5293c4d8dd6c8654e573216c38e908dbd",
+        "File Manager.app/Contents/Resources/licenses/GUIForms/Unicode-LICENSE.txt": "bfb121a2aaa8fa3d77f3429ae2aaed879cc53cacad6fbe42a2513043b80fcb9a",
+        "File Manager.app/Contents/Resources/licenses/GUIForms/libpng-LICENSE.txt": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526",
+        "File Manager.app/Contents/Resources/licenses/GUIForms/zlib-LICENSE.txt": "e1cfcc55c325b3f78cf55df9664abaa066e2271dffe8213347d9fccdfbac8f2c",
+        "File Manager.app/Contents/_CodeSignature/CodeResources": "eb74f315b3b57101dd43fd54c9a58310b6a1e6f399e1dd2774a8e3a3eda8a6e7",
+        "README.txt": "3b586ca1b459e28824d0600f002a7a5680eeceb073c12d68247c679f170a923c",
+        "collect_diagnostics.py": "408fbcc473f36fdf3fecf62c0dda07b51d916b8c353c3692af62e9fc010647f4",
+        "components/fileman-engine": "97bad562c0b5ef51830601e13e2fd3e668e24db8dc3d9a5a178f47c850d263ef",
+        "components/orchestrator": "02f51f81560b7cdec79ae2a0b0d4ace7619572d3b7a0a9aa5ea7cf367045c7c3",
+        "gui-forms-consumption.json": "209e86c643e7542d2f855fdfabaff89055398c6e128bec837a8f491aa161a3c7"
+      }
+    }
+  }
+]
