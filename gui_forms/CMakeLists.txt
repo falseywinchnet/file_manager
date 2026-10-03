@@ -175,6 +175,7 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     set_target_properties(gui_forms_bidi PROPERTIES POSITION_INDEPENDENT_CODE ON)
     add_library(gui_forms_text_engine STATIC
         src/render/text/harfbuzz/harfbuzz_font_engine.cpp
+        src/render/text/harfbuzz/bounded_shape_workspace.cpp
     )
     target_include_directories(gui_forms_text_engine
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/render/text/harfbuzz
@@ -1919,6 +1920,10 @@ if(GUI_FORMS_BUILD_TESTS)
         add_executable(gui_forms_bounded_shape_tests tests/bounded_shape_tests.cpp)
         target_link_libraries(gui_forms_bounded_shape_tests PRIVATE gui_forms_text_engine)
         add_test(NAME gui_forms_bounded_shape_tests COMMAND gui_forms_bounded_shape_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+
+        add_executable(gui_forms_bounded_shape_workspace_tests tests/bounded_shape_workspace_tests.cpp)
+        target_link_libraries(gui_forms_bounded_shape_workspace_tests PRIVATE gui_forms_text_engine)
+        add_test(NAME gui_forms_bounded_shape_workspace_tests COMMAND gui_forms_bounded_shape_workspace_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
 
         add_executable(gui_forms_harfbuzz_font_engine_tests
             tests/harfbuzz_font_engine_tests.cpp

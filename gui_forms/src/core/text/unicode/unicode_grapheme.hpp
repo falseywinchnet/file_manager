@@ -29,6 +29,41 @@ struct GraphemeStorageRequirement final {
 // and arithmetic allocate nothing. No estimate of opaque native-library memory.
 [[nodiscard]] GraphemeStorageRequirement grapheme_storage_requirement(std::string_view utf8) noexcept;
 
+struct GraphemeWorkspaceScalar;
+
+// Private executor-confined scratch. Array payload is charged here; the caller
+// additionally charges sizeof(GraphemeWorkspace) in its enclosing workspace.
+// Input must be disjoint from the owned arrays; no input is retained.
+// Boundary borrows end at successful fill/preparation,
+// move, or destruction. Failed preparation/fill preserves the previous result.
+class GraphemeWorkspace final {
+public:
+    GraphemeWorkspace();
+    ~GraphemeWorkspace();
+    GraphemeWorkspace(const GraphemeWorkspace&) = delete;
+    GraphemeWorkspace& operator=(const GraphemeWorkspace&) = delete;
+    GraphemeWorkspace(GraphemeWorkspace&& other) noexcept;
+    GraphemeWorkspace& operator=(GraphemeWorkspace&& other) noexcept;
+    // Reuses sufficient capacity; otherwise replaces both arrays atomically.
+    // The limit includes old arrays and simultaneous replacement arrays.
+    [[nodiscard]] GraphemeStorageStatus prepare(std::size_t scalar_capacity,
+                                                std::size_t maximum_live_bytes);
+    // Validates before mutation; successful fill never allocates or grows.
+    [[nodiscard]] GraphemeStorageStatus fill(std::string_view utf8) noexcept;
+    [[nodiscard]] std::span<const std::size_t> boundaries() const noexcept;
+    [[nodiscard]] std::size_t capacity_bytes() const noexcept;
+private:
+    std::unique_ptr<GraphemeWorkspaceScalar[]> scalars_{};
+    std::unique_ptr<std::size_t[]> boundaries_{};
+    std::size_t scalar_capacity_{};
+    std::size_t count_{};
+    std::size_t bytes_{};
+};
+
+// Checked array payload for a declared scalar capacity, without input or allocation.
+[[nodiscard]] GraphemeStorageRequirement grapheme_workspace_requirement(
+    std::size_t scalar_capacity) noexcept;
+
 class GraphemeBoundaryBuffer final {
 public:
     GraphemeBoundaryBuffer() = default;
