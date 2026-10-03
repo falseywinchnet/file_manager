@@ -28,6 +28,8 @@ struct SearchCoverageSummary final {
     void observe(const fileman::orchestrator::SearchPageInfo& page,
                  std::size_t rejected, bool append);
     [[nodiscard]] std::string describe(const fileman::orchestrator::SearchPageInfo& page) const;
+    [[nodiscard]] std::string result_status(std::size_t count, bool criteria,
+        const fileman::orchestrator::SearchPageInfo& page) const;
 };
 
 // Root and cancellation target are borrowed only during this synchronous call.

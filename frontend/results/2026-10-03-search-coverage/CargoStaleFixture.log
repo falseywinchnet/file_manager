@@ -1,0 +1,147 @@
+   Compiling fileman-orchestrator v0.1.0 (C:\Users\Shadow\file_manager\orchestrator)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.37s
+     Running unittests src\lib.rs (orchestrator\target\debug\deps\fileman_orchestrator-30e0a4ef8f18dfc0.exe)
+
+running 59 tests
+test availability::tests::facts_and_plugins_are_explicit_stubs ... ok
+test availability::tests::development_engine_adapter_does_not_claim_installed_transport ... ok
+test common::tests::response_has_exactly_one_terminal_payload ... ok
+test cli::tests::command_projection_is_explicit ... ok
+test cli::tests::service_command_cli_preserves_identity_and_root ... ok
+test cli::tests::settings_mutation_cli_builds_the_canonical_transaction ... ok
+test cli::tests::engine_provider_options_are_atomic ... ok
+test contract::tests::contract_identifiers_are_unique ... ok
+test engine_contract::tests::filter_only_exact_request_is_well_formed ... ok
+test engine_contract::tests::filtered_request_rejects_live_cursor_and_unknown_fields ... ok
+test engine_jsonl::tests::existing_catalogue_cursor_retains_original_exact_predicate ... ok
+test engine_jsonl::tests::bounded_peer_correlates_one_successful_response ... ok
+test engine_jsonl::tests::explicit_exact_no_match_remains_catalogue_and_does_not_fall_back ... ok
+test engine_jsonl::tests::exact_wire_result_projects_generation_cursor_and_partial_roots ... ok
+test engine_jsonl::tests::exact_filter_only_request_projects_the_frozen_engine_filter_map ... ok
+test engine_jsonl::tests::missing_catalogue_projects_unavailable_not_unsupported ... ok
+test engine_jsonl::tests::ordinary_text_and_combined_filters_never_become_exact_name_queries ... ok
+test engine_jsonl::tests::engine_worker_panic_is_contained_and_marks_worker_unavailable ... ok
+test engine_jsonl::tests::ordinary_text_uses_live_only_after_unsupported_predicate_planning ... ok
+test engine_jsonl::tests::remote_fault_is_not_an_empty_success ... ok
+test engine_jsonl::tests::response_identity_mismatch_fails_closed ... ok
+test engine_jsonl::tests::unavailable_live_method_projects_typed_unsupported_result ... ok
+test engine_port::tests::fallback_terminal_allowlist_is_narrow_and_authority_safe ... ok
+test kernel::tests::attacker_controlled_envelope_fields_are_bounded_before_error_reflection ... ok
+test kernel::tests::kernel_reports_stubs_without_fact_or_plugin_operations ... ok
+test kernel::tests::engine_restart_requires_actual_supervisor_without_sending_shutdown ... ok
+test kernel::tests::shutdown_is_terminal ... ok
+test kernel::tests::service_commands_bind_orchestrator_instance_and_generation ... ok
+test lifecycle::tests::invalid_transition_is_rejected ... ok
+test lifecycle::tests::lifecycle_is_deterministic_and_restartable ... ok
+test local_session::tests::credential_round_trip_authenticates_and_debug_is_redacted ... ok
+test local_session::tests::wrong_credential_and_major_fail_closed ... ok
+test local_wire::tests::bad_magic_and_truncated_payload_fail_closed ... ok
+test kernel::tests::settings_contract_uses_one_typed_optimistic_transaction ... ok
+test engine_jsonl::tests::oversized_response_is_rejected_without_unbounded_allocation ... ok
+test local_wire::tests::oversized_header_is_rejected_before_payload_allocation ... ok
+test local_wire::tests::round_trip_and_coalesced_frames_preserve_boundaries ... ok
+test runtime_health::tests::counters_never_underflow_and_snapshot_is_explicitly_non_authoritative ... ok
+test service::stdio::tests::bounded_line_drains_oversized_records_and_preserves_the_next_one ... ok
+test release::tests::core_release_is_ready_only_when_every_requirement_is_satisfied ... ok
+test kernel::tests::provider_health_cache_updates_after_terminal_worker_call ... ok
+test kernel::tests::separately_gated_provider_absence_does_not_block_a_ready_core_projection ... ok
+test service::stdio::tests::stdio_host_and_kernel_share_shutdown_lifecycle ... ok
+test kernel::tests::blocked_engine_provider_does_not_hold_core_status_or_lifecycle_state ... ok
+test settings::tests::concurrent_same_revision_has_one_winner ... ok
+test settings::tests::transaction_is_optimistic_atomic_and_validated ... ok
+test settings::tests::schema_and_snapshot_are_bounded_and_typed ... ok
+test worker_pool::tests::caller_lane_panics_are_counted_and_pool_remains_reusable ... ok
+test worker_pool::tests::empty_is_a_noop_and_zero_sized_tasks_are_rejected ... ok
+test worker_pool::tests::concurrent_callers_are_serialized_without_losing_work ... ok
+test kernel::tests::frontend_bootstrap_is_one_bounded_immutable_snapshot ... ok
+test worker_pool::tests::every_ticket_is_claimed_once_and_writes_are_visible ... ok
+test service::windows::tests::windows_host_rejects_inherited_public_directory_before_publication ... ok
+test worker_pool::tests::task_panics_are_counted_and_pool_remains_reusable ... ok
+test settings::tests::unavailable_persistent_store_does_not_touch_the_filesystem ... ok
+test worker_pool::tests::repeated_parallel_batches_cross_ticket_underflow_and_republication ... ok
+test worker_pool::tests::bounded_model_checks_range_claims_and_completion_orders ... ok
+test service::windows::tests::windows_host_authentication_deadline_shutdown_and_restart ... ok
+test service::windows::tests::terminal_reply_is_consumed_before_pipe_disconnect ... ok
+
+test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.32s
+
+     Running unittests src\main.rs (orchestrator\target\debug\deps\orchestrator-9fb9e0e734c0cb50.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\bin\generate_fixtures.rs (orchestrator\target\debug\deps\orchestrator_fixtures-948ef8cd0cf02cda.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\bin\worker_bench.rs (orchestrator\target\debug\deps\orchestrator_worker_bench-a6fe77139b85af77.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\cli.rs (orchestrator\target\debug\deps\cli-0fafac814ff466c9.exe)
+
+running 5 tests
+test stdio_service_handles_multiple_requests_and_clean_shutdown ... ok
+test core_release_is_machine_readable_and_ready_after_all_evidence_passes ... ok
+test human_status_is_concise ... ok
+test stdio_service_drains_oversized_and_non_utf8_records_without_losing_alignment ... ok
+test structured_status_is_machine_readable ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests\cpp_client.rs (orchestrator\target\debug\deps\cpp_client-c0a89ba6c24d25b9.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\engine_contract.rs (orchestrator\target\debug\deps\engine_contract-c16b323f9f17ceb6.exe)
+
+running 4 tests
+test live_query_pages_are_source_explicit_bounded_and_resumable ... ok
+test live_traversal_absence_is_an_explicit_unsupported_capability ... ok
+test coverage_incomplete_status_fails_closed_without_disabling_cached_exact_query ... ok
+test cached_stale_and_no_match_are_distinct_from_provider_absence ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\engine_port.rs (orchestrator\target\debug\deps\engine_port-00928190424f6ee0.exe)
+
+running 6 tests
+test authoritative_catalogue_no_match_does_not_trigger_an_expensive_live_scan ... ok
+test live_only_policy_never_touches_the_catalogue_lane ... ok
+test catalogue_absence_falls_back_to_live_without_building_a_catalogue ... ok
+test continuation_cursor_source_prevents_midstream_route_switching ... ok
+test exact_metadata_filters_never_widen_into_the_live_lane ... ok
+test denial_does_not_bypass_authority_through_live_fallback ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\fixtures.rs (orchestrator\target\debug\deps\fixtures-5d312bf42c05d214.exe)
+
+running 2 tests
+test executable_registry_projection_has_canonical_markdown_entries ... ok
+test bootstrap_golden_fixtures_match ... FAILED
+
+failures:
+
+---- bootstrap_golden_fixtures_match stdout ----
+
+thread 'bootstrap_golden_fixtures_match' (12824) panicked at tests\fixtures.rs:50:5:
+assertion `left == right` failed: fixture release
+  left: Object {"id": String("fixture-release"), "result": Object {"build_version": String("0.1.0"), "first_platform": String("macos"), "profile": String("orchestrator-core"), "provenance": Object {"algorithm": String("sha256"), "digest": String("509080821c915474c5c3d564c12948bd57cce3fa1a384939a1220816747b5bf5"), "embedded_inputs": Number(19), "scope": String("manifest-fields+embedded-core-contract-inputs-v1"), "signed": Bool(false)}, "ready": Bool(true), "required_contracts": Array [String("ORC-COM-001"), String("ORC-LIF-001"), String("ORC-FE-001"), String("ORC-CLI-001")], "requirements": Array [Object {"evidence": String("contract stage: stable"), "id": String("contract.ORC-COM-001"), "state": String("satisfied")}, Object {"evidence": String("contract stage: stable"), "id": String("contract.ORC-LIF-001"), "state": String("satisfied")}, Object {"evidence": String("contract stage: stable"), "id": String("contract.ORC-FE-001"), "state": String("satisfied")}, Object {"evidence": String("contract stage: stable"), "id": String("contract.ORC-CLI-001"), "state": String("satisfied")}, Object {"evidence": String("a release-built macOS arm64 artifact passed installed LaunchAgent bootstrap, first-use activation, authenticated status, graceful shutdown, supervisor reactivation within the five-second client bound with fresh instance identity, second shutdown, bootout, and exact test-artifact removal on 2026-08-07"), "id": String("daemon.discovery"), "state": String("satisfied")}, Object {"evidence": String("macOS private runtime objects, kernel-vouched peer UID, no-follow descriptor reads, durable publication, zeroized Rust secrets, 256-bit credential hello, instance verification, and restart rotation/stale-token rejection pass"), "id": String("session.authentication"), "state": String("satisfied")}, Object {"evidence": String("the macOS ORC1 1.0 transport passes bounded stdio, envelope-field ceilings, full-worker handshake-stall recovery, fixed-worker concurrency, panic containment, observable saturation, malformed-frame containment, and shutdown; other platforms retain separate gates"), "id": String("transport.local"), "state": String("satisfied")}, Object {"evidence": String("the independently built C++17 client passes the atomic ORC-FE-001 macOS snapshot, complete contract/availability and route/control parsing, golden release digest, shutdown, and daemon restart without linking Rust"), "id": String("client.independent"), "state": String("satisfied")}, Object {"evidence": String("macOS live and bootstrap suites cover rejected 0.1 peers, framing faults, saturation, atomic cancellation rejection, critical-field rejection, optional-field tolerance, and the ADR-010 1.x horizon"), "id": String("conformance.hostile_and_cross_version"), "state": String("satisfied")}, Object {"evidence": String("the manifest publishes a deterministic SHA-256 digest over its fields and embedded Core contract inputs; packaged-artifact signing remains a platform release concern"), "id": String("release.provenance"), "state": String("satisfied")}], "state": String("ready"), "target_version": String("1.0.0")}, "status": String("success")}
+ right: Object {"id": String("fixture-release"), "result": Object {"build_version": String("0.1.0"), "first_platform": String("macos"), "profile": String("orchestrator-core"), "provenance": Object {"algorithm": String("sha256"), "digest": String("5315dbd20b856a757603b19d225e480e597a873a0c3d38318cb336125fb96163"), "embedded_inputs": Number(19), "scope": String("manifest-fields+embedded-core-contract-inputs-v1"), "signed": Bool(false)}, "ready": Bool(true), "required_contracts": Array [String("ORC-COM-001"), String("ORC-LIF-001"), String("ORC-FE-001"), String("ORC-CLI-001")], "requirements": Array [Object {"evidence": String("contract stage: stable"), "id": String("contract.ORC-COM-001"), "state": String("satisfied")}, Object {"evidence": String("contract stage: stable"), "id": String("contract.ORC-LIF-001"), "state": String("satisfied")}, Object {"evidence": String("contract stage: stable"), "id": String("contract.ORC-FE-001"), "state": String("satisfied")}, Object {"evidence": String("contract stage: stable"), "id": String("contract.ORC-CLI-001"), "state": String("satisfied")}, Object {"evidence": String("a release-built macOS arm64 artifact passed installed LaunchAgent bootstrap, first-use activation, authenticated status, graceful shutdown, supervisor reactivation within the five-second client bound with fresh instance identity, second shutdown, bootout, and exact test-artifact removal on 2026-08-07"), "id": String("daemon.discovery"), "state": String("satisfied")}, Object {"evidence": String("macOS private runtime objects, kernel-vouched peer UID, no-follow descriptor reads, durable publication, zeroized Rust secrets, 256-bit credential hello, instance verification, and restart rotation/stale-token rejection pass"), "id": String("session.authentication"), "state": String("satisfied")}, Object {"evidence": String("the macOS ORC1 1.0 transport passes bounded stdio, envelope-field ceilings, full-worker handshake-stall recovery, fixed-worker concurrency, panic containment, observable saturation, malformed-frame containment, and shutdown; other platforms retain separate gates"), "id": String("transport.local"), "state": String("satisfied")}, Object {"evidence": String("the independently built C++17 client passes the atomic ORC-FE-001 macOS snapshot, complete contract/availability and route/control parsing, golden release digest, shutdown, and daemon restart without linking Rust"), "id": String("client.independent"), "state": String("satisfied")}, Object {"evidence": String("macOS live and bootstrap suites cover rejected 0.1 peers, framing faults, saturation, atomic cancellation rejection, critical-field rejection, optional-field tolerance, and the ADR-010 1.x horizon"), "id": String("conformance.hostile_and_cross_version"), "state": String("satisfied")}, Object {"evidence": String("the manifest publishes a deterministic SHA-256 digest over its fields and embedded Core contract inputs; packaged-artifact signing remains a platform release concern"), "id": String("release.provenance"), "state": String("satisfied")}], "state": String("ready"), "target_version": String("1.0.0")}, "status": String("success")}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    bootstrap_golden_fixtures_match
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `--test fixtures`

@@ -1,0 +1,78 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
+     Running unittests src\lib.rs (orchestrator\target\debug\deps\fileman_orchestrator-30e0a4ef8f18dfc0.exe)
+
+running 59 tests
+test availability::tests::development_engine_adapter_does_not_claim_installed_transport ... ok
+test availability::tests::facts_and_plugins_are_explicit_stubs ... ok
+test cli::tests::engine_provider_options_are_atomic ... ok
+test cli::tests::settings_mutation_cli_builds_the_canonical_transaction ... ok
+test cli::tests::service_command_cli_preserves_identity_and_root ... ok
+test cli::tests::command_projection_is_explicit ... ok
+test common::tests::response_has_exactly_one_terminal_payload ... ok
+test contract::tests::contract_identifiers_are_unique ... ok
+test engine_contract::tests::filter_only_exact_request_is_well_formed ... ok
+test engine_contract::tests::filtered_request_rejects_live_cursor_and_unknown_fields ... ok
+test engine_jsonl::tests::bounded_peer_correlates_one_successful_response ... ok
+test engine_jsonl::tests::existing_catalogue_cursor_retains_original_exact_predicate ... ok
+test engine_jsonl::tests::exact_filter_only_request_projects_the_frozen_engine_filter_map ... ok
+test engine_jsonl::tests::exact_wire_result_projects_generation_cursor_and_partial_roots ... ok
+test engine_jsonl::tests::explicit_exact_no_match_remains_catalogue_and_does_not_fall_back ... ok
+test engine_jsonl::tests::ordinary_text_and_combined_filters_never_become_exact_name_queries ... ok
+test engine_jsonl::tests::missing_catalogue_projects_unavailable_not_unsupported ... ok
+test engine_jsonl::tests::engine_worker_panic_is_contained_and_marks_worker_unavailable ... ok
+test engine_jsonl::tests::ordinary_text_uses_live_only_after_unsupported_predicate_planning ... ok
+test engine_jsonl::tests::remote_fault_is_not_an_empty_success ... ok
+test engine_jsonl::tests::response_identity_mismatch_fails_closed ... ok
+test engine_jsonl::tests::unavailable_live_method_projects_typed_unsupported_result ... ok
+test engine_port::tests::fallback_terminal_allowlist_is_narrow_and_authority_safe ... ok
+test kernel::tests::attacker_controlled_envelope_fields_are_bounded_before_error_reflection ... ok
+test kernel::tests::engine_restart_requires_actual_supervisor_without_sending_shutdown ... ok
+test kernel::tests::kernel_reports_stubs_without_fact_or_plugin_operations ... ok
+test kernel::tests::service_commands_bind_orchestrator_instance_and_generation ... ok
+test kernel::tests::shutdown_is_terminal ... ok
+test lifecycle::tests::invalid_transition_is_rejected ... ok
+test lifecycle::tests::lifecycle_is_deterministic_and_restartable ... ok
+test local_session::tests::credential_round_trip_authenticates_and_debug_is_redacted ... ok
+test local_session::tests::wrong_credential_and_major_fail_closed ... ok
+test engine_jsonl::tests::oversized_response_is_rejected_without_unbounded_allocation ... ok
+test local_wire::tests::bad_magic_and_truncated_payload_fail_closed ... ok
+test local_wire::tests::oversized_header_is_rejected_before_payload_allocation ... ok
+test kernel::tests::settings_contract_uses_one_typed_optimistic_transaction ... ok
+test local_wire::tests::round_trip_and_coalesced_frames_preserve_boundaries ... ok
+test runtime_health::tests::counters_never_underflow_and_snapshot_is_explicitly_non_authoritative ... ok
+test service::stdio::tests::bounded_line_drains_oversized_records_and_preserves_the_next_one ... ok
+test release::tests::core_release_is_ready_only_when_every_requirement_is_satisfied ... ok
+test kernel::tests::provider_health_cache_updates_after_terminal_worker_call ... ok
+test kernel::tests::separately_gated_provider_absence_does_not_block_a_ready_core_projection ... ok
+test service::stdio::tests::stdio_host_and_kernel_share_shutdown_lifecycle ... ok
+test kernel::tests::blocked_engine_provider_does_not_hold_core_status_or_lifecycle_state ... ok
+test settings::tests::transaction_is_optimistic_atomic_and_validated ... ok
+test settings::tests::concurrent_same_revision_has_one_winner ... ok
+test settings::tests::schema_and_snapshot_are_bounded_and_typed ... ok
+test worker_pool::tests::caller_lane_panics_are_counted_and_pool_remains_reusable ... ok
+test worker_pool::tests::concurrent_callers_are_serialized_without_losing_work ... ok
+test kernel::tests::frontend_bootstrap_is_one_bounded_immutable_snapshot ... ok
+test service::windows::tests::windows_host_rejects_inherited_public_directory_before_publication ... ok
+test worker_pool::tests::empty_is_a_noop_and_zero_sized_tasks_are_rejected ... ok
+test worker_pool::tests::every_ticket_is_claimed_once_and_writes_are_visible ... ok
+test worker_pool::tests::task_panics_are_counted_and_pool_remains_reusable ... ok
+test settings::tests::unavailable_persistent_store_does_not_touch_the_filesystem ... ok
+test worker_pool::tests::repeated_parallel_batches_cross_ticket_underflow_and_republication ... ok
+test service::windows::tests::windows_host_authentication_deadline_shutdown_and_restart ... FAILED
+test worker_pool::tests::bounded_model_checks_range_claims_and_completion_orders ... ok
+test service::windows::tests::terminal_reply_is_consumed_before_pipe_disconnect ... ok
+
+failures:
+
+---- service::windows::tests::windows_host_authentication_deadline_shutdown_and_restart stdout ----
+
+thread 'service::windows::tests::windows_host_authentication_deadline_shutdown_and_restart' (2364) panicked at src\service\windows.rs:422:58:
+private record: Os { code: 32, kind: Uncategorized, message: "The process cannot access the file because it is being used by another process." }
+
+
+failures:
+    service::windows::tests::windows_host_authentication_deadline_shutdown_and_restart
+
+test result: FAILED. 58 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
+
+error: test failed, to rerun pass `--lib`

@@ -497,3 +497,22 @@ criteria still use the catalogue. The frontend retains the one-operation API,
 worker scheduling, source/completeness presentation and identity revalidation.
 It must not claim indexed substring acceleration. Old exact text callers migrate
 to explicit `filters.name`; issued cursor source/predicate remains bound.
+
+### Search coverage preservation — 2026-10-03 UTC
+
+**OBSERVED producer reply:** `orchestrator/src/kernel.rs` already forwards
+catalogue stale/unavailable roots and warnings, or live unavailable paths,
+warnings and scan identity. The C++ client previously discarded them.
+
+**Frontend reply:** consume these existing fields as owned optional values;
+preserve unknown versus explicitly empty coverage. Summarize accumulated gaps
+across appended pages, reset them for replacement, and make zero displayed
+results distinct from a guaranteed complete no-match. Path observation alone
+does not establish that a cached criteria match is still current.
+
+**Orchestrator reconciliation:** the source-only additive projection and failure,
+ownership, optionality and UI rules are recorded in
+`../../orchestrator/spec/FRONTEND_SEARCH_COVERAGE.md`. Existing wire versions,
+Engine contracts and source-bound cursors are unchanged. Rebuild the C++ source
+library and consumers together; no binary ABI compatibility is claimed.
+Per-row identity/evidence preservation and currentness comparison remain open.

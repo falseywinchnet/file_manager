@@ -57,6 +57,17 @@ class ApplicationInteractionProbe final {
         const std::uint64_t generation = application.search_generation_.load();
         return generation;
     }
+    static void show_coverage_page(Application& application,
+        fileman::orchestrator::SearchPageInfo page, const bool append, const bool criteria) {
+        if (!append) application.search_generation_.fetch_add(1U);
+        const std::uint64_t generation = application.search_generation_.load();
+        application.criteria_showing_ = criteria;
+        application.filter_ = "coverage";
+        (*application.search_box_).set_text("coverage");
+        PreparedSearchPage prepared = prepare_search_page(application.protected_root_, std::move(page));
+        if (criteria) application.apply_engine_criteria(std::move(prepared), {}, generation, append);
+        else application.apply_engine_search(std::move(prepared), "coverage", generation, append);
+    }
     static void advance_search_generation(Application& application) {
         application.search_generation_.fetch_add(1U);
     }
@@ -1420,6 +1431,93 @@ struct PreparationCancellation final {
         return stop;
     }
 };
+
+void test_search_coverage_survives_paging_and_resets_on_replacement() {
+    TemporaryTree fixture{};
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(fixture.root(), std::nullopt, false, std::string{});
+    ApplicationStopGuard guard{*application};
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
+    const std::shared_ptr<gui_forms::Label> ready = std::dynamic_pointer_cast<gui_forms::Label>(
+        (*window).find("file-manager-app.shell.status.ready"));
+    const std::shared_ptr<gui_forms::Label> summary = std::dynamic_pointer_cast<gui_forms::Label>(
+        (*window).find("file-manager-app.shell.status.summary"));
+    const gui_forms::Control::Ptr more = (*window).find(
+        "file-manager-app.shell.workspace.selection.content.heading.more-results");
+    require(ready != nullptr, "search must expose its primary status control");
+    require(summary != nullptr, "search must expose its coverage status control");
+    require(more != nullptr, "search must expose its continuation control");
+
+    fileman::orchestrator::SearchPageInfo partial{};
+    partial.source = "catalogue";
+    partial.terminal = "partial";
+    partial.generation = 17U;
+    partial.cursor = fileman::orchestrator::SearchCursorInfo{"catalogue", "next-page"};
+    partial.coverage.stale_roots = std::vector<std::string>{"docs"};
+    partial.coverage.unavailable_roots = std::vector<std::string>{"removable"};
+    partial.coverage.warnings = std::vector<std::string>{"manual reconcile required"};
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, partial, false, false);
+    (*window).perform_layout();
+    require((*ready).text() == "No matches shown · partial search" && (*ready).effectively_visible() &&
+                (*ready).absolute_bounds().width > 0.0 && (*more).enabled(),
+            "empty partial pages must disclose incomplete search and retain continuation");
+    require((*summary).text().find("index needs refresh") != std::string::npos &&
+                (*summary).text().find("locations unavailable") != std::string::npos &&
+                (*summary).text().find("more results available") != std::string::npos,
+            "catalogue coverage must survive worker preparation and reach application status");
+
+    fileman::orchestrator::SearchPageInfo final_page{};
+    final_page.source = "catalogue";
+    final_page.terminal = "success";
+    final_page.complete = true;
+    final_page.generation = 17U;
+    final_page.coverage.stale_roots = std::vector<std::string>{};
+    final_page.coverage.unavailable_roots = std::vector<std::string>{};
+    final_page.coverage.warnings = std::vector<std::string>{};
+    final_page.results = {{"root.txt", fixture.root() / "root.txt", "file", 0U, false}};
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, final_page, true, false);
+    require((*ready).text() == "1 match shown · index needs refresh" && !(*more).enabled() &&
+                (*summary).text().find("search reported warnings") != std::string::npos &&
+                (*summary).text().find("locations unavailable") != std::string::npos &&
+                (*summary).text().find("more results available") == std::string::npos,
+            "a completed continuation must not erase earlier coverage gaps or keep a stale more-results claim");
+
+    fileman::orchestrator::SearchPageInfo live{};
+    live.source = "live_filesystem";
+    live.terminal = "success";
+    live.complete = true;
+    live.coverage.warnings = std::vector<std::string>{};
+    live.coverage.unavailable_paths = std::vector<std::string>{};
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, live, false, false);
+    require((*ready).text() == "No matches shown" &&
+                (*summary).text().find("index needs refresh") == std::string::npos &&
+                (*summary).text().find("locations unavailable") == std::string::npos &&
+                (*summary).text().find("search reported warnings") == std::string::npos,
+            "replacement search must retire coverage from the previous query");
+
+    live.coverage.warnings.reset();
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, live, false, false);
+    require((*ready).text() == "No matches shown · coverage unavailable",
+            "missing coverage must not be silently treated as a fully observed empty result");
+    live.terminal = "partial";
+    live.complete = false;
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, live, false, false);
+    require(!(*more).enabled() && (*ready).text() == "No matches shown · partial search" &&
+                (*summary).text().find("search incomplete; no more results available") != std::string::npos,
+            "partial pages without a cursor must not promise a continuation");
+
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, partial, false, true);
+    require((*ready).text() == "No criteria matches shown · partial search" &&
+                (*summary).text().find("indexed matches may have changed") != std::string::npos,
+            "criteria must disclose cached-match limits even with zero displayed objects");
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, final_page, true, true);
+    require((*ready).text() == "1 criteria match shown · index needs refresh",
+            "criteria pagination must retain earlier stale-index coverage");
+    final_page.results = {{"missing", fixture.root() / "missing.txt", "file", 0U, false}};
+    file_manager::ApplicationInteractionProbe::show_coverage_page(*application, final_page, false, true);
+    require((*ready).text() == "No criteria matches shown · some results omitted",
+            "unavailable returned paths must not turn into an authoritative no-match claim");
+}
 
 void test_search_preparation_owns_observations_and_cancellation() {
     TemporaryTree fixture{};
@@ -4073,6 +4171,7 @@ int main() {
         test_details_headers_sort_without_opening_objects();
         test_search_supersession_retires_replies_and_shutdown();
         test_search_preparation_owns_observations_and_cancellation();
+        test_search_coverage_survives_paging_and_resets_on_replacement();
         test_selected_file_previews_reach_visible_layout();
         test_application_command_surfaces_and_house_mark();
         test_application_command_truth_across_files_search_and_settings();

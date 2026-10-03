@@ -3892,12 +3892,8 @@ void Application::apply_engine_criteria(
         provenance += " · " + std::to_string(duplicate) +
             (duplicate == 1U ? " duplicate skipped" : " duplicates skipped");
     }
-    set_status(entries_.empty() ? "No objects in returned criteria results"
-                                : std::to_string(entries_.size()) +
-                                      (entries_.size() == 1U
-                                           ? " criteria object"
-                                           : " criteria objects"),
-               std::move(provenance));
+    const std::string result_status = search_coverage_.result_status(entries_.size(), true, page);
+    set_status(result_status, std::move(provenance));
 }
 
 void Application::apply_engine_search(
@@ -4016,10 +4012,8 @@ void Application::apply_engine_search(
         provenance += " · " + std::to_string(duplicate) +
             " duplicate" + (duplicate == 1 ? " skipped" : "s skipped");
     }
-    set_status(entries_.empty() ? "No matches in returned results" :
-                   std::to_string(entries_.size()) +
-                       (entries_.size() == 1 ? " match" : " matches"),
-               std::move(provenance));
+    const std::string result_status = search_coverage_.result_status(entries_.size(), false, page);
+    set_status(result_status, std::move(provenance));
 }
 
 std::optional<DirectoryEntry> Application::selected_entry() const {

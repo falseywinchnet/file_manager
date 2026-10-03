@@ -58,6 +58,11 @@ remain unavailable, deferred, negotiating, or stubbed.
 
 ## Windows development consumption receipt (2026-09-29)
 
+The existing ORC-FE-001 search reply has the additive C++ coverage preservation
+repair described in [FRONTEND_SEARCH_COVERAGE.md](FRONTEND_SEARCH_COVERAGE.md).
+It preserves existing wire facts and introduces no new operation, provider
+capability or identity/currentness guarantee.
+
 **GIVEN:** the current Windows recovery tranche may build the additive public
 GUI.Forms Application projection carried by Plan Paint source `64248bcc06a1`
 and its six locked patches. This is an `ORC-GUI-001` development consumption
