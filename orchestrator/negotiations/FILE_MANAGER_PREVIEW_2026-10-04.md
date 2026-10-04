@@ -106,3 +106,16 @@ acknowledgement deadline loses the offered result; grant accounting is distinct
 from proof of physical memory release. The full profile remains incomplete;
 no runtime operation, source capability, codec selection or plugin execution
 is opened by this fragment.
+
+## Native process feasibility follow-up
+
+**CANDIDATE experiment:** `../experiments/preview_process/` exercises a closed,
+generated-input native child with normal/failure exit, repeated cancellation,
+observed exit before reuse, and controlled memory-admission comparisons.
+Windows Job committed-memory limits and POSIX address-space limits are measured
+separately. An unavailable Mac limit is recorded as a skip, not resource-cap
+conformance. This disposable C++ OS probe does not select a production language,
+activate plugin execution, connect the lifecycle model, or freeze a provider.
+The existing Rust Orchestrator boundary remains authoritative. Startup footprint,
+descendants, source authority, bounded transport and full sandbox policy remain
+unresolved before an actual preview adapter can be admitted.
