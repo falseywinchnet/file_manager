@@ -1,0 +1,67 @@
+Start testing: Oct 03 23:52 Pacific Daylight Time
+----------------------------------------------------------
+5/73 Testing: gui_forms_windows_message_queue_tests
+5/73 Test: gui_forms_windows_message_queue_tests
+Command: "C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows/gui_forms_windows_message_queue_tests.exe"
+Directory: C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows
+"gui_forms_windows_message_queue_tests" start time: Oct 03 23:52 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+Windows queue fixtures passed; physical device delivery requires native dogfood
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_windows_message_queue_tests" end time: Oct 03 23:52 Pacific Daylight Time
+"gui_forms_windows_message_queue_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/73 Testing: gui_forms_windows_key_translation_tests
+7/73 Test: gui_forms_windows_key_translation_tests
+Command: "C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows/gui_forms_windows_key_translation_tests.exe"
+Directory: C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows
+"gui_forms_windows_key_translation_tests" start time: Oct 03 23:52 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+Windows virtual-key translation fixtures passed; native layout/input delivery not exercised
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_windows_key_translation_tests" end time: Oct 03 23:52 Pacific Daylight Time
+"gui_forms_windows_key_translation_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+19/73 Testing: gui_forms_host_image_tests
+19/73 Test: gui_forms_host_image_tests
+Command: "C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows/gui_forms_host_image_tests.exe"
+Directory: C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows
+"gui_forms_host_image_tests" start time: Oct 03 23:52 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+host image contracts passed
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_host_image_tests" end time: Oct 03 23:52 Pacific Daylight Time
+"gui_forms_host_image_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+73/73 Testing: gui_forms_windows_accessibility_tests
+73/73 Test: gui_forms_windows_accessibility_tests
+Command: "C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows/gui_forms_windows_accessibility_tests.exe"
+Directory: C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows
+"gui_forms_windows_accessibility_tests" start time: Oct 03 23:52 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+MSAA discovery, invocation, numeric/text editing, geometry and teardown passed
+<end of output>
+Test time =   0.17 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_windows_accessibility_tests" end time: Oct 03 23:52 Pacific Daylight Time
+"gui_forms_windows_accessibility_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 23:52 Pacific Daylight Time
