@@ -35,3 +35,11 @@ Typed Rust destructuring/derives and named tail expressions are Rust syntax;
 the C++ spelling table applies to the producer. No generated-profile restrictions
 are imposed on this ordinary authored fixture. Functional, lint and independent
 semantic source review are recorded separately in `results/`.
+
+The additional `check_jpeg` binary consumes the standalone JPEG experiment's
+actual output, with expected EXIF orientation and `plain`/`linear` color mode.
+It checks the scaled dimensions and four interior color anchors using its own
+orientation table and scalar sRGB transfer curve. The JPEG workflow owns that
+16-case cross-process comparison; evidence is in
+`../../../frontend/results/2026-10-04-jpeg-frame/README.md`. This binary does not
+open input files, launch the producer or provide process supervision.

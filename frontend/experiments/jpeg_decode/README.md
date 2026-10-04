@@ -157,3 +157,15 @@ freeze:
 Indexed thumbnails remain a separate Engine/Orchestrator contract. This research
 does not authorize background per-folder thumbnail scans. Results and source
 review are in `frontend/results/2026-10-03-jpeg-decode/README.md`.
+
+## Generated output through the candidate frame
+
+`--emit-frame N` and `--emit-color-frame N` now write the actual prepared raster
+as the experimental 64-byte header plus bounded opaque BGRA payload. `N` is 1–8.
+Only generated 2048x1536 images are accepted; the second mode combines progressive
+JPEG, linear RGB ICC and embedded EXIF orientation. No user file argument exists.
+The independent Rust `check_jpeg` consumer verifies the stream's geometry, alpha
+and color/orientation anchors. See `../../results/2026-10-04-jpeg-frame/README.md`
+for scope and evidence. The JPEG workflow runs all 16 cases on each native OS.
+This joins codec preparation to result bytes without creating a supervised
+provider, source-read authority or an application preview adapter.
