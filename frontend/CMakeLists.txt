@@ -144,6 +144,7 @@ add_subdirectory(
 
 add_library(file_manager_application STATIC
     src/application.cpp
+    src/selected_path_text.cpp
     src/search_preparation.cpp
     ${FILE_MANAGER_GENERATED_SOURCES}
     ${FILE_MANAGER_GENERATED_HEADERS})

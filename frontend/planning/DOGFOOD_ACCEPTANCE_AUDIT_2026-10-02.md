@@ -2,6 +2,24 @@
 
 Status: **ACTIVE; first source pass, not a completed whole-product audit**.
 
+## Selection and clipboard repair — 2026-10-04
+
+**OBSERVED:** PR45 replaces blanket multiple-value inspector placeholders with
+observed counts, regular-file logical-byte totals and common type/date facts.
+Unknown, zero, overflow and uncounted folder contents remain distinct. No
+recursive scan is introduced. All 15 Windows frontend suites and all 16 Mac
+frontend suites passed; the native Mac capture was inspected. Evidence and
+remaining Location clipping/verification-field polish are recorded in
+`../results/2026-10-04-selection-facts/NATIVE.md`. Other native jobs are pending.
+
+**OBSERVED:** the subsequent Copy path fix addresses the old multi-selection
+fallback to the browsing directory. It prepares every selected path before a
+single clipboard publication, with an exact byte bound and no per-path allocation
+in conversion. All 15 Windows suites pass; independent complete house-style
+review accepted the final implementation. Native clipboard execution is pending.
+See `../results/2026-10-04-copy-path/README.md`. Neither repair is yet a new
+published dogfood archive; broader operations and preview gaps remain open.
+
 ## Current delivery — 2026-10-04 UTC
 
 [v0.001-alpha.7be8b8a](https://github.com/falseywinchnet/file_manager/releases/tag/v0.001-alpha.7be8b8a)
