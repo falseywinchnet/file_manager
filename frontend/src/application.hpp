@@ -320,6 +320,8 @@ private:
     [[nodiscard]] std::optional<DirectoryEntry> selected_entry() const;
     void update_selection(std::string_view stable_id);
     void request_preview(const DirectoryEntry& entry);
+    void update_preview_demand();
+    void on_preview_availability_changed(const gui_forms::ControlAvailabilityChange& change);
     void apply_preview(PreviewResult result, std::string stable_id,
                        std::uint64_t generation);
     void reset_preview();
@@ -388,6 +390,11 @@ private:
     std::atomic_uint64_t requested_generation_{};
     std::atomic_uint64_t search_generation_{};
     std::atomic_uint64_t preview_generation_{};
+    // UI-owned request state. Workers observe only the atomic generation.
+    // Completed content survives collapse. Hidden requests retain only intent;
+    // any queued/in-flight generation is cancelled until demand returns.
+    enum class PreviewState : std::uint8_t { empty, deferred, pending, ready };
+    PreviewState preview_state_{PreviewState::empty};
     std::atomic_uint64_t checksum_generation_{};
     std::atomic_uint64_t path_suggestion_generation_{};
     std::uint64_t applied_generation_{};

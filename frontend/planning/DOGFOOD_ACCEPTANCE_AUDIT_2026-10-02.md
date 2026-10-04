@@ -554,3 +554,21 @@ resource identity, decoder policy, quota or checksum-error behavior changes.
 The existing independent bitwise test oracle plus 24 added ancillary-chunk
 cases pass in the full PNG registry suite (0.11 seconds, Windows renderer-neutral
 build). Native platform checks for this later optimization are pending.
+
+## Demand-driven selected-file preview
+
+**OBSERVED:** main `e7bd9326` still schedules a file preview when the preview or
+an ancestor is hidden, and can admit the completed PNG on the UI thread while
+hidden. The later demand-state correction defers new requests, cancels pending
+ones on loss of visibility, resumes the current selection on restoration, and
+reuses completed content across collapse/reopening. It handles layout-only
+collapse through the existing public Window availability event.
+
+**MEASURED Windows correctness:** all 15 frontend suites pass, including
+deterministic worker-queue counts and stale PNG completion checks. The initial
+ancestor-visible-event implementation failed the added layout-collapse case;
+that negative evidence, accepted log, ownership limits and independent complete
+house-style review are retained in
+`../results/2026-10-03-preview-demand/README.md`. Mac/Linux checks and packaging
+of this change remain pending. No browsing-latency measurement, new format,
+thumbnail route or off-thread visible PNG admission is established by this slice.

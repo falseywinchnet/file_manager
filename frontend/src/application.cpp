@@ -559,6 +559,11 @@ std::unique_ptr<gui_forms::Window> Application::make_window() {
     window_ = window.get();
     subscriptions_.push_back((*window_).presentation_changed().subscribe(
         std::bind_front(&Application::on_details_presentation_changed, this)));
+    // This event also covers layout-only collapse, which does not change a
+    // control's authored visible flag. Query the preview's current ancestry;
+    // availability records may have been deferred during a layout transaction.
+    subscriptions_.push_back((*window_).control_availability_changed().subscribe(
+        std::bind_front(&Application::on_preview_availability_changed, this)));
     web_forms_generated_file_manager_sapphire::bind_native_resources(
         form_, *window_);
     install_house_art();
@@ -4195,6 +4200,7 @@ void Application::reset_preview() {
 
 void Application::request_preview(const DirectoryEntry& entry) {
     const std::uint64_t generation = preview_generation_.fetch_add(1) + 1U;
+    preview_state_ = PreviewState::empty;
     reset_preview();
     (*preview_house_icon_).set_image_key(
         std::string(house_art::object_key(entry.kind)));
@@ -4203,20 +4209,58 @@ void Application::request_preview(const DirectoryEntry& entry) {
     (*preview_house_icon_).set_visible(true);
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph).set_visible(false);
     if (!builtin_previews_enabled_) {
+        preview_state_ = PreviewState::ready;
         (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind).set_text(
             kind_text(entry) + " · built-in preview disabled");
         return;
     }
-    if (entry.directory || entry.kind == EntryKind::symlink) return;
+    if (entry.directory || entry.kind == EntryKind::symlink) {
+        preview_state_ = PreviewState::ready;
+        return;
+    }
+    if (!(*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface).effectively_visible()) {
+        preview_state_ = PreviewState::deferred;
+        (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind).set_text(kind_text(entry));
+        return;
+    }
+    preview_state_ = PreviewState::pending;
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind).set_text(
         kind_text(entry) + " · loading preview…");
     const std::filesystem::path root = navigation_root_;
     post_worker(PreviewWork{shared_from_this(), root, entry, generation});
 }
 
+void Application::on_preview_availability_changed(const gui_forms::ControlAvailabilityChange&) {
+    update_preview_demand();
+}
+
+void Application::update_preview_demand() {
+    if (stopping_.load()) return;
+    if (preview_state_ != PreviewState::pending && preview_state_ != PreviewState::deferred) return;
+    const bool visible =
+        (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface).effectively_visible();
+    if (!visible && preview_state_ == PreviewState::pending) {
+        // Cancellation is cooperative: an already-entered OS read may finish,
+        // but its queued result cannot reach PNG decoding or presentation.
+        preview_generation_.fetch_add(1U);
+        preview_state_ = PreviewState::deferred;
+        const std::optional<DirectoryEntry> selected = selected_entry();
+        if (selected) {
+            (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind).set_text(kind_text(*selected));
+        }
+    } else if (visible && preview_state_ == PreviewState::deferred) {
+        const std::optional<DirectoryEntry> selected = selected_entry();
+        if (selected) request_preview(*selected);
+    }
+}
+
 void Application::apply_preview(PreviewResult result, std::string stable_id,
                                 const std::uint64_t generation) {
     if (generation != preview_generation_.load()) return;
+    if (!(*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface).effectively_visible()) {
+        update_preview_demand();
+        return;
+    }
     const std::optional<DirectoryEntry> selected = selected_entry();
     if (!selected || (*selected).stable_id != stable_id ||
         (!(*selected).identity.same_revision(result.identity) &&
@@ -4224,6 +4268,7 @@ void Application::apply_preview(PreviewResult result, std::string stable_id,
           result.kind == PreviewKind::png))) {
         return;
     }
+    preview_state_ = PreviewState::ready;
     reset_preview();
     if (result.kind == PreviewKind::text) {
         const bool empty_text = result.text_utf8.empty();
@@ -4265,6 +4310,11 @@ void Application::apply_preview(PreviewResult result, std::string stable_id,
 }
 
 void Application::update_selection(const std::string_view stable_id) {
+    // Retire the old request before visibility callbacks can resume demand
+    // during the new selection's adaptive layout and property publication.
+    preview_generation_.fetch_add(1U);
+    preview_state_ = PreviewState::empty;
+    reset_preview();
     update_adaptive_preview();
     (*property_list_).set_visible(!(*objects_).selected_ids().empty());
     update_browsing_status();
@@ -4278,8 +4328,6 @@ void Application::update_selection(const std::string_view stable_id) {
     }
     update_mutation_controls();
     if ((*objects_).selected_ids().size() > 1U) {
-        preview_generation_.fetch_add(1);
-        reset_preview();
         const std::size_t count = (*objects_).selected_ids().size();
         (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph).set_text("MULTI");
         (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_name).set_text(
@@ -4299,8 +4347,6 @@ void Application::update_selection(const std::string_view stable_id) {
     }
     const EntryMap::const_iterator found = entries_.find(std::string(stable_id));
     if (found == entries_.end()) {
-        preview_generation_.fetch_add(1);
-        reset_preview();
         (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph).set_text("—");
         (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_name).set_text(
             "Nothing selected");
