@@ -55,26 +55,56 @@ struct DibRasterCacheFixture final {
         painter.restore();
     }
     static void correctness() {
-        for (const double scale : std::array<double, 2U>{1.0, 1.25}) {
-            DibPainter reused{};
+        DibPainter reused{};
+        // Preserve populated caches across scale changes in both directions.
+        for (const double scale : std::array<double, 3U>{1.0, 1.25, 1.0}) {
             begin(reused, scale);
-            for (std::size_t pass = 0U; pass < 2U; ++pass) {
+            for (std::size_t pass = 0U; pass < 3U; ++pass) {
                 for (std::size_t variant = 0U; variant < 7U; ++variant) {
-                    DibPainter fresh{};
-                    fresh.brush_cache_disabled_ = true;
-                    begin(fresh, scale);
-                    const std::uint32_t backdrop = pass == 0U ? 0x00123456U : 0xff987654U;
-                    background(fresh, backdrop);
-                    background(reused, backdrop);
-                    scene(fresh, true, variant);
-                    scene(fresh, false, variant);
-                    const std::vector<std::uint32_t> expected = capture(fresh);
-                    scene(reused, true, variant);
-                    scene(reused, false, variant);
-                    compare(reused, expected);
+                    for (const bool shadows : std::array<bool, 2U>{true, false}) {
+                        DibPainter fresh{};
+                        fresh.brush_cache_disabled_ = true;
+                        begin(fresh, scale);
+                        // Two transparent passes cover construction and reuse.
+                        // Compare shadows alone: later gradients would overwrite
+                        // destination alpha and hide alpha-zero/skip mistakes.
+                        const std::uint32_t backdrop = pass < 2U ? 0x00123456U : 0xff987654U;
+                        background(fresh, backdrop);
+                        background(reused, backdrop);
+                        scene(fresh, shadows, variant);
+                        const std::vector<std::uint32_t> expected = capture(fresh);
+                        scene(reused, shadows, variant);
+                        compare(reused, expected);
+                    }
                 }
             }
         }
+    }
+    static void byte_limits() {
+        DibPainter painter{};
+        begin(painter);
+        const std::array<GradientStop, 2U> stops{{{0.0, Color::rgba(1, 2, 3, 255)},
+            {1.0, Color::rgba(4, 5, 6, 0)}}};
+        // Each brush is admissible alone. The third forces byte-budget FIFO
+        // retirement while the entry count remains well below its ceiling.
+        for (std::size_t index = 0U; index < 3U; ++index) {
+            const double position = static_cast<double>(index);
+            const DibPainter::GradientRaster* gradient = painter.gradient_raster({0, 0, 2048, 1024},
+                {position, 2.25}, {3.0, 4.0}, stops, GradientSpreadMode::pad, true);
+            require(gradient != nullptr, "large gradient admission");
+            const DibPainter::ShadowRaster* shadow = painter.shadow_raster({0, 0, 1024, 1024},
+                {position, 0.0, 4.0, 5.0}, 1.0, 0.75, 173U);
+            require(shadow != nullptr, "large shadow admission");
+            const std::size_t retained = std::min(index + 1U, std::size_t{2U});
+            require(painter.gradient_cache_pixels_ == retained * 2097152U,
+                "gradient pixel accounting at byte limit");
+            require(painter.shadow_cache_samples_ == retained * 1048576U,
+                "shadow sample accounting at byte limit");
+        }
+        require(painter.gradient_cache_.size() == 2U && painter.gradient_cache_.front().first.x == 1.0,
+            "gradient byte budget retires oldest brush");
+        require(painter.shadow_cache_.size() == 2U && painter.shadow_cache_.front().shadow.x == 1.0,
+            "shadow byte budget retires oldest brush");
     }
     static void limits() {
         DibPainter painter{};
@@ -150,6 +180,7 @@ struct DibRasterCacheFixture final {
     static void run() {
         correctness();
         limits();
+        byte_limits();
         if (environment_flag("GUI_FORMS_BENCH_BRUSH_CACHE")) {
             std::puts("workload,samples,p50_ms,p95_ms,p99_ms,max_ms,gradient_builds,gradient_pixels");
             benchmark(false);

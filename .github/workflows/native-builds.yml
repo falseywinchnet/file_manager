@@ -154,6 +154,16 @@ jobs:
           cmake -S gui_forms -B .build/native-${{ matrix.platform }}/gui-forms -DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON -DGUI_FORMS_BUILD_TEXT_MASKS=ON -DGUI_FORMS_BUILD_PREPARED_TEXT=ON
           cmake --build .build/native-${{ matrix.platform }}/gui-forms --target gui_forms_text_mask_lifecycle_tests gui_forms_text_mask_native_tests gui_forms_text_mask_wrapping_tests gui_forms_linebreak_conformance_tests gui_forms_prepared_text_service_tests gui_forms_prepared_window_input_tests gui_forms_prepared_window_batch_tests gui_forms_prepared_window_shape_tests gui_forms_prepared_window_session_tests --parallel 2
           ctest --test-dir .build/native-${{ matrix.platform }}/gui-forms -R '^gui_forms_(text_mask_(lifecycle|native|wrapping)_tests|linebreak_conformance|prepared_text_service_tests|prepared_window_(input|batch|shape|session)_tests)$' --output-on-failure
+      # The ordinary SDK was exported with transactional DIB disabled above.
+      # Enable the private Windows lifecycle fixture only after that export.
+      - name: Test Windows DIB ownership and exact brush replay
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          cp .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/LastTest.log .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/DevelopmentTextLastTest.log
+          cmake -S gui_forms -B .build/native-${{ matrix.platform }}/gui-forms -DGUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=ON
+          cmake --build .build/native-${{ matrix.platform }}/gui-forms --target gui_forms_windows_dib_frame_store_tests gui_forms_windows_dib_lifecycle_tests --parallel 2
+          ctest --test-dir .build/native-${{ matrix.platform }}/gui-forms -R '^gui_forms_windows_dib_(frame_store|lifecycle)_tests$' --output-on-failure
       - name: Test development text-mask ownership on macOS and Linux
         if: runner.os != 'Windows'
         shell: bash

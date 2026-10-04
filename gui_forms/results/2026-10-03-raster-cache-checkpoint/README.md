@@ -1,5 +1,11 @@
 # Windows raster-cache checkpoint — paused 2026-10-03
 
+## Resumed validation
+
+**GIVEN:** The owner subsequently said it is a new day and resumed work.
+The historical pause record below is retained. Current results and unresolved
+delivery edges are in [VALIDATION.md](VALIDATION.md).
+
 ## Status and scope
 
 **GIVEN:** The owner requested end-of-day pause, commit, and report. The File

@@ -1695,6 +1695,8 @@ private:
         std::size_t count{};
     };
 
+    // The caller supplies a nonempty raster area. Returned storage is borrowed
+    // until the next mutation of shadow_cache_; replay consumes it immediately.
     [[nodiscard]] const ShadowRaster* shadow_raster(const PixelRect area,
         const Rect shadow, const double radius, const double sigma, const unsigned alpha) {
 #if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
