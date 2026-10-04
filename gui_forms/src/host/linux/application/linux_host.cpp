@@ -541,6 +541,7 @@ NativeWindow::NativeWindow(Runtime &host, LinuxApplicationWindow source)
                       XNFocusWindow, xid, nullptr);
   register_fonts(raster);
   (*entry.model).set_text_metrics_provider(&raster);
+  (*entry.model).set_framebuffer_painter(&raster);
   (*entry.model)
       .metrics()
       .set_renderer("Skia CPU / HarfBuzz / FreeType / X11", true);
@@ -553,6 +554,7 @@ NativeWindow::~NativeWindow() {
   (*entry.model).set_dispatch_wake_handler({});
   (*entry.model).set_paint_wake_handler({});
   (*entry.model).set_text_metrics_provider(nullptr);
+  (*entry.model).set_framebuffer_painter(nullptr);
   if (session)
     (*session).shutdown();
   if (input != nullptr)

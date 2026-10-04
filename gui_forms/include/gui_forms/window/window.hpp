@@ -41,6 +41,7 @@ class HostSession;
 class BindingSource;
 class BindingContext;
 class LiveSurface;
+class PaintFramebuffer;
 namespace detail {
 class PopupAttachment;
 class AcceleratorAttachment;
@@ -261,6 +262,10 @@ public:
     // renderer-neutral seam. Replacing it invalidates measurement so controls
     // never retain geometry produced by a previous font/raster profile.
     void set_text_metrics_provider(TextMetricsProvider* provider);
+    // Native host borrows its painter until shutdown; clear before destroying it.
+    // Created framebuffers own their rendering state independently of the host.
+    void set_framebuffer_painter(Painter* painter);
+    [[nodiscard]] std::unique_ptr<PaintFramebuffer> create_framebuffer(Size logical_size, double scale);
     [[nodiscard]] TextMetricsProvider* text_metrics_provider() const noexcept {
         return text_metrics_provider_;
     }
@@ -688,6 +693,7 @@ private:
     double scale_{1.0};
     PresentationSettings presentation_settings_{};
     TextMetricsProvider* text_metrics_provider_{};
+    Painter* framebuffer_painter_{};
     Event<const PresentationSettings&> presentation_changed_;
     std::shared_ptr<const Theme> theme_;
     Event<const Theme&> theme_changed_;
