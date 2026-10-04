@@ -36,6 +36,7 @@ jobs:
         run: |
           python3 -B -m unittest discover -s tools -p test_house_style.py
           python3 -B tools/check_house_style.py frontend/include frontend/src frontend/tests frontend/examples orchestrator/conformance/clients/cpp
+          python3 -B tools/check_house_style.py gui_forms/src/host/windows/input/windows_message_queue.hpp gui_forms/tests/windows_message_queue_tests.cpp gui_forms/tests/windows_message_queue_native_probe.cpp
           python3 -B tools/check_house_style.py gui_forms/include/gui_forms/text_mask.hpp gui_forms/include/gui_forms/text_mask gui_forms/src/core/text/text_mask gui_forms/src/render/text/text_mask gui_forms/tests/text_mask_lifecycle_tests.cpp gui_forms/tests/text_mask_native_tests.cpp gui_forms/tests/text_mask_wrapping_tests.cpp gui_forms/tests/text_mask_cost_probe.cpp
           python3 -B tools/check_house_style.py gui_forms/src/core/text/prepared_window gui_forms/tests/prepared_window_input_tests.cpp gui_forms/tests/prepared_window_batch_tests.cpp
           python3 -B tools/check_house_style.py gui_forms/src/render/text/harfbuzz/harfbuzz_font_engine.hpp gui_forms/src/render/text/harfbuzz/harfbuzz_font_engine.cpp
