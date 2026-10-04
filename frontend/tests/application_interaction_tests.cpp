@@ -2,6 +2,7 @@
 #include "fixture_links.hpp"
 #include "application.hpp"
 #include "application_jobs.hpp"
+#include "selected_path_text.hpp"
 
 #include "gui_forms/gui_forms.hpp"
 
@@ -29,6 +30,9 @@ namespace file_manager {
 
 class ApplicationInteractionProbe final {
   public:
+    static void forget_entry(Application& application, const std::string& id) {
+        application.entries_.erase(id);
+    }
     static void post_worker(Application& application, std::function<void()> work) {
         application.post_worker(std::move(work));
     }
@@ -4973,6 +4977,114 @@ void test_preview_work_follows_visible_demand() {
         "reopening a completed preview must reuse its registered image without a new read or decode");
 }
 
+[[nodiscard]] gui_forms::HostCapabilities path_clipboard_capabilities() {
+    gui_forms::HostCapabilities capabilities{};
+    capabilities.platform = "file-manager-clipboard-fixture";
+    capabilities.available = gui_forms::HostCapability::clipboard;
+    return capabilities;
+}
+
+class PathClipboard final : public gui_forms::HostServices {
+public:
+    PathClipboard() : HostServices(path_clipboard_capabilities()) {}
+    ~PathClipboard() override { shutdown(); }
+    std::string text{"untouched clipboard"};
+    std::size_t writes{};
+    bool refuse{};
+protected:
+    [[nodiscard]] gui_forms::HostMonitorResult query_monitors_impl() override { return {}; }
+    [[nodiscard]] gui_forms::HostServiceStatus set_cursor_impl(gui_forms::CursorKind) override { return {}; }
+    [[nodiscard]] gui_forms::HostServiceStatus set_pointer_capture_impl(bool, std::uint64_t) override { return {}; }
+    [[nodiscard]] gui_forms::HostClipboardTextResult read_clipboard_text_impl() override { return {}; }
+    [[nodiscard]] gui_forms::HostServiceStatus write_clipboard_text_impl(const std::string_view value) override {
+        ++writes;
+        if (refuse) return {gui_forms::HostServiceError::backend_failure};
+        text.assign(value);
+        return {};
+    }
+    [[nodiscard]] gui_forms::HostDialogResult show_dialog_impl(const gui_forms::HostDialogRequest&) override { return {}; }
+    [[nodiscard]] gui_forms::HostServiceStatus play_sound_cue_impl(const gui_forms::HostSoundCueRequest&) override { return {}; }
+};
+
+void test_copy_path_uses_complete_selection() {
+    TemporaryTree fixture{};
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(fixture.root(), std::nullopt,
+            file_manager::OperationPolicy::read_only, std::string{});
+    ApplicationStopGuard guard{*application};
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
+    (*application).bind_host(host_noop, host_noop);
+    const std::shared_ptr<gui_forms::ObjectView> objects =
+        std::dynamic_pointer_cast<gui_forms::ObjectView>((*window).find("fm.objects.current-folder"));
+    const std::shared_ptr<gui_forms::Label> status = std::dynamic_pointer_cast<gui_forms::Label>(
+        (*window).find("file-manager-app.shell.status.ready"));
+    const std::shared_ptr<gui_forms::Command> copy =
+        file_manager::ApplicationInteractionProbe::command(*application, "commands.copy-path");
+    require(objects && status && copy, "Copy path fixture needs the actual command and object view");
+    require_eventually(*application, ObjectNamed{*objects, "root.txt"}, "Copy path fixture must enumerate");
+    PathClipboard clipboard{};
+    // The session observes both owners and detaches before either is destroyed.
+    gui_forms::HostSession session(*window, path_clipboard_capabilities(), &clipboard);
+    const std::string file = object_id(*objects, "root.txt");
+    const std::string folder = object_id(*objects, "Documents");
+    (*objects).clear_selection();
+    bool invoked = (*copy).execute("fixture.copy-path.empty");
+    require(invoked && clipboard.text == file_manager::path_utf8(fixture.root()),
+        "no selection must copy the browsing folder");
+    (*objects).set_selected_id(file);
+    invoked = (*copy).execute("fixture.copy-path.single");
+    require(invoked && clipboard.text == file_manager::path_utf8(fixture.root() / "root.txt") &&
+        (*status).text() == "Path copied", "one selection must copy its exact path");
+    (*objects).set_selected_ids({file, folder});
+    invoked = (*copy).execute("fixture.copy-path.multiple");
+    const std::string expected = file_manager::path_utf8(fixture.root() / "Documents") + "\n" +
+        file_manager::path_utf8(fixture.root() / "root.txt");
+    require(invoked && clipboard.text == expected && (*status).text() == "Paths copied" &&
+        clipboard.writes == 3U, "multiple selection must publish every selected path in one clipboard write");
+    clipboard.refuse = true;
+    invoked = (*copy).execute("fixture.copy-path.refused");
+    require(invoked && (*status).text() == "Clipboard unavailable" && clipboard.text == expected,
+        "a refused host write must not report success");
+    file_manager::ApplicationInteractionProbe::forget_entry(*application, folder);
+    invoked = (*copy).execute("fixture.copy-path.missing");
+    require(invoked && (*status).text() == "Paths not copied" && clipboard.text == expected &&
+        clipboard.writes == 4U, "a missing selected binding must not publish a partial list or the current folder");
+}
+
+void test_path_text_encoding_and_bounds() {
+    std::unordered_map<std::string, file_manager::DirectoryEntry> entries{};
+    file_manager::DirectoryEntry first{};
+    first.path = std::filesystem::path(u8"folder with spaces/\u03a9-\U0001f4c4.txt");
+    file_manager::DirectoryEntry second{};
+    second.path = std::filesystem::path(u8"another/quoted'\nname.txt");
+    entries.emplace("first", first);
+    entries.emplace("second", second);
+    const std::array<std::string, 2> selected{"second", "first"};
+    const std::string expected = file_manager::path_utf8(second.path) + "\n" + file_manager::path_utf8(first.path);
+    const file_manager::detail::PathText exact = file_manager::detail::selected_path_text(
+        entries, selected, {}, expected.size());
+    require(exact.status == file_manager::detail::PathTextStatus::ready && exact.text == expected,
+        "path text must preserve requested order, Unicode, spaces, apostrophes and embedded newlines");
+    const file_manager::detail::PathText too_large = file_manager::detail::selected_path_text(
+        entries, selected, {}, expected.size() - 1U);
+    require(too_large.status == file_manager::detail::PathTextStatus::too_large && too_large.text.empty(),
+        "one byte over the publication limit must return no partial text");
+    entries.erase("first");
+    const file_manager::detail::PathText missing = file_manager::detail::selected_path_text(
+        entries, selected, {}, expected.size());
+    require(missing.status == file_manager::detail::PathTextStatus::missing_entry && missing.text.empty(),
+        "a missing selected path must not fall back to current location");
+#if defined(_WIN32)
+    const std::wstring invalid_native(1U, static_cast<wchar_t>(0xd800U));
+    first.path = std::filesystem::path(invalid_native);
+    entries.emplace("first", first);
+    const file_manager::detail::PathText invalid = file_manager::detail::selected_path_text(
+        entries, selected, {}, 1024U);
+    require(invalid.status == file_manager::detail::PathTextStatus::invalid_encoding && invalid.text.empty(),
+        "unpaired Windows surrogates must fail without replacement characters or partial publication");
+#endif
+}
+
 void test_multi_selection_reports_observed_facts() {
     TemporaryTree fixture{};
     const std::filesystem::path second_path = fixture.root() / "second.txt";
@@ -5090,6 +5202,8 @@ void test_ordinary_queued_parent_identity() {
 
 int main() {
     try {
+        test_copy_path_uses_complete_selection();
+        test_path_text_encoding_and_bounds();
         test_multi_selection_reports_observed_facts();
         test_ordinary_local_actions_outside_launch_root();
         test_ordinary_queued_parent_identity();
