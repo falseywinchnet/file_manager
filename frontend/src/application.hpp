@@ -8,6 +8,7 @@
 #include "file_manager/platform_commands.hpp"
 #include "file_manager/preview.hpp"
 #include "search_preparation.hpp"
+#include "selection_summary.hpp"
 #include "file_manager_sapphire.gui_tree.wf.hpp"
 #include "fileman_orchestrator/client.hpp"
 
@@ -377,6 +378,7 @@ private:
     [[nodiscard]] bool engine_search_available() const;
     void set_status(std::string text, std::string summary);
     void update_browsing_status();
+    void update_browsing_status(const detail::SelectionSummary& summary);
     bool focus_location_accelerator();
     bool refresh_accelerator();
 

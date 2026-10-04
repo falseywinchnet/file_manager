@@ -374,8 +374,8 @@ gui_forms::ObjectGlyph object_glyph(const EntryKind kind) {
     return gui_forms::ObjectGlyph::document;
 }
 
-std::string kind_text(const DirectoryEntry& entry) {
-    switch (entry.kind) {
+std::string kind_text(const EntryKind kind) {
+    switch (kind) {
         case EntryKind::folder: return "Folder";
         case EntryKind::document: return "Document";
         case EntryKind::image: return "Image";
@@ -386,6 +386,11 @@ std::string kind_text(const DirectoryEntry& entry) {
         case EntryKind::other: return "Filesystem object";
     }
     return "Filesystem object";
+}
+
+std::string kind_text(const DirectoryEntry& entry) {
+    const std::string text = kind_text(entry.kind);
+    return text;
 }
 
 std::string_view sort_title(const std::string_view mode) {
@@ -4350,7 +4355,9 @@ void Application::update_selection(const std::string_view stable_id) {
     reset_preview();
     update_adaptive_preview();
     (*property_list_).set_visible(!(*objects_).selected_ids().empty());
-    update_browsing_status();
+    const detail::SelectionSummary summary = detail::summarize_selection(
+        entries_, (*objects_).selected_ids());
+    update_browsing_status(summary);
     pending_delete_id_.reset();
     (*property_list_).set_value("fm.property.expected-sha256", {});
     if ((*rename_box_).visible()) cancel_rename();
@@ -4366,15 +4373,26 @@ void Application::update_selection(const std::string_view stable_id) {
         (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_name).set_text(
             std::to_string(count) + " objects selected");
         (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind).set_text(
-            "Properties with multiple values are not synthesized");
-        (*property_list_).set_value("fm.property.name", "—");
+            detail::selection_count_text(summary));
+        const std::string size = detail::selection_size_text(summary);
+        std::string kind{"Multiple kinds"};
+        if (summary.unavailable_entries > 0U) kind = "Some types unavailable";
+        else if (summary.common_kind && !summary.mixed_kind) kind = kind_text(*summary.common_kind);
+        std::string modified{"Multiple dates"};
+        if (summary.modified_unavailable) modified = "Some dates unavailable";
+        else if (summary.common_modified && !summary.mixed_modified) {
+            modified = format_modified_time(*summary.common_modified);
+        }
+        const std::string location = criteria_showing_ || search_showing_
+            ? "Multiple selected paths" : path_utf8(location_);
+        (*property_list_).set_value("fm.property.name", std::to_string(count) + " selected objects");
         if (const gui_forms::Control::Ptr editor = (*property_list_).editor("fm.property.name")) {
             (*editor).set_enabled(false);
         }
-        (*property_list_).set_value("fm.property.kind", "Multiple kinds");
-        (*property_list_).set_value("fm.property.location", path_utf8(location_));
-        (*property_list_).set_value("fm.property.size", "Multiple values");
-        (*property_list_).set_value("fm.property.modified", "Multiple values");
+        (*property_list_).set_value("fm.property.kind", kind);
+        (*property_list_).set_value("fm.property.location", location);
+        (*property_list_).set_value("fm.property.size", size);
+        (*property_list_).set_value("fm.property.modified", modified);
         update_command_state();
         return;
     }
@@ -4385,10 +4403,6 @@ void Application::update_selection(const std::string_view stable_id) {
             "Nothing selected");
         (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind).set_text(
             "Choose an item to inspect it");
-        (*form_.file_manager_app_shell_workspace_selection_inspector_facts_path).set_text("Path · —");
-        (*form_.file_manager_app_shell_workspace_selection_inspector_facts_size).set_text("Size · —");
-        (*form_.file_manager_app_shell_workspace_selection_inspector_facts_modified).set_text(
-            "Modified · —");
         (*property_list_).set_value("fm.property.name", "—");
         if (const gui_forms::Control::Ptr editor = (*property_list_).editor("fm.property.name")) {
             (*editor).set_enabled(false);
@@ -4404,12 +4418,6 @@ void Application::update_selection(const std::string_view stable_id) {
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_name).set_text(entry.name);
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind).set_text(
         kind_text(entry));
-    (*form_.file_manager_app_shell_workspace_selection_inspector_facts_path).set_text(
-        "Path · " + path_utf8(entry.path));
-    (*form_.file_manager_app_shell_workspace_selection_inspector_facts_size).set_text(
-        "Size · " + entry.secondary_text);
-    (*form_.file_manager_app_shell_workspace_selection_inspector_facts_modified).set_text(
-        "Modified · " + entry.modified_text);
     (*property_list_).set_value("fm.property.name", entry.name);
     (*property_list_).set_value("fm.property.kind", kind_text(entry));
     (*property_list_).set_value("fm.property.location", path_utf8(entry.path));
@@ -5015,39 +5023,32 @@ void Application::activate(const std::string_view stable_id) {
 
 void Application::update_browsing_status() {
     if (settings_open_ || search_showing_ || criteria_showing_) return;
-    const std::span<const std::string> selected = (*objects_).selected_ids();
+    const detail::SelectionSummary summary = detail::summarize_selection(
+        entries_, (*objects_).selected_ids());
+    update_browsing_status(summary);
+}
+
+void Application::update_browsing_status(const detail::SelectionSummary& summary) {
+    if (settings_open_ || search_showing_ || criteria_showing_) return;
     std::string text{};
-    if (selected.empty()) {
+    if (summary.selected == 0U) {
         text = entries_.empty() ? "This folder is empty" :
             std::to_string(entries_.size()) + (entries_.size() == 1U ? " object" : " objects");
     } else {
-        std::uint64_t bytes{};
-        std::size_t folders{};
-        std::size_t files{};
-        bool unavailable{};
-        for (const std::string& id : selected) {
-            const std::unordered_map<std::string, DirectoryEntry>::const_iterator found = entries_.find(id);
-            if (found == entries_.end()) { unavailable = true; continue; }
-            const DirectoryEntry& entry = (*found).second;
-            if (entry.directory) { ++folders; continue; }
-            if (entry.identity.type != std::filesystem::file_type::regular) continue;
-            ++files;
-            if (!entry.identity.available() || entry.identity.size > std::numeric_limits<std::uint64_t>::max() - bytes) {
-                unavailable = true;
-            } else {
-                bytes += entry.identity.size;
-            }
+        text = std::to_string(summary.selected) + " selected";
+        if (summary.files > 0U || summary.unavailable_entries > 0U) {
+            text += " · " + detail::selection_size_text(summary);
         }
-        text = std::to_string(selected.size()) + " selected";
-        if (files > 0) text += " · " + format_bytes(bytes) + " in files";
-        if (folders > 0) text += " · " + std::to_string(folders) + (folders == 1U ? " folder" : " folders");
-        if (unavailable) text += " · some sizes unavailable";
+        if (summary.folders > 0U) {
+            text += " · " + std::to_string(summary.folders);
+            text += summary.folders == 1U ? " folder" : " folders";
+        }
     }
-    const std::string summary = path_utf8(location_) + " · direct filesystem" +
+    const std::string status_summary = path_utf8(location_) + " · direct filesystem" +
         (mutation_scope_active() ? " · protected operations admitted"
             : local_action_scope_active() ? " · New Folder and Rename available"
                                           : " · read-only observation");
-    set_status(std::move(text), summary);
+    set_status(std::move(text), status_summary);
     (*form_.file_manager_app_shell_status_summary).set_accessible_description(
         "Current folder: " + path_utf8(location_));
 }

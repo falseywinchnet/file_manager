@@ -4973,6 +4973,71 @@ void test_preview_work_follows_visible_demand() {
         "reopening a completed preview must reuse its registered image without a new read or decode");
 }
 
+void test_multi_selection_reports_observed_facts() {
+    TemporaryTree fixture{};
+    const std::filesystem::path second_path = fixture.root() / "second.txt";
+    std::ofstream second_file(second_path, std::ios::binary);
+    second_file << "abc";
+    second_file.close();
+    require(second_file.good(), "selection fixture must finish its second file");
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(fixture.root(), std::nullopt,
+            file_manager::OperationPolicy::read_only, std::string{});
+    ApplicationStopGuard guard{*application};
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
+    (*application).bind_host(host_noop, host_noop);
+    const std::shared_ptr<gui_forms::ObjectView> objects = std::dynamic_pointer_cast<gui_forms::ObjectView>(
+        (*window).find("fm.objects.current-folder"));
+    const std::shared_ptr<gui_forms::PropertyList> properties = std::dynamic_pointer_cast<gui_forms::PropertyList>(
+        (*window).find("fm.selection.properties"));
+    const std::shared_ptr<gui_forms::Label> caption = std::dynamic_pointer_cast<gui_forms::Label>(
+        (*window).find("file-manager-app.shell.workspace.selection.inspector.facts.preview.kind"));
+    require(objects && properties && caption, "selection fixture needs the actual inspector");
+    struct SelectionFilesReady final {
+        const gui_forms::ObjectView& objects;
+        bool operator()() const {
+            const bool ready = has_object_named(objects, "second.txt");
+            return ready;
+        }
+    };
+    require_eventually(*application, SelectionFilesReady{*objects},
+        "selection fixture must load both files");
+    const std::string first = object_id(*objects, "root.txt");
+    const std::string second = object_id(*objects, "second.txt");
+    const std::string folder = object_id(*objects, "Documents");
+    const std::string other_folder = object_id(*objects, "Pictures");
+    (*objects).set_selected_id(first);
+    (*objects).set_selected_ids({first, second});
+    const std::uintmax_t bytes = std::filesystem::file_size(fixture.root() / "root.txt") +
+        std::filesystem::file_size(second_path);
+    const std::string expected_size = file_manager::format_bytes(bytes) + " in files";
+    require((*caption).text() == "2 files" && (*properties).value("fm.property.kind") == "Document" &&
+        (*properties).value("fm.property.name") == "2 selected objects" &&
+        (*properties).value("fm.property.size") == expected_size,
+        "multi-selection must replace old single-file facts with common type and observed total");
+    const gui_forms::Control::Ptr name_editor = (*properties).editor("fm.property.name");
+    require(name_editor && !(*name_editor).enabled(), "aggregate facts must not enable batch rename");
+
+    (*objects).set_selected_ids({first, folder});
+    const std::optional<std::string> mixed_size = (*properties).value("fm.property.size");
+    require((*caption).text() == "1 file · 1 folder" &&
+        (*properties).value("fm.property.kind") == "Multiple kinds" &&
+        mixed_size && (*mixed_size).find("Folder contents not counted") != std::string::npos,
+        "mixed file/folder selection must name the excluded recursive contents");
+    (*objects).set_selected_ids({folder, other_folder});
+    require((*caption).text() == "2 folders" && (*properties).value("fm.property.kind") == "Folder" &&
+        (*properties).value("fm.property.size") == "Folder contents not counted",
+        "folder-only selection must show a shared type without a fabricated zero-byte size");
+    (*objects).set_selected_id(first);
+    require((*properties).value("fm.property.name") == "root.txt" &&
+        (*properties).value("fm.property.kind") == "Document",
+        "returning to one file must retire aggregate property values");
+    (*objects).clear_selection();
+    require((*properties).value("fm.property.name") == "—" &&
+        (*properties).value("fm.property.size") == "—",
+        "clearing selection must retire aggregate facts");
+}
+
 void test_ordinary_queued_parent_identity() {
     TemporaryTree fixture{};
     const std::filesystem::path parent = fixture.root() / "Documents";
@@ -5025,6 +5090,7 @@ void test_ordinary_queued_parent_identity() {
 
 int main() {
     try {
+        test_multi_selection_reports_observed_facts();
         test_ordinary_local_actions_outside_launch_root();
         test_ordinary_queued_parent_identity();
         test_stop_during_ui_drain_revokes_remaining_callbacks();

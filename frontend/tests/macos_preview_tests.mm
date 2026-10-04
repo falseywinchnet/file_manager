@@ -107,7 +107,7 @@ private:
 };
 
 enum class PreviewStage {
-    listing, text, image, unsupported, details,
+    listing, text, image, unsupported, details, selection,
     folder_created, folder_undone, file_renamed, rename_undone, finished,
 };
 
@@ -397,6 +397,32 @@ void exercise(PreviewState& state) {
         exercise_local_actions(state, native);
         return;
     }
+    if (state.stage == PreviewStage::selection) {
+        const std::shared_ptr<gui_forms::PropertyList> properties =
+            std::dynamic_pointer_cast<gui_forms::PropertyList>((*state.model).find("fm.selection.properties"));
+        const std::shared_ptr<gui_forms::Label> caption = std::dynamic_pointer_cast<gui_forms::Label>(
+            (*state.model).find("file-manager-app.shell.workspace.selection.inspector.facts.preview.kind"));
+        if (!properties || !caption) throw std::runtime_error("native selection inspector disappeared");
+        const std::uintmax_t bytes = std::filesystem::file_size(state.fixture_root / "native-preview.txt") +
+            std::filesystem::file_size(state.fixture_root / "native-preview.png") +
+            std::filesystem::file_size(state.fixture_root / "native-preview.bin");
+        const std::string expected = file_manager::format_bytes(bytes) + " in files";
+        if ((*properties).value("fm.property.name") != "3 selected objects" ||
+            (*properties).value("fm.property.kind") != "Multiple kinds" ||
+            (*properties).value("fm.property.size") != expected || (*caption).text() != "3 files") {
+            throw std::runtime_error("native selection facts differ from the generated files");
+        }
+        (*state.model).perform_layout();
+        save_preview_snapshot(native.contentView, @"native-selection-facts.png");
+        std::cout << "macOS selection facts: three_files=passed logical_total=passed mixed_type=passed\n";
+        const bool expanded = (*state.model).perform_semantic_action(
+            "file-manager-app.shell.workspace.selection.inspector.facts.preview.toggle",
+            gui_forms::SemanticAction::press);
+        if (!expanded) throw std::runtime_error("native preview could not restore after fact inspection");
+        press_menu_command(state, "fm.menu.file", "fm.application.menu.menu.popup.row.file.new-folder");
+        state.stage = PreviewStage::folder_created;
+        return;
+    }
     if (state.stage == PreviewStage::details) {
         const std::shared_ptr<gui_forms::ObjectView> objects =
             std::dynamic_pointer_cast<gui_forms::ObjectView>((*state.model).find("fm.objects.current-folder"));
@@ -435,8 +461,17 @@ void exercise(PreviewState& state) {
                   << " columns=" << (*objects).details_columns().size()
                   << " synthetic_header_sort=passed selection=preserved\n";
         require_protected_commands_unavailable(*state.model);
-        press_menu_command(state, "fm.menu.file", "fm.application.menu.menu.popup.row.file.new-folder");
-        state.stage = PreviewStage::folder_created;
+        std::vector<std::string> selected_ids{};
+        selected_ids.reserve((*objects).items().size());
+        for (const gui_forms::ObjectViewItem& item : (*objects).items()) {
+            selected_ids.push_back(item.stable_id);
+        }
+        (*objects).set_selected_ids(std::move(selected_ids));
+        const bool collapsed = (*state.model).perform_semantic_action(
+            "file-manager-app.shell.workspace.selection.inspector.facts.preview.toggle",
+            gui_forms::SemanticAction::press);
+        if (!collapsed) throw std::runtime_error("native selection preview could not collapse for fact inspection");
+        state.stage = PreviewStage::selection;
         return;
     }
     if (state.stage == PreviewStage::listing) {
