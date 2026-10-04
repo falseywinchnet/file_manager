@@ -47,6 +47,10 @@ the intake's lifecycle fragment; it opens no worker capability and adds no
 format to the portable alpha. Real source authority, transport, OS resource
 enforcement and frontend integration are the next required edges.
 
+PR39's lifecycle fragment has now passed its full native push and PR matrices
+and rebase-merged as `832a3456`, with a tree identical to tested `21ff3c92`.
+This promotes the recorded fixture evidence, not provider availability.
+
 **Native process follow-up:** the disposable experiment at
 `../../orchestrator/experiments/preview_process/` now observes real child exit
 after repeated deadline termination and successful replacements on all three
@@ -57,6 +61,15 @@ cannot establish a physical-memory ceiling. Both results are preserved. See
 the experiment's `results/README.md` and full house-style source review.
 Production supervision, source authority, IPC and application JPEG previews
 remain incomplete. The current downloadable alpha is unchanged.
+
+**Result-byte follow-up:** `../../orchestrator/experiments/preview_frame/` now
+validates bounded incremental raster frames before pixel admission. Six semantic
+suites and an independent C++-to-Rust exact-pixel stream pass on native Windows,
+macOS and Linux with Rust 1.87. The complete scoped house-style source review
+found no blockers. The canonical draft keeps source authority, actual process
+exit and publication separate from a well-formed frame. No JPEG decoder or GUI
+adapter is connected by this fixture; source acquisition, OS policy, global copy
+accounting and application validation remain open. See its `results/README.md`.
 
 ## Current checkpoint — 2026-10-02
 
