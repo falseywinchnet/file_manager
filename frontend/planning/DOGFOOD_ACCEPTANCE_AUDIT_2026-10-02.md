@@ -35,8 +35,9 @@ is retained, with the passing non-optimized gray path used in the specimen.
 See `../results/2026-10-04-jpeg-color/NATIVE_VERIFICATION.md`. The complete
 house-style review is scoped to that authored research; ordinary photos, process
 containment, monitor presentation and actual application JPEG previews remain
-unverified. PR37 has merged; PR38's post-rebase native application checks remain
-pending at this checkpoint.
+unverified. PR37 and PR38 have merged. PR38 passed its post-rebase native
+application matrices; tested head `0029499a` and merged `f728283d` have identical
+trees. No additional preview format is activated by the merged research.
 
 **Lifecycle follow-up:** the provider-independent laboratory at
 `../../orchestrator/experiments/preview_lifecycle/` checks bounded request
@@ -45,6 +46,17 @@ results and display-grant accounting. This supplies executable evidence for
 the intake's lifecycle fragment; it opens no worker capability and adds no
 format to the portable alpha. Real source authority, transport, OS resource
 enforcement and frontend integration are the next required edges.
+
+**Native process follow-up:** the disposable experiment at
+`../../orchestrator/experiments/preview_process/` now observes real child exit
+after repeated deadline termination and successful replacements on all three
+platforms. Windows committed-memory and Linux address-space admission refuse
+the oversized fixture allocation. macOS rejects the absolute 256 MiB limit;
+baseline virtual mappings plus 256 MiB can refuse a new oversized mapping but
+cannot establish a physical-memory ceiling. Both results are preserved. See
+the experiment's `results/README.md` and full house-style source review.
+Production supervision, source authority, IPC and application JPEG previews
+remain incomplete. The current downloadable alpha is unchanged.
 
 ## Current checkpoint — 2026-10-02
 

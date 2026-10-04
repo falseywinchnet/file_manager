@@ -1,0 +1,30 @@
+[
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\orchestrator\\experiments\\preview_process\\process.hpp",
+    "Hash": "8CC0D61D24DCC3323C6F6C90C1078122C5CD8F03666D82EF5D4A082E0336AC30"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\orchestrator\\experiments\\preview_process\\main.cpp",
+    "Hash": "CAF824A5E72B48E51243FE75228F4A75332AB0A273CFDA39D7CEA1EF1F185B50"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\orchestrator\\experiments\\preview_process\\windows_process.cpp",
+    "Hash": "CFC6E155711116122C6EC0B04CB594C18E6C0553F39E6DF8F8AC53FAE5D7FC4D"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\orchestrator\\experiments\\preview_process\\posix_process.cpp",
+    "Hash": "21319A1B025815790066489CCBE60B50EAAAC8B4D2310DBBA0C80567EB3C0FE8"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\orchestrator\\experiments\\preview_process\\CMakeLists.txt",
+    "Hash": "5416C3484C14B218D8D6D6EDF55FF8FDCC7E3E8E949B2A79C3593D5E96960BEF"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\orchestrator\\experiments\\preview_process\\README.md",
+    "Hash": "C38A27BA70B3C51D3407B11C07E8A75EB7AC38C235D05B0E6BBAA1FBE199AF46"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\.github\\workflows\\preview-process.yml",
+    "Hash": "3A6E6F2A18B41501DD108C9CD59036D2553907E6177E07AE51E5BD23F96F5303"
+  }
+]
