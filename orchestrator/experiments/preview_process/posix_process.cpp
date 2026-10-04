@@ -11,6 +11,10 @@
 #include <csignal>
 #include <cstdio>
 #include <string>
+#if defined(__APPLE__)
+#include <mach/mach.h>
+#include <limits>
+#endif
 
 namespace preview_process {
 
@@ -92,5 +96,39 @@ int probe_allocation(const bool apply_limit) {
     if (released != 0) { return 1; }
     return allocation_admitted;
 }
+
+#if defined(__APPLE__)
+int probe_mac_headroom() {
+    // Separate hypothesis: bound additional mapped address space after startup.
+    // Existing reservations can become resident without creating new mappings;
+    // therefore even success is not a physical/committed-memory ceiling.
+    mach_task_basic_info_data_t information{};
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    const kern_return_t observed = task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+                                             reinterpret_cast<task_info_t>(&information), &count);
+    if (observed != KERN_SUCCESS || count != MACH_TASK_BASIC_INFO_COUNT) { return 1; }
+    static_assert(sizeof(rlim_t) >= sizeof(mach_vm_size_t));
+    const rlim_t baseline = static_cast<rlim_t>(information.virtual_size);
+    const rlim_t headroom = static_cast<rlim_t>(memory_limit_bytes);
+    const rlim_t maximum = std::numeric_limits<rlim_t>::max();
+    if (baseline > maximum - headroom) { return 1; }
+    const rlim_t ceiling = baseline + headroom;
+    std::printf("mac_baseline_virtual_bytes=%llu resident_bytes=%llu candidate_ceiling=%llu\n",
+                static_cast<unsigned long long>(information.virtual_size),
+                static_cast<unsigned long long>(information.resident_size),
+                static_cast<unsigned long long>(ceiling));
+    struct rlimit limit{};
+    limit.rlim_cur = ceiling;
+    limit.rlim_max = ceiling;
+    const int limited = setrlimit(RLIMIT_AS, &limit);
+    if (limited != 0) {
+        const int error = errno;
+        std::printf("setrlimit_headroom_refused_errno=%d\n", error);
+        return limit_unavailable;
+    }
+    const int result = probe_allocation(false);
+    return result;
+}
+#endif
 
 }

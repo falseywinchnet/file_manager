@@ -52,6 +52,17 @@ Either observation produces explicit `LIMIT_UNAVAILABLE` and CTest skip code
 Windows/Linux require the limit to refuse the allocation. Setup, exec, wait,
 unexpected signal or allocation errors fail the experiment.
 
+The first native Mac run rejected 256 MiB with `EINVAL`. A separate Mac-only
+headroom probe now measures `MACH_TASK_BASIC_INFO` virtual/resident bytes, then
+tries an address-space ceiling of current virtual size plus 256 MiB. It retains
+the original fixed-ceiling test and its negative result. Even if this second
+probe refuses a new 384 MiB mapping, existing reserved ranges may become resident
+without growing virtual size. It cannot establish a 256 MiB physical-memory cap
+or a Windows-equivalent commit limit. This hypothesis follows the published
+[XNU limit check](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_resource.c)
+and [task-info layout](https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/mach/task_info.h);
+the runner result, not those source files, determines feasibility here.
+
 ## Build and authority
 
 On Shadow, use the shared read-only toolchain and one compiler job:

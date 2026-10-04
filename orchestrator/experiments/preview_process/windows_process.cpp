@@ -24,6 +24,7 @@ public:
     case Fixture::delay: return L"--child-delay";
     case Fixture::memory: return L"--child-memory";
     case Fixture::memory_control: return L"--child-memory-control";
+    case Fixture::mac_headroom: return L"--child-mac-headroom";
     }
     return L"--invalid";
 }
