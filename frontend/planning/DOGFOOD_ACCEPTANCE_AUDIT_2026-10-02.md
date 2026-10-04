@@ -71,6 +71,16 @@ exit and publication separate from a well-formed frame. No JPEG decoder or GUI
 adapter is connected by this fixture; source acquisition, OS policy, global copy
 accounting and application validation remain open. See its `results/README.md`.
 
+**Joined JPEG/result follow-up:** sixteen generated real-codec streams now pass
+on Windows/macOS/Linux: all eight embedded EXIF orientations, baseline untagged
+and progressive linear-RGB ICC sources, downscaling, frame validation and an
+independent Rust color/geometry oracle. The ICC case carries EXIF and ICC in the
+same encoded image. See `../results/2026-10-04-jpeg-frame/README.md` for exact
+source, native jobs and complete scoped house-style review. This joins decoder
+preparation to byte transfer; input generation still runs in the specimen, and
+production supervision, native source authority and GUI admission remain open.
+No new downloadable preview format is claimed.
+
 ## Current checkpoint — 2026-10-02
 
 **Latest delivery, 2026-10-03:**

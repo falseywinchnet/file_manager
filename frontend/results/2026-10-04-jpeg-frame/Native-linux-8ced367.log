@@ -1,0 +1,62 @@
+correctness (ubuntu-24.04)	Verify correctness without timing claims	﻿2026-10-04T04:18:01.2881214Z ##[group]Run ctest --test-dir .build/jpeg-research -C Release --output-on-failure --timeout 60
+correctness (ubuntu-24.04)	Verify correctness without timing claims	2026-10-04T04:18:01.2881903Z ^[[36;1mctest --test-dir .build/jpeg-research -C Release --output-on-failure --timeout 60^[[0m
+correctness (ubuntu-24.04)	Verify correctness without timing claims	2026-10-04T04:18:01.2936714Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+correctness (ubuntu-24.04)	Verify correctness without timing claims	2026-10-04T04:18:01.2937011Z ##[endgroup]
+correctness (ubuntu-24.04)	Verify correctness without timing claims	2026-10-04T04:18:01.5038021Z Internal ctest changing into directory: /home/runner/work/file_manager/file_manager/.build/jpeg-research
+correctness (ubuntu-24.04)	Verify correctness without timing claims	2026-10-04T04:18:01.5467216Z Test project /home/runner/work/file_manager/file_manager/.build/jpeg-research
+correctness (ubuntu-24.04)	Verify correctness without timing claims	2026-10-04T04:18:01.5781962Z     Start 1: file_manager_jpeg_orientation_tests
+correctness (ubuntu-24.04)	Verify correctness without timing claims	2026-10-04T04:18:01.5854518Z 1/2 Test #1: file_manager_jpeg_orientation_tests ............   Passed    0.00 sec
+correctness (ubuntu-24.04)	Verify correctness without timing claims	2026-10-04T04:18:01.5892615Z     Start 2: file_manager_jpeg_embedded_orientation_tests
+correctness (ubuntu-24.04)	Verify correctness without timing claims	2026-10-04T04:18:01.9536525Z 2/2 Test #2: file_manager_jpeg_embedded_orientation_tests ...   Passed    0.36 sec
+correctness (ubuntu-24.04)	Verify correctness without timing claims	2026-10-04T04:18:01.9539617Z
+correctness (ubuntu-24.04)	Verify correctness without timing claims	2026-10-04T04:18:01.9540020Z 100% tests passed, 0 tests failed out of 2
+correctness (ubuntu-24.04)	Verify correctness without timing claims	2026-10-04T04:18:01.9540284Z
+correctness (ubuntu-24.04)	Verify correctness without timing claims	2026-10-04T04:18:01.9540386Z Total Test time (real) =   0.41 sec
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	﻿2026-10-04T04:18:01.9810662Z ##[group]Run rustup toolchain install 1.87.0 --profile minimal --component rustfmt --component clippy
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:01.9811213Z ^[[36;1mrustup toolchain install 1.87.0 --profile minimal --component rustfmt --component clippy^[[0m
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:01.9811715Z ^[[36;1mcargo +1.87.0 fmt --manifest-path orchestrator/experiments/preview_frame/Cargo.toml -- --check^[[0m
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:01.9812494Z ^[[36;1mcargo +1.87.0 clippy --manifest-path orchestrator/experiments/preview_frame/Cargo.toml --locked --offline --all-targets --all-features --jobs 2 --target-dir orchestrator/.build/preview-frame -- -D warnings^[[0m
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:01.9813455Z ^[[36;1mcargo +1.87.0 build --manifest-path orchestrator/experiments/preview_frame/Cargo.toml --locked --offline --bin check_jpeg --jobs 2 --target-dir orchestrator/.build/preview-frame^[[0m
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:01.9866923Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:01.9867202Z ##[endgroup]
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:02.0312138Z info: syncing channel updates for 1.87.0-x86_64-unknown-linux-gnu
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:02.1486122Z info: latest update on 2025-05-15 for version 1.87.0 (17067e9ac 2025-05-09)
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:02.1486536Z info: downloading 5 components
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:09.0504044Z
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:09.0568106Z   1.87.0-x86_64-unknown-linux-gnu installed - rustc 1.87.0 (17067e9ac 2025-05-09)
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:09.0568437Z
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:09.1525874Z     Checking file-manager-preview-frame-lab v0.0.0 (/home/runner/work/file_manager/file_manager/orchestrator/experiments/preview_frame)
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:09.3233852Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.19s
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:09.3589086Z    Compiling file-manager-preview-frame-lab v0.0.0 (/home/runner/work/file_manager/file_manager/orchestrator/experiments/preview_frame)
+correctness (ubuntu-24.04)	Build independent minimum-version frame consumer	2026-10-04T04:18:09.6015521Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.26s
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	﻿2026-10-04T04:18:09.6061880Z ##[group]Run set -euo pipefail
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.6062267Z ^[[36;1mset -euo pipefail^[[0m
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.6062581Z ^[[36;1mif [ "$RUNNER_OS" = Windows ]; then^[[0m
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.6063123Z ^[[36;1m  jpeg_producer=.build/jpeg-research/Release/file_manager_jpeg_experiment.exe^[[0m
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.6063800Z ^[[36;1m  jpeg_consumer=orchestrator/.build/preview-frame/debug/check_jpeg.exe^[[0m
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.6064109Z ^[[36;1melse^[[0m
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.6064350Z ^[[36;1m  jpeg_producer=.build/jpeg-research/file_manager_jpeg_experiment^[[0m
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.6064715Z ^[[36;1m  jpeg_consumer=orchestrator/.build/preview-frame/debug/check_jpeg^[[0m
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.6064993Z ^[[36;1mfi^[[0m
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.6065170Z ^[[36;1mfor orientation in 1 2 3 4 5 6 7 8; do^[[0m
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.6065513Z ^[[36;1m  "$jpeg_producer" --emit-frame "$orientation" | "$jpeg_consumer" "$orientation" plain^[[0m
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.6065969Z ^[[36;1m  "$jpeg_producer" --emit-color-frame "$orientation" | "$jpeg_consumer" "$orientation" linear^[[0m
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.6066551Z ^[[36;1mdone^[[0m
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.6120810Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.6121095Z ##[endgroup]
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.6940382Z JPEG frame: EXIF 1, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.8365180Z JPEG frame: EXIF 1, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:09.9124625Z JPEG frame: EXIF 2, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:10.0577818Z JPEG frame: EXIF 2, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:10.1334325Z JPEG frame: EXIF 3, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:10.2744641Z JPEG frame: EXIF 3, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:10.3511037Z JPEG frame: EXIF 4, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:10.4941633Z JPEG frame: EXIF 4, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:10.5718772Z JPEG frame: EXIF 5, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:10.7162451Z JPEG frame: EXIF 5, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:10.7932122Z JPEG frame: EXIF 6, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:10.9351075Z JPEG frame: EXIF 6, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:11.0121395Z JPEG frame: EXIF 7, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:11.1552322Z JPEG frame: EXIF 7, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:11.2321488Z JPEG frame: EXIF 8, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (ubuntu-24.04)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:11.3762098Z JPEG frame: EXIF 8, linear, 768x1024, 3145728 bytes, independent color anchors accepted

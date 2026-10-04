@@ -1,0 +1,26 @@
+[
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\preview_frame.hpp",
+    "Hash": "611BA1CA08883F8E46C499288C1AA16814258854FCBEA61A0AF3F61FCB88519F"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\preview_frame.cpp",
+    "Hash": "FF0FA5A4EB1F4DBD9F8AF0626BF2F8F00A0E817E1805F643C0087D9C1CAD9B5F"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\jpeg_experiment.cpp",
+    "Hash": "281FEBB077DEE13870581079AB7EB9D564A6E32444877DF1ACD4522EBC528976"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\CMakeLists.txt",
+    "Hash": "A6BB881282C514F063AB671B18698FDB2C2B368E9FF7FC4EEBDBBAF6DC6AD0D5"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\orchestrator\\experiments\\preview_frame\\src\\bin\\check_jpeg.rs",
+    "Hash": "0AE938FFB3C309BC8811A055B6B4DB12E0533B9952E14708724C6A9AD63DC813"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\.github\\workflows\\jpeg-research.yml",
+    "Hash": "DD61EA04E5D86159DA4E70D9FA26F64A1B26C876AB912F5461411A5E24F7A013"
+  }
+]

@@ -3,6 +3,7 @@
 #include "jpeg_pixels.hpp"
 #include "icc_color.hpp"
 #include "icc_fixtures.hpp"
+#include "preview_frame.hpp"
 
 #include <algorithm>
 #include <array>
@@ -278,7 +279,10 @@ void require_decode_rejection(const std::span<const unsigned char> bytes, const 
     require(rejected, "invalid specimen input was not rejected");
 }
 
-void verify_embedded_orientation(const std::vector<unsigned char>& encoded) {
+[[nodiscard]] std::vector<unsigned char> with_orientation(
+    const std::vector<unsigned char>& encoded, const unsigned char orientation) {
+    require(encoded.size() >= 2U && encoded.size() <= encoded_limit - 36U,
+            "orientation fixture source extent");
     // APP1 alone, with little-endian TIFF IFD0. Inject after SOI without changing
     // the generated pixel encoding; the corner oracle remains independent.
     constexpr std::array<unsigned char, 36U> app1{
@@ -291,6 +295,12 @@ void verify_embedded_orientation(const std::vector<unsigned char>& encoded) {
     tagged.insert(tagged.end(), encoded.begin(), encoded.begin() + 2);
     tagged.insert(tagged.end(), app1.begin(), app1.end());
     tagged.insert(tagged.end(), encoded.begin() + 2, encoded.end());
+    tagged[30U] = orientation;
+    return tagged;
+}
+
+void verify_embedded_orientation(const std::vector<unsigned char>& encoded) {
+    std::vector<unsigned char> tagged = with_orientation(encoded, 1U);
     for (unsigned char orientation = 1U; orientation <= 8U; ++orientation) {
         tagged[30U] = orientation;
         const Pixels raster = decode_exif(tagged);
@@ -306,6 +316,20 @@ void verify_embedded_orientation(const std::vector<unsigned char>& encoded) {
     try { const Pixels invalid = decode_exif(tagged); static_cast<void>(invalid); }
     catch (const std::runtime_error&) { refused = true; }
     require(refused, "invalid EXIF must refuse before pixel publication");
+}
+
+void emit_generated_frame(const unsigned char orientation, const bool linear_color) {
+    require(orientation >= 1U && orientation <= 8U, "frame fixture orientation");
+    std::vector<unsigned char> profile{};
+    if (linear_color) {
+        profile = jpeg_research::make_icc_fixture(jpeg_research::IccFixture::linear_rgb);
+    }
+    // Baseline/untagged and progressive/linear RGB both traverse real JPEG decode,
+    // embedded EXIF and output scaling. The latter combines EXIF and ICC markers.
+    const std::vector<unsigned char> encoded = make_fixture(2048, 1536, linear_color, false, profile);
+    const std::vector<unsigned char> tagged = with_orientation(encoded, orientation);
+    const Pixels raster = decode_exif(tagged);
+    jpeg_research::write_preview_frame(raster, 7, 11);
 }
 
 void verify_embedded_color() {
@@ -479,6 +503,17 @@ void measure_wic(const char* const name, const int width, const int height, cons
 
 int main(const int argc, char** const argv) {
     try {
+        if (argc == 3) {
+            const std::string_view mode(argv[1]);
+            const std::string_view selected(argv[2]);
+            const bool plain_frame = mode == "--emit-frame";
+            const bool color_frame = mode == "--emit-color-frame";
+            require((plain_frame || color_frame) && selected.size() == 1 &&
+                    selected[0] >= '1' && selected[0] <= '8', "closed frame fixture arguments");
+            const unsigned char orientation = static_cast<unsigned char>(selected[0] - '0');
+            emit_generated_frame(orientation, color_frame);
+            return 0;
+        }
         const bool measure_requested = argc == 2 && std::string_view(argv[1]) == "--measure";
         const bool verify_requested = argc == 1 ||
             (argc == 2 && std::string_view(argv[1]) == "--verify-only");

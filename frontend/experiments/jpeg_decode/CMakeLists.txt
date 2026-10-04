@@ -24,7 +24,7 @@ set_target_properties(file_manager_jpeg_orientation PROPERTIES CXX_EXTENSIONS OF
 add_executable(file_manager_jpeg_orientation_tests exif_orientation_tests.cpp)
 target_link_libraries(file_manager_jpeg_orientation_tests PRIVATE file_manager_jpeg_orientation)
 set_target_properties(file_manager_jpeg_orientation_tests PROPERTIES CXX_EXTENSIONS OFF)
-add_executable(file_manager_jpeg_experiment jpeg_experiment.cpp icc_color.cpp icc_fixtures.cpp)
+add_executable(file_manager_jpeg_experiment jpeg_experiment.cpp icc_color.cpp icc_fixtures.cpp preview_frame.cpp)
 target_link_libraries(file_manager_jpeg_experiment PRIVATE lcms2::lcms2)
 if(WIN32)
     target_sources(file_manager_jpeg_experiment PRIVATE wic_decode.cpp)
