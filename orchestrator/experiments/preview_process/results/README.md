@@ -17,7 +17,9 @@ named execution, pre-launch path storage, synchronous borrows, Windows handle
 ownership, termination/wait ordering, numeric bounds and failure status were
 inspected. POSIX borrowed argv casts adapt execv's historical mutable signature;
 the buffers are not mutated. No retained closures or first-party heap pixels.
-Independent source review is pending; this is not a claim about legacy runtime
+Independent source review is preserved in `SOURCE_REVIEW.md`; it accepted the
+seven-file scope including the Mac extension, with one header wording correction
+subsequently applied by root. This is not a claim about legacy runtime
 or any production supervisor. Functional tests and the spelling scanner do not
 replace that review.
 
@@ -49,5 +51,23 @@ under tests that did not run. The child's `LIMIT_UNAVAILABLE` output and exit 77
 in the retained log are authoritative to interpret that status. The workflow's
 green conclusion must not be promoted to a passing Mac memory capability.
 
-The new Mac-only headroom probe is a follow-up hypothesis, not a replacement
-for the rejected fixed limit. Its native result is pending at this edit.
+## Headroom follow-up: 4c1f6a4d321554184b283a6df2491188ab4effeb
+
+[Run 37175076041](https://github.com/falseywinchnet/file_manager/actions/runs/37175076041)
+passed its native workflow. Windows and Linux passed both tests. Mac passed
+lifecycle and the additional headroom test; its original fixed-limit test
+remained **skipped**. Raw native logs with suffix `4c1f6a4` preserve all outputs.
+
+Mac job `111355907120` measured 445,746,298,880 virtual bytes and 1,277,952 resident
+bytes before setting a ceiling of 446,014,734,336 bytes. That baseline plus
+256 MiB ceiling was accepted, and the subsequent 384 MiB mapping was refused.
+The unrestricted control mapping succeeded. This is evidence for additional
+mapping admission on this macOS 26 runner, not a resident/commit cap, codec
+footprint, stable process startup budget or secure sandbox. Existing reservations
+can still gain residency. Source and semantic policy must account for that gap
+before production integration; the absolute 256 MiB Mac proposal stays rejected.
+
+The final source review covers this headroom extension. Root's subsequent header
+comment and evidence/acceptance-record updates change no executable behavior.
+Full application workflow checks remain a separate PR gate; this laboratory
+does not create a new dogfood release or render JPEGs in File Manager.

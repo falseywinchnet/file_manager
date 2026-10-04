@@ -22,8 +22,10 @@ struct Outcome {
     long long elapsed_milliseconds = 0;
 };
 
-// Synchronous experiment. Borrows executable through return; owns its one child
-// until exit is observed. No arbitrary commands, payloads or descendants.
+// Synchronous experiment. Borrows executable through return. Successful cleanup
+// requires observed exit; a failed result may report reaped=false. The caller
+// must not treat that failure as permission to reuse a production process slot.
+// No arbitrary commands, payloads or descendants.
 [[nodiscard]] Outcome run(const std::filesystem::path& executable,
                           const Fixture fixture, const unsigned int deadline_ms);
 [[nodiscard]] int probe_allocation(const bool apply_limit);
