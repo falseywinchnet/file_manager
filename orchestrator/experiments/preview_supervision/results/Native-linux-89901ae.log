@@ -1,0 +1,19 @@
+2026-10-04T04:54:31.7054788Z test cancellation_retires_child_before_return ... stall: reaped, elapsed 101 ms
+2026-10-04T04:54:31.9564309Z test deadline_discards_complete_unreaped_frame_and_recovers ... frame-then-stall: reaped, elapsed 250 ms
+2026-10-04T04:54:31.9577946Z ready: reaped, elapsed 1 ms
+2026-10-04T04:54:32.2082195Z frame-then-stall: reaped, elapsed 250 ms
+2026-10-04T04:54:32.2096047Z ready: reaped, elapsed 1 ms
+2026-10-04T04:54:32.4601958Z frame-then-stall: reaped, elapsed 250 ms
+2026-10-04T04:54:32.4616353Z ready: reaped, elapsed 1 ms
+2026-10-04T04:54:32.7127340Z frame-then-stall: reaped, elapsed 251 ms
+2026-10-04T04:54:32.7141544Z ready: reaped, elapsed 1 ms
+2026-10-04T04:54:32.7156720Z test real_exit_and_exact_frame_are_both_required ... ready: reaped, elapsed 1 ms
+2026-10-04T04:54:32.7169763Z failed-after-frame: reaped, elapsed 1 ms
+2026-10-04T04:54:32.7183156Z empty: reaped, elapsed 1 ms
+2026-10-04T04:54:32.7196608Z truncated: reaped, elapsed 1 ms
+2026-10-04T04:54:32.7209998Z trailing: reaped, elapsed 1 ms
+2026-10-04T04:54:32.7224797Z test stderr_is_drained_bounded_and_cannot_deadlock_stdout ... diagnostics-limit: reaped, elapsed 1 ms
+2026-10-04T04:54:32.7239068Z diagnostics-excess: reaped, elapsed 1 ms
+2026-10-04T04:54:32.7252178Z ready: reaped, elapsed 1 ms
+2026-10-04T04:54:32.7253521Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.12s
+2026-10-04T04:54:32.8355906Z supervised decoder: exact 1024x768 raster, EOF and successful reap; 39 ms
