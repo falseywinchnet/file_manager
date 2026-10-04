@@ -64,15 +64,20 @@ jobs:
           set -euo pipefail
           if [ "$RUNNER_OS" = Windows ]; then
             jpeg_producer=.build/jpeg-research/Release/file_manager_jpeg_experiment.exe
+            jpeg_decoder=.build/jpeg-research/Release/file_manager_jpeg_decoder.exe
             jpeg_consumer=orchestrator/.build/preview-frame/debug/check_jpeg.exe
           else
             jpeg_producer=.build/jpeg-research/file_manager_jpeg_experiment
+            jpeg_decoder=.build/jpeg-research/file_manager_jpeg_decoder
             jpeg_consumer=orchestrator/.build/preview-frame/debug/check_jpeg
           fi
           for orientation in 1 2 3 4 5 6 7 8; do
             "$jpeg_producer" --emit-frame "$orientation" | "$jpeg_consumer" "$orientation" plain
             "$jpeg_producer" --emit-color-frame "$orientation" | "$jpeg_consumer" "$orientation" linear
+            "$jpeg_producer" --emit-encoded "$orientation" | "$jpeg_decoder" | "$jpeg_consumer" "$orientation" plain
+            "$jpeg_producer" --emit-color-encoded "$orientation" | "$jpeg_decoder" | "$jpeg_consumer" "$orientation" linear
           done
+          python frontend/experiments/jpeg_decode/verify_decoder_input.py "$jpeg_producer" "$jpeg_decoder"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
