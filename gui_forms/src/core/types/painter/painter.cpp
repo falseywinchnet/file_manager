@@ -1,4 +1,5 @@
 #include "gui_forms/types.hpp"
+#include "gui_forms/paint_framebuffer.hpp"
 #if defined(GUI_FORMS_PREPARED_TEXT)
 #include "gui_forms/prepared_text/types/prepared_text_types.hpp"
 #endif
@@ -7,6 +8,9 @@
 #include <cmath>
 
 namespace gui_forms {
+std::unique_ptr<PaintFramebuffer> Painter::create_framebuffer(Size, double) {
+    return {};
+}
 #if defined(GUI_FORMS_PREPARED_TEXT)
 PreparedTextPaintResult Painter::draw_prepared_text(const PreparedTextLayout&, const LayoutAuthority, const Point, const Color) {
     return {};

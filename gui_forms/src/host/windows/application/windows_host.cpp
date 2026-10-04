@@ -1,3 +1,4 @@
+#include "gui_forms/paint_framebuffer.hpp"
 #include "windows_host.hpp"
 #include "../accessibility/windows_accessibility.hpp"
 #include "../services/windows_clipboard_image.hpp"
@@ -570,7 +571,9 @@ void enable_best_dpi_awareness() noexcept {
     }
 }
 
+class DibFramebuffer;
 class DibPainter final : public Painter {
+    friend class DibFramebuffer;
 #if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
     friend struct DibHostFixture;
     friend struct DibRasterCacheFixture;
@@ -607,6 +610,7 @@ class DibPainter final : public Painter {
 
 public:
     DibPainter() = default;
+    std::unique_ptr<PaintFramebuffer> create_framebuffer(Size logical_size, double scale) override;
     ~DibPainter() override {
         constexpr std::array<const char*, 8> names{
             "fill", "linear_gradient", "radial_gradient", "shadow", "line", "text", "text_metrics", "image"};
@@ -682,11 +686,13 @@ public:
 #endif
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
         if (!surface_size_valid_) return false;
-        const detail::DibFrameStatus begun = frames_.begin(width_, height_);
-        if (begun != detail::DibFrameStatus::success) return false;
-        const detail::DibSurfaceView candidate = frames_.candidate();
-        memory_dc_ = candidate.dc;
-        pixels_ = candidate.pixels.data();
+        if (!offscreen_ || pixels_ == nullptr) {
+            const detail::DibFrameStatus begun = frames_.begin(width_, height_);
+            if (begun != detail::DibFrameStatus::success) return false;
+            const detail::DibSurfaceView candidate = frames_.candidate();
+            memory_dc_ = candidate.dc;
+            pixels_ = candidate.pixels.data();
+        }
 #endif
         states_.clear();
         states_.push_back(State{
@@ -2418,6 +2424,7 @@ private:
         return SUCCEEDED(status);
     }
 
+    bool offscreen_{};
     HDC memory_dc_{};
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
     detail::DibFrameStore frames_{};
@@ -2480,6 +2487,38 @@ struct RequestWindowTitle final {
         } catch (...) { return {HostServiceError::backend_failure}; }
     }
 };
+// An independent DIB uses the same font selection, gradients, shadows and image
+// sampling as the window, without repainting the retained control tree.
+class DibFramebuffer final : public PaintFramebuffer {
+public:
+    DibPainter raster;
+    bool begin(const ImageRegistry& images, Rect damage) override {
+        if (!raster.synchronize_images(images) || !raster.begin_frame()) return false;
+        raster.clip_rect(damage);
+        return true;
+    }
+    void end() override { GdiFlush(); }
+    Painter& painter() noexcept override { return raster; }
+    std::span<std::byte> pixels() noexcept override {
+        return {reinterpret_cast<std::byte*>(raster.pixels_), row_bytes() * height()};
+    }
+    std::size_t row_bytes() const noexcept override { return width() * 4U; }
+    std::uint32_t width() const noexcept override { return static_cast<std::uint32_t>(raster.width_); }
+    std::uint32_t height() const noexcept override { return static_cast<std::uint32_t>(raster.height_); }
+    FramebufferChannelOrder channel_order() const noexcept override { return FramebufferChannelOrder::bgra; }
+};
+std::unique_ptr<PaintFramebuffer> DibPainter::create_framebuffer(Size logical_size, double scale) {
+    if (!std::isfinite(scale) || scale <= 0 || !std::isfinite(logical_size.width) ||
+        !std::isfinite(logical_size.height) || logical_size.width <= 0 || logical_size.height <= 0 ||
+        std::ceil(logical_size.width * scale) * std::ceil(logical_size.height * scale) > 16777216.0)
+        return {};
+    std::unique_ptr<DibFramebuffer> result = std::make_unique<DibFramebuffer>();
+    (*result).raster.offscreen_ = true;
+    (*result).raster.set_bundled_fonts_ready(bundled_fonts_ready_);
+    if (!(*result).raster.resize(logical_size, scale) || !(*result).raster.begin_frame()) return {};
+    return result;
+}
+
 class WindowsHostState final {
 #if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
     friend struct DibHostFixture;

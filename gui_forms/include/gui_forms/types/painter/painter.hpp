@@ -11,6 +11,7 @@
 namespace gui_forms {
 
 class LiveSurface;
+class PaintFramebuffer;
 #if defined(GUI_FORMS_PREPARED_TEXT)
 class PreparedTextLayout;
 struct LayoutAuthority;
@@ -20,6 +21,10 @@ struct PreparedTextPaintResult;
 class Painter : public TextMetricsProvider {
 public:
     virtual ~Painter() = default;
+    // Native renderers preserve their fonts and drawing semantics offscreen.
+    // Recording/headless painters explicitly report this facility unavailable.
+    [[nodiscard]] virtual std::unique_ptr<PaintFramebuffer> create_framebuffer(
+        Size logical_size, double scale);
 #if defined(GUI_FORMS_PREPARED_TEXT)
     // Development surface: recording retains immutable storage; a compatible
     // backend stages pixels. Only the host's successful frame commit presents.
