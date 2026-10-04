@@ -77,7 +77,8 @@ void require(const bool condition, const char* const message) {
 
 [[nodiscard]] double milliseconds(const Clock::time_point begin, const Clock::time_point end) {
     const std::chrono::duration<double, std::milli> elapsed = end - begin;
-    return elapsed.count();
+    const double value = elapsed.count();
+    return value;
 }
 
 [[nodiscard]] std::vector<std::byte> read_png(const std::filesystem::path& path,
@@ -215,17 +216,25 @@ void report(const char* const phase, const char* const format, const std::uint32
 
 void run_case(State& state, NSView* const view, const Sources& sources) {
     // Complete warmup, including native pixel and blank-retirement controls.
-    for (const Format format : orders[0]) (void)measure(state, view, sources, format, true);
+    for (const Format format : orders[0]) {
+        @autoreleasepool {
+            (void)measure(state, view, sources, format, true);
+        }
+    }
     std::array<Series, 3> series{};
     for (std::size_t sample = 0U; sample < sample_count; ++sample) {
         for (const Format format : orders[sample % orders.size()]) {
-            const Durations durations = measure(state, view, sources, format, false);
-            Series& current = series[static_cast<std::size_t>(format)];
-            current.admission[sample] = durations.admission;
-            current.bind_and_paint[sample] = durations.bind_and_paint;
-            current.total[sample] = durations.total;
-            current.cached_paint[sample] = durations.cached_paint;
-            current.retirement[sample] = durations.retirement;
+            // Drain native temporary objects after this sample's five timed
+            // spans, so they do not accumulate across the complete batch.
+            @autoreleasepool {
+                const Durations durations = measure(state, view, sources, format, false);
+                Series& current = series[static_cast<std::size_t>(format)];
+                current.admission[sample] = durations.admission;
+                current.bind_and_paint[sample] = durations.bind_and_paint;
+                current.total[sample] = durations.total;
+                current.cached_paint[sample] = durations.cached_paint;
+                current.retirement[sample] = durations.retirement;
+            }
         }
     }
     for (std::size_t index = 0U; index < series.size(); ++index) {

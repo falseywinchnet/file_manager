@@ -20,7 +20,8 @@ display call rather than assigning uninstrumented time to individual internals.
   the experiment. This is not a photo corpus or a source-I/O benchmark.
 - One retained PictureBox fills a 640 by 480 DIP native client area and uses
   stretch mode for equal destination work. The actual backing scale and renderer
-  name are recorded. Geometry changes or an occluded window reject the run.
+  name are recorded. The initial callback rejects an occluded window or a client
+  extent other than 640 by 480; this is not continuous geometry monitoring.
 - Each format/geometry is warmed once. Warmups independently inspect nine
   interior native snapshot samples for the expected sRGB color, then clear the
   image and require those samples to stop matching. The tolerance is 0.02 per
@@ -44,6 +45,8 @@ by exactly one. After removal, the ID must be stale and logical registry
 resource/byte counters must return to zero. Samples and percentile scratch
 arrays are fixed storage; source preparation, snapshots, metric reads,
 assertions after each display, sorting and reporting are outside timed spans.
+Each warmup and sample has its own autorelease pool, drained after its timed
+spans; pool drainage time is excluded and physical memory release is unproven.
 The harmless admission success check is inside the bind/display and combined
 intervals. Nearest-rank p50/p95, maximum and every raw sample are retained.
 No speed threshold is asserted.
