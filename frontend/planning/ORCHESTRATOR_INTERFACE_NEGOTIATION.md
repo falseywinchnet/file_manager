@@ -575,3 +575,31 @@ opens development of ordinary New Folder, same-parent Rename, and their Undo;
 ordinary transfers, native Trash, root setup, and package acceptance remain
 separate work. No new wire method or stable ABI is declared. The source-only
 implementation and semantic review must precede any availability/delivery claim.
+
+### Bounded selected-preview intake 001 — 2026-10-04 UTC
+
+**Orchestrator request:** define an independently bounded first-party JPEG/PDF
+render request/result profile. Retain the current UTF-8/PNG behavior while
+comparing provider placement, source-read authority, resource enforcement and
+failure semantics. Canonical intake:
+`../../orchestrator/negotiations/FILE_MANAGER_PREVIEW_2026-10-04.md`.
+
+**Observed frontend reply:** `Application::request_preview`,
+`on_preview_availability_changed` and `apply_preview` already retain selected
+generation/demand state and refuse obsolete UI publication. PR35/36 provide
+fixture evidence and adaptable public PictureBox/Label composition. This is
+consumer feasibility, not worker execution or a generalized decoding contract.
+The consumer needs owned, validated raster results and structured terminal
+reasons; it must retire output on selection/visibility/lifetime changes and
+account for retained GUI.Forms copies. No foreign controls or worker callbacks
+enter the frontend.
+
+Selected-file experiments require current native identity/revision validation
+but no persistent cache or Engine identity equivalence. Index-only thumbnail
+eligibility, derivative storage and cross-component identity reconciliation
+remain separate questions. The reviewed candidate paper is
+`../../planning/PREVIEW_AND_THUMBNAIL_NEXT_SLICE.md`; its numbers are unmeasured
+experimental limits, not this component's available contract.
+
+**Disposition:** paper negotiation continues. No frontend adapter or new format
+is admitted by this reply; ORC-PLG stubs and ADR-020 retain their current status.

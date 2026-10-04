@@ -1,0 +1,12 @@
+{
+  "git_executable": "/opt/homebrew/bin/git",
+  "git_version": "git version 2.55.0",
+  "source_revision": "7be8b8a1a1821b21dc41729a026a6ee43ae848ec",
+  "source_dirty": false,
+  "status_porcelain": [],
+  "tracked_diff_stat": "",
+  "git_config": [
+    "file:.git/config\tcore.filemode true",
+    "file:.git/config\tcore.ignorecase true"
+  ]
+}

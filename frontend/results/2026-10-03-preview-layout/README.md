@@ -60,3 +60,29 @@ helpers and their call sites, and the single CI artifact path. The four C++/ObjC
 files pass the spelling scanner with zero candidates. Independent semantic
 review is recorded separately; unchanged toolkit and generated code are not
 newly certified.
+
+## Native evidence after integration
+
+The layout commit rebased onto merged preview-demand main as
+`7be8b8a1a1821b21dc41729a026a6ee43ae848ec`. Its complete tree is identical to
+the reviewed/local-tested pre-rebase `77bd620` tree:
+`f7cea74adfa9246e76e48186134cb3e0b3a9980e`. Exact-head push run
+`37169104924` subsequently passed macOS arm64 and Linux x64. Mac retained
+16 passing frontend suites; Linux retained 14. Their logs are copied here.
+Windows CI and final release disposition are recorded in DELIVERY.md when
+complete; these native results do not rewrite the earlier local checkpoint.
+
+Root inspected both actual AppKit captures from that exact clean source:
+`MacTextPreview.png` and `MacImagePreview.png`, with `MacSourceState.json`.
+The text starts at the padded interior edge and the square PNG uses the full
+available image height without stretching. The coverage caption remains below
+the content and above Properties. Native pixel checks report 1,280 readable
+text pixels, 24,964 matching PNG pixels and 1,807 readable unsupported-explanation
+pixels. The unchanged native Details and local-action cases also passed.
+The first three numbers are fixture coverage counts, not visual-quality scores.
+
+This is synthetic native-window verification on macOS 26.6.2 arm64. It does not
+establish physical-input acceptance on the owner's Mac, wider format coverage,
+large-file latency or smoothness under disk load. The fixture image is a small
+generated square; local portrait/landscape geometry cases remain distinct from
+photographic visual acceptance.

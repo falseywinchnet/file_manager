@@ -56,6 +56,15 @@ remain unavailable, deferred, negotiating, or stubbed.
 | ORC-FED-001 | Machine/network catalogue and federated-query envelope | Orchestrator | remote Orchestrator/engine adapter | Orchestrator query broker | authenticated optional wire | deferred paper |
 | ORC-AUD-001 | Local audit, provenance inspection, redacted export | Orchestrator | audit service | frontend, CLI | local API | outline |
 
+## Selected-preview intake (2026-10-04)
+
+The selected JPEG/PDF and indexed-thumbnail intake is recorded in
+[`FILE_MANAGER_PREVIEW_2026-10-04.md`](../negotiations/FILE_MANAGER_PREVIEW_2026-10-04.md).
+It is an outline comparison, not an available capability or new wire operation.
+ORC-PLG-002/003 remain stubbed; first-party profile placement, source authority,
+resource enforcement and adapter fixtures are unresolved. Thumbnail eligibility,
+identity association and disposable-store ownership form a separate later round.
+
 ## Windows development consumption receipt (2026-09-29)
 
 Ordinary first-party New Folder/Rename development is reconciled in

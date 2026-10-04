@@ -2,6 +2,23 @@
 
 Status: **ACTIVE; first source pass, not a completed whole-product audit**.
 
+## Current delivery — 2026-10-04 UTC
+
+[v0.001-alpha.7be8b8a](https://github.com/falseywinchnet/file_manager/releases/tag/v0.001-alpha.7be8b8a)
+is the current Windows/macOS/Linux portable checkpoint. PR36 passed its complete
+exact-head native matrix and rebase-merged with identical trees. Hidden previews
+defer work, completed previews survive collapse/reopening, and text/PNG content
+uses the inspector's padded extent with scale-aware text rows. All downloaded
+archive/file hashes and published asset digests were checked. Root inspected
+the actual Mac text and image captures. See
+`../results/2026-10-03-preview-layout/DELIVERY.md` for exact evidence and limits.
+
+The next JPEG/PDF and indexed-thumbnail comparison is outlined in
+`../../planning/PREVIEW_AND_THUMBNAIL_NEXT_SLICE.md` and registered as an
+Orchestrator negotiation intake. It preserves separate selected-preview and
+index-only thumbnail authority; no decoder, worker capability or thumbnail
+store is selected. Earlier dated checkpoints below retain historical status.
+
 ## Current checkpoint — 2026-10-02
 
 **Latest delivery, 2026-10-03:**
