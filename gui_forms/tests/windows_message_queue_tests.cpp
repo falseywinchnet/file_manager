@@ -1,18 +1,85 @@
 #include "windows_message_queue.hpp"
 
+#include <array>
+#include <cstddef>
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
 
 namespace {
 
-void require(bool condition, const char* message) {
+void require(const bool condition, const char* const message) {
     if (!condition) { throw std::runtime_error(message); }
 }
 
-void post(UINT message, WPARAM value = 0U) {
+void post(const UINT message, const WPARAM value = 0U) {
     const BOOL posted = PostThreadMessageW(GetCurrentThreadId(), message, value, 0);
     require(posted != FALSE, "post test queue message");
+}
+
+struct QueueEntry final {
+    UINT message{0U};
+    WPARAM value{0U};
+    bool hardware{false};
+    bool consumed{false};
+};
+
+struct QueueCategories final {
+    // The earlier character was posted by translation; Backspace is later
+    // hardware input. Private rendering work precedes both in the posted lane.
+    std::array<QueueEntry, 4> entries{{
+        {WM_APP + 0x42U, 1U, false, false},
+        {WM_APP + 0x42U, 2U, false, false},
+        {WM_CHAR, 'a', false, false},
+        {WM_KEYDOWN, VK_BACK, true, false}}};
+};
+
+// This bounded reference queue follows documented Win32 category precedence:
+// matching posted messages precede hardware unless QS_INPUT is requested.
+// It does not simulate the desktop or prove physical device delivery.
+bool read_categories(void* const context, MSG& message,
+                     const UINT first, const UINT last, const UINT flags) {
+    QueueCategories& queue = *static_cast<QueueCategories*>(context);
+    require((flags & PM_REMOVE) != 0U, "reference queue requires removal");
+    const bool hardware_only = (flags & PM_QS_INPUT) != 0U;
+    for (std::size_t category = hardware_only ? 1U : 0U; category < 2U; ++category) {
+        for (QueueEntry& entry : queue.entries) {
+            const bool in_range = (first == 0U && last == 0U) ||
+                (entry.message >= first && entry.message <= last);
+            if (!entry.consumed && in_range && entry.hardware == (category == 1U)) {
+                message = {};
+                message.message = entry.message;
+                message.wParam = entry.value;
+                entry.consumed = true;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void test_translated_character_order() {
+    QueueCategories queue{};
+    MSG message{};
+    require(gui_forms::host::detail::take_window_message_with_reader(
+                message, true, read_categories, &queue), "translated character available");
+    require(message.message == WM_CHAR && message.wParam == 'a',
+            "earlier translated character must precede later hardware Backspace");
+    require(gui_forms::host::detail::take_window_message_with_reader(
+                message, false, read_categories, &queue), "ordinary work available");
+    require(message.message == WM_APP + 0x42U && message.wParam == 1U,
+            "ordinary work receives its paired turn");
+    require(gui_forms::host::detail::take_window_message_with_reader(
+                message, true, read_categories, &queue), "later hardware key available");
+    require(message.message == WM_KEYDOWN && message.wParam == VK_BACK,
+            "hardware key still overtakes unrelated posted rendering work");
+
+    QueueCategories outside_range{};
+    outside_range.entries[2].consumed = true;
+    outside_range.entries[3].message = WM_INPUT;
+    require(gui_forms::host::detail::take_window_message_with_reader(
+                message, true, read_categories, &outside_range), "input-category fallback available");
+    require(message.message == WM_INPUT, "input outside the key/mouse range is not starved");
 }
 
 void test_queue() {
@@ -52,6 +119,7 @@ void test_queue() {
 
 int main() {
     try {
+        test_translated_character_order();
         test_queue();
         std::cout << "Windows queue fixtures passed; physical device delivery requires native dogfood\n";
         return EXIT_SUCCESS;

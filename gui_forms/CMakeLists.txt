@@ -1704,6 +1704,12 @@ if(GUI_FORMS_BUILD_TESTS)
         target_compile_features(gui_forms_windows_message_queue_tests PRIVATE cxx_std_20)
         target_link_libraries(gui_forms_windows_message_queue_tests PRIVATE user32)
         add_test(NAME gui_forms_windows_message_queue_tests COMMAND gui_forms_windows_message_queue_tests)
+        # Explicit local probe only: needs ownership of an interactive desktop
+        # window before injecting a bounded native key sequence. Not a CTest.
+        add_executable(gui_forms_windows_message_queue_native_probe tests/windows_message_queue_native_probe.cpp)
+        target_include_directories(gui_forms_windows_message_queue_native_probe PRIVATE src/host/windows/input)
+        target_compile_features(gui_forms_windows_message_queue_native_probe PRIVATE cxx_std_20)
+        target_link_libraries(gui_forms_windows_message_queue_native_probe PRIVATE user32)
         add_executable(gui_forms_windows_cursor_tests tests/windows_cursor_tests.cpp)
         target_link_libraries(gui_forms_windows_cursor_tests PRIVATE gui_forms_core user32 gdi32)
         add_test(NAME gui_forms_windows_cursors COMMAND gui_forms_windows_cursor_tests)
