@@ -1,6 +1,7 @@
 # Copy selected paths
 
-Status: **OBSERVED implementation; MEASURED Windows verification; native CI pending.**
+Status: **MEASURED three-platform verification; published portable alpha.**
+See `DELIVERY.md` for final native results, package identity and release limits.
 
 The old command used `selected_entry()`, which returns no entry for a multiple
 selection, and silently copied the browsing directory instead. The shared
@@ -34,7 +35,7 @@ filesystem identity or grant file access.
   missing entry, Windows unpaired surrogate.
 - The macOS native harness invokes Commands / Copy path on three selected
   generated files and compares the actual NSPasteboard bytes with independently
-  prepared expected paths. Native execution is pending, not proved by Windows.
+  prepared expected paths. The native Mac run passed; its log is retained here.
 - Complete independent house-style review accepted the revised scope. The first
   review rejected repeated conversion-temporary allocations; the final code
   removes them. See `SOURCE_REVIEW.md` and reviewed source hashes.
