@@ -1,4 +1,5 @@
 #include "skia_raster.hpp"
+#include "gui_forms/paint_framebuffer.hpp"
 
 #include "gui_forms/live_surface.hpp"
 #if defined(GUI_FORMS_PREPARED_TEXT)
@@ -140,6 +141,13 @@ public:
         sk_sp<SkTypeface> face;
     };
 
+    struct FontSource {
+        std::optional<FontRole> role;
+        std::uint16_t weight;
+        bool italic;
+        sk_sp<SkData> data;
+    };
+    std::vector<FontSource> font_sources;
     sk_sp<SkSurface> surface;
 #if defined(GUI_FORMS_PREPARED_TEXT)
     PreparedSkiaFrame prepared_frame{};
@@ -170,6 +178,7 @@ public:
         if (!data || (*data).isEmpty() || (*data).size() > 64U * 1024U * 1024U) return false;
         sk_sp<SkTypeface> face = (*fonts).makeFromData(data);
         if (!face) return false;
+        const sk_sp<SkData> retained_data = data;
 #if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
         const std::span<const std::byte> bytes(
             static_cast<const std::byte*>((*data).data()), (*data).size());
@@ -184,6 +193,7 @@ public:
         registered_typefaces.push_back(
             {role.value_or(FontRole::content), weight, italic, !role, std::move(face)});
 #endif
+        font_sources.push_back({role, weight, italic, retained_data});
         return true;
     }
 
@@ -341,6 +351,39 @@ bool SkiaRaster::register_fallback_typeface_file(
     sk_sp<SkData> data = SkData::MakeFromFileName(path);
     const bool registered = (*impl_).register_font_data(std::nullopt, weight, italic, std::move(data));
     return registered;
+}
+
+class SkiaFramebuffer final : public PaintFramebuffer {
+public:
+    SkiaRaster raster;
+    bool begin(const ImageRegistry& images, Rect damage) override {
+        if (!raster.synchronize_images(images)) return false;
+        DamageRegion region;
+        region.add(damage);
+        raster.begin_frame(region);
+        return true;
+    }
+    void end() override { raster.end_frame(); }
+    Painter& painter() noexcept override { return raster; }
+    std::span<std::byte> pixels() noexcept override {
+        return {static_cast<std::byte*>(const_cast<void*>(raster.pixels())), raster.byte_size()};
+    }
+    std::size_t row_bytes() const noexcept override { return raster.row_bytes(); }
+    std::uint32_t width() const noexcept override { return raster.pixel_width(); }
+    std::uint32_t height() const noexcept override { return raster.pixel_height(); }
+    FramebufferChannelOrder channel_order() const noexcept override { return FramebufferChannelOrder::rgba; }
+};
+std::unique_ptr<PaintFramebuffer> SkiaRaster::create_framebuffer(Size logical_size, double scale) {
+    if (!std::isfinite(scale) || scale <= 0 || !std::isfinite(logical_size.width) ||
+        !std::isfinite(logical_size.height) || logical_size.width <= 0 || logical_size.height <= 0 ||
+        std::ceil(logical_size.width * scale) * std::ceil(logical_size.height * scale) > 16777216.0)
+        return {};
+    std::unique_ptr<SkiaFramebuffer> result = std::make_unique<SkiaFramebuffer>();
+    for (const Impl::FontSource& source : (*impl_).font_sources)
+        if (!(*(*result).raster.impl_).register_font_data(source.role, source.weight, source.italic, source.data))
+            return {};
+    if (!(*result).raster.resize(logical_size, scale)) return {};
+    return result;
 }
 
 bool SkiaRaster::resize(Size logical_size, double scale) {

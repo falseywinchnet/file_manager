@@ -18,6 +18,7 @@ namespace gui_forms::render {
 class SkiaRaster final : public Painter {
 public:
     SkiaRaster();
+    std::unique_ptr<PaintFramebuffer> create_framebuffer(Size logical_size, double scale) override;
     ~SkiaRaster() override;
     SkiaRaster(const SkiaRaster&) = delete;
     SkiaRaster& operator=(const SkiaRaster&) = delete;
