@@ -1,6 +1,7 @@
 # Selected-object facts
 
-Status: **OBSERVED implementation; MEASURED Windows checks; native matrix pending.**
+Status: **MEASURED three-platform checks; merged and published.**
+See `../2026-10-04-copy-path/DELIVERY.md` for the combined release receipt.
 
 The live inspector previously displayed generic multiple-value placeholders for
 every multi-selection. It now presents file/folder/other/unavailable counts,

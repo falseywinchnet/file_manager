@@ -18,4 +18,6 @@ the owner's Mac and large-folder responsiveness are unverified by this capture.
 The harness also passed existing text/PNG/unsupported preview, four-column Details,
 synthetic header sort, and ordinary New Folder/Rename/Undo checks. This is not
 broader preview-format, thumbnail, recursive-folder-size or ordinary transfer
-acceptance. Windows/Linux matrix completion is recorded separately when known.
+acceptance. Both full native runs (37179652389 and 37179654337) subsequently
+passed Windows, Mac, Linux and house style. The combined portable release is
+recorded in `../2026-10-04-copy-path/DELIVERY.md`.

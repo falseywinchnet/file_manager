@@ -10,20 +10,28 @@ Unknown, zero, overflow and uncounted folder contents remain distinct. No
 recursive scan is introduced. All 15 Windows frontend suites and all 16 Mac
 frontend suites passed; the native Mac capture was inspected. Evidence and
 remaining Location clipping/verification-field polish are recorded in
-`../results/2026-10-04-selection-facts/NATIVE.md`. Other native jobs are pending.
+`../results/2026-10-04-selection-facts/NATIVE.md`. Both full native matrices
+subsequently passed, including Windows/Linux; PR45 is merged.
 
 **OBSERVED:** the subsequent Copy path fix addresses the old multi-selection
 fallback to the browsing directory. It prepares every selected path before a
 single clipboard publication, with an exact byte bound and no per-path allocation
 in conversion. All 15 Windows suites pass; independent complete house-style
-review accepted the final implementation. Native clipboard execution is pending.
-See `../results/2026-10-04-copy-path/README.md`. Neither repair is yet a new
-published dogfood archive; broader operations and preview gaps remain open.
+review accepted the final implementation. The native Mac clipboard check passed,
+and both complete native matrices passed. PR46 is merged. Both repairs are in
+the published alpha below; broader operations and preview gaps remain open.
 
 ## Current delivery — 2026-10-04 UTC
 
-[v0.001-alpha.7be8b8a](https://github.com/falseywinchnet/file_manager/releases/tag/v0.001-alpha.7be8b8a)
-is the current Windows/macOS/Linux portable checkpoint. PR36 passed its complete
+[v0.001-alpha.9042dd4](https://github.com/falseywinchnet/file_manager/releases/tag/v0.001-alpha.9042dd4)
+is the current Windows/macOS/Linux portable checkpoint. It adds observed
+multi-selection facts and complete Copy path. Both repairs passed native CI;
+the Mac clipboard was independently read and selection capture inspected. All
+downloaded archive/file hashes and uploaded asset digests were checked. See
+`../results/2026-10-04-copy-path/DELIVERY.md` for exact receipts and limits.
+
+The preceding [v0.001-alpha.7be8b8a](https://github.com/falseywinchnet/file_manager/releases/tag/v0.001-alpha.7be8b8a)
+introduced adaptive, demand-driven previews. PR36 passed its complete
 exact-head native matrix and rebase-merged with identical trees. Hidden previews
 defer work, completed previews survive collapse/reopening, and text/PNG content
 uses the inspector's padded extent with scale-aware text rows. All downloaded
@@ -36,6 +44,12 @@ The next JPEG/PDF and indexed-thumbnail comparison is outlined in
 Orchestrator negotiation intake. It preserves separate selected-preview and
 index-only thumbnail authority; no decoder, worker capability or thumbnail
 store is selected. Earlier dated checkpoints below retain historical status.
+
+The raw-image consumer ownership source trace is recorded in
+`../../planning/PREVIEW_IMAGE_OWNERSHIP_OBSERVATIONS_2026-10-04.md`. Registry and
+renderer copies plus replacement overlap must be measured before the candidate
+payload budget can be treated as a complete display-residency budget. This
+source observation is not a new API, provider choice or measured peak.
 
 **Provider comparison follow-up:** the preserved JPEG/EXIF experiment is
 selectively restored as research, with its earlier three-platform CI verified.
