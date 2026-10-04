@@ -6,6 +6,7 @@
 #include "house_art.hpp"
 #include "object_order.hpp"
 #include "details_projection.hpp"
+#include "selected_path_text.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -1189,7 +1190,7 @@ void Application::install_command_surfaces() {
         std::bind_front(&Application::request_terminal, this));
     command_copy_path_ = make_command(
         "commands.copy-path", "Copy path",
-        "Copy the exact selected or current local path",
+        "Copy selected local paths, or the current folder when nothing is selected",
         std::bind_front(&Application::copy_current_path, this));
     command_settings_ = make_command(
         "file.settings", "Settings…",
@@ -4601,16 +4602,31 @@ void Application::request_terminal() {
 }
 
 void Application::copy_current_path() {
-    const std::optional<DirectoryEntry> entry = selected_entry();
-    const std::filesystem::path path = entry ? (*entry).path : location_;
+    const std::span<const std::string> selected = (*objects_).selected_ids();
+    const detail::PathText prepared = detail::selected_path_text(entries_, selected, location_,
+        gui_forms::HostServices::maximum_clipboard_text_bytes);
+    if (prepared.status == detail::PathTextStatus::missing_entry) {
+        set_status("Paths not copied", "A selected path is unavailable; refresh the selection");
+        return;
+    }
+    if (prepared.status == detail::PathTextStatus::too_large) {
+        set_status("Paths not copied", "Selected paths exceed the clipboard text limit");
+        return;
+    }
+    if (prepared.status == detail::PathTextStatus::invalid_encoding) {
+        set_status("Paths not copied", "A selected path cannot be represented as clipboard text");
+        return;
+    }
+    const std::string description = selected.size() > 1U
+        ? std::to_string(selected.size()) + " selected paths" : prepared.text;
     if (!window_ || !(*window_).host_services()) {
-        set_status("Clipboard unavailable", path_utf8(path));
+        set_status("Clipboard unavailable", description);
         return;
     }
     const gui_forms::HostServiceStatus copied = (*(*window_).host_services()).write_clipboard_text(
-        path_utf8(path));
-    set_status(copied.accepted() ? "Path copied" : "Clipboard unavailable",
-               path_utf8(path));
+        prepared.text);
+    const std::string success = selected.size() > 1U ? "Paths copied" : "Path copied";
+    set_status(copied.accepted() ? success : "Clipboard unavailable", description);
 }
 
 void Application::run_platform_command(const PlatformCommandKind kind,

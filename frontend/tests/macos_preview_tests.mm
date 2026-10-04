@@ -1,6 +1,7 @@
 #import <AppKit/AppKit.h>
 
 #include "application.hpp"
+#include "file_manager/platform_paths.hpp"
 #include "gui_forms/gui_forms.hpp"
 #include "gui_forms/platform/macos_host.hpp"
 
@@ -415,6 +416,36 @@ void exercise(PreviewState& state) {
         (*state.model).perform_layout();
         save_preview_snapshot(native.contentView, @"native-selection-facts.png");
         std::cout << "macOS selection facts: three_files=passed logical_total=passed mixed_type=passed\n";
+        const std::shared_ptr<gui_forms::ObjectView> objects =
+            std::dynamic_pointer_cast<gui_forms::ObjectView>((*state.model).find("fm.objects.current-folder"));
+        if (!objects || (*objects).items().size() != 3U || (*objects).selected_ids().size() != 3U) {
+            throw std::runtime_error("native clipboard fixture lost its three selected files");
+        }
+        const std::array<std::filesystem::path, 3> fixture_paths{
+            state.fixture_root / (*objects).items()[0U].name,
+            state.fixture_root / (*objects).items()[1U].name,
+            state.fixture_root / (*objects).items()[2U].name};
+        const std::array<std::string, 3> encoded_paths{
+            file_manager::path_utf8(fixture_paths[0U]),
+            file_manager::path_utf8(fixture_paths[1U]),
+            file_manager::path_utf8(fixture_paths[2U])};
+        const std::size_t expected_bytes = encoded_paths[0U].size() + encoded_paths[1U].size() +
+            encoded_paths[2U].size() + 2U;
+        std::string expected_paths{};
+        expected_paths.reserve(expected_bytes);
+        for (const std::string& path : encoded_paths) {
+            if (!expected_paths.empty()) expected_paths.push_back('\n');
+            expected_paths.append(path);
+        }
+        press_menu_command(state, "fm.menu.commands", "fm.application.menu.menu.popup.row.commands.copy-path");
+        NSString* const pasted = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
+        if (pasted == nil) throw std::runtime_error("native Copy path did not publish clipboard text");
+        const char* const pasted_bytes = [pasted UTF8String];
+        if (pasted_bytes == nullptr) throw std::runtime_error("native clipboard text could not encode as UTF-8");
+        // The NSString owns these bytes throughout this synchronous comparison.
+        const std::string_view clipboard(pasted_bytes, [pasted lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+        if (clipboard != expected_paths) throw std::runtime_error("native clipboard omitted or changed selected paths");
+        std::cout << "macOS Copy path: three_exact_paths=passed native_pasteboard=passed\n";
         const bool expanded = (*state.model).perform_semantic_action(
             "file-manager-app.shell.workspace.selection.inspector.facts.preview.toggle",
             gui_forms::SemanticAction::press);

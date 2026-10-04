@@ -1,0 +1,26 @@
+[
+  {
+    "path": "frontend/src/selected_path_text.hpp",
+    "sha256": "fcd134907719e54704c5204d16ea3e893f23b403afd7fffd932f939ed7f83420"
+  },
+  {
+    "path": "frontend/src/selected_path_text.cpp",
+    "sha256": "2027ca84b2a56229c19ee22402e53b4de9ff2e7e7969aec87405e3a4f8626d28"
+  },
+  {
+    "path": "frontend/src/application.cpp",
+    "sha256": "bbbcb1b1ce86d6b0690665c937c87328bd3fd60640118ecccfde853ad988401c"
+  },
+  {
+    "path": "frontend/tests/application_interaction_tests.cpp",
+    "sha256": "6cae6a1749c5974dd1b0e25bde3b9b171c3c3f4ae1ec8bfcee507af58e4e4272"
+  },
+  {
+    "path": "frontend/tests/macos_preview_tests.mm",
+    "sha256": "adf9c99d7eb129db1b5f579dd3397ed6c688a70739b6f6d8627406c36ac1f08c"
+  },
+  {
+    "path": "frontend/CMakeLists.txt",
+    "sha256": "29ed12cceb4f083e1ec306480c9dd524bd42aa89e10d49f5ade2901c9e58015c"
+  }
+]
