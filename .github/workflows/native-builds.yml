@@ -161,6 +161,14 @@ jobs:
           cmake --build .build/native-${{ matrix.platform }}/preview-admission/build --parallel 2
           .build/native-${{ matrix.platform }}/preview-admission/build/preview_admission .build/native-${{ matrix.platform }}/preview-admission/data | tee .build/native-${{ matrix.platform }}/preview-admission/forward.log
           .build/native-${{ matrix.platform }}/preview-admission/build/preview_admission .build/native-${{ matrix.platform }}/preview-admission/data --reverse | tee .build/native-${{ matrix.platform }}/preview-admission/reverse.log
+      - name: Measure preview admission through forced native Mac paint
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S frontend/experiments/preview_paint -B .build/native-macos-arm64/preview-paint/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DGUIForms_DIR="$PWD/.build/native-macos-arm64/gui-forms-sdk/lib/cmake/GUIForms" -DPREVIEW_PAINT_FIXTURES="$PWD/.build/native-macos-arm64/preview-admission/data"
+          cmake --build .build/native-macos-arm64/preview-paint/build --parallel 2
+          ctest --test-dir .build/native-macos-arm64/preview-paint/build --verbose | tee .build/native-macos-arm64/preview-paint/measurements.log
       # Export the normal OFF SDK above before enabling source-only development
       # tests. This option does not change the Core/Painter ABI or install headers.
       - name: Test development text-mask ownership on Windows
@@ -315,6 +323,7 @@ jobs:
             .build/native-${{ matrix.platform }}/paint-cost/*
             .build/native-${{ matrix.platform }}/focused-cpu/*
             .build/native-${{ matrix.platform }}/preview-admission/*.log
+            .build/native-${{ matrix.platform }}/preview-paint/*.log
             .build/native-${{ matrix.platform }}/frontend/native-preview-failure.png
             .build/native-${{ matrix.platform }}/frontend/native-preview-failure.json
             .build/native-${{ matrix.platform }}/frontend/native-details.png
