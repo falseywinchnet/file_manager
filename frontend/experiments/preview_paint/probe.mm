@@ -136,14 +136,21 @@ void check_paint(const gui_forms::MetricsSnapshot& before, const gui_forms::Wind
 // Snapshot and color checks are outside timers. They may trigger another draw;
 // they certify this fixture's sampled pixels, not physical screen scan-out.
 void check_pixels(const State& state, NSView* const view, const bool image_expected) {
-    NSBitmapImageRep* const bitmap = [view bitmapImageRepForCachingDisplayInRect:view.bounds];
-    require(bitmap != nil, "native bitmap unavailable");
+    NSBitmapImageRep* const compatible = [view bitmapImageRepForCachingDisplayInRect:view.bounds];
+    require(compatible != nil, "native bitmap unavailable");
+    // Choose the destination profile before drawing. Retagging captured pixels
+    // afterward would only relabel device values and could hide a color error.
+    NSColorSpace* const color_space = NSColorSpace.sRGBColorSpace;
+    NSBitmapImageRep* const bitmap = [compatible bitmapImageRepByRetaggingWithColorSpace:color_space];
+    require(bitmap != nil, "sRGB snapshot destination unavailable");
+    require([bitmap.colorSpace isEqual:color_space] == YES, "snapshot destination is not sRGB");
     [view cacheDisplayInRect:view.bounds toBitmapImageRep:bitmap];
     require(bitmap.pixelsWide > 8 && bitmap.pixelsHigh > 8, "native bitmap too small");
     for (NSInteger vertical = 1; vertical <= 3; ++vertical) {
         for (NSInteger horizontal = 1; horizontal <= 3; ++horizontal) {
-            NSColor* const color = [[bitmap colorAtX:bitmap.pixelsWide * horizontal / 4
-                y:bitmap.pixelsHigh * vertical / 4] colorUsingColorSpace:NSColorSpace.sRGBColorSpace];
+            NSColor* const sample = [bitmap colorAtX:bitmap.pixelsWide * horizontal / 4
+                y:bitmap.pixelsHigh * vertical / 4];
+            NSColor* const color = [sample colorUsingColorSpace:color_space];
             require(color != nil, "sample has no sRGB color");
             const bool match = std::abs(color.redComponent - 12.0 / 255.0) < 0.02 &&
                 std::abs(color.greenComponent - 226.0 / 255.0) < 0.02 &&

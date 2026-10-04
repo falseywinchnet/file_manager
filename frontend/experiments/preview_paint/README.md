@@ -27,6 +27,8 @@ display call rather than assigning uninstrumented time to individual internals.
   image and require those samples to stop matching. The tolerance is 0.02 per
   color channel and opacity must exceed 0.98. This is sampled fixture evidence,
   not a complete image-equivalence test.
+  The compatible AppKit destination is tagged sRGB before drawing into it;
+  captured pixels are never retagged afterward to satisfy the predicate.
 - Thirty samples per format/geometry cover all six format orders five times.
   A second fresh process reverses geometry order. This balances that declared
   order effect; it is not a collection of independent statistical trials.
@@ -90,3 +92,25 @@ previews or a diagnosed application bug. The next run records the exact warmup,
 expected state, sampled color, control/image bounds and a failure PNG without
 changing the pixel tolerance or accepting missing output. Rejected logs are
 retained in `../../results/2026-10-04-preview-paint/`.
+
+## Display-profile diagnostic and next control
+
+**OBSERVED:** at `5050e675`, both processes failed during their first BGRA
+warmup, with correct 640 by 480 control/image bounds. The first sample converted
+to sRGB was `(0, 0.898072, 0.818158, 1)`. The retained failure PNG carries the
+runner's `Display` / `Apple Virtual` ICC profile. Reading its stored sample
+through Windows System.Drawing without enabling embedded color management gave
+RGBA `(13,226,198,255)`, close to the fixture bytes. The log and forward PNG are
+retained as `MacDisplayProfileRejectedLastTest.log` and
+`MacDisplayProfileRejected.png` in the results directory.
+
+**HYPOTHESIS:** the display-dependent snapshot destination makes this control
+compare values from different color spaces. The next control gives the compatible
+AppKit bitmap an explicit sRGB profile **before** `cacheDisplayInRect` draws into
+it and verifies that destination profile. Apple documents that callers initialize
+the destination configuration before this
+[snapshot operation](https://developer.apple.com/documentation/appkit/nsview/cachedisplay%28in%3Ato%3A%29?language=objc).
+No captured samples, fixture colors, tolerance or renderer implementation change.
+This does not yet diagnose the renderer or establish color fidelity in the normal
+desktop presentation path. Native execution must still pass the unchanged
+presence and retirement checks before any timings are accepted.

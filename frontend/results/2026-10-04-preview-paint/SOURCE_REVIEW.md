@@ -1,5 +1,34 @@
 # Native preview paint source review
 
+## Explicit sRGB destination followup
+
+**Source acceptance for this diagnostic follow-up. No correctness, ownership or house-style blockers found in the reviewed changes.** The change preserves the test’s integrity as a new, explicitly configured snapshot control; it does not prove the cause of the earlier failure.
+
+The operation order matters here and is correct: the probe obtains a compatible bitmap, assigns the proposed sRGB destination profile, checks for failure and verifies the profile, **then draws the view into that destination**. It does not relabel already captured failing samples. Apple documents both configuring the destination before `cacheDisplayInRect` and the possibility that retagging returns nil or the original representation. The code handles both outcomes appropriately. [AppKit snapshot documentation](https://developer.apple.com/documentation/appkit/nsview/cachedisplay%28in%3Ato%3A%29?language=objc), [bitmap retagging documentation](https://developer.apple.com/documentation/appkit/nsbitmapimagerep/retagging%28with%3A%29?language=objc).
+
+The source retains the important controls:
+
+- Expected RGB values, channel tolerance, opacity threshold, nine sample positions, and presence/retirement predicates are unchanged.
+- Snapshot creation and sampling remain outside timed spans.
+- A missing compatible bitmap, failed retagging, unexpected destination profile or failed sample conversion rejects the run.
+- Under ARC, the compatible bitmap, returned destination, color space and sampled colors remain owned for the synchronous operation. Returning the same bitmap from retagging creates no ownership problem. No foreign borrow escapes the existing autorelease scope.
+- Separating `sample` from its color-space conversion makes the operation order and intermediate objects explicit.
+
+The retained log corroborates the README’s account that both processes failed their first BGRA warmup with 640×480 arranged/image bounds and the reported `(0, 0.898072, 0.818158, 1)` sample. The README correctly labels the display-profile explanation **HYPOTHESIS**, preserves the failed control, and requires native success before accepting timing results. A future pass would validate this explicit-sRGB snapshot control; it would not, by itself, establish normal display-path color fidelity.
+
+Exact reviewed scope:
+
+- Snapshot destination setup and sample-conversion changes in [probe.mm](C:/Users/Shadow/file_manager/frontend/experiments/preview_paint/probe.mm).
+- The workload clarification and diagnostic account in [README.md](C:/Users/Shadow/file_manager/frontend/experiments/preview_paint/README.md).
+- [MacDisplayProfileRejectedLastTest.log](C:/Users/Shadow/file_manager/frontend/results/2026-10-04-preview-paint/MacDisplayProfileRejectedLastTest.log).
+- The narrowly scoped log-preservation rules in [.gitattributes](C:/Users/Shadow/file_manager/frontend/results/2026-10-04-preview-paint/.gitattributes).
+
+I confirmed the retained PNG is present, but did **not** independently decode its ICC profile or reproduce the System.Drawing sample; those details remain root-reported observations. The `.gitattributes` rules apply only to logs in this results scope and preserve their original line endings.
+
+No edits, builds, native execution or Git mutations were performed.
+
+---
+
 ## Diagnostic followup after the first native pixel rejection
 
 **Source acceptance for the diagnostic-only changes. No correctness or house-style blockers found in this diff.**

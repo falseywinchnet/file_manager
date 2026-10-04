@@ -1,0 +1,2 @@
+# Preserve native diagnostic bytes, including their original line endings.
+MacDisplayProfileRejectedLastTest.log -text -whitespace
