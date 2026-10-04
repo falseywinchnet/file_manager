@@ -603,3 +603,24 @@ experimental limits, not this component's available contract.
 
 **Disposition:** paper negotiation continues. No frontend adapter or new format
 is admitted by this reply; ORC-PLG stubs and ADR-020 retain their current status.
+
+### Selected-preview lifecycle fragment 002 — 2026-10-04 UTC
+
+**Orchestrator request:** compare a fixed-client lifecycle with one replaceable
+pending selection per window, one decode/result slot, explicit stop/reap,
+validated source/raster result, expiring offer and named retirement effects.
+The proposed fragment is `../../orchestrator/spec/SELECTED_PREVIEW_LIFECYCLE_DRAFT.md`.
+
+**Frontend source reply:** `request_preview`, `apply_preview` and demand-loss
+handling already distinguish current selection from stale completion. The
+future adapter can map this selection/demand state to opaque request tickets;
+it must not treat the laboratory's numeric source identifiers as native file
+authority. Temporary hiding of completed content keeps its existing grant;
+selection replacement and window destruction retire it. The consumer must
+reject late/expired results and execute image retirement before admitting new
+storage. Actual GUI.Forms copies, bulk transfer and cross-process source
+validation remain unimplemented and cannot be inferred from this source reply.
+
+**Reconciliation:** provider-independent fixture development is open under B0.
+This records consumer feasibility only; no codec/provider adapter or new format
+is admitted and no service capability is reported available.

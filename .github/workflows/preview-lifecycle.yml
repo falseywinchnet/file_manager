@@ -1,0 +1,38 @@
+name: Preview lifecycle laboratory
+on:
+  push:
+    branches: [main, 'codex/**']
+    paths:
+      - 'orchestrator/experiments/preview_lifecycle/**'
+      - '.github/workflows/preview-lifecycle.yml'
+  pull_request:
+    paths:
+      - 'orchestrator/experiments/preview_lifecycle/**'
+      - '.github/workflows/preview-lifecycle.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: preview-lifecycle-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  lifecycle:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, macos-26, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select declared minimum Rust toolchain
+        run: rustup toolchain install 1.87.0 --profile minimal --component rustfmt --component clippy
+      - name: Check format
+        run: cargo +1.87.0 fmt --manifest-path orchestrator/experiments/preview_lifecycle/Cargo.toml -- --check
+      - name: Verify dependency-free state transitions
+        run: |
+          cargo +1.87.0 test --manifest-path orchestrator/experiments/preview_lifecycle/Cargo.toml --locked --offline --jobs 2 --target-dir orchestrator/.build/preview-lifecycle
+          cargo +1.87.0 clippy --manifest-path orchestrator/experiments/preview_lifecycle/Cargo.toml --locked --offline --all-targets --all-features --jobs 2 --target-dir orchestrator/.build/preview-lifecycle -- -D warnings
