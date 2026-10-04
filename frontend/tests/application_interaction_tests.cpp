@@ -74,6 +74,19 @@ class ApplicationInteractionProbe final {
         const std::size_t count = application.ui_queue_.size();
         return count;
     }
+    static std::size_t pending_worker_count(Application& application) {
+        const std::lock_guard<std::mutex> lock(application.worker_mutex_);
+        const std::size_t count = application.worker_queue_.size();
+        return count;
+    }
+    static std::uint64_t preview_generation(const Application& application) {
+        const std::uint64_t generation = application.preview_generation_.load();
+        return generation;
+    }
+    static void deliver_preview(Application& application, PreviewResult result,
+                                std::string stable_id, const std::uint64_t generation) {
+        application.apply_preview(std::move(result), std::move(stable_id), generation);
+    }
     static std::uint64_t
     show_search_results(Application& application, std::string query,
                         std::vector<fileman::orchestrator::SearchResultInfo> results) {
@@ -2032,9 +2045,9 @@ void test_selected_file_previews_reach_visible_layout() {
     const std::string unsupported_id = object_id(*objects, "unsupported.bin");
     const bool unsupported_selected = (*window).perform_semantic_action(unsupported_id, gui_forms::SemanticAction::select);
     require(unsupported_selected, "unsupported file must accept ordinary selection");
-    require_eventually(*application, UnavailablePreviewReady{*text}, "unsupported format must explain its limitation in the preview body");
     const bool explanation_expanded = (*window).perform_semantic_action(toggle_id, gui_forms::SemanticAction::press);
     require(explanation_expanded, "unavailable preview explanation must be expandable");
+    require_eventually(*application, UnavailablePreviewReady{*text}, "unsupported format must explain its limitation after expansion");
     (*window).perform_layout();
     require((*text).effectively_visible() && !(*picture).visible(),
         "an unavailable preview must display its explanation without retaining the previous file image");
@@ -4706,6 +4719,170 @@ struct ReleaseOrdinaryWorker final {
     ~ReleaseOrdinaryWorker() { (*gate).released.store(true); }
 };
 
+void test_preview_work_follows_visible_demand() {
+    TemporaryTree fixture{};
+    const std::filesystem::path source = std::filesystem::path(__FILE__).parent_path().parent_path() /
+        "ui/boards/file_manager/assets/house/view@2x.png";
+    const std::filesystem::path image_path = fixture.root() / "preview.png";
+    const bool copied = std::filesystem::copy_file(source, image_path);
+    require(copied, "preview demand fixture must contain a decodable PNG");
+    const std::shared_ptr<file_manager::Application> application =
+        std::make_shared<file_manager::Application>(fixture.root(), std::nullopt, false, std::string{});
+    ApplicationStopGuard stop_guard{*application};
+    const std::unique_ptr<gui_forms::Window> window = (*application).make_window();
+    (*application).bind_host(host_noop, host_noop);
+    const std::shared_ptr<gui_forms::ObjectView> objects = std::dynamic_pointer_cast<gui_forms::ObjectView>(
+        (*window).find("fm.objects.current-folder"));
+    const std::shared_ptr<gui_forms::PictureBox> picture = std::dynamic_pointer_cast<gui_forms::PictureBox>(
+        (*window).find("fm.inspector.preview.image"));
+    const std::shared_ptr<gui_forms::Label> text = std::dynamic_pointer_cast<gui_forms::Label>(
+        (*window).find("fm.inspector.preview.text"));
+    constexpr std::string_view toggle_id = "file-manager-app.shell.workspace.selection.inspector.facts.preview.toggle";
+    const gui_forms::Control::Ptr surface = (*window).find(
+        "file-manager-app.shell.workspace.selection.inspector.facts.preview.surface");
+    require(objects && picture && text && surface, "preview demand controls must exist");
+    require_eventually(*application, ObjectNamed{*objects, "preview.png"}, "preview demand fixture must enumerate");
+    const std::string text_id = object_id(*objects, "root.txt");
+    const std::string image_id = object_id(*objects, "preview.png");
+
+    // Freeze the sole ordinary worker after startup. Queue deltas now identify
+    // scheduling directly, without sleeps or filesystem timing assumptions.
+    // The gate owner outlives the callback; release precedes stop on every exit.
+    const std::shared_ptr<OrdinaryWorkerGate> gate = std::make_shared<OrdinaryWorkerGate>();
+    const ReleaseOrdinaryWorker release{gate};
+    file_manager::ApplicationInteractionProbe::post_worker(*application,
+        std::bind_front(&OrdinaryWorkerGate::wait, gate));
+    require_eventually(*application, std::bind_front(&OrdinaryWorkerGate::ready, gate),
+        "ordinary worker must reach the preview test gate");
+    require(file_manager::ApplicationInteractionProbe::pending_worker_count(*application) == 0U,
+        "startup work must drain before preview scheduling is observed");
+    (*window).resize({1340.0, 500.0});
+    (*window).perform_layout();
+    bool selected = (*window).perform_semantic_action(text_id, gui_forms::SemanticAction::select);
+    require(selected && !(*surface).effectively_visible(), "short viewport must start with collapsed preview");
+    selected = (*window).perform_semantic_action(image_id, gui_forms::SemanticAction::select);
+    require(selected && file_manager::ApplicationInteractionProbe::pending_worker_count(*application) == 0U,
+        "changing hidden selections must schedule no file read or decode work");
+
+    (*window).resize({1340.0, 850.0});
+    (*window).perform_layout();
+    const std::uint64_t obsolete_generation = file_manager::ApplicationInteractionProbe::preview_generation(*application);
+    require((*surface).effectively_visible() &&
+        file_manager::ApplicationInteractionProbe::pending_worker_count(*application) == 1U,
+        "automatic expansion must request only the latest selection once");
+    const file_manager::ObjectIdentity image_identity = file_manager::observe_identity(image_path);
+    const file_manager::PreviewResult obsolete_result = file_manager::load_preview(fixture.root(), image_path, image_identity);
+    require(obsolete_result.kind == file_manager::PreviewKind::png, "obsolete completion fixture must own valid PNG bytes");
+    (*window).resize({1340.0, 500.0});
+    (*window).perform_layout();
+    require(file_manager::ApplicationInteractionProbe::preview_generation(*application) != obsolete_generation,
+        "automatic collapse must cancel an already queued preview generation");
+    file_manager::ApplicationInteractionProbe::deliver_preview(*application, obsolete_result, image_id, obsolete_generation);
+    require(!(*picture).visible() && !(*text).visible(), "late hidden completion must not publish a preview");
+    (*window).resize({1340.0, 850.0});
+    (*window).perform_layout();
+    require(file_manager::ApplicationInteractionProbe::pending_worker_count(*application) == 2U,
+        "reopening a cancelled request must schedule one fresh generation");
+    file_manager::ApplicationInteractionProbe::deliver_preview(*application, obsolete_result, image_id, obsolete_generation);
+    require(!(*picture).visible() && !(*text).visible(), "old completion must remain obsolete after reopening the same file");
+
+    const std::shared_ptr<gui_forms::Command> pane =
+        file_manager::ApplicationInteractionProbe::command(*application, "view.selection-pane");
+    const std::shared_ptr<gui_forms::Command> settings =
+        file_manager::ApplicationInteractionProbe::command(*application, "file.settings");
+    require(pane && settings, "pane and Settings commands must exist");
+    bool invoked = (*pane).execute("fixture.preview.hide-pane");
+    require(invoked && !(*surface).effectively_visible(), "whole-pane collapse must retire visible preview demand");
+    selected = (*window).perform_semantic_action(text_id, gui_forms::SemanticAction::select);
+    require(selected && file_manager::ApplicationInteractionProbe::pending_worker_count(*application) == 2U,
+        "selection with a collapsed inspector must not queue preview work");
+    invoked = (*pane).execute("fixture.preview.restore-pane");
+    require(invoked && file_manager::ApplicationInteractionProbe::pending_worker_count(*application) == 3U,
+        "restoring the inspector must request its current selection once");
+
+    // Supply an explicit settings fixture before opening the page, so no
+    // service request shares the queue being measured. Enabling while hidden
+    // must retain intent without scheduling; disabling must revoke that intent.
+    invoked = (*window).perform_semantic_action(toggle_id, gui_forms::SemanticAction::press);
+    require(invoked && !(*surface).effectively_visible(), "preview toggle must cancel pending demand");
+    fileman::orchestrator::SettingsSchemaInfo schema{};
+    schema.schema_revision = "preview-demand-fixture";
+    fileman::orchestrator::SettingsSnapshotInfo snapshot{};
+    snapshot.schema_revision = schema.schema_revision;
+    snapshot.revision = 1U;
+    snapshot.recovery_provenance = "fixture";
+    snapshot.values = {{"previews.builtin_enabled", false}};
+    file_manager::ApplicationInteractionProbe::install_settings_state(*application, schema, snapshot);
+    invoked = (*window).perform_semantic_action(toggle_id, gui_forms::SemanticAction::press);
+    require(invoked && (*surface).effectively_visible() &&
+        file_manager::ApplicationInteractionProbe::pending_worker_count(*application) == 3U,
+        "reopening must not revive a preview disabled by settings");
+    invoked = (*settings).execute("fixture.preview.settings");
+    require(invoked && !(*surface).effectively_visible(), "Settings must hide the preview ancestry");
+    snapshot.values = {{"previews.builtin_enabled", true}};
+    file_manager::ApplicationInteractionProbe::install_settings_state(*application, schema, snapshot);
+    require(file_manager::ApplicationInteractionProbe::pending_worker_count(*application) == 3U,
+        "enabling previews while Settings hides the workspace must defer file work");
+    invoked = (*settings).execute("fixture.preview.files");
+    require(invoked && (*surface).effectively_visible() &&
+        file_manager::ApplicationInteractionProbe::pending_worker_count(*application) == 4U,
+        "returning from Settings must resume one current preview request");
+    const std::uint64_t before_settings = file_manager::ApplicationInteractionProbe::preview_generation(*application);
+    invoked = (*settings).execute("fixture.preview.settings-again");
+    require(invoked && file_manager::ApplicationInteractionProbe::preview_generation(*application) != before_settings,
+        "entering Settings must cancel an outstanding request even when the preview itself stays expanded");
+    invoked = (*settings).execute("fixture.preview.files-again");
+    require(invoked && file_manager::ApplicationInteractionProbe::pending_worker_count(*application) == 5U,
+        "returning again must replace the cancelled request exactly once");
+
+    const std::uint64_t before_multi = file_manager::ApplicationInteractionProbe::preview_generation(*application);
+    (*objects).set_selected_ids({text_id, image_id}, text_id);
+    require(file_manager::ApplicationInteractionProbe::preview_generation(*application) != before_multi &&
+        file_manager::ApplicationInteractionProbe::pending_worker_count(*application) == 5U,
+        "multiple selection must cancel a single-file request without replacing it");
+    (*objects).clear_selection();
+    require(file_manager::ApplicationInteractionProbe::pending_worker_count(*application) == 5U,
+        "clearing selection must not revive deferred file work");
+    selected = (*window).perform_semantic_action(image_id, gui_forms::SemanticAction::select);
+    require(selected && file_manager::ApplicationInteractionProbe::pending_worker_count(*application) == 6U,
+        "a new visible selection must schedule one preview after selection reset");
+
+    // Retained layout collapse has its own availability signal; it does not
+    // change the authored visible bit or emit Control::visible_changed().
+    const std::shared_ptr<gui_forms::ResponsiveTrackPanel> shell =
+        std::dynamic_pointer_cast<gui_forms::ResponsiveTrackPanel>((*window).find("file-manager-app.shell"));
+    const gui_forms::Control::Ptr workspace = (*window).find("file-manager-app.shell.workspace");
+    require(shell && workspace, "preview layout fixture must have an authored workspace track");
+    const std::optional<std::size_t> workspace_track = (*shell).child_track(*workspace);
+    require(workspace_track.has_value(), "workspace must occupy a named shell track");
+    const gui_forms::ResponsiveTrackSpec original_track = (*shell).track_specs()[*workspace_track];
+    gui_forms::ResponsiveTrackSpec hidden_track = original_track;
+    hidden_track.hidden = true;
+    const std::uint64_t before_layout = file_manager::ApplicationInteractionProbe::preview_generation(*application);
+    (*shell).set_track_spec(*workspace_track, hidden_track);
+    (*window).perform_layout();
+    require((*workspace).visible() && (*workspace).layout_collapsed() && !(*surface).effectively_visible(),
+        "layout-only collapse must preserve authored visibility while hiding the preview");
+    require(file_manager::ApplicationInteractionProbe::preview_generation(*application) != before_layout,
+        "layout-only collapse must cancel pending preview demand");
+    (*shell).set_track_spec(*workspace_track, original_track);
+    (*window).perform_layout();
+    require((*surface).effectively_visible() &&
+        file_manager::ApplicationInteractionProbe::pending_worker_count(*application) == 7U,
+        "restoring a layout-collapsed track must resume one preview request");
+    (*gate).released.store(true);
+    require_eventually(*application, ImagePreviewReady{*picture}, "only the final requested PNG must reach the preview");
+    require((*picture).effectively_visible() && !(*text).visible(), "final preview must be visible without obsolete text");
+    const gui_forms::ImageId retained_image = (*picture).image();
+    const std::uint64_t completed_generation = file_manager::ApplicationInteractionProbe::preview_generation(*application);
+    invoked = (*window).perform_semantic_action(toggle_id, gui_forms::SemanticAction::press);
+    require(invoked && !(*picture).effectively_visible(), "completed preview must collapse");
+    invoked = (*window).perform_semantic_action(toggle_id, gui_forms::SemanticAction::press);
+    require(invoked && (*picture).effectively_visible() && (*picture).image() == retained_image &&
+        file_manager::ApplicationInteractionProbe::preview_generation(*application) == completed_generation,
+        "reopening a completed preview must reuse its registered image without a new read or decode");
+}
+
 void test_ordinary_queued_parent_identity() {
     TemporaryTree fixture{};
     const std::filesystem::path parent = fixture.root() / "Documents";
@@ -4769,6 +4946,7 @@ int main() {
         test_search_source_records_follow_displayed_rows();
         test_search_coverage_survives_paging_and_resets_on_replacement();
         test_selected_file_previews_reach_visible_layout();
+        test_preview_work_follows_visible_demand();
         test_application_command_surfaces_and_house_mark();
         test_application_command_truth_across_files_search_and_settings();
         test_criteria_virtual_folder_is_retained_exact_and_catalogue_only();

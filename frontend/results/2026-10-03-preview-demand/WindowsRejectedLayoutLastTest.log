@@ -1,0 +1,20 @@
+Start testing: Oct 03 18:21 Pacific Daylight Time
+----------------------------------------------------------
+13/15 Testing: file_manager_application_interaction_tests
+13/15 Test: file_manager_application_interaction_tests
+Command: "C:/Users/Shadow/file_manager/frontend/.build/shadow-windows-latency/file_manager_application_interaction_tests.exe"
+Directory: C:/Users/Shadow/file_manager/frontend/.build/shadow-windows-latency
+"file_manager_application_interaction_tests" start time: Oct 03 18:21 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+SKIP symlink fixture assertions: Windows error 1314
+file manager application interaction tests failed: layout-only collapse must cancel pending preview demand
+<end of output>
+Test time =   2.14 sec
+----------------------------------------------------------
+Test Failed.
+"file_manager_application_interaction_tests" end time: Oct 03 18:21 Pacific Daylight Time
+"file_manager_application_interaction_tests" time elapsed: 00:00:02
+----------------------------------------------------------
+
+End testing: Oct 03 18:21 Pacific Daylight Time
