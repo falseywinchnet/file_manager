@@ -11,7 +11,7 @@ inline constexpr int allocation_refused = 20;
 inline constexpr int allocation_admitted = 21;
 inline constexpr int limit_unavailable = 77;
 
-enum class Fixture { success, failure, delay, memory, memory_control };
+enum class Fixture { success, failure, delay, memory, memory_control, mac_headroom };
 
 struct Outcome {
     bool launched = false;
@@ -27,6 +27,9 @@ struct Outcome {
 [[nodiscard]] Outcome run(const std::filesystem::path& executable,
                           const Fixture fixture, const unsigned int deadline_ms);
 [[nodiscard]] int probe_allocation(const bool apply_limit);
+#if defined(__APPLE__)
+[[nodiscard]] int probe_mac_headroom();
+#endif
 [[nodiscard]] const char* fixture_argument(const Fixture fixture) noexcept;
 
 }

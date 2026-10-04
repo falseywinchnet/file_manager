@@ -1,0 +1,47 @@
+Start testing: Oct 04 03:43 UTC
+----------------------------------------------------------
+1/2 Testing: preview_process_lifecycle
+1/2 Test: preview_process_lifecycle
+Command: "/Users/runner/work/file_manager/file_manager/orchestrator/.build/preview-process/preview_process" "--lifecycle"
+Directory: /Users/runner/work/file_manager/file_manager/orchestrator/.build/preview-process
+"preview_process_lifecycle" start time: Oct 04 03:43 UTC
+Output:
+----------------------------------------------------------
+case=baseline launched=1 reaped=1 timeout=0 failed=0 exit=0 elapsed_ms=21
+case=nonzero-exit launched=1 reaped=1 timeout=0 failed=0 exit=23 elapsed_ms=23
+case=cancel-and-reap launched=1 reaped=1 timeout=1 failed=0 exit=137 elapsed_ms=266
+case=recovery launched=1 reaped=1 timeout=0 failed=0 exit=0 elapsed_ms=18
+case=cancel-and-reap launched=1 reaped=1 timeout=1 failed=0 exit=137 elapsed_ms=254
+case=recovery launched=1 reaped=1 timeout=0 failed=0 exit=0 elapsed_ms=27
+case=cancel-and-reap launched=1 reaped=1 timeout=1 failed=0 exit=137 elapsed_ms=268
+case=recovery launched=1 reaped=1 timeout=0 failed=0 exit=0 elapsed_ms=17
+case=cancel-and-reap launched=1 reaped=1 timeout=1 failed=0 exit=137 elapsed_ms=269
+case=recovery launched=1 reaped=1 timeout=0 failed=0 exit=0 elapsed_ms=20
+<end of output>
+Test time =   1.19 sec
+----------------------------------------------------------
+Test Passed.
+"preview_process_lifecycle" end time: Oct 04 03:43 UTC
+"preview_process_lifecycle" time elapsed: 00:00:01
+----------------------------------------------------------
+
+2/2 Testing: preview_process_memory
+2/2 Test: preview_process_memory
+Command: "/Users/runner/work/file_manager/file_manager/orchestrator/.build/preview-process/preview_process" "--memory-probe"
+Directory: /Users/runner/work/file_manager/file_manager/orchestrator/.build/preview-process
+"preview_process_memory" start time: Oct 04 03:43 UTC
+Output:
+----------------------------------------------------------
+setrlimit_AS_refused_errno=22
+case=unlimited-384MiB-control launched=1 reaped=1 timeout=0 failed=0 exit=21 elapsed_ms=28
+case=256MiB-limit-384MiB-request launched=1 reaped=1 timeout=0 failed=0 exit=77 elapsed_ms=16
+LIMIT_UNAVAILABLE: this Mac does not establish the proposed address-space ceiling
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"preview_process_memory" end time: Oct 04 03:43 UTC
+"preview_process_memory" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 04 03:43 UTC

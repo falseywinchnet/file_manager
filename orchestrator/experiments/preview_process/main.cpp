@@ -15,6 +15,7 @@ const char* fixture_argument(const Fixture fixture) noexcept {
     case Fixture::delay: return "--child-delay";
     case Fixture::memory: return "--child-memory";
     case Fixture::memory_control: return "--child-memory-control";
+    case Fixture::mac_headroom: return "--child-mac-headroom";
     }
     return "--invalid";
 }
@@ -54,12 +55,12 @@ static void report(const char* const name, const Outcome& outcome) {
     return 0;
 }
 
-[[nodiscard]] static int memory(const std::filesystem::path& executable) {
+[[nodiscard]] static int memory(const std::filesystem::path& executable, const Fixture fixture) {
     const Outcome control = run(executable, Fixture::memory_control, 3000);
     report("unlimited-384MiB-control", control);
     if (!completed(control, allocation_admitted)) { return 1; }
-    const Outcome outcome = run(executable, Fixture::memory, 3000);
-    report("256MiB-limit-384MiB-request", outcome);
+    const Outcome outcome = run(executable, fixture, 3000);
+    report(fixture_argument(fixture), outcome);
     if (completed(outcome, allocation_refused)) { return 0; }
 #if defined(__APPLE__)
     if (completed(outcome, limit_unavailable) || completed(outcome, allocation_admitted)) {
@@ -85,15 +86,27 @@ static void report(const char* const name, const Outcome& outcome) {
         const int result = probe_allocation(apply_limit);
         return result;
     }
+#if defined(__APPLE__)
+    if (mode == "--child-mac-headroom") {
+        const int result = probe_mac_headroom();
+        return result;
+    }
+#endif
     const std::filesystem::path executable = std::filesystem::canonical(arguments[0]);
     if (mode == "--lifecycle") {
         const int result = lifecycle(executable);
         return result;
     }
     if (mode == "--memory-probe") {
-        const int result = memory(executable);
+        const int result = memory(executable, Fixture::memory);
         return result;
     }
+#if defined(__APPLE__)
+    if (mode == "--headroom-probe") {
+        const int result = memory(executable, Fixture::mac_headroom);
+        return result;
+    }
+#endif
     return 2;
 }
 

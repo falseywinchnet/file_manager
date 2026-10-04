@@ -27,3 +27,27 @@ tested, not descendants, hostile native code or filesystem/network confinement.
 Failure paths for OS launch/assign/kill/wait errors are inspected but not all
 fault-injected. The POSIX final reap is blocking and Windows creation is not
 bounded by the later wait; the README preserves these experimental limitations.
+
+## First native matrix: 03561cec01eaf848cace619dd984de219ed32c14
+
+[Run 37174876232](https://github.com/falseywinchnet/file_manager/actions/runs/37174876232)
+completed on all three native hosts. Raw logs are retained as
+`Native-{Windows,Mac,Linux}-03561ce.log`.
+
+- Windows/MSVC: lifecycle and memory admission tests passed. Job
+  `111355323283`; all four terminated children observed, recovery passed.
+- Ubuntu 24.04/GCC: both passed. Job `111355323130`; all four terminated
+  children observed, recovery passed; 384 MiB mapping refused under RLIMIT_AS.
+- macOS 26/AppleClang 21.0.0.21000101: lifecycle passed; memory test **skipped**.
+  Job `111355323236`; setrlimit returned errno 22 (`EINVAL`) before allocation.
+  Unlimited control succeeded. The four cancellations/reaps and recoveries
+  passed; no Mac resource cap is established.
+
+CTest's LastTest.log says `Test Passed` even for its configured skip. The Mac
+console explicitly reports `preview_process_memory ... ***Skipped` and lists it
+under tests that did not run. The child's `LIMIT_UNAVAILABLE` output and exit 77
+in the retained log are authoritative to interpret that status. The workflow's
+green conclusion must not be promoted to a passing Mac memory capability.
+
+The new Mac-only headroom probe is a follow-up hypothesis, not a replacement
+for the rejected fixed limit. Its native result is pending at this edit.

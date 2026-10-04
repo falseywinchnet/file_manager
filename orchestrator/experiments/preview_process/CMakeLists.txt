@@ -22,3 +22,7 @@ add_test(NAME preview_process_memory COMMAND preview_process --memory-probe)
 set_tests_properties(preview_process_lifecycle preview_process_memory PROPERTIES TIMEOUT 30)
 # An explicitly unavailable Mac address-space limit is evidence, not a pass.
 set_tests_properties(preview_process_memory PROPERTIES SKIP_RETURN_CODE 77)
+if(APPLE)
+    add_test(NAME preview_process_mac_headroom COMMAND preview_process --headroom-probe)
+    set_tests_properties(preview_process_mac_headroom PROPERTIES TIMEOUT 30 SKIP_RETURN_CODE 77)
+endif()
