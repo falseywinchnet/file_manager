@@ -3,6 +3,11 @@ project(FileManagerJpegExperiment LANGUAGES CXX)
 
 # Release 2.19.1 publishes package version 2.19. The fetch script locks the
 # actual archive bytes; do not infer its patch release from this version check.
+# Its Unix static export references Threads::Threads without discovering that
+# dependency in the installed config. Establish it before importing the target.
+if(NOT WIN32)
+    find_package(Threads REQUIRED)
+endif()
 find_package(lcms2 2.19 EXACT CONFIG REQUIRED)
 
 # Research target only. No application/GUI.Forms dependency or install rule.

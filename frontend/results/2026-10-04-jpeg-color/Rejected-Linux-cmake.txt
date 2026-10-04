@@ -1,0 +1,24 @@
+2026-10-04T02:51:20.4786603Z -- Detecting CXX compiler ABI info - done
+2026-10-04T02:51:20.4938982Z -- Check for working CXX compiler: /usr/bin/c++ - skipped
+2026-10-04T02:51:20.4942146Z -- Detecting CXX compile features
+2026-10-04T02:51:20.4948010Z -- Detecting CXX compile features - done
+2026-10-04T02:51:20.5032299Z -- Configuring done (0.2s)
+2026-10-04T02:51:20.5074224Z CMake Error at /home/runner/work/file_manager/file_manager/.build/jpeg-color/lib/cmake/lcms2/lcms2-targets.cmake:61 (set_target_properties):
+2026-10-04T02:51:20.5080598Z   The link interface of target "lcms2::lcms2" contains:
+2026-10-04T02:51:20.5080867Z 
+2026-10-04T02:51:20.5080986Z     Threads::Threads
+2026-10-04T02:51:20.5081124Z 
+2026-10-04T02:51:20.5081276Z   but the target was not found.  Possible reasons include:
+2026-10-04T02:51:20.5081492Z 
+2026-10-04T02:51:20.5081602Z     * There is a typo in the target name.
+2026-10-04T02:51:20.5081928Z     * A find_package call is missing for an IMPORTED target.
+2026-10-04T02:51:20.5082256Z     * An ALIAS target is missing.
+2026-10-04T02:51:20.5082411Z 
+2026-10-04T02:51:20.5082751Z Call Stack (most recent call first):
+2026-10-04T02:51:20.5083228Z   /home/runner/work/file_manager/file_manager/.build/jpeg-color/lib/cmake/lcms2/lcms2-config.cmake:27 (include)
+2026-10-04T02:51:20.5083707Z   CMakeLists.txt:6 (find_package)
+2026-10-04T02:51:20.5083870Z 
+2026-10-04T02:51:20.5083874Z 
+2026-10-04T02:51:20.5084079Z CMake Generate step failed.  Build files cannot be regenerated correctly.
+2026-10-04T02:51:20.5084443Z -- Generating done (0.0s)
+2026-10-04T02:51:20.5105329Z ##[error]Process completed with exit code 1.
