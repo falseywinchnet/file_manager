@@ -1,0 +1,34 @@
+[
+  {
+    "path": "frontend/experiments/jpeg_decode/icc_color.hpp",
+    "sha256": "76EB32207A7809A4EC4CFC72BD94E3E11DDA708B55FEDB123CCBF981E3F53996"
+  },
+  {
+    "path": "frontend/experiments/jpeg_decode/icc_color.cpp",
+    "sha256": "51DB38C4311EC41E5A7B989A12292A8ECE4755BB31AC0B842D8406420AD117A5"
+  },
+  {
+    "path": "frontend/experiments/jpeg_decode/icc_fixtures.hpp",
+    "sha256": "33F76004792F45D62008534F841AB5504CD40F20248A739946AF2F79E1DA07F5"
+  },
+  {
+    "path": "frontend/experiments/jpeg_decode/icc_fixtures.cpp",
+    "sha256": "C91E4831A509D8020233EAF09ED1FD661C1F05FED953AD3264B48868AF29A8E9"
+  },
+  {
+    "path": "frontend/experiments/jpeg_decode/jpeg_experiment.cpp",
+    "sha256": "419E5C5499C20FF8C5AA520B517EDD2E2D6F623965B7959E0A59850C4AB86BCC"
+  },
+  {
+    "path": "frontend/experiments/jpeg_decode/CMakeLists.txt",
+    "sha256": "6809642AE926EAFBB2266C90C72C71186338B547EA47F112A4FB4E3B5FAB80A2"
+  },
+  {
+    "path": "frontend/experiments/jpeg_decode/fetch_color.cmake",
+    "sha256": "A54A0C4922A2EA933A46B71918E0B197EADFB0FA5E96E95F61A47CFE7533E684"
+  },
+  {
+    "path": ".github/workflows/jpeg-research.yml",
+    "sha256": "E4B821C062884EA39AF1005E8DE222CC1C0C540ECD2E8149D84248EC43522C9E"
+  }
+]

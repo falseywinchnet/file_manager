@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.25)
 project(FileManagerJpegExperiment LANGUAGES CXX)
 
+# Release 2.19.1 publishes package version 2.19. The fetch script locks the
+# actual archive bytes; do not infer its patch release from this version check.
+find_package(lcms2 2.19 EXACT CONFIG REQUIRED)
+
 # Research target only. No application/GUI.Forms dependency or install rule.
 option(FILE_MANAGER_JPEG_CMAKE_PACKAGE "Use an independently built static codec package" OFF)
 if(FILE_MANAGER_JPEG_CMAKE_PACKAGE)
@@ -15,7 +19,8 @@ set_target_properties(file_manager_jpeg_orientation PROPERTIES CXX_EXTENSIONS OF
 add_executable(file_manager_jpeg_orientation_tests exif_orientation_tests.cpp)
 target_link_libraries(file_manager_jpeg_orientation_tests PRIVATE file_manager_jpeg_orientation)
 set_target_properties(file_manager_jpeg_orientation_tests PROPERTIES CXX_EXTENSIONS OFF)
-add_executable(file_manager_jpeg_experiment jpeg_experiment.cpp)
+add_executable(file_manager_jpeg_experiment jpeg_experiment.cpp icc_color.cpp icc_fixtures.cpp)
+target_link_libraries(file_manager_jpeg_experiment PRIVATE lcms2::lcms2)
 if(WIN32)
     target_sources(file_manager_jpeg_experiment PRIVATE wic_decode.cpp)
     target_compile_definitions(file_manager_jpeg_experiment PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)

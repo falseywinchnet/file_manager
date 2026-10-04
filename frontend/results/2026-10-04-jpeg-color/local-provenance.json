@@ -1,0 +1,11 @@
+{
+  "base_revision": "29d39ecbaf81c285c6686acd2287cce7b29ef71d",
+  "lcms_release": "lcms2.19.1",
+  "archive_sha256": "BFC54F7BAB59FBC921012014A8032E4CBA4ABD46DB47D46B76416A8C0B2815C8",
+  "lcms_package": "C:/Users/Shadow/file_manager/.build/jpeg-color-package/lib/cmake/lcms2",
+  "lcms_static_sha256": "337EB77B818E73E661137DEAE03A43C03991A0E6022643D3E78C4D0FE9F7B2A0",
+  "test_executable_sha256": "2F80E3C3C20F21EE48EC34F94795BFA2E06977A145F75930DE472AC62A5623F2",
+  "build": "MinGW GCC 16.2 Release",
+  "tests": "3/3 passed; 1.83 seconds",
+  "timing_claim": false
+}

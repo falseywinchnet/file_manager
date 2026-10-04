@@ -1,0 +1,1513 @@
+Start testing: Oct 04 02:35 UTC
+----------------------------------------------------------
+1/83 Testing: cursor_interaction
+1/83 Test: cursor_interaction
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_cursor_interaction_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"cursor_interaction" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+Cursor lease policy, metrics, revocation and terminal outcomes pass.
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"cursor_interaction" end time: Oct 04 02:35 UTC
+"cursor_interaction" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/83 Testing: gui_forms_audio_loop_scheduler_tests
+2/83 Test: gui_forms_audio_loop_scheduler_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_audio_loop_scheduler_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_audio_loop_scheduler_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+Independent boundary oracle: 470028 cases.
+Serial loop scheduler timing, capacity and retirement model pass.
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_audio_loop_scheduler_tests" end time: Oct 04 02:35 UTC
+"gui_forms_audio_loop_scheduler_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/83 Testing: gui_forms_cursor_images
+3/83 Test: gui_forms_cursor_images
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_cursor_image_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_cursor_images" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+Cursor validation, scaling, inheritance, fallback and lifetime passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_cursor_images" end time: Oct 04 02:35 UTC
+"gui_forms_cursor_images" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/83 Testing: gui_forms_application_contract_tests
+4/83 Test: gui_forms_application_contract_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_application_contract_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_application_contract_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+application validation, weak handles, affinity, and reusable hide passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_application_contract_tests" end time: Oct 04 02:35 UTC
+"gui_forms_application_contract_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/83 Testing: gui_forms_application_native_tests
+5/83 Test: gui_forms_application_native_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_application_native_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_application_native_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+portable application API: native attach, cancel/retry, close, expiry, recursion and exception containment passed
+<end of output>
+Test time =   2.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_application_native_tests" end time: Oct 04 02:35 UTC
+"gui_forms_application_native_tests" time elapsed: 00:00:02
+----------------------------------------------------------
+
+6/83 Testing: gui_forms_api_reference_tests
+6/83 Test: gui_forms_api_reference_tests
+Command: "/opt/homebrew/Frameworks/Python.framework/Versions/3.14/bin/python3.14" "/Users/runner/work/file_manager/file_manager/gui_forms/tests/api_reference_tests.py"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_api_reference_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.131s
+
+OK
+<end of output>
+Test time =   0.48 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_api_reference_tests" end time: Oct 04 02:35 UTC
+"gui_forms_api_reference_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/83 Testing: gui_drawing_core_tests
+7/83 Test: gui_drawing_core_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_drawing_core_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_drawing_core_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_drawing_core_tests" end time: Oct 04 02:35 UTC
+"gui_drawing_core_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+8/83 Testing: gui_forms_canvas_tests
+8/83 Test: gui_forms_canvas_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_canvas_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_canvas_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.08 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_canvas_tests" end time: Oct 04 02:35 UTC
+"gui_forms_canvas_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+9/83 Testing: gui_drawing_c_api_c11_tests
+9/83 Test: gui_drawing_c_api_c11_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_drawing_c_api_c11_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_drawing_c_api_c11_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.17 sec
+----------------------------------------------------------
+Test Passed.
+"gui_drawing_c_api_c11_tests" end time: Oct 04 02:35 UTC
+"gui_drawing_c_api_c11_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+10/83 Testing: gui_drawing_trace_equivalence_tests
+10/83 Test: gui_drawing_trace_equivalence_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_drawing_trace_equivalence_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_drawing_trace_equivalence_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_drawing_trace_equivalence_tests" end time: Oct 04 02:35 UTC
+"gui_drawing_trace_equivalence_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+11/83 Testing: gui_drawing_renderer_boundary_audit
+11/83 Test: gui_drawing_renderer_boundary_audit
+Command: "/opt/homebrew/bin/cmake" "-DDRAWING_CORE=/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/libgui_drawing_core.a" "-DDRAWING_C_API=/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/libgui_drawing_abi0.0.1.0.dylib" "-DDRAWING_TEST_BINARY=/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_drawing_core_tests" "-DSOURCE_DIRECTORY=/Users/runner/work/file_manager/file_manager/gui_forms" "-P" "/Users/runner/work/file_manager/file_manager/gui_forms/cmake/check_drawing_boundaries.cmake"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_drawing_renderer_boundary_audit" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   2.64 sec
+----------------------------------------------------------
+Test Passed.
+"gui_drawing_renderer_boundary_audit" end time: Oct 04 02:35 UTC
+"gui_drawing_renderer_boundary_audit" time elapsed: 00:00:02
+----------------------------------------------------------
+
+12/83 Testing: gui_drawing_c_api_export_policy
+12/83 Test: gui_drawing_c_api_export_policy
+Command: "/opt/homebrew/bin/cmake" "-DC_API_LIBRARY=/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/libgui_drawing_abi0.0.1.0.dylib" "-DEXPECTED_SYMBOL=_gd_get_api_v0" "-P" "/Users/runner/work/file_manager/file_manager/gui_forms/cmake/check_single_c_api_export.cmake"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_drawing_c_api_export_policy" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   1.02 sec
+----------------------------------------------------------
+Test Passed.
+"gui_drawing_c_api_export_policy" end time: Oct 04 02:35 UTC
+"gui_drawing_c_api_export_policy" time elapsed: 00:00:01
+----------------------------------------------------------
+
+13/83 Testing: gui_forms_host_image_tests
+13/83 Test: gui_forms_host_image_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_host_image_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_host_image_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+host image contracts passed
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_host_image_tests" end time: Oct 04 02:35 UTC
+"gui_forms_host_image_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+14/83 Testing: gui_forms_core_tests
+14/83 Test: gui_forms_core_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_core_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_core_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_core_tests: all tests passed
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_core_tests" end time: Oct 04 02:35 UTC
+"gui_forms_core_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+15/83 Testing: gui_forms_binary_search_tests
+15/83 Test: gui_forms_binary_search_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_binary_search_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_binary_search_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+binary search tests passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_binary_search_tests" end time: Oct 04 02:35 UTC
+"gui_forms_binary_search_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+16/83 Testing: gui_forms_sort_algorithm_tests
+16/83 Test: gui_forms_sort_algorithm_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_sort_algorithm_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_sort_algorithm_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+sort algorithm tests passed
+<end of output>
+Test time =   0.07 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_sort_algorithm_tests" end time: Oct 04 02:35 UTC
+"gui_forms_sort_algorithm_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+17/83 Testing: gui_forms_delegate_event_tests
+17/83 Test: gui_forms_delegate_event_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_delegate_event_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_delegate_event_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+delegate event tests passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_delegate_event_tests" end time: Oct 04 02:35 UTC
+"gui_forms_delegate_event_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+18/83 Testing: gui_forms_live_surface_tests
+18/83 Test: gui_forms_live_surface_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_live_surface_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_live_surface_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_live_surface_tests" end time: Oct 04 02:35 UTC
+"gui_forms_live_surface_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+19/83 Testing: gui_forms_text_store_tests
+19/83 Test: gui_forms_text_store_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_text_store_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_text_store_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+text_store_tests: PASS
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_text_store_tests" end time: Oct 04 02:35 UTC
+"gui_forms_text_store_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+20/83 Testing: gui_forms_bounded_grapheme_tests
+20/83 Test: gui_forms_bounded_grapheme_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_bounded_grapheme_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_bounded_grapheme_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+Bounded grapheme allocation and equivalence fixtures passed
+<end of output>
+Test time =   0.17 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_bounded_grapheme_tests" end time: Oct 04 02:35 UTC
+"gui_forms_bounded_grapheme_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+21/83 Testing: gui_forms_document_view_tests
+21/83 Test: gui_forms_document_view_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_document_view_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_document_view_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+document view D1 fixtures passed; map span bytes=32
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_document_view_tests" end time: Oct 04 02:35 UTC
+"gui_forms_document_view_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+22/83 Testing: gui_forms_grapheme_conformance_tests
+22/83 Test: gui_forms_grapheme_conformance_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_grapheme_conformance_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_grapheme_conformance_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+grapheme_conformance_tests: PASS (766 official cases)
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_grapheme_conformance_tests" end time: Oct 04 02:35 UTC
+"gui_forms_grapheme_conformance_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+23/83 Testing: gui_forms_text_shaping_tests
+23/83 Test: gui_forms_text_shaping_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_text_shaping_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_text_shaping_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+text_shaping_tests: PASS
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_text_shaping_tests" end time: Oct 04 02:35 UTC
+"gui_forms_text_shaping_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+24/83 Testing: gui_forms_bounded_shape_tests
+24/83 Test: gui_forms_bounded_shape_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_bounded_shape_tests" "/Users/runner/work/file_manager/file_manager/gui_forms/assets/fonts"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_bounded_shape_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+Bounded shaping exact geometry and controlled storage fixtures passed
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_bounded_shape_tests" end time: Oct 04 02:35 UTC
+"gui_forms_bounded_shape_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+25/83 Testing: gui_forms_bounded_shape_workspace_tests
+25/83 Test: gui_forms_bounded_shape_workspace_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_bounded_shape_workspace_tests" "/Users/runner/work/file_manager/file_manager/gui_forms/assets/fonts"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_bounded_shape_workspace_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+Reusable bounded shaping equivalence and ownership fixtures passed
+<end of output>
+Test time =   0.14 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_bounded_shape_workspace_tests" end time: Oct 04 02:35 UTC
+"gui_forms_bounded_shape_workspace_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+26/83 Testing: gui_forms_prepared_window_shape_preview_verify
+26/83 Test: gui_forms_prepared_window_shape_preview_verify
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_prepared_window_shape_bench" "--fonts" "/Users/runner/work/file_manager/file_manager/gui_forms/assets/fonts" "--scene" "preview-seven" "--verify-only"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_prepared_window_shape_preview_verify" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+Exact geometry, retained rows, coverage, width and empty-EOF fixtures passed; no timings run
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_prepared_window_shape_preview_verify" end time: Oct 04 02:35 UTC
+"gui_forms_prepared_window_shape_preview_verify" time elapsed: 00:00:00
+----------------------------------------------------------
+
+27/83 Testing: gui_forms_prepared_window_shape_rows_verify
+27/83 Test: gui_forms_prepared_window_shape_rows_verify
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_prepared_window_shape_bench" "--fonts" "/Users/runner/work/file_manager/file_manager/gui_forms/assets/fonts" "--scene" "window-512" "--verify-only"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_prepared_window_shape_rows_verify" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+Exact geometry, retained rows, coverage, width and empty-EOF fixtures passed; no timings run
+<end of output>
+Test time =   0.17 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_prepared_window_shape_rows_verify" end time: Oct 04 02:35 UTC
+"gui_forms_prepared_window_shape_rows_verify" time elapsed: 00:00:00
+----------------------------------------------------------
+
+28/83 Testing: gui_forms_harfbuzz_font_engine_tests
+28/83 Test: gui_forms_harfbuzz_font_engine_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_harfbuzz_font_engine_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_harfbuzz_font_engine_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+coverage_case,isolated mark remains reported,1
+coverage_case,noncomposable q plus acute remains reported,1
+coverage_case,longer unsupported cluster remains reported,1
+resolution corpus bytes=31 width=130.797 ascent=12.000 descent=4.000 runs=4
+resolution scale=1.000 width=130.797 line=16.000
+resolution scale=1.250 width=160.734 line=20.000
+resolution scale=1.500 width=195.688 line=23.000
+resolution scale=2.000 width=261.578 line=30.000
+harfbuzz font engine tests passed
+<end of output>
+Test time =   0.06 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_harfbuzz_font_engine_tests" end time: Oct 04 02:35 UTC
+"gui_forms_harfbuzz_font_engine_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+29/83 Testing: gui_forms_basic_controls_tests
+29/83 Test: gui_forms_basic_controls_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_basic_controls_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_basic_controls_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+label preview cost: bytes=65536 drawn_lines=7 width_queries=23 queried_bytes=383
+gui_forms_basic_controls_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_basic_controls_tests" end time: Oct 04 02:35 UTC
+"gui_forms_basic_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+30/83 Testing: gui_forms_connected_controls_tests
+30/83 Test: gui_forms_connected_controls_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_connected_controls_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_connected_controls_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_connected_controls_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_connected_controls_tests" end time: Oct 04 02:35 UTC
+"gui_forms_connected_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+31/83 Testing: gui_forms_scrollable_control_tests
+31/83 Test: gui_forms_scrollable_control_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_scrollable_control_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_scrollable_control_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_scrollable_control_tests: all tests passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_scrollable_control_tests" end time: Oct 04 02:35 UTC
+"gui_forms_scrollable_control_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+32/83 Testing: gui_forms_input_controls_tests
+32/83 Test: gui_forms_input_controls_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_input_controls_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_input_controls_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_input_controls_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_input_controls_tests" end time: Oct 04 02:35 UTC
+"gui_forms_input_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+33/83 Testing: gui_forms_multiline_text_box_tests
+33/83 Test: gui_forms_multiline_text_box_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_multiline_text_box_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_multiline_text_box_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+10k lines: 77.421 ms; cold metric calls=120002; warm=0
+4096-byte line cold layout: 516.842 ms
+gui_forms_multiline_text_box_tests: passed
+<end of output>
+Test time =   0.61 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_multiline_text_box_tests" end time: Oct 04 02:35 UTC
+"gui_forms_multiline_text_box_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+34/83 Testing: gui_forms_inspection_controls_tests
+34/83 Test: gui_forms_inspection_controls_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_inspection_controls_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_inspection_controls_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_inspection_controls_tests: all tests passed
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_inspection_controls_tests" end time: Oct 04 02:35 UTC
+"gui_forms_inspection_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+35/83 Testing: gui_forms_visual_inspection_tests
+35/83 Test: gui_forms_visual_inspection_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_visual_inspection_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_visual_inspection_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_visual_inspection_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_visual_inspection_tests" end time: Oct 04 02:35 UTC
+"gui_forms_visual_inspection_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+36/83 Testing: gui_forms_instrument_controls_tests
+36/83 Test: gui_forms_instrument_controls_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_instrument_controls_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_instrument_controls_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_instrument_controls_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_instrument_controls_tests" end time: Oct 04 02:35 UTC
+"gui_forms_instrument_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+37/83 Testing: gui_forms_checked_list_box_tests
+37/83 Test: gui_forms_checked_list_box_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_checked_list_box_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_checked_list_box_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_checked_list_box_tests: all tests passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_checked_list_box_tests" end time: Oct 04 02:35 UTC
+"gui_forms_checked_list_box_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+38/83 Testing: gui_forms_collection_controls_tests
+38/83 Test: gui_forms_collection_controls_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_collection_controls_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_collection_controls_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+Details fractional row: handled=1 top=1 selected=detail.2 height=102
+Details fixture rows=1000 visited_rows=6 cells=12 prepared=14
+Details fixture rows=100000 visited_rows=6 cells=12 prepared=14
+Details cold bytes=65536 nonmonotonic=0 queries=21 measured_bytes=131152
+Details cold bytes=65536 nonmonotonic=1 queries=21 measured_bytes=131144
+gui_forms_collection_controls_tests: all tests passed
+<end of output>
+Test time =   0.15 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_collection_controls_tests" end time: Oct 04 02:35 UTC
+"gui_forms_collection_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+39/83 Testing: gui_forms_object_details_failure_tests
+39/83 Test: gui_forms_object_details_failure_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_object_details_failure_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_object_details_failure_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+Details allocation operation=0 capture=0 sites=67 old_failures=57 new_failures=10
+Details allocation operation=0 capture=1 sites=68 old_failures=57 new_failures=11
+Details allocation operation=4 capture=0 sites=66 old_failures=56 new_failures=10
+Details allocation operation=4 capture=1 sites=67 old_failures=56 new_failures=11
+Details allocation operation=1 capture=0 sites=30 old_failures=20 new_failures=10
+Details allocation operation=1 capture=1 sites=30 old_failures=20 new_failures=10
+Details allocation operation=2 capture=0 sites=97 old_failures=77 new_failures=20
+Details allocation operation=3 capture=0 sites=12 old_failures=6 new_failures=6
+gui_forms_object_details_failure_tests: all tests passed
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_object_details_failure_tests" end time: Oct 04 02:35 UTC
+"gui_forms_object_details_failure_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+40/83 Testing: gui_forms_menu_controls_tests
+40/83 Test: gui_forms_menu_controls_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_menu_controls_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_menu_controls_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_menu_controls_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_menu_controls_tests" end time: Oct 04 02:35 UTC
+"gui_forms_menu_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+41/83 Testing: gui_forms_popup_controls_tests
+41/83 Test: gui_forms_popup_controls_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_popup_controls_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_popup_controls_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_popup_controls_tests" end time: Oct 04 02:35 UTC
+"gui_forms_popup_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+42/83 Testing: gui_forms_range_controls_tests
+42/83 Test: gui_forms_range_controls_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_range_controls_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_range_controls_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_range_controls_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_range_controls_tests" end time: Oct 04 02:35 UTC
+"gui_forms_range_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+43/83 Testing: gui_forms_material_tests
+43/83 Test: gui_forms_material_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_material_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_material_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_material_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_material_tests" end time: Oct 04 02:35 UTC
+"gui_forms_material_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+44/83 Testing: gui_forms_theme_tests
+44/83 Test: gui_forms_theme_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_theme_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_theme_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_theme_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_theme_tests" end time: Oct 04 02:35 UTC
+"gui_forms_theme_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+45/83 Testing: gui_forms_composition_controls_tests
+45/83 Test: gui_forms_composition_controls_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_composition_controls_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_composition_controls_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_composition_controls_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_composition_controls_tests" end time: Oct 04 02:35 UTC
+"gui_forms_composition_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+46/83 Testing: gui_forms_split_container_tests
+46/83 Test: gui_forms_split_container_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_split_container_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_split_container_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+split-container-tests: pass
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_split_container_tests" end time: Oct 04 02:35 UTC
+"gui_forms_split_container_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+47/83 Testing: gui_forms_layout_panel_tests
+47/83 Test: gui_forms_layout_panel_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_layout_panel_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_layout_panel_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+layout-panel-tests: pass
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_layout_panel_tests" end time: Oct 04 02:35 UTC
+"gui_forms_layout_panel_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+48/83 Testing: gui_forms_responsive_track_panel_tests
+48/83 Test: gui_forms_responsive_track_panel_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_responsive_track_panel_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_responsive_track_panel_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+responsive-track-panel-tests: pass
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_responsive_track_panel_tests" end time: Oct 04 02:35 UTC
+"gui_forms_responsive_track_panel_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+49/83 Testing: gui_forms_command_overflow_panel_tests
+49/83 Test: gui_forms_command_overflow_panel_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_command_overflow_panel_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_command_overflow_panel_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_command_overflow_panel_tests" end time: Oct 04 02:35 UTC
+"gui_forms_command_overflow_panel_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+50/83 Testing: gui_forms_tab_control_tests
+50/83 Test: gui_forms_tab_control_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_tab_control_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_tab_control_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_tab_control_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_tab_control_tests" end time: Oct 04 02:35 UTC
+"gui_forms_tab_control_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+51/83 Testing: gui_forms_focus_scope_tests
+51/83 Test: gui_forms_focus_scope_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_focus_scope_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_focus_scope_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_focus_scope_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_focus_scope_tests" end time: Oct 04 02:35 UTC
+"gui_forms_focus_scope_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+52/83 Testing: gui_forms_animation_tests
+52/83 Test: gui_forms_animation_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_animation_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_animation_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_animation_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_animation_tests" end time: Oct 04 02:35 UTC
+"gui_forms_animation_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+53/83 Testing: gui_forms_semantic_tests
+53/83 Test: gui_forms_semantic_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_semantic_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_semantic_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_semantic_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_semantic_tests" end time: Oct 04 02:35 UTC
+"gui_forms_semantic_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+54/83 Testing: gui_forms_lifecycle_controls_tests
+54/83 Test: gui_forms_lifecycle_controls_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_lifecycle_controls_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_lifecycle_controls_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+lifecycle controls tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_lifecycle_controls_tests" end time: Oct 04 02:35 UTC
+"gui_forms_lifecycle_controls_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+55/83 Testing: gui_forms_retained_lifetime_tests
+55/83 Test: gui_forms_retained_lifetime_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_retained_lifetime_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_retained_lifetime_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_retained_lifetime_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_retained_lifetime_tests" end time: Oct 04 02:35 UTC
+"gui_forms_retained_lifetime_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+56/83 Testing: gui_forms_invalidation_damage_tests
+56/83 Test: gui_forms_invalidation_damage_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_invalidation_damage_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_invalidation_damage_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_invalidation_damage_tests: all tests passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_invalidation_damage_tests" end time: Oct 04 02:35 UTC
+"gui_forms_invalidation_damage_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+57/83 Testing: gui_forms_display_chunk_tests
+57/83 Test: gui_forms_display_chunk_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_display_chunk_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_display_chunk_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_display_chunk_tests: all tests passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_display_chunk_tests" end time: Oct 04 02:35 UTC
+"gui_forms_display_chunk_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+58/83 Testing: gui_forms_frame_scheduler_tests
+58/83 Test: gui_forms_frame_scheduler_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_frame_scheduler_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_frame_scheduler_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_frame_scheduler_tests: all tests passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_frame_scheduler_tests" end time: Oct 04 02:35 UTC
+"gui_forms_frame_scheduler_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+59/83 Testing: gui_forms_timer_tests
+59/83 Test: gui_forms_timer_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_timer_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_timer_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+timer tests passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_timer_tests" end time: Oct 04 02:35 UTC
+"gui_forms_timer_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+60/83 Testing: gui_forms_dispatcher_tests
+60/83 Test: gui_forms_dispatcher_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_dispatcher_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_dispatcher_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+dispatcher-tests=pass
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_dispatcher_tests" end time: Oct 04 02:35 UTC
+"gui_forms_dispatcher_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+61/83 Testing: gui_forms_tooltip_tests
+61/83 Test: gui_forms_tooltip_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_tooltip_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_tooltip_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+tooltip tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_tooltip_tests" end time: Oct 04 02:35 UTC
+"gui_forms_tooltip_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+62/83 Testing: gui_forms_binding_tests
+62/83 Test: gui_forms_binding_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_binding_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_binding_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_binding_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_binding_tests" end time: Oct 04 02:35 UTC
+"gui_forms_binding_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+63/83 Testing: gui_forms_validation_tests
+63/83 Test: gui_forms_validation_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_validation_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_validation_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+validation tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_validation_tests" end time: Oct 04 02:35 UTC
+"gui_forms_validation_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+64/83 Testing: gui_forms_guidance_provider_tests
+64/83 Test: gui_forms_guidance_provider_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_guidance_provider_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_guidance_provider_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+guidance provider tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_guidance_provider_tests" end time: Oct 04 02:35 UTC
+"gui_forms_guidance_provider_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+65/83 Testing: gui_forms_date_time_picker_tests
+65/83 Test: gui_forms_date_time_picker_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_date_time_picker_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_date_time_picker_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+date time picker tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_date_time_picker_tests" end time: Oct 04 02:35 UTC
+"gui_forms_date_time_picker_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+66/83 Testing: gui_forms_png_registry_tests
+66/83 Test: gui_forms_png_registry_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_png_registry_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_png_registry_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_png_registry_tests" end time: Oct 04 02:35 UTC
+"gui_forms_png_registry_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+67/83 Testing: gui_forms_headless_trace_tests
+67/83 Test: gui_forms_headless_trace_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_headless_trace_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_headless_trace_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+create controls=4
+t=10 resize=160x90 scale=2
+paint draws=6
+t=20 pointer id=trace.root phase=preview action=down
+t=20 pointer id=trace.left phase=preview action=down
+t=20 pointer id=trace.target phase=preview action=down
+t=20 focus id=trace.target state=on
+t=20 pointer id=trace.target phase=target action=down
+t=20 pointer id=trace.left phase=bubble action=down
+t=20 pointer id=trace.root phase=bubble action=down
+t=30 pointer id=trace.root phase=preview action=up
+t=30 pointer id=trace.left phase=preview action=up
+t=30 pointer id=trace.target phase=preview action=up
+t=30 pointer id=trace.target phase=target action=up
+t=30 pointer id=trace.left phase=bubble action=up
+t=30 pointer id=trace.root phase=bubble action=up
+t=30 activate id=trace.target
+t=40 key id=trace.root phase=preview code=40
+t=40 key id=trace.left phase=preview code=40
+t=40 key id=trace.target phase=preview code=40
+t=40 key id=trace.target phase=target code=40
+t=40 key id=trace.left phase=bubble code=40
+t=40 key id=trace.root phase=bubble code=40
+t=40 text id=trace.target value=A
+t=50 focus id=trace.target state=off
+t=50 reparent id=trace.target parent=trace.right
+t=50 focus id=trace.target state=on
+t=60 pointer id=trace.root phase=preview action=down
+t=60 pointer id=trace.right phase=preview action=down
+t=60 pointer id=trace.target phase=preview action=down
+t=60 pointer id=trace.target phase=target action=down
+t=60 pointer id=trace.right phase=bubble action=down
+t=60 pointer id=trace.root phase=bubble action=down
+t=60 dispose id=trace.target state=disposed
+t=60 pointer id=trace.root phase=preview action=up
+t=60 pointer id=trace.right phase=preview action=up
+t=60 pointer id=trace.right phase=target action=up
+t=60 pointer id=trace.root phase=bubble action=up
+paint draws=5
+metrics focus=4 activation=1 disposal=1 focus_revoke=2 capture_revoke=1
+t=1060 idle frame=0 wake=0 layout=0 paint=0 present=0 callback=0
+gui_forms_headless_trace_tests: byte-identical replay passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_headless_trace_tests" end time: Oct 04 02:35 UTC
+"gui_forms_headless_trace_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+68/83 Testing: gui_forms_host_protocol_tests
+68/83 Test: gui_forms_host_protocol_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_host_protocol_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_host_protocol_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+headless_capabilities={"protocol_version":7,"platform":"headless-reference","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]}
+seq=1 time_ns=1000 event=attach accepted=1 handled=0 input_deferred=0 input_rejected=0 drag_effect=none close_allowed=1 error=none phase=attached attached=1 active=0 occluded=0 display_changes=0 monitors=0 captured=0 pointer_id=0 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=2 time_ns=1001 event=display accepted=1 handled=0 input_deferred=0 input_rejected=0 drag_effect=none close_allowed=1 error=none phase=attached attached=1 active=0 occluded=0 display_changes=1 monitors=1 captured=0 pointer_id=0 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=3 time_ns=1002 event=activation accepted=1 handled=0 input_deferred=0 input_rejected=0 drag_effect=none close_allowed=1 error=none phase=attached attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=0 pointer_id=0 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=4 time_ns=1003 event=occlusion accepted=1 handled=0 input_deferred=0 input_rejected=0 drag_effect=none close_allowed=1 error=none phase=attached attached=1 active=1 occluded=1 display_changes=1 monitors=1 captured=0 pointer_id=0 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=5 time_ns=1004 event=occlusion accepted=1 handled=0 input_deferred=0 input_rejected=0 drag_effect=none close_allowed=1 error=none phase=attached attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=0 pointer_id=0 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=6 time_ns=1005 event=pointer accepted=1 handled=1 input_deferred=0 input_rejected=0 drag_effect=none close_allowed=1 error=none phase=attached attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=1 pointer_id=1 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=7 time_ns=1006 event=key accepted=1 handled=1 input_deferred=0 input_rejected=0 drag_effect=none close_allowed=1 error=none phase=attached attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=1 pointer_id=1 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=8 time_ns=1007 event=text accepted=1 handled=1 input_deferred=0 input_rejected=0 drag_effect=none close_allowed=1 error=none phase=attached attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=1 pointer_id=1 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=9 time_ns=1008 event=close_request accepted=1 handled=0 input_deferred=0 input_rejected=0 drag_effect=none close_allowed=1 error=none phase=close_authorized attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=1 pointer_id=1 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=10 time_ns=1009 event=closed accepted=1 handled=0 input_deferred=0 input_rejected=0 drag_effect=none close_allowed=1 error=none phase=closed attached=0 active=0 occluded=0 display_changes=1 monitors=1 captured=0 pointer_id=0 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=1 shutdown=0
+seq=11 time_ns=1010 event=shutdown accepted=1 handled=0 input_deferred=0 input_rejected=0 drag_effect=none close_allowed=1 error=none phase=shutdown attached=0 active=0 occluded=0 display_changes=1 monitors=1 captured=0 pointer_id=0 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=1 shutdown=1
+service=monitors error=none count=1 primary=headless.primary
+service=cursor error=none value=text
+service=capture error=none pointer=7
+service=release error=none
+service=clipboard_write error=none
+service=clipboard_read error=none generation=1 text=service Ω
+dialog=message request=40 depth=1 error=none outcome=cancelled choice=cancel
+service=dialog error=none
+snapshot={"capabilities":{"protocol_version":7,"platform":"headless-reference","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"cursor":"text","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":1,"cursor_updates":1,"pointer_capture_updates":2,"clipboard_reads":1,"clipboard_writes":1,"clipboard_generation":1,"dialog_requests":1,"dialog_completions":1,"dialog_cancellations":1,"sound_requests":0,"sound_playbacks":0,"sound_coalesced":0,"sound_muted":0,"sound_coalescing_window_nanoseconds":50000000,"modal_depth":0,"maximum_modal_depth":1,"rejected_requests":0,"shutdown":false}
+modal=enter request=70 depth=1
+modal=enter request=71 depth=2
+modal=leave request=71 depth=1
+modal=leave request=70 depth=0
+dialog=message request=71 depth=2 error=none outcome=accepted choice=ok
+dialog=message request=70 depth=1 error=none outcome=cancelled choice=cancel
+services={"capabilities":{"protocol_version":7,"platform":"headless-reference","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"cursor":"arrow","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":0,"cursor_updates":0,"pointer_capture_updates":0,"clipboard_reads":0,"clipboard_writes":0,"clipboard_generation":0,"dialog_requests":2,"dialog_completions":2,"dialog_cancellations":1,"sound_requests":0,"sound_playbacks":0,"sound_coalesced":0,"sound_muted":0,"sound_coalescing_window_nanoseconds":50000000,"modal_depth":0,"maximum_modal_depth":2,"rejected_requests":0,"shutdown":false}
+session={"capabilities":{"protocol_version":7,"platform":"headless-reference","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"phase":"constructed","last_sequence":0,"events_accepted":0,"events_rejected":0,"callback_faults":0,"close_requests":0,"close_cancellations":0,"display_changes":0,"monitor_count":0,"modal_transitions":4,"modal_input_suppressions":0,"drag_events":0,"drag_drops":0,"modal_depth":0,"attached":false,"active":false,"occluded":false,"closed":false,"shutdown":false}
+gui_forms_host_protocol_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_host_protocol_tests" end time: Oct 04 02:35 UTC
+"gui_forms_host_protocol_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+69/83 Testing: gui_forms_host_boundary_audit
+69/83 Test: gui_forms_host_boundary_audit
+Command: "/opt/homebrew/bin/cmake" "-DTARGET_SYSTEM_NAME=Darwin" "-DNM_TOOL=/usr/bin/nm" "-DOBJDUMP_TOOL=/usr/bin/objdump" "-DCORE_LIBRARY=/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/libgui_forms_core.a" "-DHEADLESS_LIBRARY=/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/libgui_forms_host_headless.a" "-DHEADLESS_TEST_BINARY=/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_host_protocol_tests" "-DPORTABLE_SOURCE_DIRECTORY=/Users/runner/work/file_manager/file_manager/gui_forms/src" "-DPUBLIC_INCLUDE_DIRECTORY=/Users/runner/work/file_manager/file_manager/gui_forms/include" "-P" "/Users/runner/work/file_manager/file_manager/gui_forms/cmake/check_host_boundaries.cmake"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_host_boundary_audit" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+-- host_boundary_audit=passed
+core_bytes=3171784
+headless_host_bytes=136712
+dependencies:
+/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_host_protocol_tests:
+	/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 2100.43.0)
+	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1356.0.0)
+
+<end of output>
+Test time =   0.23 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_host_boundary_audit" end time: Oct 04 02:35 UTC
+"gui_forms_host_boundary_audit" time elapsed: 00:00:00
+----------------------------------------------------------
+
+70/83 Testing: gui_forms_c_api_c11_tests
+70/83 Test: gui_forms_c_api_c11_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_c_api_c11_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_c_api_c11_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_c_api_c11_tests: all tests passed
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_c_api_c11_tests" end time: Oct 04 02:35 UTC
+"gui_forms_c_api_c11_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+71/83 Testing: gui_forms_c_api_cpp_tests
+71/83 Test: gui_forms_c_api_cpp_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_c_api_cpp_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_c_api_cpp_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+gui_forms_c_api_cpp_tests: all tests passed
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_c_api_cpp_tests" end time: Oct 04 02:35 UTC
+"gui_forms_c_api_cpp_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+72/83 Testing: gui_forms_c_api_export_policy
+72/83 Test: gui_forms_c_api_export_policy
+Command: "/opt/homebrew/bin/cmake" "-DC_API_LIBRARY=/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/libgui_forms_abi0.0.4.0.dylib" "-P" "/Users/runner/work/file_manager/file_manager/gui_forms/cmake/check_c_api_exports.cmake"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_c_api_export_policy" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.11 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_c_api_export_policy" end time: Oct 04 02:35 UTC
+"gui_forms_c_api_export_policy" time elapsed: 00:00:00
+----------------------------------------------------------
+
+73/83 Testing: gui_forms_macos_clipboard_image_tests
+73/83 Test: gui_forms_macos_clipboard_image_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_macos_clipboard_image_tests.app/Contents/MacOS/gui_forms_macos_clipboard_image_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_macos_clipboard_image_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+isolated macOS clipboard image roundtrip and PNG interchange passed
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_macos_clipboard_image_tests" end time: Oct 04 02:35 UTC
+"gui_forms_macos_clipboard_image_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+74/83 Testing: gui_forms_macos_exposure_tests
+74/83 Test: gui_forms_macos_exposure_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_macos_exposure_tests.app/Contents/MacOS/gui_forms_macos_exposure_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_macos_exposure_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+Cached native exposure, minimize/restore and hide/show preserve pixels without input
+<end of output>
+Test time =   2.35 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_macos_exposure_tests" end time: Oct 04 02:35 UTC
+"gui_forms_macos_exposure_tests" time elapsed: 00:00:02
+----------------------------------------------------------
+
+75/83 Testing: gui_forms_macos_idle_visibility_tests
+75/83 Test: gui_forms_macos_idle_visibility_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_macos_idle_visibility_tests.app/Contents/MacOS/gui_forms_macos_idle_visibility_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_macos_idle_visibility_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+idle-stage=0|host={"session":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"phase":"attached","last_sequence":4,"events_accepted":3,"events_rejected":1,"callback_faults":0,"close_requests":0,"close_cancellations":0,"display_changes":1,"monitor_count":1,"modal_transitions":0,"modal_input_suppressions":0,"drag_events":0,"drag_drops":0,"modal_depth":0,"attached":true,"active":false,"occluded":true,"closed":false,"shutdown":false},"services":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"cursor":"arrow","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":1,"cursor_updates":0,"pointer_capture_updates":0,"clipboard_reads":0,"clipboard_writes":0,"clipboard_generation":0,"dialog_requests":0,"dialog_completions":0,"dialog_cancellations":0,"sound_requests":0,"sound_playbacks":0,"sound_coalesced":0,"sound_muted":0,"sound_coalescing_window_nanoseconds":50000000,"modal_depth":0,"maximum_modal_depth":0,"rejected_requests":0,"shutdown":false},"titlebar_presentation":"standard","native_full_size_content":false,"native_title_hidden":false,"native_titlebar_transparent":false,"native_close_button_present":true,"native_minimize_button_present":true,"native_zoom_button_present":true,"native_system_title_present":true,"window_drag_region_configured":false,"window_drag_region_resolved":false,"window_drag_region_count":0,"window_drag_region_resolved_count":0,"initial_host_occluded":true,"host_occluded":true,"scheduled_wake_count":5,"damage_collection_count":11,"native_draw_count":1,"display_tick_count":0,"paint_raster_prepare_calls":1,"paint_raster_prepare_nanoseconds":49875,"paint_raster_prepare_maximum_nanoseconds":49875,"paint_raster_prepare_saturated":false,"paint_retained_calls":1,"paint_retained_nanoseconds":709,"paint_retained_maximum_nanoseconds":709,"paint_retained_saturated":false,"paint_raster_finish_calls":1,"paint_raster_finish_nanoseconds":459,"paint_raster_finish_maximum_nanoseconds":459,"paint_raster_finish_saturated":false,"paint_cg_setup_calls":0,"paint_cg_setup_nanoseconds":0,"paint_cg_setup_maximum_nanoseconds":0,"paint_cg_setup_saturated":false,"paint_cg_draw_calls":0,"paint_cg_draw_nanoseconds":0,"paint_cg_draw_maximum_nanoseconds":0,"paint_cg_draw_saturated":false,"paint_cg_release_calls":0,"paint_cg_release_nanoseconds":0,"paint_cg_release_maximum_nanoseconds":0,"paint_cg_release_saturated":false,"last_native_dirty_area":74240.000000,"last_frame_damage_bounds_area":74240.000000,"last_cg_destination_area":0.000000,"last_cg_clip_bounds_area":0.000000,"last_cg_source_bytes":0,"native_callback_faults":0}
+idle-stage=1|host={"session":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"phase":"attached","last_sequence":6,"events_accepted":5,"events_rejected":1,"callback_faults":0,"close_requests":0,"close_cancellations":0,"display_changes":1,"monitor_count":1,"modal_transitions":0,"modal_input_suppressions":0,"drag_events":0,"drag_drops":0,"modal_depth":0,"attached":true,"active":true,"occluded":false,"closed":false,"shutdown":false},"services":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"cursor":"arrow","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":1,"cursor_updates":0,"pointer_capture_updates":0,"clipboard_reads":0,"clipboard_writes":0,"clipboard_generation":0,"dialog_requests":0,"dialog_completions":0,"dialog_cancellations":0,"sound_requests":0,"sound_playbacks":0,"sound_coalesced":0,"sound_muted":0,"sound_coalescing_window_nanoseconds":50000000,"modal_depth":0,"maximum_modal_depth":0,"rejected_requests":0,"shutdown":false},"titlebar_presentation":"standard","native_full_size_content":false,"native_title_hidden":false,"native_titlebar_transparent":false,"native_close_button_present":true,"native_minimize_button_present":true,"native_zoom_button_present":true,"native_system_title_present":true,"window_drag_region_configured":false,"window_drag_region_resolved":false,"window_drag_region_count":0,"window_drag_region_resolved_count":0,"initial_host_occluded":true,"host_occluded":false,"scheduled_wake_count":6,"damage_collection_count":16,"native_draw_count":4,"display_tick_count":0,"paint_raster_prepare_calls":4,"paint_raster_prepare_nanoseconds":97709,"paint_raster_prepare_maximum_nanoseconds":49875,"paint_raster_prepare_saturated":false,"paint_retained_calls":4,"paint_retained_nanoseconds":764459,"paint_retained_maximum_nanoseconds":443875,"paint_retained_saturated":false,"paint_raster_finish_calls":4,"paint_raster_finish_nanoseconds":3751,"paint_raster_finish_maximum_nanoseconds":2125,"paint_raster_finish_saturated":false,"paint_cg_setup_calls":2,"paint_cg_setup_nanoseconds":55959,"paint_cg_setup_maximum_nanoseconds":45917,"paint_cg_setup_saturated":false,"paint_cg_draw_calls":2,"paint_cg_draw_nanoseconds":2148833,"paint_cg_draw_maximum_nanoseconds":1639667,"paint_cg_draw_saturated":false,"paint_cg_release_calls":2,"paint_cg_release_nanoseconds":22209,"paint_cg_release_maximum_nanoseconds":12417,"paint_cg_release_saturated":false,"last_native_dirty_area":392.000000,"last_frame_damage_bounds_area":392.000000,"last_cg_destination_area":64000.000000,"last_cg_clip_bounds_area":392.000000,"last_cg_source_bytes":256000,"native_callback_faults":0}
+idle-stage=2|host={"session":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"phase":"attached","last_sequence":6,"events_accepted":5,"events_rejected":1,"callback_faults":0,"close_requests":0,"close_cancellations":0,"display_changes":1,"monitor_count":1,"modal_transitions":0,"modal_input_suppressions":0,"drag_events":0,"drag_drops":0,"modal_depth":0,"attached":true,"active":true,"occluded":false,"closed":false,"shutdown":false},"services":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"cursor":"arrow","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":1,"cursor_updates":0,"pointer_capture_updates":0,"clipboard_reads":0,"clipboard_writes":0,"clipboard_generation":0,"dialog_requests":0,"dialog_completions":0,"dialog_cancellations":0,"sound_requests":0,"sound_playbacks":0,"sound_coalesced":0,"sound_muted":0,"sound_coalescing_window_nanoseconds":50000000,"modal_depth":0,"maximum_modal_depth":0,"rejected_requests":0,"shutdown":false},"titlebar_presentation":"standard","native_full_size_content":false,"native_title_hidden":false,"native_titlebar_transparent":false,"native_close_button_present":true,"native_minimize_button_present":true,"native_zoom_button_present":true,"native_system_title_present":true,"window_drag_region_configured":false,"window_drag_region_resolved":false,"window_drag_region_count":0,"window_drag_region_resolved_count":0,"initial_host_occluded":true,"host_occluded":false,"scheduled_wake_count":7,"damage_collection_count":18,"native_draw_count":5,"display_tick_count":0,"paint_raster_prepare_calls":5,"paint_raster_prepare_nanoseconds":166459,"paint_raster_prepare_maximum_nanoseconds":68750,"paint_raster_prepare_saturated":false,"paint_retained_calls":5,"paint_retained_nanoseconds":1009459,"paint_retained_maximum_nanoseconds":443875,"paint_retained_saturated":false,"paint_raster_finish_calls":5,"paint_raster_finish_nanoseconds":4085,"paint_raster_finish_maximum_nanoseconds":2125,"paint_raster_finish_saturated":false,"paint_cg_setup_calls":3,"paint_cg_setup_nanoseconds":80792,"paint_cg_setup_maximum_nanoseconds":45917,"paint_cg_setup_saturated":false,"paint_cg_draw_calls":3,"paint_cg_draw_nanoseconds":2411541,"paint_cg_draw_maximum_nanoseconds":1639667,"paint_cg_draw_saturated":false,"paint_cg_release_calls":3,"paint_cg_release_nanoseconds":26334,"paint_cg_release_maximum_nanoseconds":12417,"paint_cg_release_saturated":false,"last_native_dirty_area":392.000000,"last_frame_damage_bounds_area":392.000000,"last_cg_destination_area":64000.000000,"last_cg_clip_bounds_area":392.000000,"last_cg_source_bytes":256000,"native_callback_faults":0}
+idle-stage=3|host={"session":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"phase":"attached","last_sequence":8,"events_accepted":7,"events_rejected":1,"callback_faults":0,"close_requests":0,"close_cancellations":0,"display_changes":1,"monitor_count":1,"modal_transitions":0,"modal_input_suppressions":0,"drag_events":0,"drag_drops":0,"modal_depth":0,"attached":true,"active":false,"occluded":true,"closed":false,"shutdown":false},"services":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"cursor":"arrow","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":1,"cursor_updates":0,"pointer_capture_updates":0,"clipboard_reads":0,"clipboard_writes":0,"clipboard_generation":0,"dialog_requests":0,"dialog_completions":0,"dialog_cancellations":0,"sound_requests":0,"sound_playbacks":0,"sound_coalesced":0,"sound_muted":0,"sound_coalescing_window_nanoseconds":50000000,"modal_depth":0,"maximum_modal_depth":0,"rejected_requests":0,"shutdown":false},"titlebar_presentation":"standard","native_full_size_content":false,"native_title_hidden":false,"native_titlebar_transparent":false,"native_close_button_present":true,"native_minimize_button_present":true,"native_zoom_button_present":true,"native_system_title_present":true,"window_drag_region_configured":false,"window_drag_region_resolved":false,"window_drag_region_count":0,"window_drag_region_resolved_count":0,"initial_host_occluded":true,"host_occluded":true,"scheduled_wake_count":7,"damage_collection_count":20,"native_draw_count":6,"display_tick_count":0,"paint_raster_prepare_calls":6,"paint_raster_prepare_nanoseconds":172584,"paint_raster_prepare_maximum_nanoseconds":68750,"paint_raster_prepare_saturated":false,"paint_retained_calls":6,"paint_retained_nanoseconds":1273250,"paint_retained_maximum_nanoseconds":443875,"paint_retained_saturated":false,"paint_raster_finish_calls":6,"paint_raster_finish_nanoseconds":4252,"paint_raster_finish_maximum_nanoseconds":2125,"paint_raster_finish_saturated":false,"paint_cg_setup_calls":4,"paint_cg_setup_nanoseconds":85584,"paint_cg_setup_maximum_nanoseconds":45917,"paint_cg_setup_saturated":false,"paint_cg_draw_calls":4,"paint_cg_draw_nanoseconds":2533083,"paint_cg_draw_maximum_nanoseconds":1639667,"paint_cg_draw_saturated":false,"paint_cg_release_calls":4,"paint_cg_release_nanoseconds":27376,"paint_cg_release_maximum_nanoseconds":12417,"paint_cg_release_saturated":false,"last_native_dirty_area":64000.000000,"last_frame_damage_bounds_area":64000.000000,"last_cg_destination_area":64000.000000,"last_cg_clip_bounds_area":64000.000000,"last_cg_source_bytes":256000,"native_callback_faults":0}
+idle-stage=4|host={"session":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"phase":"attached","last_sequence":8,"events_accepted":7,"events_rejected":1,"callback_faults":0,"close_requests":0,"close_cancellations":0,"display_changes":1,"monitor_count":1,"modal_transitions":0,"modal_input_suppressions":0,"drag_events":0,"drag_drops":0,"modal_depth":0,"attached":true,"active":false,"occluded":true,"closed":false,"shutdown":false},"services":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"cursor":"arrow","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":1,"cursor_updates":0,"pointer_capture_updates":0,"clipboard_reads":0,"clipboard_writes":0,"clipboard_generation":0,"dialog_requests":0,"dialog_completions":0,"dialog_cancellations":0,"sound_requests":0,"sound_playbacks":0,"sound_coalesced":0,"sound_muted":0,"sound_coalescing_window_nanoseconds":50000000,"modal_depth":0,"maximum_modal_depth":0,"rejected_requests":0,"shutdown":false},"titlebar_presentation":"standard","native_full_size_content":false,"native_title_hidden":false,"native_titlebar_transparent":false,"native_close_button_present":true,"native_minimize_button_present":true,"native_zoom_button_present":true,"native_system_title_present":true,"window_drag_region_configured":false,"window_drag_region_resolved":false,"window_drag_region_count":0,"window_drag_region_resolved_count":0,"initial_host_occluded":true,"host_occluded":true,"scheduled_wake_count":7,"damage_collection_count":20,"native_draw_count":6,"display_tick_count":0,"paint_raster_prepare_calls":6,"paint_raster_prepare_nanoseconds":172584,"paint_raster_prepare_maximum_nanoseconds":68750,"paint_raster_prepare_saturated":false,"paint_retained_calls":6,"paint_retained_nanoseconds":1273250,"paint_retained_maximum_nanoseconds":443875,"paint_retained_saturated":false,"paint_raster_finish_calls":6,"paint_raster_finish_nanoseconds":4252,"paint_raster_finish_maximum_nanoseconds":2125,"paint_raster_finish_saturated":false,"paint_cg_setup_calls":4,"paint_cg_setup_nanoseconds":85584,"paint_cg_setup_maximum_nanoseconds":45917,"paint_cg_setup_saturated":false,"paint_cg_draw_calls":4,"paint_cg_draw_nanoseconds":2533083,"paint_cg_draw_maximum_nanoseconds":1639667,"paint_cg_draw_saturated":false,"paint_cg_release_calls":4,"paint_cg_release_nanoseconds":27376,"paint_cg_release_maximum_nanoseconds":12417,"paint_cg_release_saturated":false,"last_native_dirty_area":64000.000000,"last_frame_damage_bounds_area":64000.000000,"last_cg_destination_area":64000.000000,"last_cg_clip_bounds_area":64000.000000,"last_cg_source_bytes":256000,"native_callback_faults":0}
+idle-stage=5|host={"session":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"phase":"attached","last_sequence":10,"events_accepted":9,"events_rejected":1,"callback_faults":0,"close_requests":0,"close_cancellations":0,"display_changes":1,"monitor_count":1,"modal_transitions":0,"modal_input_suppressions":0,"drag_events":0,"drag_drops":0,"modal_depth":0,"attached":true,"active":true,"occluded":false,"closed":false,"shutdown":false},"services":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"cursor":"arrow","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":1,"cursor_updates":0,"pointer_capture_updates":0,"clipboard_reads":0,"clipboard_writes":0,"clipboard_generation":0,"dialog_requests":0,"dialog_completions":0,"dialog_cancellations":0,"sound_requests":0,"sound_playbacks":0,"sound_coalesced":0,"sound_muted":0,"sound_coalescing_window_nanoseconds":50000000,"modal_depth":0,"maximum_modal_depth":0,"rejected_requests":0,"shutdown":false},"titlebar_presentation":"standard","native_full_size_content":false,"native_title_hidden":false,"native_titlebar_transparent":false,"native_close_button_present":true,"native_minimize_button_present":true,"native_zoom_button_present":true,"native_system_title_present":true,"window_drag_region_configured":false,"window_drag_region_resolved":false,"window_drag_region_count":0,"window_drag_region_resolved_count":0,"initial_host_occluded":true,"host_occluded":false,"scheduled_wake_count":8,"damage_collection_count":25,"native_draw_count":9,"display_tick_count":0,"paint_raster_prepare_calls":9,"paint_raster_prepare_nanoseconds":210333,"paint_raster_prepare_maximum_nanoseconds":68750,"paint_raster_prepare_saturated":false,"paint_retained_calls":9,"paint_retained_nanoseconds":1604667,"paint_retained_maximum_nanoseconds":443875,"paint_retained_saturated":false,"paint_raster_finish_calls":9,"paint_raster_finish_nanoseconds":5793,"paint_raster_finish_maximum_nanoseconds":2125,"paint_raster_finish_saturated":false,"paint_cg_setup_calls":7,"paint_cg_setup_nanoseconds":135125,"paint_cg_setup_maximum_nanoseconds":45917,"paint_cg_setup_saturated":false,"paint_cg_draw_calls":7,"paint_cg_draw_nanoseconds":3617750,"paint_cg_draw_maximum_nanoseconds":1639667,"paint_cg_draw_saturated":false,"paint_cg_release_calls":7,"paint_cg_release_nanoseconds":43709,"paint_cg_release_maximum_nanoseconds":12417,"paint_cg_release_saturated":false,"last_native_dirty_area":392.000000,"last_frame_damage_bounds_area":392.000000,"last_cg_destination_area":64000.000000,"last_cg_clip_bounds_area":392.000000,"last_cg_source_bytes":256000,"native_callback_faults":0}
+{"stable_id":"idle.primary","window":{"control_count":1,"stable_id_count":1,"mutations":6,"dirty_marks":7,"measure_passes":1,"arrange_passes":1,"paint_passes":4,"controls_measured":1,"controls_arranged":1,"controls_painted":4,"measure_nodes_visited":1,"arrange_nodes_visited":1,"paint_nodes_visited":12,"paint_invalidations_consumed":4,"display_chunks_rebuilt":4,"display_chunks_reused":0,"display_commands_replayed":8,"display_cache_entries":1,"display_generation":4,"requested_damage_area":320000,"painted_damage_area":256000,"full_window_paints":4,"partial_paints":0,"input_events":0,"focus_transitions":0,"focus_scopes_opened":0,"focus_scopes_closed":0,"focus_scope_restorations":0,"focus_scope_rejections":0,"focus_scope_depth":0,"maximum_focus_scope_depth":0,"activations":0,"disposals":0,"rejected_wrong_thread_operations":0,"subscriptions_connected":0,"subscriptions_disconnected":0,"callbacks_emitted":0,"focus_revocations":0,"capture_revocations":0,"press_revocations":0,"undeclared_mutations":0,"damage_region_compactions":4,"damage_region_collapses":0,"maximum_damage_rectangles":1,"update_scopes_started":1,"update_scope_depth":0,"maximum_update_scope_depth":1,"flush_count":1,"read_barrier_flushes":1,"bounded_pass_limit_hits":0,"callback_arbitration_retries":0,"callback_arbitration_limit_hits":0,"scheduled_frame_requests":0,"scheduler_wakes":0,"frame_deadlines_fired":0,"active_surface_ticks":0,"frame_requests_coalesced":0,"frame_callback_faults":0,"reentrant_frame_polls_deferred":0,"active_surface_count":0,"maximum_active_surface_count":0,"occlusion_suspensions":1,"occlusion_resumes":1,"occluded_frame_polls":4,"frames_presented":4,"present_duration_nanoseconds":2952084,"worst_present_duration_nanoseconds":1060125,"renderer_name":"Skia CPU m152 · HarfBuzz 14.2.1 · FreeType 2.14.2 · bundled fonts (optional Unicode fallback)","cpu_only":true},"host":{"session":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"phase":"closed","last_sequence":11,"events_accepted":10,"events_rejected":1,"callback_faults":0,"close_requests":1,"close_cancellations":0,"display_changes":1,"monitor_count":1,"modal_transitions":0,"modal_input_suppressions":0,"drag_events":0,"drag_drops":0,"modal_depth":0,"attached":false,"active":false,"occluded":false,"closed":true,"shutdown":false},"services":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"cursor":"arrow","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":1,"cursor_updates":0,"pointer_capture_updates":0,"clipboard_reads":0,"clipboard_writes":0,"clipboard_generation":0,"dialog_requests":0,"dialog_completions":0,"dialog_cancellations":0,"sound_requests":0,"sound_playbacks":0,"sound_coalesced":0,"sound_muted":0,"sound_coalescing_window_nanoseconds":50000000,"modal_depth":0,"maximum_modal_depth":0,"rejected_requests":0,"shutdown":false},"titlebar_presentation":"standard","native_full_size_content":false,"native_title_hidden":false,"native_titlebar_transparent":false,"native_close_button_present":true,"native_minimize_button_present":true,"native_zoom_button_present":true,"native_system_title_present":true,"window_drag_region_configured":false,"window_drag_region_resolved":false,"window_drag_region_count":0,"window_drag_region_resolved_count":0,"initial_host_occluded":true,"host_occluded":false,"scheduled_wake_count":0,"damage_collection_count":15,"native_draw_count":5,"display_tick_count":0,"paint_raster_prepare_calls":5,"paint_raster_prepare_nanoseconds":2251835,"paint_raster_prepare_maximum_nanoseconds":2194417,"paint_raster_prepare_saturated":false,"paint_retained_calls":5,"paint_retained_nanoseconds":1989249,"paint_retained_maximum_nanoseconds":783125,"paint_retained_saturated":false,"paint_raster_finish_calls":5,"paint_raster_finish_nanoseconds":1584,"paint_raster_finish_maximum_nanoseconds":625,"paint_raster_finish_saturated":false,"paint_cg_setup_calls":4,"paint_cg_setup_nanoseconds":52000,"paint_cg_setup_maximum_nanoseconds":19333,"paint_cg_setup_saturated":false,"paint_cg_draw_calls":4,"paint_cg_draw_nanoseconds":815958,"paint_cg_draw_maximum_nanoseconds":280667,"paint_cg_draw_saturated":false,"paint_cg_release_calls":4,"paint_cg_release_nanoseconds":15083,"paint_cg_release_maximum_nanoseconds":5625,"paint_cg_release_saturated":false,"last_native_dirty_area":64000.000000,"last_frame_damage_bounds_area":64000.000000,"last_cg_destination_area":64000.000000,"last_cg_clip_bounds_area":64000.000000,"last_cg_source_bytes":256000,"native_callback_faults":0}}
+{"stable_id":"idle.child","window":{"control_count":1,"stable_id_count":1,"mutations":12,"dirty_marks":13,"measure_passes":1,"arrange_passes":1,"paint_passes":6,"controls_measured":1,"controls_arranged":1,"controls_painted":6,"measure_nodes_visited":1,"arrange_nodes_visited":1,"paint_nodes_visited":18,"paint_invalidations_consumed":6,"display_chunks_rebuilt":6,"display_chunks_reused":0,"display_commands_replayed":56,"display_cache_entries":1,"display_generation":6,"requested_damage_area":512878,"painted_damage_area":193176,"full_window_paints":3,"partial_paints":3,"input_events":0,"focus_transitions":1,"focus_scopes_opened":0,"focus_scopes_closed":0,"focus_scope_restorations":0,"focus_scope_rejections":0,"focus_scope_depth":0,"maximum_focus_scope_depth":0,"activations":0,"disposals":0,"rejected_wrong_thread_operations":0,"subscriptions_connected":0,"subscriptions_disconnected":0,"callbacks_emitted":12,"focus_revocations":0,"capture_revocations":0,"press_revocations":0,"undeclared_mutations":0,"damage_region_compactions":5,"damage_region_collapses":0,"maximum_damage_rectangles":1,"update_scopes_started":1,"update_scope_depth":0,"maximum_update_scope_depth":1,"flush_count":1,"read_barrier_flushes":1,"bounded_pass_limit_hits":0,"callback_arbitration_retries":0,"callback_arbitration_limit_hits":0,"scheduled_frame_requests":7,"scheduler_wakes":5,"frame_deadlines_fired":5,"active_surface_ticks":0,"frame_requests_coalesced":6,"frame_callback_faults":0,"reentrant_frame_polls_deferred":0,"active_surface_count":0,"maximum_active_surface_count":0,"occlusion_suspensions":2,"occlusion_resumes":2,"occluded_frame_polls":11,"frames_presented":6,"present_duration_nanoseconds":4837126,"worst_present_duration_nanoseconds":2119542,"renderer_name":"Skia CPU m152 · HarfBuzz 14.2.1 · FreeType 2.14.2 · bundled fonts (optional Unicode fallback)","cpu_only":true},"host":{"session":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"phase":"closed","last_sequence":11,"events_accepted":10,"events_rejected":2,"callback_faults":0,"close_requests":0,"close_cancellations":0,"display_changes":1,"monitor_count":1,"modal_transitions":0,"modal_input_suppressions":0,"drag_events":0,"drag_drops":0,"modal_depth":0,"attached":false,"active":false,"occluded":false,"closed":true,"shutdown":false},"services":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"cursor":"arrow","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":1,"cursor_updates":0,"pointer_capture_updates":0,"clipboard_reads":0,"clipboard_writes":0,"clipboard_generation":0,"dialog_requests":0,"dialog_completions":0,"dialog_cancellations":0,"sound_requests":0,"sound_playbacks":0,"sound_coalesced":0,"sound_muted":0,"sound_coalescing_window_nanoseconds":50000000,"modal_depth":0,"maximum_modal_depth":0,"rejected_requests":0,"shutdown":false},"titlebar_presentation":"standard","native_full_size_content":false,"native_title_hidden":false,"native_titlebar_transparent":false,"native_close_button_present":true,"native_minimize_button_present":true,"native_zoom_button_present":true,"native_system_title_present":true,"window_drag_region_configured":false,"window_drag_region_resolved":false,"window_drag_region_count":0,"window_drag_region_resolved_count":0,"initial_host_occluded":true,"host_occluded":false,"scheduled_wake_count":8,"damage_collection_count":26,"native_draw_count":9,"display_tick_count":0,"paint_raster_prepare_calls":9,"paint_raster_prepare_nanoseconds":210333,"paint_raster_prepare_maximum_nanoseconds":68750,"paint_raster_prepare_saturated":false,"paint_retained_calls":9,"paint_retained_nanoseconds":1604667,"paint_retained_maximum_nanoseconds":443875,"paint_retained_saturated":false,"paint_raster_finish_calls":9,"paint_raster_finish_nanoseconds":5793,"paint_raster_finish_maximum_nanoseconds":2125,"paint_raster_finish_saturated":false,"paint_cg_setup_calls":7,"paint_cg_setup_nanoseconds":135125,"paint_cg_setup_maximum_nanoseconds":45917,"paint_cg_setup_saturated":false,"paint_cg_draw_calls":7,"paint_cg_draw_nanoseconds":3617750,"paint_cg_draw_maximum_nanoseconds":1639667,"paint_cg_draw_saturated":false,"paint_cg_release_calls":7,"paint_cg_release_nanoseconds":43709,"paint_cg_release_maximum_nanoseconds":12417,"paint_cg_release_saturated":false,"last_native_dirty_area":392.000000,"last_frame_damage_bounds_area":392.000000,"last_cg_destination_area":64000.000000,"last_cg_clip_bounds_area":392.000000,"last_cg_source_bytes":256000,"native_callback_faults":0}}
+Initial hidden, explicit UI timer, caret, hide/show and shutdown passed
+<end of output>
+Test time =   5.16 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_macos_idle_visibility_tests" end time: Oct 04 02:35 UTC
+"gui_forms_macos_idle_visibility_tests" time elapsed: 00:00:05
+----------------------------------------------------------
+
+76/83 Testing: gui_forms_macos_host_close_tests
+76/83 Test: gui_forms_macos_host_close_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_macos_host_close_tests.app/Contents/MacOS/gui_forms_macos_host_close_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_macos_host_close_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+appkit_services monitor_count=1 primary=appkit.display.1 clipboard_generation=1 snapshot={"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"cursor":"arrow","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":1,"cursor_updates":4,"pointer_capture_updates":2,"clipboard_reads":1,"clipboard_writes":1,"clipboard_generation":1,"dialog_requests":5,"dialog_completions":5,"dialog_cancellations":5,"sound_requests":0,"sound_playbacks":0,"sound_coalesced":0,"sound_muted":0,"sound_coalescing_window_nanoseconds":50000000,"modal_depth":0,"maximum_modal_depth":1,"rejected_requests":1,"shutdown":true}
+AppKit scheduled wake did not autonomously advance after repeated active-surface replacement: before=0 after=34 paints=37 successful_cycles=8 quiescent_gap_failures=0
+  cycle=0 before=0 rearm=0 after=4
+  cycle=1 before=5 rearm=5 after=9
+  cycle=2 before=11 rearm=11 after=14
+  cycle=3 before=15 rearm=15 after=18
+  cycle=4 before=19 rearm=19 after=22
+  cycle=5 before=23 rearm=23 after=26
+  cycle=6 before=27 rearm=27 after=30
+  cycle=7 before=31 rearm=31 after=34
+<end of output>
+Test time =   5.33 sec
+----------------------------------------------------------
+Test Failed.
+"gui_forms_macos_host_close_tests" end time: Oct 04 02:35 UTC
+"gui_forms_macos_host_close_tests" time elapsed: 00:00:05
+----------------------------------------------------------
+
+77/83 Testing: gui_forms_macos_multi_window_tests
+77/83 Test: gui_forms_macos_multi_window_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_macos_multi_window_tests.app/Contents/MacOS/gui_forms_macos_multi_window_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_macos_multi_window_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+{"stable_id":"test.window.product","window":{"control_count":1,"stable_id_count":1,"mutations":5,"dirty_marks":6,"measure_passes":1,"arrange_passes":1,"paint_passes":1,"controls_measured":1,"controls_arranged":1,"controls_painted":1,"measure_nodes_visited":1,"arrange_nodes_visited":1,"paint_nodes_visited":3,"paint_invalidations_consumed":1,"display_chunks_rebuilt":1,"display_chunks_reused":0,"display_commands_replayed":2,"display_cache_entries":1,"display_generation":1,"requested_damage_area":201600,"painted_damage_area":33600,"full_window_paints":1,"partial_paints":0,"input_events":0,"focus_transitions":0,"focus_scopes_opened":0,"focus_scopes_closed":0,"focus_scope_restorations":0,"focus_scope_rejections":0,"focus_scope_depth":0,"maximum_focus_scope_depth":0,"activations":0,"disposals":0,"rejected_wrong_thread_operations":0,"subscriptions_connected":0,"subscriptions_disconnected":0,"callbacks_emitted":0,"focus_revocations":0,"capture_revocations":0,"press_revocations":0,"undeclared_mutations":0,"damage_region_compactions":8,"damage_region_collapses":0,"maximum_damage_rectangles":1,"update_scopes_started":1,"update_scope_depth":0,"maximum_update_scope_depth":1,"flush_count":1,"read_barrier_flushes":1,"bounded_pass_limit_hits":0,"callback_arbitration_retries":0,"callback_arbitration_limit_hits":0,"scheduled_frame_requests":0,"scheduler_wakes":0,"frame_deadlines_fired":0,"active_surface_ticks":0,"frame_requests_coalesced":0,"frame_callback_faults":0,"reentrant_frame_polls_deferred":0,"active_surface_count":0,"maximum_active_surface_count":0,"occlusion_suspensions":1,"occlusion_resumes":1,"occluded_frame_polls":6,"frames_presented":1,"present_duration_nanoseconds":21615417,"worst_present_duration_nanoseconds":21615417,"renderer_name":"Skia CPU m152 · HarfBuzz 14.2.1 · FreeType 2.14.2 · bundled fonts (optional Unicode fallback)","cpu_only":true},"host":{"session":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"phase":"closed","last_sequence":10,"events_accepted":9,"events_rejected":2,"callback_faults":0,"close_requests":1,"close_cancellations":0,"display_changes":1,"monitor_count":1,"modal_transitions":0,"modal_input_suppressions":0,"drag_events":0,"drag_drops":0,"modal_depth":0,"attached":false,"active":false,"occluded":false,"closed":true,"shutdown":false},"services":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"cursor":"arrow","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":1,"cursor_updates":0,"pointer_capture_updates":0,"clipboard_reads":0,"clipboard_writes":0,"clipboard_generation":0,"dialog_requests":0,"dialog_completions":0,"dialog_cancellations":0,"sound_requests":0,"sound_playbacks":0,"sound_coalesced":0,"sound_muted":0,"sound_coalescing_window_nanoseconds":50000000,"modal_depth":0,"maximum_modal_depth":0,"rejected_requests":0,"shutdown":false},"titlebar_presentation":"transparent_full_size_content","native_full_size_content":true,"native_title_hidden":true,"native_titlebar_transparent":true,"native_close_button_present":true,"native_minimize_button_present":true,"native_zoom_button_present":true,"native_system_title_present":true,"window_drag_region_configured":true,"window_drag_region_resolved":true,"window_drag_region_count":1,"window_drag_region_resolved_count":1,"initial_host_occluded":true,"host_occluded":false,"scheduled_wake_count":0,"damage_collection_count":12,"native_draw_count":2,"display_tick_count":0,"paint_raster_prepare_calls":2,"paint_raster_prepare_nanoseconds":110019792,"paint_raster_prepare_maximum_nanoseconds":110012000,"paint_raster_prepare_saturated":false,"paint_retained_calls":2,"paint_retained_nanoseconds":21386834,"paint_retained_maximum_nanoseconds":21385667,"paint_retained_saturated":false,"paint_raster_finish_calls":2,"paint_raster_finish_nanoseconds":1833,"paint_raster_finish_maximum_nanoseconds":1208,"paint_raster_finish_saturated":false,"paint_cg_setup_calls":1,"paint_cg_setup_nanoseconds":15459,"paint_cg_setup_maximum_nanoseconds":15459,"paint_cg_setup_saturated":false,"paint_cg_draw_calls":1,"paint_cg_draw_nanoseconds":186167,"paint_cg_draw_maximum_nanoseconds":186167,"paint_cg_draw_saturated":false,"paint_cg_release_calls":1,"paint_cg_release_nanoseconds":5125,"paint_cg_release_maximum_nanoseconds":5125,"paint_cg_release_saturated":false,"last_native_dirty_area":33600.000000,"last_frame_damage_bounds_area":33600.000000,"last_cg_destination_area":33600.000000,"last_cg_clip_bounds_area":33600.000000,"last_cg_source_bytes":134400,"native_callback_faults":0}}
+{"stable_id":"test.window.controller","window":{"control_count":1,"stable_id_count":1,"mutations":6,"dirty_marks":7,"measure_passes":2,"arrange_passes":2,"paint_passes":0,"controls_measured":2,"controls_arranged":2,"controls_painted":0,"measure_nodes_visited":2,"arrange_nodes_visited":2,"paint_nodes_visited":0,"paint_invalidations_consumed":0,"display_chunks_rebuilt":0,"display_chunks_reused":0,"display_commands_replayed":0,"display_cache_entries":0,"display_generation":0,"requested_damage_area":225200,"painted_damage_area":0,"full_window_paints":0,"partial_paints":0,"input_events":0,"focus_transitions":0,"focus_scopes_opened":0,"focus_scopes_closed":0,"focus_scope_restorations":0,"focus_scope_rejections":0,"focus_scope_depth":0,"maximum_focus_scope_depth":0,"activations":0,"disposals":0,"rejected_wrong_thread_operations":0,"subscriptions_connected":0,"subscriptions_disconnected":0,"callbacks_emitted":0,"focus_revocations":0,"capture_revocations":0,"press_revocations":0,"undeclared_mutations":0,"damage_region_compactions":18,"damage_region_collapses":0,"maximum_damage_rectangles":1,"update_scopes_started":1,"update_scope_depth":0,"maximum_update_scope_depth":1,"flush_count":2,"read_barrier_flushes":1,"bounded_pass_limit_hits":0,"callback_arbitration_retries":0,"callback_arbitration_limit_hits":0,"scheduled_frame_requests":0,"scheduler_wakes":0,"frame_deadlines_fired":0,"active_surface_ticks":0,"frame_requests_coalesced":0,"frame_callback_faults":0,"reentrant_frame_polls_deferred":0,"active_surface_count":0,"maximum_active_surface_count":0,"occlusion_suspensions":1,"occlusion_resumes":0,"occluded_frame_polls":7,"frames_presented":0,"present_duration_nanoseconds":0,"worst_present_duration_nanoseconds":0,"renderer_name":"Skia CPU m152 · HarfBuzz 14.2.1 · FreeType 2.14.2 · bundled fonts (optional Unicode fallback)","cpu_only":true},"host":{"session":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"phase":"closed","last_sequence":8,"events_accepted":7,"events_rejected":1,"callback_faults":0,"close_requests":1,"close_cancellations":0,"display_changes":1,"monitor_count":1,"modal_transitions":0,"modal_input_suppressions":0,"drag_events":0,"drag_drops":0,"modal_depth":0,"attached":false,"active":false,"occluded":false,"closed":true,"shutdown":false},"services":{"capabilities":{"protocol_version":7,"platform":"appkit-macos","available_bits":401407,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","clipboard_images","typed_drag_destination","dialogs","sound_cues"]},"cursor":"arrow","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":1,"cursor_updates":0,"pointer_capture_updates":0,"clipboard_reads":0,"clipboard_writes":0,"clipboard_generation":0,"dialog_requests":0,"dialog_completions":0,"dialog_cancellations":0,"sound_requests":0,"sound_playbacks":0,"sound_coalesced":0,"sound_muted":0,"sound_coalescing_window_nanoseconds":50000000,"modal_depth":0,"maximum_modal_depth":0,"rejected_requests":0,"shutdown":false},"titlebar_presentation":"standard","native_full_size_content":false,"native_title_hidden":false,"native_titlebar_transparent":false,"native_close_button_present":true,"native_minimize_button_present":true,"native_zoom_button_present":true,"native_system_title_present":true,"window_drag_region_configured":false,"window_drag_region_resolved":false,"window_drag_region_count":0,"window_drag_region_resolved_count":0,"initial_host_occluded":true,"host_occluded":true,"scheduled_wake_count":0,"damage_collection_count":9,"native_draw_count":2,"display_tick_count":0,"paint_raster_prepare_calls":2,"paint_raster_prepare_nanoseconds":480374,"paint_raster_prepare_maximum_nanoseconds":473916,"paint_raster_prepare_saturated":false,"paint_retained_calls":2,"paint_retained_nanoseconds":1334,"paint_retained_maximum_nanoseconds":1042,"paint_retained_saturated":false,"paint_raster_finish_calls":2,"paint_raster_finish_nanoseconds":1750,"paint_raster_finish_maximum_nanoseconds":1125,"paint_raster_finish_saturated":false,"paint_cg_setup_calls":0,"paint_cg_setup_nanoseconds":0,"paint_cg_setup_maximum_nanoseconds":0,"paint_cg_setup_saturated":false,"paint_cg_draw_calls":0,"paint_cg_draw_nanoseconds":0,"paint_cg_draw_maximum_nanoseconds":0,"paint_cg_draw_saturated":false,"paint_cg_release_calls":0,"paint_cg_release_nanoseconds":0,"paint_cg_release_maximum_nanoseconds":0,"paint_cg_release_saturated":false,"last_native_dirty_area":33880.000000,"last_frame_damage_bounds_area":39360.000000,"last_cg_destination_area":0.000000,"last_cg_clip_bounds_area":0.000000,"last_cg_source_bytes":0,"native_callback_faults":0}}
+<end of output>
+Test time =   0.82 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_macos_multi_window_tests" end time: Oct 04 02:35 UTC
+"gui_forms_macos_multi_window_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+78/83 Testing: gui_forms_skia_smoke
+78/83 Test: gui_forms_skia_smoke
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_skia_smoke"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_skia_smoke" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+{"renderer":"skia-cpu","width":440,"height":240,"bytes":422400,"checksum":16384426340562564518}
+<end of output>
+Test time =   0.23 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_skia_smoke" end time: Oct 04 02:35 UTC
+"gui_forms_skia_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+79/83 Testing: gui_forms_canvas_raster_tests
+79/83 Test: gui_forms_canvas_raster_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_canvas_raster_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_canvas_raster_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+sampling=0 zoom=0.015625 scale=1 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=0.015625 scale=1 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=0.015625 scale=1.5 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=0.015625 scale=1.5 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=0.015625 scale=2 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=0.015625 scale=2 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=0.1 scale=1 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=0.1 scale=1 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=0.1 scale=1.5 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=0.1 scale=1.5 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=0.1 scale=2 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=0.1 scale=2 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=0.25 scale=1 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=0.25 scale=1 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=0.25 scale=1.5 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=0.25 scale=1.5 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=0.25 scale=2 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=0.25 scale=2 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=1 scale=1 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=1 scale=1 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=1 scale=1.5 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=1 scale=1.5 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=1 scale=2 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=1 scale=2 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=1.25 scale=1 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=1.25 scale=1 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=1.25 scale=1.5 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=1.25 scale=1.5 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=1.25 scale=2 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=1.25 scale=2 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=3.1 scale=1 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=3.1 scale=1 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=3.1 scale=1.5 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=3.1 scale=1.5 edited=1 max_channel_error=0 differences=0
+sampling=0 zoom=3.1 scale=2 edited=0 max_channel_error=0 differences=0
+sampling=0 zoom=3.1 scale=2 edited=1 max_channel_error=0 differences=0
+sampling=1 zoom=0.015625 scale=1 edited=0 max_channel_error=0 differences=0
+sampling=1 zoom=0.015625 scale=1 edited=1 max_channel_error=0 differences=0
+sampling=1 zoom=0.015625 scale=1.5 edited=0 max_channel_error=0 differences=0
+sampling=1 zoom=0.015625 scale=1.5 edited=1 max_channel_error=0 differences=0
+sampling=1 zoom=0.015625 scale=2 edited=0 max_channel_error=0 differences=0
+sampling=1 zoom=0.015625 scale=2 edited=1 max_channel_error=0 differences=0
+sampling=1 zoom=0.1 scale=1 edited=0 max_channel_error=0 differences=0
+sampling=1 zoom=0.1 scale=1 edited=1 max_channel_error=0 differences=0
+sampling=1 zoom=0.1 scale=1.5 edited=0 max_channel_error=1 differences=0
+sampling=1 zoom=0.1 scale=1.5 edited=1 max_channel_error=1 differences=0
+sampling=1 zoom=0.1 scale=2 edited=0 max_channel_error=1 differences=0
+sampling=1 zoom=0.1 scale=2 edited=1 max_channel_error=1 differences=0
+sampling=1 zoom=0.25 scale=1 edited=0 max_channel_error=0 differences=0
+sampling=1 zoom=0.25 scale=1 edited=1 max_channel_error=0 differences=0
+sampling=1 zoom=0.25 scale=1.5 edited=0 max_channel_error=1 differences=0
+sampling=1 zoom=0.25 scale=1.5 edited=1 max_channel_error=1 differences=0
+sampling=1 zoom=0.25 scale=2 edited=0 max_channel_error=0 differences=0
+sampling=1 zoom=0.25 scale=2 edited=1 max_channel_error=0 differences=0
+sampling=1 zoom=1 scale=1 edited=0 max_channel_error=1 differences=0
+sampling=1 zoom=1 scale=1 edited=1 max_channel_error=1 differences=0
+sampling=1 zoom=1 scale=1.5 edited=0 max_channel_error=1 differences=0
+sampling=1 zoom=1 scale=1.5 edited=1 max_channel_error=1 differences=0
+sampling=1 zoom=1 scale=2 edited=0 max_channel_error=1 differences=0
+sampling=1 zoom=1 scale=2 edited=1 max_channel_error=1 differences=0
+sampling=1 zoom=1.25 scale=1 edited=0 max_channel_error=0 differences=0
+sampling=1 zoom=1.25 scale=1 edited=1 max_channel_error=0 differences=0
+sampling=1 zoom=1.25 scale=1.5 edited=0 max_channel_error=1 differences=0
+sampling=1 zoom=1.25 scale=1.5 edited=1 max_channel_error=1 differences=0
+sampling=1 zoom=1.25 scale=2 edited=0 max_channel_error=0 differences=0
+sampling=1 zoom=1.25 scale=2 edited=1 max_channel_error=0 differences=0
+sampling=1 zoom=3.1 scale=1 edited=0 max_channel_error=1 differences=0
+sampling=1 zoom=3.1 scale=1 edited=1 max_channel_error=1 differences=0
+sampling=1 zoom=3.1 scale=1.5 edited=0 max_channel_error=1 differences=0
+sampling=1 zoom=3.1 scale=1.5 edited=1 max_channel_error=1 differences=0
+sampling=1 zoom=3.1 scale=2 edited=0 max_channel_error=1 differences=0
+sampling=1 zoom=3.1 scale=2 edited=1 max_channel_error=1 differences=0
+<end of output>
+Test time =   4.98 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_canvas_raster_tests" end time: Oct 04 02:35 UTC
+"gui_forms_canvas_raster_tests" time elapsed: 00:00:04
+----------------------------------------------------------
+
+80/83 Testing: gui_forms_skia_archive_policy
+80/83 Test: gui_forms_skia_archive_policy
+Command: "/opt/homebrew/bin/cmake" "-DSKIA_ARCHIVE=/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/skia/libskia.a" "-P" "/Users/runner/work/file_manager/file_manager/gui_forms/cmake/check_skia_archive.cmake"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_skia_archive_policy" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+-- Skia archive policy passed: PNG-only decoder and no GPU backend implementation
+<end of output>
+Test time =   0.20 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_skia_archive_policy" end time: Oct 04 02:35 UTC
+"gui_forms_skia_archive_policy" time elapsed: 00:00:00
+----------------------------------------------------------
+
+81/83 Testing: gui_drawing_skia_tests
+81/83 Test: gui_drawing_skia_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_drawing_skia_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_drawing_skia_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.16 sec
+----------------------------------------------------------
+Test Passed.
+"gui_drawing_skia_tests" end time: Oct 04 02:35 UTC
+"gui_drawing_skia_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+82/83 Testing: gui_drawing_raster_c_api_tests
+82/83 Test: gui_drawing_raster_c_api_tests
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_drawing_raster_c_api_tests"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_drawing_raster_c_api_tests" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"gui_drawing_raster_c_api_tests" end time: Oct 04 02:35 UTC
+"gui_drawing_raster_c_api_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+83/83 Testing: gui_forms_coregraphics_smoke
+83/83 Test: gui_forms_coregraphics_smoke
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_coregraphics_smoke"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms
+"gui_forms_coregraphics_smoke" start time: Oct 04 02:35 UTC
+Output:
+----------------------------------------------------------
+{"renderer":"coregraphics-cpu","width":320,"height":192,"bytes":245760,"checksum":15274527434273426205}
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_coregraphics_smoke" end time: Oct 04 02:35 UTC
+"gui_forms_coregraphics_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 04 02:35 UTC
