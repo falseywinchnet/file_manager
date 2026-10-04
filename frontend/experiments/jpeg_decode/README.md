@@ -33,7 +33,11 @@ excluded. See `../../results/2026-10-04-jpeg-wic-control/README.md`.
 
 ```powershell
 . ./tools/Enter-WindowsToolchain.ps1
-cmake -S frontend/experiments/jpeg_decode -B .build/jpeg-decode -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake '-DCOLOR_DOWNLOAD_ROOT=.build/jpeg-color-source' -P frontend/experiments/jpeg_decode/fetch_color.cmake
+cmake -S .build/jpeg-color-source/lcms2-2.19.1 -B .build/jpeg-color-library -G Ninja '-DCMAKE_BUILD_TYPE=Release' '-DLCMS2_BUILD_SHARED=OFF' '-DLCMS2_BUILD_STATIC=ON' '-DLCMS2_BUILD_TOOLS=OFF' '-DLCMS2_BUILD_TESTS=OFF' '-DLCMS2_WITH_FASTFLOAT=OFF' '-DLCMS2_WITH_THREADED_PLUGIN=OFF' '-DCMAKE_INSTALL_LIBDIR=lib' '-DCMAKE_INSTALL_PREFIX=C:/Users/Shadow/file_manager/.build/jpeg-color-package'
+cmake --build .build/jpeg-color-library --parallel 2
+cmake --install .build/jpeg-color-library
+cmake -S frontend/experiments/jpeg_decode -B .build/jpeg-decode -G Ninja '-DCMAKE_BUILD_TYPE=Release' '-DCMAKE_PREFIX_PATH=C:/Users/Shadow/file_manager/.build/jpeg-color-package'
 cmake --build .build/jpeg-decode --parallel 2
 ctest --test-dir .build/jpeg-decode --output-on-failure
 .build/jpeg-decode/file_manager_jpeg_experiment.exe --measure > .build/jpeg-decode/results.csv 2> .build/jpeg-decode/verification.txt
@@ -41,8 +45,11 @@ python -B frontend/experiments/jpeg_decode/summarize.py .build/jpeg-decode/resul
 ```
 
 Check each exit status before using output. CMake requires exact pkg-config
-`libturbojpeg=3.2.0` by default; that route neither fetches nor installs
-dependencies. The adjacent toolchain is read-only. Default execution and
+`libturbojpeg=3.2.0` by default; that codec route neither fetches nor installs
+dependencies. LittleCMS is independently built under File Manager's ignored
+build directory. Its 2.19.1 archive is SHA-256 pinned; upstream publishes CMake
+package version 2.19, so the package version alone does not establish the patch
+release. The adjacent toolchain is read-only. Default execution and
 `--verify-only` run correctness only; timing now requires `--measure` explicitly.
 Compile mode is C++20 with warnings-as-errors.
 
@@ -81,13 +88,34 @@ experiment is installed into File Manager by this workflow.
   bounds. A generated JPEG with embedded little-endian EXIF exercises all eight
   transforms against independent corner-permutation and non-square geometry
   checks. Grayscale, alpha and empty/truncated/range refusal also run.
-  Independent coverage for source/ICC/precision/scan-limit refusal remains
+  Independent coverage for source/precision/scan-limit refusal remains
   incomplete; no real-photo corpus is claimed.
-- No ICC conversion. In the pinned
+- ICC input/display RGB or grayscale profiles up to 1 MiB are converted to
+  sRGB with relative colorimetric intent and no black-point compensation using
+  pinned LittleCMS 2.19.1. Untagged input retains the prior assumed-sRGB behavior.
+  Profiles must match the decoded JPEG color space; CMYK/YCCK, device-link and
+  other profile classes remain excluded. Profile size must match its header.
+  Alpha is opaque. Source and conversion output are disjoint, each at most
+  4 MiB; gray adds at most a 1 MiB input plane. Decoder/profile/transform internal
+  allocations remain additional and are not covered by those raster caps.
+  The codec assembles metadata before the 1 MiB admission check, so that check
+  does not bound upstream header allocation to 1 MiB.
+- The default optimized gray transform failed the independent dark-ramp
+  oracle. Gray currently uses `cmsFLAGS_NOOPTIMIZE`; RGB retains the default
+  optimizer. See the retained failure and passing correctness evidence in
+  `../../results/2026-10-04-jpeg-color/README.md`. This is not a performance claim.
+  Generated neutral ramps use an independent sRGB transfer equation; embedded
+  RGB and gray profiles exercise both JPEG coding modes and all orientations.
+  Real camera profiles, wide-gamut clipping, monitor-profile display conversion
+  and arbitrary LUT accuracy remain unverified.
+- In the pinned
   [3.2.0 implementation](https://github.com/libjpeg-turbo/libjpeg-turbo/blob/3.2.0/src/turbojpeg.c),
   absent profile data returns `-1`, warning severity and zero size. The specimen
-  recognizes this combination. Malformed/incomplete ICC behavior is unverified;
-  no production color policy can be inferred from it.
+  recognizes this combination only after successful header decoding. The codec's
+  stop-on-warning policy rejects the tested missing/invalid sequence numbers.
+  Truncated profile bytes, wrong magic, excessive bytes, mismatched color spaces,
+  unsupported class and invalid raster layout/alpha are separately checked.
+  No complete ICC/JPEG conformance or production color policy is inferred.
 
 Verification exercises the codec before measurement. Each group has one first
 invocation and 30 warm samples; this is not a cold-process measurement. Each

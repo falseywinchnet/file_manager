@@ -1,7 +1,10 @@
 #include <turbojpeg.h>
 #include "exif_orientation.hpp"
 #include "jpeg_pixels.hpp"
+#include "icc_color.hpp"
+#include "icc_fixtures.hpp"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -60,7 +63,7 @@ struct CompressedBytes final {
 using Pixels = jpeg_research::Pixels;
 
 [[nodiscard]] std::vector<unsigned char> make_fixture(const int width, const int height,
-    const bool progressive, const bool grayscale) {
+    const bool progressive, const bool grayscale, const std::span<const unsigned char> profile = {}) {
     require(width > 0 && height > 0 && width <= 6000 && height <= 4000,
             "fixture dimensions exceed the declared generator extent");
     const std::size_t row_bytes = static_cast<std::size_t>(width) * 3U;
@@ -87,6 +90,13 @@ using Pixels = jpeg_research::Pixels;
     encoder.set(TJPARAM_SUBSAMP, grayscale ? TJSAMP_GRAY : TJSAMP_444);
     encoder.set(TJPARAM_PROGRESSIVE, progressive ? 1 : 0);
     encoder.set(TJPARAM_MAXMEMORY, 256);
+    // TurboJPEG's setter copies bytes but exposes a mutable pointer parameter.
+    // Supply separately owned mutable fixture bytes instead of casting const.
+    std::vector<unsigned char> profile_copy(profile.begin(), profile.end());
+    if (!profile_copy.empty()) {
+        const int profile_status = tj3SetICCProfile(encoder.handle, profile_copy.data(), profile_copy.size());
+        encoder.check(profile_status);
+    }
     CompressedBytes encoded{};
     const int status = tj3Compress8(encoder.handle, rgb.data(), width,
         static_cast<int>(row_bytes), height, TJPF_RGB, &encoded.data, &encoded.size);
@@ -175,7 +185,13 @@ void orient_kernel(const Pixels& source, Pixels& destination) {
     const int profile_error = tj3GetErrorCode(decoder.handle);
     const bool absent_profile = profile_status == -1 && profile_error == TJERR_WARNING && profile_size == 0U;
     if (!absent_profile) decoder.check(profile_status);
-    require(profile_size == 0U, "color-managed JPEG requires a separate color conversion stage");
+    require(profile_size <= jpeg_research::icc_profile_limit, "ICC profile byte limit");
+    CompressedBytes profile{};
+    if (profile_size != 0U) {
+        const int fetch_status = tj3GetICCProfile(decoder.handle, &profile.data, &profile.size);
+        decoder.check(fetch_status);
+        require(profile.data != nullptr && profile.size == profile_size, "ICC profile extraction extent");
+    }
     int factor_count{};
     const tjscalingfactor* factors = tj3GetScalingFactors(&factor_count);
     require(factors != nullptr && factor_count > 0 && factor_count <= 64, "scaling-factor list");
@@ -207,6 +223,13 @@ void orient_kernel(const Pixels& source, Pixels& destination) {
     const int decode_status = tj3Decompress8(decoder.handle, encoded.data(), encoded.size(),
         raster.bytes.data(), raster.row_bytes, TJPF_BGRA);
     decoder.check(decode_status);
+    if (profile_size != 0U) {
+        const jpeg_research::IccSource space = colorspace == TJCS_GRAY ?
+            jpeg_research::IccSource::gray : jpeg_research::IccSource::rgb;
+        const std::span<const unsigned char> bytes(profile.data, profile.size);
+        Pixels converted = jpeg_research::convert_icc_to_srgb(raster, bytes, space);
+        raster = std::move(converted);
+    }
     Pixels result = orient(std::move(raster), orientation);
     return result;
 }
@@ -285,7 +308,62 @@ void verify_embedded_orientation(const std::vector<unsigned char>& encoded) {
     require(refused, "invalid EXIF must refuse before pixel publication");
 }
 
+void verify_embedded_color() {
+    const std::vector<unsigned char> srgb = jpeg_research::make_icc_fixture(jpeg_research::IccFixture::srgb);
+    const std::vector<unsigned char> linear_rgb = jpeg_research::make_icc_fixture(jpeg_research::IccFixture::linear_rgb);
+    const std::vector<unsigned char> linear_gray = jpeg_research::make_icc_fixture(jpeg_research::IccFixture::linear_gray);
+    for (const bool progressive : {false, true}) {
+        for (const bool gray : {false, true}) {
+            const std::vector<unsigned char>& profile = gray ? linear_gray : linear_rgb;
+            const std::vector<unsigned char> plain = make_fixture(320, 192, progressive, gray);
+            const std::vector<unsigned char> tagged = make_fixture(320, 192, progressive, gray, profile);
+            for (unsigned orientation = 1U; orientation <= 8U; ++orientation) {
+                const Pixels reference = decode(plain, orientation);
+                const Pixels converted = decode(tagged, orientation);
+                require(converted.width == reference.width && converted.height == reference.height,
+                    "ICC must preserve oriented geometry");
+                // Same generated JPEG samples, with only the attached profile
+                // differing. The scalar transfer equation is independent of LCMS.
+                for (std::size_t pixel = 0U; pixel < reference.bytes.size(); pixel += 4U) {
+                    for (std::size_t channel = 0U; channel < 3U; ++channel) {
+                        const int expected = jpeg_research::encode_linear_srgb(reference.bytes[pixel + channel]);
+                        const int difference = static_cast<int>(converted.bytes[pixel + channel]) - expected;
+                        require(difference >= -3 && difference <= 3, "embedded ICC colors differ from scalar oracle");
+                    }
+                    require(converted.bytes[pixel + 3U] == 255U, "embedded ICC alpha");
+                }
+            }
+        }
+        const std::vector<unsigned char> identity = make_fixture(320, 192, progressive, false, srgb);
+        const Pixels identity_raster = decode(identity, 1U);
+        check_quadrants(identity_raster, 1U);
+    }
+    const std::vector<unsigned char> wrong_space = make_fixture(320, 192, false, false, linear_gray);
+    require_decode_rejection(wrong_space, 1U);
+    const std::vector<unsigned char> truncated(srgb.begin(), srgb.end() - 1);
+    const std::vector<unsigned char> malformed = make_fixture(320, 192, false, false, truncated);
+    require_decode_rejection(malformed, 1U);
+    const std::vector<unsigned char> oversized(jpeg_research::icc_profile_limit + 1U, 0U);
+    const std::vector<unsigned char> excessive = make_fixture(320, 192, false, false, oversized);
+    require_decode_rejection(excessive, 1U);
+    std::vector<unsigned char> marker_error = make_fixture(320, 192, false, false, srgb);
+    constexpr std::array<unsigned char, 12U> signature{'I', 'C', 'C', '_', 'P', 'R', 'O', 'F', 'I', 'L', 'E', 0U};
+    const std::vector<unsigned char>::iterator marker = std::search(marker_error.begin(), marker_error.end(),
+        signature.begin(), signature.end());
+    require(marker != marker_error.end(), "generated ICC marker must be present");
+    const std::size_t signature_offset = static_cast<std::size_t>(marker - marker_error.begin());
+    require(signature_offset + 14U <= marker_error.size(), "generated ICC sequence extent");
+    marker_error[signature_offset + 13U] = 2U; // Declares a missing second APP2 segment.
+    require_decode_rejection(marker_error, 1U);
+    marker_error[signature_offset + 13U] = 1U;
+    marker_error[signature_offset + 12U] = 0U; // Sequence numbers start at one.
+    require_decode_rejection(marker_error, 1U);
+    std::cerr << "PASS ICC RGB/gray scalar oracles, baseline/progressive, all orientations, malformed/oversize/mismatch refusal\n";
+}
+
 void verify() {
+    jpeg_research::verify_icc_conversion();
+    verify_embedded_color();
     const std::vector<unsigned char> encoded = make_fixture(320, 192, false, false);
     verify_embedded_orientation(encoded);
     for (unsigned orientation = 1U; orientation <= 8U; ++orientation) {

@@ -1,0 +1,14 @@
+{
+  "source_revision": "29d39ecbaf81c285c6686acd2287cce7b29ef71d",
+  "command": [
+    "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/gui-forms/gui_forms_macos_idle_visibility_tests.app/Contents/MacOS/gui_forms_macos_idle_visibility_tests",
+    "--focused-cpu-attribution"
+  ],
+  "status": "rejected",
+  "exit_code": 1,
+  "wall_seconds": 14.11161012499997,
+  "process_timeout_seconds": 90,
+  "accepted_marker": false,
+  "detail": "focused-cpu-rejected|interval=0|reason=ten-second interval exceeded declared duration bound",
+  "limits": "Provider blank-textbox fixture; remaining main-thread CPU is not CA attribution or a consumer performance guarantee"
+}
