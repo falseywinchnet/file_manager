@@ -1,0 +1,22 @@
+[
+  {
+    "path": "frontend/experiments/preview_admission/probe.cpp",
+    "sha256": "0350de035ce6fcacbdcabe0a02e9416b70ea9d97a2f5e07836ae87c13ccae36b"
+  },
+  {
+    "path": "frontend/experiments/preview_admission/fixture.py",
+    "sha256": "88cdac88962c5d6d2a1d447cbf6ff279f5c5d5eb678725527f607653d49fa461"
+  },
+  {
+    "path": "frontend/experiments/preview_admission/CMakeLists.txt",
+    "sha256": "fe6229cdaa39b6ff2c1470a006599e3b3e994a707d72204d1d4360e38aa60c8f"
+  },
+  {
+    "path": ".github/workflows/native-builds.yml",
+    "sha256": "3be31b33c3a1253266e6b25cc8b8d96ecc85d4da60e25ff2b3b5bff2fe9276b8"
+  },
+  {
+    "path": "gui_forms/.build/shadow-sdk/lib/libgui_forms_core.a",
+    "sha256": "b29b2329c9bba0791d111aa63106730b807a1e01e1cb1bb385a8ab542cdd949f"
+  }
+]
