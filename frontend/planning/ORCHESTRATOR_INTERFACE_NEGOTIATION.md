@@ -624,3 +624,24 @@ validation remain unimplemented and cannot be inferred from this source reply.
 **Reconciliation:** provider-independent fixture development is open under B0.
 This records consumer feasibility only; no codec/provider adapter or new format
 is admitted and no service capability is reported available.
+
+### Selected-preview result/source fragment 003 — 2026-10-04 UTC
+
+**Orchestrator request:** validate one bounded byte frame, echoing the host's
+ticket without transferring source authority to the decoder. Require exact
+shape/extent/profile, opaque alpha, explicit failures and EOF before completion.
+The draft is `../../orchestrator/spec/SELECTED_PREVIEW_FRAME_DRAFT.md`.
+
+**Frontend reply:** incoming raster ownership and independent validation must
+precede GUI.Forms image admission. Existing `NativeReadFile` observations bind
+reads to an opened object and compare visible-path revision afterward; they do
+not prove atomic source bytes or an immutable ancestor route. The new profile
+must specify those assumptions and source/revocation checks independently.
+An echoed ticket or valid pixel buffer does not replace current selection/demand
+validation. Display retirement and actual image-registry copies remain consumer
+responsibilities, not properties of the byte receiver.
+
+**Reconciliation:** the disposable Rust receiver/C++ golden producer supplies
+candidate byte-conformance evidence only. Source acquisition, actual transport,
+OS confinement/resource policy and provider/consumer integration remain open.
+No frontend source adapter or additional preview format is enabled here.

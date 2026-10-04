@@ -119,3 +119,25 @@ activate plugin execution, connect the lifecycle model, or freeze a provider.
 The existing Rust Orchestrator boundary remains authoritative. Startup footprint,
 descendants, source authority, bounded transport and full sandbox policy remain
 unresolved before an actual preview adapter can be admitted.
+
+## Result-byte/source fragment 003
+
+**Orchestrator requirement:** a decoder cannot publish an arbitrary native
+record, claim file authority through its own source identifiers, or induce
+unbounded raster allocation. Establish exact byte extent, ticket matching,
+version/profile refusal, terminal shape, and publication only after EOF plus
+host-owned lifecycle/source checks.
+
+**Frontend reply:** any new raster result must be owned and independently
+validated before GUI.Forms image admission. Current `NativeReadFile` descriptor
+and visible-path observations are useful existing evidence but not atomic
+snapshot or ancestor-route guarantees. The frontend does not authorize a new
+decoder merely by accepting its echoed ticket. Its generation/demand state
+still rejects stale publication and retains completed content across hiding.
+
+**Reconciliation:** the candidate frame/source fragment is recorded in
+`../spec/SELECTED_PREVIEW_FRAME_DRAFT.md`, with a disposable Rust receiver and
+independent C++ byte producer under `../experiments/preview_frame/`. No real file,
+codec, provider discovery or production IPC participates. Native read authority,
+source revision assumptions, private transport authentication, global copies and
+Mac resource policy remain open. ORC-PLG remains stubbed; no adapter is frozen.

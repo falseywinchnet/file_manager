@@ -73,6 +73,13 @@ source/ticket matching. This is B0 provider-independent conformance work, not
 an available worker, a complete preview contract or an adapter freeze. Source
 authority, process limits and transport remain unreconciled.
 
+The [selected-preview byte/source fragment](SELECTED_PREVIEW_FRAME_DRAFT.md)
+adds an executable candidate for bounded result framing in
+`../experiments/preview_frame/`, with an independent C++ golden producer and Rust
+receiver. It separates helper correlation from trusted source authority and
+retains unresolved native source acquisition, peer authentication, supervision
+and resource policy. It is not a frozen wire, runtime capability or format grant.
+
 ## Windows development consumption receipt (2026-09-29)
 
 Ordinary first-party New Folder/Rename development is reconciled in

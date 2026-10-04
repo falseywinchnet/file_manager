@@ -1,0 +1,50 @@
+name: Preview byte frame laboratory
+on:
+  push:
+    branches: [main, 'codex/**']
+    paths:
+      - 'orchestrator/experiments/preview_frame/**'
+      - '.github/workflows/preview-frame.yml'
+  pull_request:
+    paths:
+      - 'orchestrator/experiments/preview_frame/**'
+      - '.github/workflows/preview-frame.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: preview-frame-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  framing:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, macos-26, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select declared minimum Rust toolchain
+        run: rustup toolchain install 1.87.0 --profile minimal --component rustfmt --component clippy
+      - name: Check format, semantics and warnings
+        run: |
+          cargo +1.87.0 fmt --manifest-path orchestrator/experiments/preview_frame/Cargo.toml -- --check
+          cargo +1.87.0 test --manifest-path orchestrator/experiments/preview_frame/Cargo.toml --locked --offline --jobs 2 --target-dir orchestrator/.build/preview-frame
+          cargo +1.87.0 clippy --manifest-path orchestrator/experiments/preview_frame/Cargo.toml --locked --offline --all-targets --all-features --jobs 2 --target-dir orchestrator/.build/preview-frame -- -D warnings
+      - name: Build independent C++ producer
+        run: |
+          cmake -S orchestrator/experiments/preview_frame/fixture -B orchestrator/.build/preview-frame-fixture -DCMAKE_BUILD_TYPE=Release
+          cmake --build orchestrator/.build/preview-frame-fixture --config Release --parallel 2
+      - name: Verify exact cross-language streamed pixels
+        run: |
+          set -euo pipefail
+          cargo +1.87.0 build --manifest-path orchestrator/experiments/preview_frame/Cargo.toml --locked --offline --bin consume --jobs 2 --target-dir orchestrator/.build/preview-frame
+          if [ "$RUNNER_OS" = Windows ]; then
+            orchestrator/.build/preview-frame-fixture/Release/preview_frame_fixture.exe | orchestrator/.build/preview-frame/debug/consume.exe
+          else
+            orchestrator/.build/preview-frame-fixture/preview_frame_fixture | orchestrator/.build/preview-frame/debug/consume
+          fi
