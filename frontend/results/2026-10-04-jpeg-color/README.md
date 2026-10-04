@@ -62,6 +62,16 @@ An initial PowerShell invocation passed an unquoted `-D...` token and failed
 before downloading. Quoting the argument resolved setup. This is not codec
 failure evidence.
 
+**REJECTED native setup at `2595df0a`:** exact-head research run `37172286515`
+configured the color library successfully, then failed CMake generation on both
+macOS and Linux. Its installed static target references `Threads::Threads`,
+but the pinned `lcms2-config.cmake.in` only includes the targets file and never
+discovers Threads. The consumer now calls `find_package(Threads REQUIRED)` on
+non-Windows hosts before importing LittleCMS. Vendor bytes are unchanged.
+Failure excerpts are retained; this build correction needs a new native run.
+The root reviewed that five-line CMake correction separately from the preceding
+independent review. No C++ implementation or test oracle changed.
+
 ## Bounds, ownership and outstanding admission work
 
 Each conversion has its own LittleCMS context and named nonthrowing error
