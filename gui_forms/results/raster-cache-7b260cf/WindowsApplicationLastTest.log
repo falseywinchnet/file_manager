@@ -1,0 +1,19 @@
+Start testing: Oct 03 17:56 Pacific Daylight Time
+----------------------------------------------------------
+9/71 Testing: gui_forms_application_native_tests
+9/71 Test: gui_forms_application_native_tests
+Command: "C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows/gui_forms_application_native_tests.exe"
+Directory: C:/Users/Shadow/file_manager/gui_forms/.build/shadow-windows
+"gui_forms_application_native_tests" start time: Oct 03 17:56 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+portable application API: native attach, cancel/retry, close, expiry, recursion and exception containment passed
+<end of output>
+Test time =   0.22 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_application_native_tests" end time: Oct 03 17:56 Pacific Daylight Time
+"gui_forms_application_native_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 17:56 Pacific Daylight Time

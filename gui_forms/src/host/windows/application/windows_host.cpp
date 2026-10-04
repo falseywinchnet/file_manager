@@ -572,6 +572,7 @@ void enable_best_dpi_awareness() noexcept {
 class DibPainter final : public Painter {
 #if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
     friend struct DibHostFixture;
+    friend struct DibRasterCacheFixture;
 #endif
 #if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST)
     friend struct PreparedHostFixture;
@@ -1093,6 +1094,11 @@ public:
                     rect.height + spread * 2.0};
         const double radius = std::max(0.0, corner_radius + spread);
         const double sigma = std::max(blur_radius * 0.5, 0.25 / scale_);
+        const ShadowRaster* cached = shadow_raster(area, shadow, radius, sigma, color.alpha);
+        if (cached != nullptr) {
+            paint_shadow_raster(*cached, color);
+            return;
+        }
         for (int y = area.top; y < area.bottom; ++y) {
             std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
             for (int x = area.left; x < area.right; ++x) {
@@ -1675,12 +1681,100 @@ private:
         std::vector<GradientStop> stops;
         std::vector<std::uint32_t> pixels;
     };
+    struct ShadowRaster final {
+        PixelRect area{};
+        Rect shadow{};
+        double radius{};
+        double sigma{};
+        double scale{};
+        unsigned alpha{};
+        // 256 means the original coverage threshold skipped this pixel.
+        // Zero is distinct: blend_pixel with zero alpha still writes opaque
+        // destination alpha, so treating zero as skipped would change output.
+        std::unique_ptr<std::uint16_t[]> samples{};
+        std::size_t count{};
+    };
+
+    // The caller supplies a nonempty raster area. Returned storage is borrowed
+    // until the next mutation of shadow_cache_; replay consumes it immediately.
+    [[nodiscard]] const ShadowRaster* shadow_raster(const PixelRect area,
+        const Rect shadow, const double radius, const double sigma, const unsigned alpha) {
+#if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
+        if (brush_cache_disabled_) return nullptr;
+#endif
+        constexpr std::size_t maximum_samples = 2U * 1024U * 1024U;
+        const std::size_t columns = static_cast<std::size_t>(area.right - area.left);
+        const std::size_t rows = static_cast<std::size_t>(area.bottom - area.top);
+        if (columns == 0U || rows > maximum_samples / columns) return nullptr;
+        const std::size_t count = columns * rows;
+        for (const ShadowRaster& cached : shadow_cache_) {
+            if (cached.area.left == area.left && cached.area.right == area.right &&
+                cached.area.top == area.top && cached.area.bottom == area.bottom &&
+                cached.shadow == shadow && cached.radius == radius && cached.sigma == sigma &&
+                cached.scale == scale_ && cached.alpha == alpha) return &cached;
+        }
+        // Evict before allocation: at most 4 MiB of owned alpha/skip samples.
+        // A refused allocation falls back to the unchanged scalar paint path.
+        while (!shadow_cache_.empty() &&
+            (shadow_cache_.size() >= 64U || count > maximum_samples - shadow_cache_samples_)) {
+            shadow_cache_samples_ -= shadow_cache_.front().count;
+            shadow_cache_.erase(shadow_cache_.begin());
+        }
+        try {
+#if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
+            if (fail_shadow_allocation_) throw std::bad_alloc();
+#endif
+            ShadowRaster next{area, shadow, radius, sigma, scale_, alpha, {}, count};
+            // Every live sample is assigned below before publication.
+            next.samples = std::make_unique_for_overwrite<std::uint16_t[]>(count);
+            for (int y = area.top; y < area.bottom; ++y) {
+                const std::size_t row = static_cast<std::size_t>(y - area.top) * columns;
+                for (int x = area.left; x < area.right; ++x) {
+                    const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
+                    const double distance = rounded_distance(sample, shadow, radius);
+                    const double coverage = distance <= 0.0 ? 1.0
+                        : std::exp(-0.5 * (distance / sigma) * (distance / sigma));
+                    std::uint16_t value = 256U;
+                    if (coverage > 0.001) {
+                        const long rounded = std::lround(static_cast<double>(alpha) * coverage);
+                        value = static_cast<std::uint16_t>(rounded);
+                    }
+                    next.samples[row + static_cast<std::size_t>(x - area.left)] = value;
+                }
+            }
+            shadow_cache_.push_back(std::move(next));
+            shadow_cache_samples_ += count;
+        } catch (const std::bad_alloc&) {
+            return nullptr;
+        }
+        return &shadow_cache_.back();
+    }
+    void paint_shadow_raster(const ShadowRaster& raster, const Color color) {
+        const PixelRect area = raster.area;
+        const std::size_t columns = static_cast<std::size_t>(area.right - area.left);
+        for (int y = area.top; y < area.bottom; ++y) {
+            const PixelSpan span = clipped_row_span(area, y);
+            const std::size_t source_row = static_cast<std::size_t>(y - area.top) * columns;
+            std::uint32_t* const destination = pixels_ + static_cast<std::size_t>(y) *
+                static_cast<std::size_t>(width_);
+            for (int x = span.left; x < span.right; ++x) {
+                const std::uint16_t alpha = raster.samples[source_row + static_cast<std::size_t>(x - area.left)];
+                if (alpha == 256U) continue;
+                blend_pixel(destination[x], color, alpha);
+            }
+        }
+    }
 
     [[nodiscard]] const GradientRaster* gradient_raster(PixelRect area, Point first, Point second,
         std::span<const GradientStop> stops, GradientSpreadMode spread, bool radial) {
+#if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
+        if (brush_cache_disabled_) return nullptr;
+#endif
         // Cache the sampled brush, never the destination/background. Alpha is
         // composited afresh and current clipping is applied on every replay.
-        // FIFO eviction bounds material pixels to 16 MiB per painter.
+        // FIFO eviction bounds material pixels to 16 MiB per painter. The
+        // entry ceiling admits a repeated 42-brush scene without cyclic
+        // eviction; it does not promise hits for every possible working set.
         constexpr std::size_t maximum_pixels = 4U * 1024U * 1024U;
         const std::size_t count = static_cast<std::size_t>(area.right - area.left) * (area.bottom - area.top);
         if (count > maximum_pixels) return nullptr;
@@ -1698,8 +1792,11 @@ private:
             }
             if (same) return &cached;
         }
+#if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
+        ++gradient_builds_;
+#endif
         while (!gradient_cache_.empty() &&
-               (gradient_cache_.size() >= 32U || gradient_cache_pixels_ + count > maximum_pixels)) {
+               (gradient_cache_.size() >= 128U || gradient_cache_pixels_ + count > maximum_pixels)) {
             gradient_cache_pixels_ -= gradient_cache_.front().pixels.size();
             gradient_cache_.erase(gradient_cache_.begin());
         }
@@ -2351,6 +2448,13 @@ private:
     std::array<PaintTiming, 8> timings_{};
     std::vector<GradientRaster> gradient_cache_;
     std::size_t gradient_cache_pixels_{};
+    std::vector<ShadowRaster> shadow_cache_{};
+    std::size_t shadow_cache_samples_{};
+#if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
+    std::size_t gradient_builds_{};
+    bool brush_cache_disabled_{};
+    bool fail_shadow_allocation_{};
+#endif
 };
 
 class WindowsHostState final {
@@ -3573,6 +3677,7 @@ LRESULT CALLBACK window_procedure(HWND window, UINT message, WPARAM wparam, LPAR
 
 #if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
 #include "windows_dib_lifecycle_fixture.inc"
+#include "windows_raster_cache_fixture.inc"
 #endif
 #if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST)
 #include "windows_prepared_text_fixture.inc"
@@ -3581,7 +3686,10 @@ LRESULT CALLBACK window_procedure(HWND window, UINT message, WPARAM wparam, LPAR
 } // namespace
 
 #if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
-void run_windows_dib_lifecycle_fixture() { DibHostFixture::run(); }
+void run_windows_dib_lifecycle_fixture() {
+    DibRasterCacheFixture::run();
+    DibHostFixture::run();
+}
 #endif
 #if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST)
 void run_windows_prepared_text_fixture(const std::span<const std::byte> fonts) { PreparedHostFixture::run(fonts); }

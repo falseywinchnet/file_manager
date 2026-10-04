@@ -1,0 +1,11 @@
+gui-forms-host=transaction-frame-not-presented
+gui-forms-host=transaction-paint-fault
+gui-forms-host=transaction-frame-not-presented
+gui-forms-host=transaction-frame-not-presented
+gui-forms-host=transaction-frame-not-presented
+workload,samples,p50_ms,p95_ms,p99_ms,max_ms,gradient_builds,gradient_pixels
+gradients_42,40,0.852800,0.888900,0.978300,0.978300,0,520740
+shadow,40,0.928800,1.025800,1.145100,1.145100,0,0
+gradients_42_cold,40,25.488900,28.250100,30.435700,30.435700,1680,520740
+shadow_cold,40,5.520000,7.786300,8.272500,8.272500,0,0
+Hidden owned Window DIB lifecycle fixture passed
