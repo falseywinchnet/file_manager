@@ -48,8 +48,26 @@ Source review covers new `preview_frame.hpp/.cpp`, the generated EXIF helper and
 closed emit-mode changes in `jpeg_experiment.cpp`, CMake/workflow changes and the
 new Rust `check_jpeg` consumer. The full programming house style applies. Earlier
 review of untouched decoder/color code is recorded separately; this change does
-not declare all legacy frontend code compliant. Independent review and native
-matrix results remain pending at this checkpoint.
+not declare all legacy frontend code compliant. Independent source review found
+no blockers or remaining house-style violations in that named scope; the full
+report is retained in `SOURCE_REVIEW.md`.
+
+## Native joined result
+
+Source `8ced367eb43478e4658a1946bffd2f01ae5d002d`,
+[run 37176574363](https://github.com/falseywinchnet/file_manager/actions/runs/37176574363),
+passed on Windows 2022 (job 111360306130), macOS 26 (111360306273) and
+Ubuntu 24.04 (111360306236). Each ran the existing codec correctness tests and
+all sixteen real JPEG output streams through Rust 1.87.0. Root inspected the
+logs and verified that every orientation/profile pair appears exactly once.
+Scoped native log excerpts are retained beside this file, with trailing
+whitespace normalized; full logs remain in ignored `.build/jpeg-frame-*-8ced367.log`.
+The separate byte-frame workflow `37176574334` also passes all three hosts.
+
+This is combined native correctness evidence for the declared generated corpus.
+There is no application latency, photographic-corpus or production confinement
+claim. The follow-up review/evidence changes do not alter executable behavior.
+Full development matrices remain separate PR gates.
 
 ## Remaining integration
 

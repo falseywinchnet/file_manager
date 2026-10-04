@@ -1,0 +1,63 @@
+correctness (macos-26)	Verify correctness without timing claims	﻿2026-10-04T04:18:18.7082330Z ##[group]Run ctest --test-dir .build/jpeg-research -C Release --output-on-failure --timeout 60
+correctness (macos-26)	Verify correctness without timing claims	2026-10-04T04:18:18.7082940Z ^[[36;1mctest --test-dir .build/jpeg-research -C Release --output-on-failure --timeout 60^[[0m
+correctness (macos-26)	Verify correctness without timing claims	2026-10-04T04:18:18.7117960Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+correctness (macos-26)	Verify correctness without timing claims	2026-10-04T04:18:18.7118350Z ##[endgroup]
+correctness (macos-26)	Verify correctness without timing claims	2026-10-04T04:18:18.7866050Z Test project /Users/runner/work/file_manager/file_manager/.build/jpeg-research
+correctness (macos-26)	Verify correctness without timing claims	2026-10-04T04:18:18.7894250Z     Start 1: file_manager_jpeg_orientation_tests
+correctness (macos-26)	Verify correctness without timing claims	2026-10-04T04:18:18.7945030Z 1/2 Test #1: file_manager_jpeg_orientation_tests ............   Passed    0.00 sec
+correctness (macos-26)	Verify correctness without timing claims	2026-10-04T04:18:18.7946840Z     Start 2: file_manager_jpeg_embedded_orientation_tests
+correctness (macos-26)	Verify correctness without timing claims	2026-10-04T04:18:19.1635700Z 2/2 Test #2: file_manager_jpeg_embedded_orientation_tests ...   Passed    0.36 sec
+correctness (macos-26)	Verify correctness without timing claims	2026-10-04T04:18:19.1736750Z
+correctness (macos-26)	Verify correctness without timing claims	2026-10-04T04:18:19.1837730Z 100% tests passed out of 2
+correctness (macos-26)	Verify correctness without timing claims	2026-10-04T04:18:19.1939140Z
+correctness (macos-26)	Verify correctness without timing claims	2026-10-04T04:18:19.1997680Z Total Test time (real) =   0.38 sec
+correctness (macos-26)	Build independent minimum-version frame consumer	﻿2026-10-04T04:18:19.2316880Z ##[group]Run rustup toolchain install 1.87.0 --profile minimal --component rustfmt --component clippy
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:19.2318650Z ^[[36;1mrustup toolchain install 1.87.0 --profile minimal --component rustfmt --component clippy^[[0m
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:19.2320500Z ^[[36;1mcargo +1.87.0 fmt --manifest-path orchestrator/experiments/preview_frame/Cargo.toml -- --check^[[0m
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:19.2322860Z ^[[36;1mcargo +1.87.0 clippy --manifest-path orchestrator/experiments/preview_frame/Cargo.toml --locked --offline --all-targets --all-features --jobs 2 --target-dir orchestrator/.build/preview-frame -- -D warnings^[[0m
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:19.2326050Z ^[[36;1mcargo +1.87.0 build --manifest-path orchestrator/experiments/preview_frame/Cargo.toml --locked --offline --bin check_jpeg --jobs 2 --target-dir orchestrator/.build/preview-frame^[[0m
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:19.2375770Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:19.2376260Z ##[endgroup]
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:19.3544600Z info: syncing channel updates for 1.87.0-aarch64-apple-darwin
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:19.4872540Z info: latest update on 2025-05-15 for version 1.87.0 (17067e9ac 2025-05-09)
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:19.4969960Z info: downloading 5 components
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:27.3228580Z
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:27.5453620Z   1.87.0-aarch64-apple-darwin installed - rustc 1.87.0 (17067e9ac 2025-05-09)
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:27.5455160Z info: self-update is disabled for this build of rustup
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:27.5456530Z info: any updates to rustup will need to be fetched with your system package manager
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:27.5457590Z
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:27.9618630Z     Checking file-manager-preview-frame-lab v0.0.0 (/Users/runner/work/file_manager/file_manager/orchestrator/experiments/preview_frame)
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:28.7542980Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.91s
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:28.8184610Z    Compiling file-manager-preview-frame-lab v0.0.0 (/Users/runner/work/file_manager/file_manager/orchestrator/experiments/preview_frame)
+correctness (macos-26)	Build independent minimum-version frame consumer	2026-10-04T04:18:29.3805310Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.59s
+correctness (macos-26)	Verify real JPEG pixels across process bytes	﻿2026-10-04T04:18:29.3989550Z ##[group]Run set -euo pipefail
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.3991950Z ^[[36;1mset -euo pipefail^[[0m
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.3992660Z ^[[36;1mif [ "$RUNNER_OS" = Windows ]; then^[[0m
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.3994270Z ^[[36;1m  jpeg_producer=.build/jpeg-research/Release/file_manager_jpeg_experiment.exe^[[0m
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.3995320Z ^[[36;1m  jpeg_consumer=orchestrator/.build/preview-frame/debug/check_jpeg.exe^[[0m
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.3995880Z ^[[36;1melse^[[0m
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.3996220Z ^[[36;1m  jpeg_producer=.build/jpeg-research/file_manager_jpeg_experiment^[[0m
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.3996790Z ^[[36;1m  jpeg_consumer=orchestrator/.build/preview-frame/debug/check_jpeg^[[0m
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.3997210Z ^[[36;1mfi^[[0m
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.3997440Z ^[[36;1mfor orientation in 1 2 3 4 5 6 7 8; do^[[0m
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.3997980Z ^[[36;1m  "$jpeg_producer" --emit-frame "$orientation" | "$jpeg_consumer" "$orientation" plain^[[0m
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.3998610Z ^[[36;1m  "$jpeg_producer" --emit-color-frame "$orientation" | "$jpeg_consumer" "$orientation" linear^[[0m
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.4033440Z ^[[36;1mdone^[[0m
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.4084980Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.4085330Z ##[endgroup]
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.5396820Z JPEG frame: EXIF 1, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.6695320Z JPEG frame: EXIF 1, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.7572630Z JPEG frame: EXIF 2, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.8963670Z JPEG frame: EXIF 2, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:29.9663530Z JPEG frame: EXIF 3, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:30.1172090Z JPEG frame: EXIF 3, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:30.2293820Z JPEG frame: EXIF 4, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:30.3907170Z JPEG frame: EXIF 4, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:30.4912850Z JPEG frame: EXIF 5, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:30.6344660Z JPEG frame: EXIF 5, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:30.7235140Z JPEG frame: EXIF 6, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:30.8692630Z JPEG frame: EXIF 6, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:30.9610720Z JPEG frame: EXIF 7, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:31.1202380Z JPEG frame: EXIF 7, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:31.2107030Z JPEG frame: EXIF 8, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (macos-26)	Verify real JPEG pixels across process bytes	2026-10-04T04:18:31.3613790Z JPEG frame: EXIF 8, linear, 768x1024, 3145728 bytes, independent color anchors accepted
