@@ -82,5 +82,7 @@ package) were corrected to an explicit StableId and plain retained Control.
 
 The full programming house style was independently reviewed for all authored
 C++, Python, CMake and workflow additions. That review does not certify the
-unchanged GUI.Forms implementation or vendor dependencies. Native platform
-measurements beyond this Windows run remain pending.
+unchanged GUI.Forms implementation or vendor dependencies. The later complete
+Windows/macOS/Linux matrix passed at source `6105a31b`; native raw samples,
+compiler/source receipts and the comparison table are recorded in
+`../../results/2026-10-04-preview-admission/native/`.

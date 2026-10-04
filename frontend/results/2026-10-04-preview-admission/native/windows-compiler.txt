@@ -1,0 +1,2 @@
+        gcc version 16.2.0 (Rev4, Built by MSYS2 project) 
+        ignore line: [gcc version 16.2.0 (Rev4  Built by MSYS2 project) ]

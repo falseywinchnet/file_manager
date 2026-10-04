@@ -1,0 +1,13 @@
+{
+  "git_executable": "D:\\a\\_temp\\msys64\\usr\\bin/git.EXE",
+  "git_version": "git version 2.56.0",
+  "source_revision": "6105a31bcf9f7faf8c4a1fecfa986729683e14e5",
+  "source_dirty": false,
+  "status_porcelain": [],
+  "tracked_diff_stat": "",
+  "git_config": [
+    "file:.git/config\tcore.filemode false",
+    "file:.git/config\tcore.ignorecase true",
+    "file:.git/config\tcore.autocrlf true"
+  ]
+}

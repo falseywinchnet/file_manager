@@ -1,0 +1,5 @@
+# Preserve evidence bytes, including native CRLF and compiler-output spaces.
+# Whitespace checks still apply to authored source and documentation.
+*.log -text -whitespace
+*-source.json -text -whitespace
+*-compiler.txt -text -whitespace
