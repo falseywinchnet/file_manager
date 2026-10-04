@@ -1,0 +1,41 @@
+[
+  {
+    "archive": "file-manager-0.001-alpha-linux-x64-7be8b8a1a182.tar.gz",
+    "sha256": "576de022cabce903b7460bd75877d6f0f5f58d00586f77740d4efc23c563a0f6",
+    "source_revision": "7be8b8a1a1821b21dc41729a026a6ee43ae848ec",
+    "files_verified": 40,
+    "validation": {
+      "source_revision": "7be8b8a1a1821b21dc41729a026a6ee43ae848ec",
+      "frontend_ctest": "passed",
+      "gui_forms_sdk_sha256": "4036c0a39c315287891d6867157f1870ec982ee269c651a6c44de5b8b6d8c433",
+      "gui_forms_ctest": "passed",
+      "packaged_startup": "process stayed alive for 5 seconds on generated empty root; not GUI workflow acceptance"
+    }
+  },
+  {
+    "archive": "file-manager-0.001-alpha-macos-arm64-7be8b8a1a182.tar.gz",
+    "sha256": "088db2be0d34dc96e45fbf376fa1cdd201215be523c53297dda369fb7ee8140a",
+    "source_revision": "7be8b8a1a1821b21dc41729a026a6ee43ae848ec",
+    "files_verified": 42,
+    "validation": {
+      "source_revision": "7be8b8a1a1821b21dc41729a026a6ee43ae848ec",
+      "frontend_ctest": "passed",
+      "gui_forms_sdk_sha256": "093ca234d7c0db821f7b445a46a7f50beec5210b4cb55a946d1f2cb0d1456ef4",
+      "gui_forms_ctest": "passed",
+      "packaged_startup": "process stayed alive for 5 seconds on generated empty root; not GUI workflow acceptance"
+    }
+  },
+  {
+    "archive": "file-manager-0.001-alpha-windows-x64-7be8b8a1a182.zip",
+    "sha256": "16afb56f071bca98e204a7ac52ec2f397a9b1e82ad42eeb9232b6687485e3ef2",
+    "source_revision": "7be8b8a1a1821b21dc41729a026a6ee43ae848ec",
+    "files_verified": 44,
+    "validation": {
+      "source_revision": "7be8b8a1a1821b21dc41729a026a6ee43ae848ec",
+      "frontend_ctest": "passed",
+      "gui_forms_sdk_sha256": "481c58a52b970badca5e4724b5be3536cec2cac9cb3d85948d341720dabd4bb9",
+      "gui_forms_ctest": "passed",
+      "packaged_startup": "process stayed alive for 5 seconds on generated empty root; not GUI workflow acceptance"
+    }
+  }
+]
