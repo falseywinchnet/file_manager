@@ -1,0 +1,30 @@
+[
+  {
+    "path": "frontend/src/selection_summary.hpp",
+    "sha256": "3ce22885b06aeb728f3bf112862d7cb39547367746b757d36a5f7aef3d31d13b"
+  },
+  {
+    "path": "frontend/src/application.cpp",
+    "sha256": "7ae50edbfa15d81f57559c224e868a746ca4cb71ef070b8a8bc1b8f73210549d"
+  },
+  {
+    "path": "frontend/src/application.hpp",
+    "sha256": "4f9162497c08719b01389ca6eac8576050be6b904d07c12bb99a9807f996bc71"
+  },
+  {
+    "path": "frontend/tests/object_order_tests.cpp",
+    "sha256": "de6d2b9890b37c6b5023d541fd8aa45622efae3714892f04ad97aff78f13e2c7"
+  },
+  {
+    "path": "frontend/tests/application_interaction_tests.cpp",
+    "sha256": "287d06a7ca92af0f4cff04d190edfd02a4f733d6ec9e7d0be00797ffe7edbe6e"
+  },
+  {
+    "path": "frontend/tests/macos_preview_tests.mm",
+    "sha256": "798a0148693a4f4bebc40cede3576ccdba37020f76234cf0ef18c151af18884b"
+  },
+  {
+    "path": ".github/workflows/native-builds.yml",
+    "sha256": "190f4cdbf534fcebc8cffd32f1a709bf2a649e6e1e06a1e90c769a1eababdaef"
+  }
+]

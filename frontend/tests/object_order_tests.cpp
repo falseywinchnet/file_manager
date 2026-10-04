@@ -1,5 +1,6 @@
 #include "object_order.hpp"
 #include "details_projection.hpp"
+#include "selection_summary.hpp"
 
 #include <array>
 #include <iostream>
@@ -64,6 +65,75 @@ void check_factual_projection() {
     }
 }
 
+void check_selection_observations() {
+    file_manager::detail::ObjectEntries entries{};
+    file_manager::DirectoryEntry first{};
+    first.identity.inode = 1U;
+    first.identity.type = std::filesystem::file_type::regular;
+    first.identity.size = 999U; // Deliberately different from the display observation.
+    first.kind = file_manager::EntryKind::document;
+    first.metadata.logical_size = 5U;
+    first.metadata.modified = file_manager::ObservedFileTime{17, 3U};
+    entries.emplace("first", first);
+    file_manager::DirectoryEntry second = first;
+    second.identity.inode = 2U;
+    second.metadata.logical_size = 7U;
+    entries.emplace("second", second);
+    const std::array<std::string, 2U> pair{"first", "second"};
+    file_manager::detail::SelectionSummary summary = file_manager::detail::summarize_selection(entries, pair);
+    if (summary.logical_bytes != 12U || summary.known_sizes != 2U || summary.files != 2U ||
+        summary.mixed_kind || summary.mixed_modified || summary.modified_unavailable ||
+        summary.common_kind != file_manager::EntryKind::document ||
+        file_manager::detail::selection_count_text(summary) != "2 files") {
+        throw std::runtime_error("selection must retain common facts and sum observed sizes, not identity fingerprints");
+    }
+    entries.at("second").metadata.logical_size.reset();
+    entries.at("second").metadata.modified = file_manager::ObservedFileTime{17, 4U};
+    summary = file_manager::detail::summarize_selection(entries, pair);
+    const std::string partial_size = file_manager::detail::selection_size_text(summary);
+    if (summary.logical_bytes != 5U || summary.known_sizes != 1U || !summary.mixed_modified ||
+        partial_size.find("in known files") == std::string::npos ||
+        partial_size.find("some sizes unavailable") == std::string::npos) {
+        throw std::runtime_error("missing sizes and subsecond differences must remain explicit");
+    }
+    entries.at("first").metadata.logical_size = 0U;
+    entries.at("second").metadata.logical_size = 0U;
+    summary = file_manager::detail::summarize_selection(entries, pair);
+    if (summary.known_sizes != 2U || summary.logical_bytes != 0U || summary.size_overflow) {
+        throw std::runtime_error("observed empty files are known zero, not unavailable");
+    }
+    entries.at("first").metadata.logical_size = std::numeric_limits<std::uint64_t>::max();
+    entries.at("second").metadata.logical_size = 1U;
+    summary = file_manager::detail::summarize_selection(entries, pair);
+    if (!summary.size_overflow || file_manager::detail::selection_size_text(summary) !=
+        "File size total exceeds display range") {
+        throw std::runtime_error("overflow must not publish a wrapped or partial numeric total");
+    }
+
+    file_manager::DirectoryEntry folder = first;
+    folder.identity.type = std::filesystem::file_type::directory;
+    folder.kind = file_manager::EntryKind::folder;
+    folder.directory = true;
+    entries.emplace("folder", folder);
+    file_manager::DirectoryEntry link = first;
+    link.identity.type = std::filesystem::file_type::symlink;
+    link.kind = file_manager::EntryKind::symlink;
+    entries.emplace("link", link);
+    const std::array<std::string, 3U> mixed{"folder", "link", "missing"};
+    summary = file_manager::detail::summarize_selection(entries, mixed);
+    if (summary.files != 0U || summary.folders != 1U || summary.other != 1U ||
+        summary.logical_bytes != 0U || summary.known_sizes != 0U ||
+        summary.unavailable_entries != 1U || !summary.modified_unavailable ||
+        file_manager::detail::selection_size_text(summary).find("Folder contents not counted") == std::string::npos) {
+        throw std::runtime_error("folder, link and unavailable entries must not invent file sizes");
+    }
+    const std::array<std::string, 1U> folders{"folder"};
+    summary = file_manager::detail::summarize_selection(entries, folders);
+    if (file_manager::detail::selection_size_text(summary) != "Folder contents not counted") {
+        throw std::runtime_error("a selected folder is not a zero-byte content total");
+    }
+}
+
 void check_signed_and_missing_order() {
     using file_manager::detail::ObjectSort;
     file_manager::detail::ObjectEntries entries{};
@@ -109,6 +179,7 @@ void check_signed_and_missing_order() {
 int main() {
     try {
         check_factual_projection();
+        check_selection_observations();
         check_signed_and_missing_order();
         using file_manager::EntryKind;
         using file_manager::detail::ObjectSort;

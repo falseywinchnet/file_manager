@@ -1,0 +1,34 @@
+Start testing: Oct 03 22:10 Pacific Daylight Time
+----------------------------------------------------------
+12/15 Testing: file_manager_object_order_tests
+12/15 Test: file_manager_object_order_tests
+Command: "C:/Users/Shadow/file_manager/frontend/.build/shadow-windows-latency/file_manager_object_order_tests.exe"
+Directory: C:/Users/Shadow/file_manager/frontend/.build/shadow-windows-latency
+"file_manager_object_order_tests" start time: Oct 03 22:10 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.17 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_object_order_tests" end time: Oct 03 22:10 Pacific Daylight Time
+"file_manager_object_order_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+13/15 Testing: file_manager_application_interaction_tests
+13/15 Test: file_manager_application_interaction_tests
+Command: "C:/Users/Shadow/file_manager/frontend/.build/shadow-windows-latency/file_manager_application_interaction_tests.exe"
+Directory: C:/Users/Shadow/file_manager/frontend/.build/shadow-windows-latency
+"file_manager_application_interaction_tests" start time: Oct 03 22:10 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+file manager application interaction tests failed: selection fixture needs the actual inspector
+<end of output>
+Test time =   0.49 sec
+----------------------------------------------------------
+Test Failed.
+"file_manager_application_interaction_tests" end time: Oct 03 22:10 Pacific Daylight Time
+"file_manager_application_interaction_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 22:10 Pacific Daylight Time
