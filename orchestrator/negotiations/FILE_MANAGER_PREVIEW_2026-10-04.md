@@ -83,3 +83,26 @@ and OS resource-limit constraints. The portable candidate has lower medians on
 the declared Windows fixtures; color-policy equivalence, real photos, process
 limits and application pixels remain unproved. The intake stays an outline;
 no helper placement, decoder dependency or additional format is admitted.
+
+## Lifecycle fragment 002
+
+**Orchestrator requirement:** test the selected-preview lifecycle independently
+of provider/transport choice: bounded pending storage, stop/reap ordering,
+monotonic deadlines, wrong-ticket/source rejection, result acknowledgement and
+expiry, window loss and restart. Numeric budgets remain revisable candidates.
+
+**Frontend reply:** its current selection generation/demand state is compatible
+with replacing one pending request per window and refusing late completion.
+It must retain a completed grant when merely collapsing/reopening the inspector,
+retire that grant on selection/window loss, and validate any future incoming
+pixels before GUI.Forms admission. Current code has no broker adapter and its
+existing worker queue is not replaced by this reply. See the appended local
+round in `../../frontend/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`.
+
+**Reconciliation:** the candidate lifecycle fragment and disposable laboratory
+are recorded in `../spec/SELECTED_PREVIEW_LIFECYCLE_DRAFT.md`. A reap event cannot
+be inferred from a successful stop call or decoded pixels. A client missing its
+acknowledgement deadline loses the offered result; grant accounting is distinct
+from proof of physical memory release. The full profile remains incomplete;
+no runtime operation, source capability, codec selection or plugin execution
+is opened by this fragment.

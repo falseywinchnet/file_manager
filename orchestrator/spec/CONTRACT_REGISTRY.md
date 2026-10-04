@@ -65,6 +65,14 @@ ORC-PLG-002/003 remain stubbed; first-party profile placement, source authority,
 resource enforcement and adapter fixtures are unresolved. Thumbnail eligibility,
 identity association and disposable-store ownership form a separate later round.
 
+The [selected-preview lifecycle draft fragment](SELECTED_PREVIEW_LIFECYCLE_DRAFT.md)
+now has a disposable, independently buildable Rust laboratory under
+`../experiments/preview_lifecycle/`. It exercises bounded selection replacement,
+stop-before-reap ordering, result retirement, acknowledgement expiry and inert
+source/ticket matching. This is B0 provider-independent conformance work, not
+an available worker, a complete preview contract or an adapter freeze. Source
+authority, process limits and transport remain unreconciled.
+
 ## Windows development consumption receipt (2026-09-29)
 
 Ordinary first-party New Folder/Rename development is reconciled in

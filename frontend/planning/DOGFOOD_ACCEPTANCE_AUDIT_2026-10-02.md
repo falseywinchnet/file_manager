@@ -28,6 +28,24 @@ See `../results/2026-10-04-jpeg-wic-control/README.md` and
 `../../planning/PREVIEW_PROVIDER_COMPARISON_2026-10-04.md`. Neither experiment
 adds JPEG to the shipped application or opens thumbnail/provider authority.
 
+**Color preparation follow-up:** RGB/grayscale ICC conversion now passes
+independent scalar color oracles and embedded baseline/progressive JPEG checks
+on Windows/macOS/Linux. A dark-gray failure in the default optimized transform
+is retained, with the passing non-optimized gray path used in the specimen.
+See `../results/2026-10-04-jpeg-color/NATIVE_VERIFICATION.md`. The complete
+house-style review is scoped to that authored research; ordinary photos, process
+containment, monitor presentation and actual application JPEG previews remain
+unverified. PR37 has merged; PR38's post-rebase native application checks remain
+pending at this checkpoint.
+
+**Lifecycle follow-up:** the provider-independent laboratory at
+`../../orchestrator/experiments/preview_lifecycle/` checks bounded request
+replacement, stop/reap ordering, source/ticket rejection, expiring offered
+results and display-grant accounting. This supplies executable evidence for
+the intake's lifecycle fragment; it opens no worker capability and adds no
+format to the portable alpha. Real source authority, transport, OS resource
+enforcement and frontend integration are the next required edges.
+
 ## Current checkpoint — 2026-10-02
 
 **Latest delivery, 2026-10-03:**
