@@ -1,4 +1,5 @@
 #include "gui_forms/live_surface.hpp"
+#include "gui_forms/paint_framebuffer.hpp"
 #include "gui_forms/window.hpp"
 
 #include "../../display/chunk/display_chunk.hpp"
@@ -12,6 +13,20 @@
 #include <vector>
 
 namespace gui_forms {
+
+void Window::set_framebuffer_painter(Painter* const painter) {
+    require_ui_thread("set_framebuffer_painter");
+    framebuffer_painter_ = painter;
+}
+
+std::unique_ptr<PaintFramebuffer> Window::create_framebuffer(const Size logical_size, const double scale) {
+    require_ui_thread("create_framebuffer");
+    std::unique_ptr<PaintFramebuffer> result{};
+    if (framebuffer_painter_ != nullptr) {
+        result = (*framebuffer_painter_).create_framebuffer(logical_size, scale);
+    }
+    return result;
+}
 
 void Window::collect_paint_checkpoints(
     const Control::Ptr& control, PaintControlCheckpointList& checkpoints) {

@@ -1248,6 +1248,7 @@ private:
             register_bundle_fallback_typeface(
                 _raster, @"NotoEmoji-Regular", @"ttf");
         (*_model).set_text_metrics_provider(fonts_ready ? &_raster : nullptr);
+        (*_model).set_framebuffer_painter(fonts_ready ? &_raster : nullptr);
         (*_model).metrics().set_renderer(
             fonts_ready
                 ? "Skia CPU m152 · HarfBuzz 14.2.1 · FreeType 2.14.2 · bundled fonts (optional Unicode fallback)"
@@ -1486,6 +1487,7 @@ private:
     }
     if (_model != nullptr) {
         (*_model).set_text_metrics_provider(nullptr);
+        (*_model).set_framebuffer_painter(nullptr);
     }
     _model.reset();
 }

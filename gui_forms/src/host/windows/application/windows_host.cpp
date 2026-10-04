@@ -2558,6 +2558,7 @@ public:
         if (model_) {
             (*model_).set_paint_wake_handler({});
             (*model_).set_text_metrics_provider(nullptr);
+            (*model_).set_framebuffer_painter(nullptr);
         }
         session_.shutdown();
         services_.shutdown();
@@ -2588,6 +2589,7 @@ public:
         raster_.resize(logical, scale_);
         raster_.set_bundled_fonts_ready(fonts_ready);
         (*model_).set_text_metrics_provider(fonts_ready ? &raster_ : nullptr);
+        (*model_).set_framebuffer_painter(fonts_ready ? &raster_ : nullptr);
         (*model_).metrics().set_renderer(
             fonts_ready
                 ? "Win32 DIB CPU · Uniscribe/GDI text · WIC PNG · bundled fonts"
