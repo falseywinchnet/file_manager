@@ -3,6 +3,7 @@
 #include "../services/windows_clipboard_image.hpp"
 #include "../services/windows_cursor.hpp"
 #include "../input/windows_key_translation.hpp"
+#include "../input/windows_message_queue.hpp"
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
 #include "../raster/dib_frame_store.hpp"
 #endif
@@ -3130,11 +3131,12 @@ private:
             return;
         }
         const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
-        if (pending_damage_.empty()) {
-            pending_damage_.add({paint_state.rcPaint.left / scale_, paint_state.rcPaint.top / scale_,
-                (paint_state.rcPaint.right - paint_state.rcPaint.left) / scale_,
-                (paint_state.rcPaint.bottom - paint_state.rcPaint.top) / scale_});
-        }
+        // Windows exposes whole device pixels. Include its complete update
+        // bounds even when logical damage exists, so all drawing operations
+        // restore the same pixel edges and native exposures are not omitted.
+        pending_damage_.add({paint_state.rcPaint.left / scale_, paint_state.rcPaint.top / scale_,
+            (paint_state.rcPaint.right - paint_state.rcPaint.left) / scale_,
+            (paint_state.rcPaint.bottom - paint_state.rcPaint.top) / scale_});
         std::optional<PaintReceipt> receipt{};
         bool presented = false;
         try {
@@ -3181,11 +3183,11 @@ private:
         HDC dc = BeginPaint(hwnd_, &paint_state);
         const std::chrono::steady_clock::time_point started =
             std::chrono::steady_clock::now();
-        if (pending_damage_.empty()) {
-            pending_damage_.add({paint_state.rcPaint.left / scale_, paint_state.rcPaint.top / scale_,
-                                 (paint_state.rcPaint.right - paint_state.rcPaint.left) / scale_,
-                                 (paint_state.rcPaint.bottom - paint_state.rcPaint.top) / scale_});
-        }
+        // Match the whole device pixels that BeginPaint will present. A
+        // narrower fractional clip can leave stripes from previous frames.
+        pending_damage_.add({paint_state.rcPaint.left / scale_, paint_state.rcPaint.top / scale_,
+                             (paint_state.rcPaint.right - paint_state.rcPaint.left) / scale_,
+                             (paint_state.rcPaint.bottom - paint_state.rcPaint.top) / scale_});
         raster_.begin_frame();
         static_cast<void>(raster_.synchronize_images((*model_).image_resources()));
         const std::optional<PaintReceipt> receipt =
@@ -3817,7 +3819,7 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
             std::chrono::steady_clock::now();
         for (std::size_t drained = 0U; drained < 32U; ++drained) {
             MSG pending{};
-            if (!PeekMessageW(&pending, nullptr, 0, 0, PM_REMOVE)) break;
+            if (!detail::take_window_message(pending, drained % 2U == 0U)) break;
             if (pending.message == WM_QUIT) {
                 message = pending;
                 quit = true;
@@ -3829,7 +3831,8 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
                 quit = true;
                 break;
             }
-            if (std::chrono::steady_clock::now() - batch_started >=
+            // Finish an input/ordinary pair before applying the time budget.
+            if (drained % 2U == 1U && std::chrono::steady_clock::now() - batch_started >=
                 std::chrono::milliseconds(4)) {
                 break;
             }
@@ -4007,7 +4010,7 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
             std::chrono::steady_clock::now();
         for (std::size_t drained = 0U; drained < 32U; ++drained) {
             MSG pending{};
-            if (!PeekMessageW(&pending, nullptr, 0, 0, PM_REMOVE)) break;
+            if (!detail::take_window_message(pending, drained % 2U == 0U)) break;
             if (pending.message == WM_QUIT) {
                 message = pending;
                 quit = true;
@@ -4015,7 +4018,8 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
             }
             TranslateMessage(&pending);
             DispatchMessageW(&pending);
-            if (std::chrono::steady_clock::now() - batch_started >=
+            // Finish an input/ordinary pair before applying the time budget.
+            if (drained % 2U == 1U && std::chrono::steady_clock::now() - batch_started >=
                 std::chrono::milliseconds(4)) {
                 break;
             }
