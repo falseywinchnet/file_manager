@@ -30,8 +30,8 @@ availability. `WindowsRejectedLayoutLastTest.log` retains that failure. The
 window availability subscription corrects it without a new toolkit API.
 
 **MEASURED correctness:** Windows Release, GCC 16.2.0, the current GUI.Forms
-application library built with HarfBuzz/Skia/transactional DIB disabled, at most
-two compiler jobs. All 15 frontend CTest suites passed in 7.40 seconds, including
+application library built with HarfBuzz/Skia/transactional DIB disabled, with
+build commands using `--parallel 2`. All 15 frontend CTest suites passed in 7.40 seconds, including
 the interaction suite in 3.58 seconds. `WindowsLastTest.log` records the complete
 run. Fixtures own generated temporary files. Windows reported error 1314 for
 symlink fixture creation; those assertions were skipped, not passed.
@@ -62,3 +62,26 @@ Root verified those hashes and the three-file spelling scan (zero candidates).
 No unchanged legacy-code compliance is claimed. The earlier test helper typo
 (`PngPreviewReady` instead of the existing `ImagePreviewReady`) was corrected
 before the accepted build.
+
+## Mainline integration
+
+PR34 passed both native matrices (push `37166736865`, PR `37166738667`) and
+merged by rebase as `648784eb256e97a8c57113ef03a10dffb9612146`. Its tested
+`5a329687` source and merged main have the same tree,
+`0e04f8ac0e8d59247076113fe904b68802d8a741`.
+
+The preview change then rebased cleanly onto that main as `87d07945`.
+Its three C++ files are byte-identical in Git to pre-rebase commit `c9ac177`.
+The integrated GUI.Forms application library was rebuilt and installed, then
+the frontend rebuilt against that SDK. All 15 suites passed again in 7.13 s;
+`WindowsIntegratedLastTest.log` retains that run. A sibling reported a brief
+one-job compile overlap during this correctness run; neither run is a quiet-host
+performance benchmark.
+
+Git-normalized reviewed source blob identities after rebase:
+
+| File | Blob |
+|---|---|
+| `src/application.hpp` | `399e081049eef589c41bf990586a8637b296ae27` |
+| `src/application.cpp` | `aeac4899a07c83327eb8182a017dd26db5ba755c` |
+| `tests/application_interaction_tests.cpp` | `6ba04c3052e2d5540df72cd5272ff5b5755ab740` |
