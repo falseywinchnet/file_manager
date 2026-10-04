@@ -140,6 +140,26 @@ jobs:
           xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" python3 tools/build_native.py --jobs 2
           python3 -B tools/export_native_sdks_tests.py
           python3 -B tools/export_native_sdks.py
+      - name: Measure consumer image admission on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          python frontend/experiments/preview_admission/fixture.py .build/native-${{ matrix.platform }}/preview-admission/data
+          cmake -S frontend/experiments/preview_admission -B .build/native-${{ matrix.platform }}/preview-admission/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DGUIForms_DIR="$PWD/.build/native-${{ matrix.platform }}/gui-forms-sdk/lib/cmake/GUIForms"
+          cmake --build .build/native-${{ matrix.platform }}/preview-admission/build --parallel 2
+          .build/native-${{ matrix.platform }}/preview-admission/build/preview_admission.exe .build/native-${{ matrix.platform }}/preview-admission/data | tee .build/native-${{ matrix.platform }}/preview-admission/forward.log
+          .build/native-${{ matrix.platform }}/preview-admission/build/preview_admission.exe .build/native-${{ matrix.platform }}/preview-admission/data --reverse | tee .build/native-${{ matrix.platform }}/preview-admission/reverse.log
+      - name: Measure consumer image admission on macOS and Linux
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 frontend/experiments/preview_admission/fixture.py .build/native-${{ matrix.platform }}/preview-admission/data
+          cmake -S frontend/experiments/preview_admission -B .build/native-${{ matrix.platform }}/preview-admission/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DGUIForms_DIR="$PWD/.build/native-${{ matrix.platform }}/gui-forms-sdk/lib/cmake/GUIForms"
+          cmake --build .build/native-${{ matrix.platform }}/preview-admission/build --parallel 2
+          .build/native-${{ matrix.platform }}/preview-admission/build/preview_admission .build/native-${{ matrix.platform }}/preview-admission/data | tee .build/native-${{ matrix.platform }}/preview-admission/forward.log
+          .build/native-${{ matrix.platform }}/preview-admission/build/preview_admission .build/native-${{ matrix.platform }}/preview-admission/data --reverse | tee .build/native-${{ matrix.platform }}/preview-admission/reverse.log
       # Export the normal OFF SDK above before enabling source-only development
       # tests. This option does not change the Core/Painter ABI or install headers.
       - name: Test development text-mask ownership on Windows
@@ -293,6 +313,7 @@ jobs:
             .build/native-${{ matrix.platform }}/source-state-*.json
             .build/native-${{ matrix.platform }}/paint-cost/*
             .build/native-${{ matrix.platform }}/focused-cpu/*
+            .build/native-${{ matrix.platform }}/preview-admission/*.log
             .build/native-${{ matrix.platform }}/frontend/native-preview-failure.png
             .build/native-${{ matrix.platform }}/frontend/native-preview-failure.json
             .build/native-${{ matrix.platform }}/frontend/native-details.png
