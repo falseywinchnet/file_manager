@@ -80,9 +80,30 @@ ordering, not a new color-accuracy claim.
 passed. Four 250 ms deadline fixtures returned after 251–252 ms with observed
 reaping; the 100 ms cancellation fixture returned after 101 ms. The separately
 supervised Release C++ decoder produced its admitted frame and exited in one
-41 ms sample. That sample includes process launch/transport/validation and is
-not a latency distribution or application-speed claim. Native minimum-version
-checks and independent source review are pending.
+41 ms sample; the retained follow-up sample is 42 ms. These include process
+launch/transport/validation and are not a latency distribution or application-speed
+claim. The independent visible audit accepted the complete new
+source, tests and workflow additions, plus the admitted-byte counter and final
+budget check, with no blockers or remaining house-style violations. Exact scope,
+raw reports and source hashes are retained in `results/`. Each timeout test now
+requires all 68 fixture-frame bytes to have arrived before the timeout, excluding
+a slow-launch false positive. Final local tests and Clippy pass.
+
+**MEASURED native minimum-version verification:** Actions run
+[37178271741](https://github.com/falseywinchnet/file_manager/actions/runs/37178271741)
+passed on all three hosts at exact source
+`89901ae29c6e982718e16909386d789cfb2844f0`. Jobs: Windows `111365393112`,
+Mac `111365393132`, Linux `111365393042`. Each runs Rust 1.87 formatting,
+warning-free Clippy, the four semantic suites (17 observed/reaped fixture
+children), and the real C++ decoder check. Raw scoped excerpts are in
+`results/Native-*-89901ae.log`. Single generated-JPEG host samples were Windows
+44 ms, Mac 152 ms and Linux 39 ms; different hosted machines and debug Rust make
+these correctness-run observations unsuitable for platform speed rankings.
+The four 250 ms deadline cycles returned in 250–256 ms across these runs, including
+cleanup. This is measured fixture behavior, not a hard cleanup guarantee.
+
+The complete application merge matrices are separate gates; this native research
+run does not by itself establish that PR44 is ready to merge or ship.
 
 The full [programming house style](../../../planning/PROGRAMMING_HOUSE_STYLE.md)
 applies to all authored Rust, tests and workflow changes. Source review, not only

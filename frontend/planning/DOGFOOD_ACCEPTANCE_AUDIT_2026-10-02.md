@@ -81,6 +81,10 @@ preparation to byte transfer; input generation still runs in the specimen, and
 production supervision, native source authority and GUI admission remain open.
 No new downloadable preview format is claimed.
 
+PR42's joined JPEG/frame source has passed both full native application matrices
+and rebase-merged as `7d6e222d`, with an entire tree identical to tested
+`241ed39e`. This is merged decoder evidence, not a new product preview capability.
+
 **Separate decoder input follow-up:** generated JPEG input and decoding now run
 in separate executables. A 16 MiB envelope bound precedes allocation; exact body
 and EOF are required. All 32 direct/separate orientation and color streams,
@@ -90,6 +94,18 @@ at `43b76c69`. Complete scoped house-style review found no blockers. See
 caller-supplied bytes, not only generated fixtures; it is presently unsupervised
 research. The shipped application remains unchanged, with JPEG/PDF, thumbnails,
 source authority and production process integration still unfinished.
+
+**Joined process/result follow-up:** a disposable Rust host now validates a
+decoder result only after both stream EOF and successful child exit. Four local
+Windows suites check complete-frame stalls, cancellation, repeated reap/recovery,
+failed exit, malformed extent and bounded diagnostic draining. A real separate
+JPEG decoder also returns a validated 1024x768 raster under this host. Complete
+scoped house-style review found no blockers. All three native Rust 1.87 jobs now
+pass the four suites and real decoder check at `89901ae2`; see
+`../../orchestrator/experiments/preview_supervision/README.md` for results and
+limits. This single-threaded host still lacks a production input pump, source
+authority, descendant containment, hard cleanup bound and OS confinement/memory
+policy. It is not linked into the app or daemon; the downloadable alpha is unchanged.
 
 ## Current checkpoint — 2026-10-02
 
