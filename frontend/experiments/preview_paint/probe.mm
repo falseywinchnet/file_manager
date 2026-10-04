@@ -146,15 +146,43 @@ void check_pixels(const State& state, NSView* const view, const bool image_expec
     require([bitmap.colorSpace isEqual:color_space] == YES, "snapshot destination is not sRGB");
     [view cacheDisplayInRect:view.bounds toBitmapImageRep:bitmap];
     require(bitmap.pixelsWide > 8 && bitmap.pixelsHigh > 8, "native bitmap too small");
+    require([bitmap.colorSpace isEqual:color_space] == YES, "captured bitmap is not sRGB");
+    require(bitmap.bitsPerSample == 8 && bitmap.samplesPerPixel == 4 &&
+            bitmap.bitsPerPixel == 32 && bitmap.hasAlpha == YES && bitmap.isPlanar == NO,
+            "snapshot requires packed four-channel eight-bit samples");
+    const NSBitmapFormat refused_formats = NSBitmapFormatAlphaFirst | NSBitmapFormatFloatingPointSamples;
+    require((bitmap.bitmapFormat & refused_formats) == 0, "snapshot requires integer RGBA sample order");
     for (NSInteger vertical = 1; vertical <= 3; ++vertical) {
         for (NSInteger horizontal = 1; horizontal <= 3; ++horizontal) {
-            NSColor* const sample = [bitmap colorAtX:bitmap.pixelsWide * horizontal / 4
-                y:bitmap.pixelsHigh * vertical / 4];
-            NSColor* const color = [sample colorUsingColorSpace:color_space];
-            require(color != nil, "sample has no sRGB color");
-            const bool match = std::abs(color.redComponent - 12.0 / 255.0) < 0.02 &&
-                std::abs(color.greenComponent - 226.0 / 255.0) < 0.02 &&
-                std::abs(color.blueComponent - 198.0 / 255.0) < 0.02 && color.alphaComponent > 0.98;
+            const NSInteger x = bitmap.pixelsWide / 4 * horizontal;
+            const NSInteger y = bitmap.pixelsHigh / 4 * vertical;
+            std::array<NSUInteger, 4> components{};
+            [bitmap getPixel:components.data() atX:x y:y];
+            const double red = static_cast<double>(components[0U]) / 255.0;
+            const double green = static_cast<double>(components[1U]) / 255.0;
+            const double blue = static_cast<double>(components[2U]) / 255.0;
+            const double alpha = static_cast<double>(components[3U]) / 255.0;
+            const bool match = std::abs(red - 12.0 / 255.0) < 0.02 &&
+                std::abs(green - 226.0 / 255.0) < 0.02 &&
+                std::abs(blue - 198.0 / 255.0) < 0.02 && alpha > 0.98;
+            if (horizontal == 1 && vertical == 1) {
+                // Diagnose NSColor's intermediate profile without using its
+                // conversion as the oracle for an explicitly tagged bitmap.
+                NSColor* const sample = [bitmap colorAtX:x y:y];
+                NSColor* const color = [sample colorUsingColorSpace:color_space];
+                NSColorSpace* const sample_color_space = sample.colorSpace;
+                NSString* const sample_color_space_name = sample_color_space.localizedName;
+                const char* const sample_space = [sample_color_space_name UTF8String];
+                std::cout << "pixel-control|image_expected=" << image_expected
+                          << "|raw_rgba=" << components[0U] << ',' << components[1U] << ','
+                          << components[2U] << ',' << components[3U]
+                          << "|sample_space=" << (sample_space == nullptr ? "unavailable" : sample_space);
+                if (color != nil) {
+                    std::cout << "|converted_rgba=" << color.redComponent << ',' << color.greenComponent
+                              << ',' << color.blueComponent << ',' << color.alphaComponent;
+                }
+                std::cout << '\n';
+            }
             if (match != image_expected) {
                 const gui_forms::Rect arranged = (*state.picture).arranged_bounds();
                 const gui_forms::Rect image = (*state.picture).image_bounds();
@@ -164,8 +192,7 @@ void check_pixels(const State& state, NSView* const view, const bool image_expec
                 const BOOL saved = encoded != nil && [encoded writeToFile:filename atomically:YES];
                 std::cerr << "pixel-mismatch|image_expected=" << image_expected
                           << "|sample=" << horizontal << ',' << vertical
-                          << "|rgba=" << color.redComponent << ',' << color.greenComponent
-                          << ',' << color.blueComponent << ',' << color.alphaComponent
+                           << "|rgba=" << red << ',' << green << ',' << blue << ',' << alpha
                           << "|bitmap=" << bitmap.pixelsWide << 'x' << bitmap.pixelsHigh
                           << "|arranged=" << arranged.x << ',' << arranged.y << ','
                           << arranged.width << ',' << arranged.height

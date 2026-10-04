@@ -29,6 +29,9 @@ display call rather than assigning uninstrumented time to individual internals.
   not a complete image-equivalence test.
   The compatible AppKit destination is tagged sRGB before drawing into it;
   captured pixels are never retagged afterward to satisfy the predicate.
+  After capture the probe verifies that profile and packed 8-bit, four-channel,
+  integer RGBA layout, then normalizes `getPixel` samples by 255. The opaque
+  fixture does not distinguish premultiplied from straight-alpha storage.
 - Thirty samples per format/geometry cover all six format orders five times.
   A second fresh process reverses geometry order. This balances that declared
   order effect; it is not a collection of independent statistical trials.
@@ -114,3 +117,25 @@ No captured samples, fixture colors, tolerance or renderer implementation change
 This does not yet diagnose the renderer or establish color fidelity in the normal
 desktop presentation path. Native execution must still pass the unchanged
 presence and retirement checks before any timings are accepted.
+
+**REJECTED control:** at `f5d1ca9e`, pre-draw sRGB tagging alone still failed
+the NSColor-based check with `(0,0.898066,0.818159,1)`. The saved PNG now has an
+explicit sRGB chunk, no ICC chunk, and stored RGBA `(12,226,198,255)` at the same
+sample. Primary inspection used System.Drawing without embedded color management
+and a standard-library PNG chunk listing; these are independent reads of the
+retained file, not evidence about screen scan-out. The failure log and PNG are
+preserved as `MacSrgbColorObjectRejectedLastTest.log` and
+`MacSrgbColorObjectRejected.png`.
+
+The next control therefore reads the verified sRGB bitmap's numeric samples
+directly through AppKit's documented
+[`getPixel:atX:y:`](https://developer.apple.com/documentation/appkit/nsbitmapimagerep/getpixel%28_%3Aatx%3Ay%3A%29?language=objc)
+interface. The expected color, tolerance, opacity threshold and nine-point
+presence/retirement checks remain the same. It rejects unsupported sample
+formats before reading a four-component array. Raw channels and the independent
+NSColor conversion/profile are both logged for the first sample of each capture,
+outside timing. **HYPOTHESIS:** NSColor's intermediate representation introduces
+the observed discrepancy. That mechanism is still unconfirmed; the validated
+bitmap samples, rather than a relabeled capture or a relaxed threshold, are the
+new oracle. This changes the sample-reading method and must pass native execution
+before measurements are accepted.

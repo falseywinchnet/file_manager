@@ -1,5 +1,32 @@
 # Native preview paint source review
 
+## Numeric sRGB sample control followup
+
+**Source acceptance for the raw-sample control. No correctness, ownership or house-style blockers found in the reviewed diff.** This is acceptance of the diagnostic method, not a conclusion that the color discrepancy is explained or that native measurements now pass.
+
+The implementation preserves the control’s integrity:
+
+- It verifies sRGB both before and after capture, then checks four-channel, 8-bit, 32-bit, nonplanar storage with alpha. Alpha-first and floating-point representations are refused before `getPixel` writes into the fixed four-element `NSUInteger` array.
+- Sample coordinates remain inside the admitted bitmap. Dividing the dimensions before multiplying avoids the previous multiplication’s overflow concern. For the declared 640×480 capture and integral backing scales, these are the same quarter-grid sample positions.
+- Raw components are converted explicitly to `double` and normalized by 255. The original RGB tolerance and `alpha > 0.98` predicate remain unchanged. The retirement check still requires the sampled pixels to stop matching the opaque fixture.
+- No captured pixels are retagged after drawing. The change replaces the sample-reading method, not the expected color or its acceptance threshold.
+- NSColor conversion is secondary diagnostic output. A nil conversion no longer determines the color verdict. The localized color-space name and its UTF-8 pointer remain owned and borrowed only through synchronous logging.
+- Format checks occur before the sample loops. Sample storage is fixed and initialized; the additional diagnostic allocations occur only for the first sample of an untimed capture.
+
+The README correctly retains `f5d1ca9e` as a rejected control, separates the saved-PNG observations from the mechanism hypothesis, and requires native execution before measurements are accepted. Its opaque-fixture limitation is appropriate: this control does not establish correct interpretation of partially transparent premultiplied samples.
+
+Exact reviewed scope:
+
+- Post-capture representation checks, `getPixel` sampling, first-sample NSColor diagnostics and mismatch logging in [probe.mm](C:/Users/Shadow/file_manager/frontend/experiments/preview_paint/probe.mm).
+- Raw-sample methodology and retained-failure account in [README.md](C:/Users/Shadow/file_manager/frontend/experiments/preview_paint/README.md).
+- The exact-filename log preservation rules in [.gitattributes](C:/Users/Shadow/file_manager/frontend/results/2026-10-04-preview-paint/.gitattributes).
+
+The newly retained PNG’s chunk and pixel interpretation remains root-reported; I did not independently decode it in this review. The failed native log was inspected in the preceding diagnostic review.
+
+No edits, builds, tests or Git mutations were performed. The remaining gate is the native run with the unchanged presence/retirement predicate and the new representation checks.
+
+---
+
 ## Explicit sRGB destination followup
 
 **Source acceptance for this diagnostic follow-up. No correctness, ownership or house-style blockers found in the reviewed changes.** The change preserves the test’s integrity as a new, explicitly configured snapshot control; it does not prove the cause of the earlier failure.
