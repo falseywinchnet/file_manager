@@ -1,0 +1,42 @@
+[
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\exif_orientation_tests.cpp",
+    "Hash": "7D3CA1CFCB4D08045DCD367854E16991C9CBA84A81AFB545FC81F891ED73EF7D"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\exif_orientation.cpp",
+    "Hash": "9F226FA4E15257C9A44DF13668662154E85595F6753166A5BAF3625D70133B48"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\jpeg_experiment.cpp",
+    "Hash": "48706D839E456E5CCBF9E299EEFF0D327239A24DECEBA5B8669C48B54DBD0E8C"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\wic_decode.cpp",
+    "Hash": "D50CE654C7A5F78F512CB645C0CA081AE31B26AA8B694F19743C021E34B460D1"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\exif_orientation.hpp",
+    "Hash": "FF169BFB81FC4DE675E35F924D35E564AE770B9C3BB10408620B3BC606974274"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\jpeg_pixels.hpp",
+    "Hash": "C39C4FC50E540F626F74763E422F84DD06C5EFCC62DF5D6D2A2020C41AE8ABF5"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\summarize.py",
+    "Hash": "8EEFF49F88DFD4815F3C121365241F254B2EA306D50623A786A699B7898F00BE"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\CMakeLists.txt",
+    "Hash": "B9488C4D71A46AA8DA4A6C4DDA26D150903C2A995C4733130940B31E9C60DA51"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\fetch_codec.cmake",
+    "Hash": "8F46F92EEF9FD219D4A172F0A8D4AF7C0BD39F474A46EC6B5D15B886EEDA521B"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\.github\\workflows\\jpeg-research.yml",
+    "Hash": "E7D9CE9F23B201B0B5ED982030191DFC70C4AD3F3218D1ADB3C8F757D73064DD"
+  }
+]
