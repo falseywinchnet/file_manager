@@ -64,11 +64,31 @@ exact base; the zero-context format avoids whitespace-only context lines in
 the stored evidence. It changes no brush
 algorithm. Preserve the historical initial fixture when replaying those logs.
 
-## Remaining edges
+## Integration progress after the resumed local checks
+
+**OBSERVED:** The separately tested Games backport is
+`3f75e379213de972f78729a591594e70fe65a585`, parent
+`7b260cfb9f3267392e1470b0fcf4cd2497437819`, on
+`codex/gui-forms-raster-cache-7b260cf`. Its DIB suites passed 2/2 (3.35 s),
+ordinary OFF native application test passed 1/1 (0.24 s), and component timing
+completed. That branch retains its own evidence and explicitly noisier cold
+tails. It was handed to Games for a coherent development rebuild; public-header
+diff versus its old pin is empty. Consumer/package validation remains separate.
+
+File Manager PR 33 was rebase-merged after its two native matrices passed.
+Tested head eccf4922992471b387c6eab5b959bda3fb35a3d4 and merged main
+e7bd932674eec3c87477e8754039e0fb04b730f1 both have complete tree
+5f3ef8e69a30788a6737b1528167adab2f4664a9. This admits private row placement,
+not frontend preview activation. Renderer PR 34 was then rebased onto that
+main. Its host and brush-fixture bytes have no Git diff from the locally
+validated 7fb8d9dd candidate; combined native checks must run on the new head.
+
+## Remaining delivery edges
 
 - Native Windows/macOS/Linux CI and actual consumer adoption are pending.
-- Games needs a separately tested backport onto 7b260cf to avoid unrelated
-  public-header changes. No old/new SDK DLL interchangeability is claimed.
+- Games has the independently tested backport, but its actual application
+  comparison and release matrix remain pending. No old/new mainline SDK DLL
+  interchangeability is claimed.
 - These are Windows DIB results, not Mac Skia or whole-application latency.
 - Image sampling and broader File Manager preview/thumbnail work are unchanged.
 - Shadow failure fallback is tested before sample allocation. Vector insertion
