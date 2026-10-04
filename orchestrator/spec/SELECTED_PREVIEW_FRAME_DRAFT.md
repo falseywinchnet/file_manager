@@ -111,3 +111,20 @@ frontend consumption are still unresolved before a complete preview family can
 freeze. The native Mac process experiment establishes additional mapping
 admission only; it does not satisfy the earlier candidate hard physical-memory
 budget. This draft does not silently relax that unresolved requirement.
+
+## Decoder-only input feasibility
+
+The JPEG research now separates generated input from the decoder entry point.
+Its experimental envelope is eight ASCII bytes `FMJPEG01`, a little-endian u64
+length admitted only in 1..16 MiB, that exact body, then EOF. Header/length
+validation precedes allocation; incomplete or trailing input cannot decode.
+The executable takes no path argument but accepts caller-supplied bytes and is
+not a sandbox. Its fixed result ticket 7/11 is conformance data, not an
+authenticated runtime request. No source grant, revision, root association or
+production request schema is established by this envelope.
+
+This helps measure decoding separately from fixture encoding and exercises
+the bounded-copy candidate. It does not select that candidate or freeze input
+transport. The synchronous reader can block on a stalled sender, and process
+limits/cancellation must be established by a supervising host before adoption.
+See `../../frontend/results/2026-10-04-jpeg-decoder-input/README.md`.

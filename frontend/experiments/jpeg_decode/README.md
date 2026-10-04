@@ -169,3 +169,20 @@ and color/orientation anchors. See `../../results/2026-10-04-jpeg-frame/README.m
 for scope and evidence. The JPEG workflow runs all 16 cases on each native OS.
 This joins codec preparation to result bytes without creating a supervised
 provider, source-read authority or an application preview adapter.
+
+## Decoder-only executable
+
+`file_manager_jpeg_decoder` now receives a bounded input envelope on stdin and
+returns the candidate raster frame. It accepts caller-supplied bytes, not a file
+path; unlike the generator modes it is not restricted to self-generated content.
+The checked-in tests supply generated fixtures only. It is an unsupervised research
+executable with no install rule, production capability or filesystem/network
+confinement. Do not treat its existence as a shipped preview provider.
+
+The envelope is `FMJPEG01`, a little-endian u64 encoded-byte length (1..16 MiB),
+that exact body, then EOF. The reader validates length before allocation and
+rejects incomplete/trailing input. New generator modes `--emit-encoded N` and
+`--emit-color-encoded N` supply this envelope. The separate decoder avoids
+counting generator/encoder work as decoding; actual process accounting and
+supervision remain subsequent work. See
+`../../results/2026-10-04-jpeg-decoder-input/README.md` for evidence and limits.
