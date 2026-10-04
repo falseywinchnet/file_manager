@@ -5119,7 +5119,39 @@ void test_multi_selection_reports_observed_facts() {
     const std::string folder = object_id(*objects, "Documents");
     const std::string other_folder = object_id(*objects, "Pictures");
     (*objects).set_selected_id(first);
+    const std::shared_ptr<gui_forms::TextBox> location = std::dynamic_pointer_cast<gui_forms::TextBox>(
+        (*properties).editor("fm.property.location"));
+    require(location && (*location).read_only(), "inspector location must expose selectable read-only text");
+    const std::string first_path = file_manager::path_utf8(fixture.root() / "root.txt");
+    require((*location).text() == first_path, "inspector location must preserve the full selected path");
+    const bool revealed = (*window).perform_semantic_action(
+        "file-manager-app.shell.commands.arrange-group.actions.settings", gui_forms::SemanticAction::press);
+    require(revealed, "location fixture must reveal the ordinary inspector");
+    (*window).perform_layout();
+    const bool focused = (*window).request_focus(location);
+    require(focused, "inspector location must accept focus for text navigation and copying");
+    PathClipboard clipboard{};
+    // The host session detaches before the clipboard and window owners end.
+    gui_forms::HostSession session(*window, path_clipboard_capabilities(), &clipboard);
+#if defined(__APPLE__)
+    constexpr gui_forms::Modifier primary = gui_forms::Modifier::meta;
+#else
+    constexpr gui_forms::Modifier primary = gui_forms::Modifier::control;
+#endif
+    const bool selected_text = (*window).dispatch_key(
+        {gui_forms::KeyAction::down, gui_forms::PhysicalKey::a, primary});
+    const bool copied = (*window).dispatch_key(
+        {gui_forms::KeyAction::down, gui_forms::PhysicalKey::c, primary});
+    require(selected_text && copied && clipboard.text == first_path && (*objects).selected_ids().size() == 1U,
+        "location Select All and Copy must use the entire path without selecting other files");
+    static_cast<void>((*window).dispatch_text({"replacement"}));
+    static_cast<void>((*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::backspace}));
+    static_cast<void>((*window).dispatch_key({gui_forms::KeyAction::down, gui_forms::PhysicalKey::delete_forward}));
+    require((*location).text() == first_path && (*properties).value("fm.property.location") == first_path,
+        "typing and deletion must not alter the observed location");
     (*objects).set_selected_ids({first, second});
+    require((*location).text() == file_manager::path_utf8(fixture.root()) && (*location).selected_text().empty(),
+        "multiple selection must replace the location and retire the previous text selection");
     const std::uintmax_t bytes = std::filesystem::file_size(fixture.root() / "root.txt") +
         std::filesystem::file_size(second_path);
     const std::string expected_size = file_manager::format_bytes(bytes) + " in files";
@@ -5145,6 +5177,8 @@ void test_multi_selection_reports_observed_facts() {
         (*properties).value("fm.property.kind") == "Document",
         "returning to one file must retire aggregate property values");
     (*objects).clear_selection();
+    require((*location).text() == "—" && (*location).selected_text().empty(),
+        "clearing selection must retire the old location text");
     require((*properties).value("fm.property.name") == "—" &&
         (*properties).value("fm.property.size") == "—",
         "clearing selection must retire aggregate facts");

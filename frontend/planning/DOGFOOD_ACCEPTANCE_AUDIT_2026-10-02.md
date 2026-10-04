@@ -2,6 +2,16 @@
 
 Status: **ACTIVE; first source pass, not a completed whole-product audit**.
 
+## Selectable Location followup — 2026-10-04
+
+**OBSERVED:** the inspector Location row now uses the public read-only TextBox
+editor so a long path supports text navigation, selection and copying. The
+existing value projection still owns single/multiple/empty-selection semantics.
+All 15 local Windows frontend suites passed, including clipboard and refused-edit
+coverage for this field. Native Mac clipboard and updated visual evidence remain
+pending; see `../results/2026-10-04-inspector-location/README.md`. This addresses
+access to clipped location text, not the remaining verification-field polish.
+
 ## Selection and clipboard repair — 2026-10-04
 
 **OBSERVED:** PR45 replaces blanket multiple-value inspector placeholders with
