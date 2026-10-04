@@ -297,5 +297,6 @@ jobs:
             .build/native-${{ matrix.platform }}/frontend/native-preview-failure.json
             .build/native-${{ matrix.platform }}/frontend/native-details.png
             .build/native-${{ matrix.platform }}/frontend/native-text-preview.png
+            .build/native-${{ matrix.platform }}/frontend/native-image-preview.png
             .build/native-${{ matrix.platform }}/frontend/native-local-actions.png
           if-no-files-found: ignore

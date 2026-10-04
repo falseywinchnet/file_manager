@@ -240,7 +240,8 @@ private:
     void publish_object_items(std::vector<gui_forms::ObjectViewItem> items);
     void on_objects_sort_requested(const gui_forms::ObjectDetailsSort& request);
     void fit_details_columns(const gui_forms::Rect& bounds);
-    void on_details_presentation_changed(const gui_forms::PresentationSettings& settings);
+    void on_presentation_changed(const gui_forms::PresentationSettings& settings);
+    void fit_preview_content(const gui_forms::Rect& bounds);
     void set_view_mode(gui_forms::ObjectViewMode mode);
     void set_sort_mode(std::string mode);
     void show_properties();

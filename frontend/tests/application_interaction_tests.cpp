@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -574,6 +575,18 @@ struct UnavailablePreviewReady final {
         return ready;
     }
 };
+
+void require_preview_uses_surface(const gui_forms::Control& content,
+                                  const gui_forms::Control& surface) {
+    const gui_forms::Rect body = content.absolute_bounds();
+    const gui_forms::Rect available = surface.absolute_bounds();
+    require(available.contains(body) && body.width >= available.width - 20.0 &&
+        body.height >= available.height - 20.0 && body.x >= available.x + 6.0 &&
+        body.y >= available.y + 6.0,
+        "preview body must use its padded surface: body=" + std::to_string(body.width) + "x" +
+        std::to_string(body.height) + " surface=" + std::to_string(available.width) + "x" +
+        std::to_string(available.height));
+}
 
 // Application stores the bound observer. Stop clears host callbacks and joins the worker before
 // state dies, including assertion unwinding. Wake is deliberately inert in this headless test.
@@ -1896,7 +1909,7 @@ void test_selected_file_previews_reach_visible_layout() {
     TemporaryTree fixture{};
     std::ofstream literal_text(fixture.root() / "root.txt", std::ios::binary | std::ios::trunc);
     literal_text << "root\nA&B && C&D\n";
-    literal_text << "\n\n\n\n\n\n\n\n";
+    literal_text << "café αβ 日本語\n";
     literal_text << std::string(file_manager::maximum_text_preview_bytes, 'x');
     literal_text.close();
     require(literal_text.good(), "literal preview fixture must be written completely");
@@ -1924,6 +1937,10 @@ void test_selected_file_previews_reach_visible_layout() {
     require(text_selected, "text must be selected through the public user action");
     require_eventually(*application, TextPreviewReady{*text}, "selected text must reach the preview control");
     (*window).perform_layout();
+    const gui_forms::Control::Ptr preview_surface = (*window).find(
+        "file-manager-app.shell.workspace.selection.inspector.facts.preview.surface");
+    require(preview_surface != nullptr, "selected preview surface must exist");
+    require_preview_uses_surface(*text, *preview_surface);
     const gui_forms::Rect text_bounds = (*text).committed_arranged_bounds();
     require((*text).effectively_visible() && text_bounds.width >= 100.0 && text_bounds.height >= 60.0,
         "selected text must have a visible readable layout, not merely loaded bytes");
@@ -1942,6 +1959,40 @@ void test_selected_file_previews_reach_visible_layout() {
         "byte-limit disclosure must remain visible outside the elided preview body");
     require((*text).text().find("preview limited") == std::string::npos,
         "preview body must not mix synthetic truncation messages with file contents");
+    require((*text).font().role == gui_forms::FontRole::monospace,
+        "the selected text excerpt must use the declared monospace font role");
+    const std::size_t ordinary_lines = (*text).maximum_lines();
+    require(ordinary_lines > 1U && ordinary_lines <= 32U, "visible text must have a finite viewport line budget");
+    const gui_forms::PresentationSettings original_presentation = (*window).presentation_settings();
+    gui_forms::PresentationSettings larger_text = original_presentation;
+    larger_text.text_scale = 2.0;
+    (*window).set_presentation_settings(larger_text);
+    (*window).perform_layout();
+    require_preview_uses_surface(*text, *preview_surface);
+    require((*text).maximum_lines() >= 1U && (*text).maximum_lines() < ordinary_lines &&
+        (*text).font().size == 13.0 && (*text).effective_text_scale() == 2.0,
+        "larger text must reduce the bounded row budget without shrinking the authored font");
+    ImageRecordingPainter scaled_text_painter{};
+    const gui_forms::Rect scaled_text_bounds = (*text).committed_arranged_bounds();
+    (*text).on_paint(scaled_text_painter, {0.0, 0.0, scaled_text_bounds.width, scaled_text_bounds.height});
+    require(scaled_text_painter.text_runs > 0U && scaled_text_painter.text_runs <= (*text).maximum_lines(),
+        "scaled long UTF-8 content must retain bounded paint work");
+    (*window).set_presentation_settings(original_presentation);
+    (*window).perform_layout();
+    require((*text).maximum_lines() == ordinary_lines, "restoring text scale must restore the row budget");
+
+    const std::shared_ptr<gui_forms::SplitContainer> inspector_split =
+        std::dynamic_pointer_cast<gui_forms::SplitContainer>((*window).find("file-manager-app.shell.workspace.selection"));
+    require(inspector_split != nullptr, "preview must belong to the resizable inspector");
+    const double original_distance = (*inspector_split).splitter_distance();
+    (*inspector_split).set_splitter_distance(original_distance - 100.0);
+    (*window).perform_layout();
+    require_preview_uses_surface(*text, *preview_surface);
+    require((*text).committed_arranged_bounds().width > text_bounds.width + 50.0 &&
+        (*objects).selected_id() == text_id,
+        "widening the inspector must widen the text body without changing selection");
+    (*inspector_split).set_splitter_distance(original_distance);
+    (*window).perform_layout();
     const std::filesystem::path refreshed_path = fixture.root() / "root.txt";
     const file_manager::ObjectIdentity before_refresh = file_manager::observe_identity(refreshed_path);
     constexpr std::string_view refreshed_text = "root changed in place\nA&B && C&D\n";
@@ -1980,14 +2031,18 @@ void test_selected_file_previews_reach_visible_layout() {
         "changing selection must retire the previous text coverage notice");
     (*window).perform_layout();
     const gui_forms::Rect image_bounds = (*picture).image_bounds();
-    const gui_forms::Control::Ptr preview_surface = (*window).find(
-        "file-manager-app.shell.workspace.selection.inspector.facts.preview.surface");
+    require_preview_uses_surface(*picture, *preview_surface);
     const gui_forms::Rect picture_absolute = (*picture).absolute_bounds();
     const gui_forms::Rect surface_absolute = (*preview_surface).absolute_bounds();
     require(surface_absolute.contains(picture_absolute),
         "selected image control must remain inside its preview clip");
     require((*picture).effectively_visible() && image_bounds.width > 0.0 && image_bounds.height > 0.0,
         "selected PNG must have visible image geometry");
+    const gui_forms::Size image_size = (*picture).image_size();
+    const double source_ratio = image_size.width / image_size.height;
+    const double displayed_ratio = image_bounds.width / image_bounds.height;
+    require(std::abs(displayed_ratio - source_ratio) < 0.000001,
+        "filling the preview control must preserve the source image aspect ratio");
     ImageRecordingPainter painter{};
     const gui_forms::Rect picture_bounds = (*picture).committed_arranged_bounds();
     (*picture).on_paint(painter, {0.0, 0.0, picture_bounds.width, picture_bounds.height});
@@ -2003,14 +2058,45 @@ void test_selected_file_previews_reach_visible_layout() {
         whole_window_painter.tracked_image_order > whole_window_painter.tracked_surface_fill_order,
         "selected image must paint after its opaque preview surface rather than underneath it");
 
+    // Exercise non-square source geometry through the same retained consumer.
+    // These raw-pixel fixtures test layout only, not additional preview formats.
+    struct ImageShape final {
+        std::uint32_t width{};
+        std::uint32_t height{};
+    };
+    const std::array<ImageShape, 2U> shapes{{{2U, 4U}, {4U, 2U}}};
+    std::array<std::byte, 32U> pixels{};
+    pixels.fill(std::byte{255U});
+    const gui_forms::ImageId selected_image = (*picture).image();
+    for (const ImageShape shape : shapes) {
+        const std::uint64_t row_bytes = static_cast<std::uint64_t>(shape.width) * 4U;
+        const gui_forms::ImageLoadResult loaded = (*window).load_bgra32_premultiplied(
+            shape.width, shape.height, row_bytes, pixels);
+        require(static_cast<bool>(loaded), "aspect fixture must register its eight opaque pixels");
+        (*picture).set_image(loaded.image);
+        const gui_forms::Rect drawn = (*picture).image_bounds();
+        const double expected_ratio = static_cast<double>(shape.width) / static_cast<double>(shape.height);
+        const double actual_ratio = drawn.width / drawn.height;
+        require(drawn.width > 0.0 && drawn.height > 0.0 &&
+            std::abs(actual_ratio - expected_ratio) < 0.000001 &&
+            (std::abs(drawn.width - picture_bounds.width) < 0.000001 ||
+             std::abs(drawn.height - picture_bounds.height) < 0.000001),
+            "portrait and landscape images must fill one content axis without distortion");
+        (*picture).set_image(selected_image);
+        const bool removed = (*window).remove_image(loaded.image);
+        require(removed, "temporary aspect fixture must release its registry ownership");
+    }
+
     // The first Mac native probe was constrained to 1024x674 by its desktop.
     // That ordinary viewport has room for content and a usable inspector.
     (*window).resize({1024.0, 674.0});
     (*window).perform_layout();
+    require_preview_uses_surface(*picture, *preview_surface);
     require((*picture).effectively_visible() && (*picture).image_bounds().width >= 100.0,
         "ordinary 1024-wide browsing must keep the selected preview available by default");
     (*window).resize({800.0, 674.0});
     (*window).perform_layout();
+    require_preview_uses_surface(*picture, *preview_surface);
     require((*picture).effectively_visible(),
         "narrowing should retire the folder tree before the selected-file inspector");
 
@@ -2051,6 +2137,10 @@ void test_selected_file_previews_reach_visible_layout() {
     (*window).perform_layout();
     require((*text).effectively_visible() && !(*picture).visible(),
         "an unavailable preview must display its explanation without retaining the previous file image");
+    require_preview_uses_surface(*text, *preview_surface);
+    std::cout << "preview layout: text=" << text_bounds.width << 'x' << text_bounds.height
+              << " lines=" << ordinary_lines << " image=" << picture_bounds.width << 'x'
+              << picture_bounds.height << " scale-and-pane-resize=passed\n";
 }
 
 void test_application_command_surfaces_and_house_mark() {
