@@ -390,6 +390,36 @@ void exercise_local_actions(PreviewState& state, NSWindow* const native) {
     state.close();
 }
 
+void check_location_clipboard(PreviewState& state, gui_forms::PropertyList& properties) {
+    const std::shared_ptr<gui_forms::TextBox> location =
+        std::dynamic_pointer_cast<gui_forms::TextBox>(properties.editor("fm.property.location"));
+    const std::string expected = file_manager::path_utf8(state.fixture_root);
+    if (!location || !(*location).read_only() || (*location).text() != expected) {
+        throw std::runtime_error("native inspector location must retain the full read-only common path");
+    }
+    const bool focused = (*state.model).request_focus(location);
+    const bool selected = (*state.model).dispatch_key(
+        {gui_forms::KeyAction::down, gui_forms::PhysicalKey::a, gui_forms::Modifier::meta});
+    const bool copied = (*state.model).dispatch_key(
+        {gui_forms::KeyAction::down, gui_forms::PhysicalKey::c, gui_forms::Modifier::meta});
+    if (!focused || !selected || !copied || (*location).selected_text() != expected) {
+        throw std::runtime_error("native location text must support focus, Select All and Copy");
+    }
+    NSString* const pasted = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
+    const char* const bytes = pasted == nil ? nullptr : [pasted UTF8String];
+    if (bytes == nullptr) throw std::runtime_error("native location clipboard text unavailable");
+    // The NSString owns this UTF-8 borrow through the synchronous comparison.
+    const std::string_view clipboard(bytes, [pasted lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+    if (clipboard != expected) throw std::runtime_error("native location clipboard changed the full path");
+    const bool end = (*state.model).dispatch_key(
+        {gui_forms::KeyAction::down, gui_forms::PhysicalKey::end});
+    const gui_forms::TextSelection selection = (*location).selection();
+    if (!end || !selection.empty() || selection.caret.value() != expected.size()) {
+        throw std::runtime_error("native location must navigate to the path end without editing");
+    }
+    std::cout << "macOS inspector location: readonly=passed full_path_copy=passed end_navigation=passed\n";
+}
+
 void exercise(PreviewState& state) {
     NSWindow* const native = preview_window();
     if (native == nil || !native.isVisible) return;
@@ -414,6 +444,7 @@ void exercise(PreviewState& state) {
             throw std::runtime_error("native selection facts differ from the generated files");
         }
         (*state.model).perform_layout();
+        check_location_clipboard(state, *properties);
         save_preview_snapshot(native.contentView, @"native-selection-facts.png");
         std::cout << "macOS selection facts: three_files=passed logical_total=passed mixed_type=passed\n";
         const std::shared_ptr<gui_forms::ObjectView> objects =

@@ -840,10 +840,11 @@ void Application::install_dynamic_controls() {
     (*property_list_).set_groups({
         {"fm.property.group.identity", "IDENTITY", {
             {"fm.property.name", "Name", "—",
-             "Rename this exact filesystem object inside the protected mutation scope",
+             "Rename this exact filesystem object when the current operation policy allows it",
              gui_forms::PropertyEditorKind::text},
             {"fm.property.kind", "Kind", "—", "Selected object kind"},
-            {"fm.property.location", "Location", "—", "Exact local path"},
+            {"fm.property.location", "Location", "—", "Read-only location; select and copy its text",
+             gui_forms::PropertyEditorKind::text},
             {"fm.property.size", "Size", "—", "Observed object size"},
             {"fm.property.modified", "Modified", "—", "Filesystem modification time"},
         }},
@@ -858,6 +859,12 @@ void Application::install_dynamic_controls() {
         (*name_editor).set_maximum_length(255);
         (*name_editor).set_enabled(false);
     }
+    const std::shared_ptr<gui_forms::TextBox> location_editor =
+        std::dynamic_pointer_cast<gui_forms::TextBox>((*property_list_).editor("fm.property.location"));
+    if (!location_editor) {
+        throw std::logic_error("Selection PropertyList did not create the location editor");
+    }
+    (*location_editor).set_read_only(true);
     expected_checksum_box_ = std::dynamic_pointer_cast<gui_forms::TextBox>(
         (*property_list_).editor("fm.property.expected-sha256"));
     if (!expected_checksum_box_) {
