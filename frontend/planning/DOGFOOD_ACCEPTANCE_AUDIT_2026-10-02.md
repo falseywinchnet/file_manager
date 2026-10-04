@@ -572,3 +572,19 @@ house-style review are retained in
 `../results/2026-10-03-preview-demand/README.md`. Mac/Linux checks and packaging
 of this change remain pending. No browsing-latency measurement, new format,
 thumbnail route or off-thread visible PNG admission is established by this slice.
+
+## Preview content fits the inspector
+
+The fixed 190x108 text and 194x112 image controls now follow the preview
+surface's padded interior. **MEASURED Windows geometry:** both become 250x158
+in the default 266x174 surface. The content responds to inspector-width and
+text-scale changes, preserves PNG aspect ratio, and uses an actual monospace
+font for the bounded excerpt. The outer header and single scroll owner remain.
+
+All 15 frontend suites passed locally. The new geometry assertion rejected the
+old fixed bounds; a second failed attempt exposed auto-size feedback and led to
+explicit authored surface-height constraints. Both failures, final results,
+reviewed scope and native capture additions are recorded in
+`../results/2026-10-03-preview-layout/README.md`. Native CI and visual acceptance
+of this later source remain pending; these checks do not establish new formats,
+thumbnails, a full-document viewer or end-to-end latency improvement.

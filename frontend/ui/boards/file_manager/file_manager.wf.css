@@ -488,6 +488,9 @@ button {
 
 .preview-surface {
   height: 174px;
+  min-height: 174px;
+  max-height: 174px;
+  padding: 8px;
   display: flex;
   align-items: center;
   justify-content: center;

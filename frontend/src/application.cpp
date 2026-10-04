@@ -11,6 +11,7 @@
 #include <cctype>
 #include <charconv>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <exception>
 #include <iomanip>
@@ -558,7 +559,7 @@ std::unique_ptr<gui_forms::Window> Application::make_window() {
     // enter installed application callbacks; publish the owning window first.
     window_ = window.get();
     subscriptions_.push_back((*window_).presentation_changed().subscribe(
-        std::bind_front(&Application::on_details_presentation_changed, this)));
+        std::bind_front(&Application::on_presentation_changed, this)));
     // This event also covers layout-only collapse, which does not change a
     // control's authored visible flag. Query the preview's current ancestry;
     // availability records may have been deferred during a layout transaction.
@@ -767,19 +768,21 @@ void Application::install_dynamic_controls() {
     // that opaque parent surface during the window's ordered plane replay.
     (*preview_picture_).set_paint_plane(gui_forms::PaintPlane::control);
     (*preview_picture_).set_background(gui_forms::Color::rgba(0, 0, 0, 0));
-    (*preview_picture_).set_requested_bounds({0, 0, 194, 112});
+    // Positive initial bounds keep measurement independent of preview bytes.
+    // The surface's committed layout supplies both content dimensions.
+    (*preview_picture_).set_requested_bounds({0, 0, 1, 1});
     (*preview_picture_).set_size_mode(gui_forms::PictureBoxSizeMode::zoom);
     (*preview_picture_).set_accessible_name("Selected image preview");
     (*preview_picture_).set_visible(false);
     preview_text_ = std::make_shared<gui_forms::Label>(
         gui_forms::StableId("fm.inspector.preview.text"));
-    (*preview_text_).set_font({gui_forms::FontRole::content, 13.0, 400, false});
+    (*preview_text_).set_font({gui_forms::FontRole::monospace, 13.0, 400, false});
     (*preview_text_).set_foreground(gui_forms::Color::rgba(219, 232, 239));
-    (*preview_text_).set_requested_bounds({0, 0, 190, 108});
+    (*preview_text_).set_requested_bounds({0, 0, 1, 1});
     (*preview_text_).set_text_style_role(gui_forms::TextStyleRole::monospace);
     (*preview_text_).set_text_wrapping(gui_forms::TextWrapping::word);
     (*preview_text_).set_use_mnemonic(false);
-    (*preview_text_).set_maximum_lines(7);
+    (*preview_text_).set_maximum_lines(1);
     (*preview_text_).set_vertical_alignment(gui_forms::VerticalAlignment::near);
     (*preview_text_).set_accessible_name("Selected text preview");
     (*preview_text_).set_visible(false);
@@ -809,8 +812,6 @@ void Application::install_dynamic_controls() {
         form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph);
     (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview).set_minimum_size(
         {0, 260});
-    (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface).set_minimum_size(
-        {0, 174});
 
     rename_box_ = std::make_shared<gui_forms::TextBox>(
         gui_forms::StableId("fm.operations.rename"));
@@ -1740,8 +1741,37 @@ void Application::publish_object_items(std::vector<gui_forms::ObjectViewItem> it
     fit_details_columns((*objects_).committed_arranged_bounds());
 }
 
-void Application::on_details_presentation_changed(const gui_forms::PresentationSettings&) {
+void Application::on_presentation_changed(const gui_forms::PresentationSettings&) {
     fit_details_columns((*objects_).committed_arranged_bounds());
+    fit_preview_content(
+        (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface).committed_arranged_bounds());
+}
+
+void Application::fit_preview_content(const gui_forms::Rect& bounds) {
+    if (bounds.width <= 0.0 || bounds.height <= 0.0) return;
+    const gui_forms::Insets padding =
+        (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface).padding();
+    const double width = std::max(1.0, bounds.width - padding.left - padding.right);
+    const double height = std::max(1.0, bounds.height - padding.top - padding.bottom);
+    const gui_forms::Rect content{0.0, 0.0, width, height};
+    (*preview_picture_).set_requested_bounds(content);
+    gui_forms::Label& text = *preview_text_;
+    text.set_requested_bounds(content);
+
+    // Use one primary-font sample, never the file's full text, to budget rows.
+    // Font fallback can make a row taller; the content clip remains authoritative.
+    // The finite cap bounds wrapping work even in a very large inspector.
+    const gui_forms::FontSpec authored_font = text.font();
+    const gui_forms::FontSpec font = text.effective_font(authored_font);
+    const gui_forms::ResolvedTextLayout metrics = text.resolve_text_layout_utf8("Mg", font);
+    const double row_height = std::max(font.size, metrics.logical_size.height) * text.line_spacing();
+    std::size_t maximum_lines{1U};
+    if (std::isfinite(row_height) && row_height > 0.0) {
+        const double available_height = std::max(0.0, height - 4.0);
+        const double rows = std::clamp(std::floor(available_height / row_height), 1.0, 32.0);
+        maximum_lines = static_cast<std::size_t>(rows);
+    }
+    text.set_maximum_lines(maximum_lines);
 }
 
 void Application::fit_details_columns(const gui_forms::Rect& bounds) {
@@ -2427,6 +2457,9 @@ void Application::on_workspace_split_splitter_changed(const gui_forms::SplitChan
 void Application::on_selection_split_splitter_changed(const gui_forms::SplitChangeEvent&) { update_command_state(); }
 
 void Application::install_handlers() {
+    subscriptions_.push_back(
+        (*form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface).arranged_bounds_changed().subscribe(
+            std::bind_front(&Application::fit_preview_content, this)));
     (*form_.file_manager_app_shell).set_track_focus_fallback(2, *menu_strip_);
     subscriptions_.push_back((*form_.file_manager_app_shell).arranged_bounds_changed().subscribe(
         std::bind_front(&Application::update_adaptive_layout, this)));

@@ -1,0 +1,20 @@
+Start testing: Oct 03 18:33 Pacific Daylight Time
+----------------------------------------------------------
+13/15 Testing: file_manager_application_interaction_tests
+13/15 Test: file_manager_application_interaction_tests
+Command: "C:/Users/Shadow/file_manager/frontend/.build/shadow-windows-latency/file_manager_application_interaction_tests.exe"
+Directory: C:/Users/Shadow/file_manager/frontend/.build/shadow-windows-latency
+"file_manager_application_interaction_tests" start time: Oct 03 18:33 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+SKIP symlink fixture assertions: Windows error 1314
+file manager application interaction tests failed: preview body must use its padded surface: body=190.000000x108.000000 surface=266.000000x174.000000
+<end of output>
+Test time =   1.87 sec
+----------------------------------------------------------
+Test Failed.
+"file_manager_application_interaction_tests" end time: Oct 03 18:34 Pacific Daylight Time
+"file_manager_application_interaction_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+End testing: Oct 03 18:34 Pacific Daylight Time

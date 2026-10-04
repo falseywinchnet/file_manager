@@ -157,6 +157,31 @@ void save_failure_snapshot(gui_forms::Window& model) {
     std::cerr << "Retained preview diagnostics saved=" << diagnostics.good() << '\n';
 }
 
+void require_filled_preview(gui_forms::Window& model, const gui_forms::Control& content) {
+    const gui_forms::Control::Ptr surface = model.find(
+        "file-manager-app.shell.workspace.selection.inspector.facts.preview.surface");
+    if (!surface) throw std::runtime_error("native preview surface disappeared");
+    const gui_forms::Rect body = content.absolute_bounds();
+    const gui_forms::Rect available = (*surface).absolute_bounds();
+    if (!available.contains(body) || body.width < available.width - 20.0 ||
+        body.height < available.height - 20.0 || body.x < available.x + 6.0 ||
+        body.y < available.y + 6.0) {
+        throw std::runtime_error("native preview body does not fill its padded surface");
+    }
+    std::cout << "macOS preview extent: body=" << body.width << 'x' << body.height
+              << " surface=" << available.width << 'x' << available.height << '\n';
+}
+
+// Borrow the live AppKit view and filename only during this synchronous capture.
+void save_preview_snapshot(NSView* const view, NSString* const filename) {
+    NSBitmapImageRep* const bitmap = [view bitmapImageRepForCachingDisplayInRect:view.bounds];
+    if (bitmap == nil) throw std::runtime_error("native preview snapshot unavailable");
+    [view cacheDisplayInRect:view.bounds toBitmapImageRep:bitmap];
+    NSData* const encoded = [bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+    const BOOL saved = [encoded writeToFile:filename atomically:YES];
+    if (saved != YES) throw std::runtime_error("cannot save native preview evidence");
+}
+
 bool select_file(PreviewState& state, const std::string_view name) {
     const std::shared_ptr<gui_forms::ObjectView> objects =
         std::dynamic_pointer_cast<gui_forms::ObjectView>(
@@ -446,6 +471,8 @@ void exercise(PreviewState& state) {
         const gui_forms::Rect bounds = (*picture).rectangle_to_window((*picture).image_bounds());
         const std::size_t pixels = matching_pixels(native.contentView, bounds, PixelMatch::image);
         if (pixels < 100U) return;
+        require_filled_preview(*state.model, *picture);
+        save_preview_snapshot(native.contentView, @"native-image-preview.png");
         std::cout << "macOS PNG preview: matching_pixels=" << pixels << '\n';
         if (!select_file(state, "native-preview.bin")) throw std::runtime_error("cannot select unsupported fixture");
         state.stage = PreviewStage::unsupported;
@@ -458,6 +485,7 @@ void exercise(PreviewState& state) {
     if (!content_ready || !(*text).effectively_visible() || (*picture).visible()) return;
     const std::size_t pixels = matching_pixels(native.contentView, (*text).absolute_bounds(), PixelMatch::light_text);
     if (pixels < 25U) return;
+    require_filled_preview(*state.model, *text);
     if (!unsupported) {
         const std::shared_ptr<gui_forms::Label> coverage = std::dynamic_pointer_cast<gui_forms::Label>(
             (*state.model).find("file-manager-app.shell.workspace.selection.inspector.facts.preview.kind"));
@@ -469,13 +497,7 @@ void exercise(PreviewState& state) {
         const std::size_t caption_pixels = matching_pixels(
             native.contentView, (*coverage).absolute_bounds(), PixelMatch::caption_text);
         if (caption_pixels < 25U) return;
-        NSView* const view = native.contentView;
-        NSBitmapImageRep* const bitmap = [view bitmapImageRepForCachingDisplayInRect:view.bounds];
-        if (bitmap == nil) throw std::runtime_error("native text snapshot unavailable");
-        [view cacheDisplayInRect:view.bounds toBitmapImageRep:bitmap];
-        NSData* const encoded = [bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
-        const BOOL saved = [encoded writeToFile:@"native-text-preview.png" atomically:YES];
-        if (saved != YES) throw std::runtime_error("cannot save native text-preview evidence");
+        save_preview_snapshot(native.contentView, @"native-text-preview.png");
         std::cout << "macOS TXT coverage: caption_pixels=" << caption_pixels << " outside_body=passed\n";
     }
     std::cout << "macOS " << (unsupported ? "unsupported explanation" : "TXT preview")
