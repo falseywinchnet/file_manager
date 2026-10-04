@@ -1,0 +1,12 @@
+{
+  "encoding": "UTF-8 without BOM, normalized LF",
+  "sha256": {
+    "frontend/experiments/jpeg_decode/exif_orientation.cpp": "4809792fe9a87c1c36f979d08dfa5731a4fdd5fc1acecf952a739ef2b30ed148",
+    "frontend/experiments/jpeg_decode/exif_orientation.hpp": "2edc47c1635aea6dfd2ef09abfbcfb723763f81041c00e591561bfbcfab7e5ee",
+    "frontend/experiments/jpeg_decode/exif_orientation_tests.cpp": "cca8cc7a63a2b298422a068340fc618e74ccd462e49ccacad5ee194f484a0875",
+    "frontend/experiments/jpeg_decode/jpeg_experiment.cpp": "af76fea257bbea3882648780658eedf06759a7f3db6adc694017427f351babda",
+    "frontend/experiments/jpeg_decode/CMakeLists.txt": "fc62053f11a065066b2dacb5f3c09356d4642aeb9250168daad81e38a5276947",
+    "frontend/experiments/jpeg_decode/fetch_codec.cmake": "bcdb05b3002aec32f8b415d8f5d61beeef93e088f3391541d3971c525dd9aabf",
+    ".github/workflows/jpeg-research.yml": "66fdc8f2333eb7f4c119ad269f7e7a4d63a3a7ba588b15829fc7cc01382d2a96"
+  }
+}

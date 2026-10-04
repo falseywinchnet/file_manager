@@ -1,0 +1,35 @@
+Start testing: Oct 03 08:59 UTC
+----------------------------------------------------------
+1/2 Testing: file_manager_jpeg_orientation_tests
+1/2 Test: file_manager_jpeg_orientation_tests
+Command: "/home/runner/work/file_manager/file_manager/.build/jpeg-research/file_manager_jpeg_orientation_tests"
+Directory: /home/runner/work/file_manager/file_manager/.build/jpeg-research
+"file_manager_jpeg_orientation_tests" start time: Oct 03 08:59 UTC
+Output:
+----------------------------------------------------------
+PASS EXIF IFD0 orientation in both byte orders; absent, malformed, ambiguous and bounded states
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_jpeg_orientation_tests" end time: Oct 03 08:59 UTC
+"file_manager_jpeg_orientation_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/2 Testing: file_manager_jpeg_embedded_orientation_tests
+2/2 Test: file_manager_jpeg_embedded_orientation_tests
+Command: "/home/runner/work/file_manager/file_manager/.build/jpeg-research/file_manager_jpeg_experiment" "--verify-only"
+Directory: /home/runner/work/file_manager/file_manager/.build/jpeg-research
+"file_manager_jpeg_embedded_orientation_tests" start time: Oct 03 08:59 UTC
+Output:
+----------------------------------------------------------
+PASS embedded EXIF and supplied orientations, geometry, colors, opaque alpha, grayscale, empty/truncated/range refusal
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_jpeg_embedded_orientation_tests" end time: Oct 03 08:59 UTC
+"file_manager_jpeg_embedded_orientation_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 08:59 UTC

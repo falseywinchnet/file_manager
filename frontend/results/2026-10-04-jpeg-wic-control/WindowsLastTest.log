@@ -1,0 +1,51 @@
+Start testing: Oct 03 19:22 Pacific Daylight Time
+----------------------------------------------------------
+1/3 Testing: file_manager_jpeg_orientation_tests
+1/3 Test: file_manager_jpeg_orientation_tests
+Command: "C:/Users/Shadow/file_manager/.build/jpeg-wic-control/file_manager_jpeg_orientation_tests.exe"
+Directory: C:/Users/Shadow/file_manager/.build/jpeg-wic-control
+"file_manager_jpeg_orientation_tests" start time: Oct 03 19:22 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+PASS EXIF IFD0 orientation in both byte orders; absent, malformed, ambiguous and bounded states
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_jpeg_orientation_tests" end time: Oct 03 19:22 Pacific Daylight Time
+"file_manager_jpeg_orientation_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/3 Testing: file_manager_jpeg_embedded_orientation_tests
+2/3 Test: file_manager_jpeg_embedded_orientation_tests
+Command: "C:/Users/Shadow/file_manager/.build/jpeg-wic-control/file_manager_jpeg_experiment.exe" "--verify-only"
+Directory: C:/Users/Shadow/file_manager/.build/jpeg-wic-control
+"file_manager_jpeg_embedded_orientation_tests" start time: Oct 03 19:22 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+PASS embedded EXIF and supplied orientations, geometry, colors, opaque alpha, grayscale, empty/truncated/range refusal
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_jpeg_embedded_orientation_tests" end time: Oct 03 19:22 Pacific Daylight Time
+"file_manager_jpeg_embedded_orientation_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/3 Testing: file_manager_jpeg_wic_control_tests
+3/3 Test: file_manager_jpeg_wic_control_tests
+Command: "C:/Users/Shadow/file_manager/.build/jpeg-wic-control/file_manager_jpeg_experiment.exe" "--verify-wic"
+Directory: C:/Users/Shadow/file_manager/.build/jpeg-wic-control
+"file_manager_jpeg_wic_control_tests" start time: Oct 03 19:22 Pacific Daylight Time
+Output:
+----------------------------------------------------------
+PASS WIC baseline/progressive shared geometry, orientation, alpha, grayscale and input/output refusal
+<end of output>
+Test time =   0.48 sec
+----------------------------------------------------------
+Test Passed.
+"file_manager_jpeg_wic_control_tests" end time: Oct 03 19:22 Pacific Daylight Time
+"file_manager_jpeg_wic_control_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 03 19:22 Pacific Daylight Time

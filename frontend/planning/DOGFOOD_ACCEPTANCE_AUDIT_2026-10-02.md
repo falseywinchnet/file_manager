@@ -19,6 +19,15 @@ Orchestrator negotiation intake. It preserves separate selected-preview and
 index-only thumbnail authority; no decoder, worker capability or thumbnail
 store is selected. Earlier dated checkpoints below retain historical status.
 
+**Provider comparison follow-up:** the preserved JPEG/EXIF experiment is
+selectively restored as research, with its earlier three-platform CI verified.
+A new generated-fixture Windows WIC control passes three local suites and has
+paired fresh-call timings against the portable decoder. The latter has lower
+medians on those fixtures, with variable tails and no product-latency claim.
+See `../results/2026-10-04-jpeg-wic-control/README.md` and
+`../../planning/PREVIEW_PROVIDER_COMPARISON_2026-10-04.md`. Neither experiment
+adds JPEG to the shipped application or opens thumbnail/provider authority.
+
 ## Current checkpoint — 2026-10-02
 
 **Latest delivery, 2026-10-03:**

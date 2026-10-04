@@ -72,3 +72,14 @@ correction pass. That is planning review, not a decoder safety, performance or
 implementation-compliance claim. Next evidence must include primary-source
 codec/platform comparison, scoped capability/lifetime fixtures and three-platform
 resource-enforcement feasibility before provider selection.
+
+### Provider evidence update
+
+The first comparison is now recorded in
+[`PREVIEW_PROVIDER_COMPARISON_2026-10-04.md`](../../planning/PREVIEW_PROVIDER_COMPARISON_2026-10-04.md):
+historical native JPEG/EXIF correctness, a new generated-fixture Windows WIC
+control, bounded-output fresh-call measurements, and primary-source PDF/build
+and OS resource-limit constraints. The portable candidate has lower medians on
+the declared Windows fixtures; color-policy equivalence, real photos, process
+limits and application pixels remain unproved. The intake stays an outline;
+no helper placement, decoder dependency or additional format is admitted.

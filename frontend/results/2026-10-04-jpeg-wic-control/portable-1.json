@@ -1,0 +1,58 @@
+{
+  "baseline-24mp/orientation-1": {
+    "first_invocation_ms": 13.9585,
+    "geometry": {
+      "encoded_bytes": 662876,
+      "output_bytes": 1500000,
+      "output_height": 500,
+      "output_width": 750
+    },
+    "warm_max_ms": 22.949,
+    "warm_median_ms": 14.27805,
+    "warm_p95_ms": 20.95,
+    "warm_p99_ms": 22.949,
+    "warm_samples": 30
+  },
+  "baseline-24mp/orientation-6": {
+    "first_invocation_ms": 21.4661,
+    "geometry": {
+      "encoded_bytes": 662876,
+      "output_bytes": 1500000,
+      "output_height": 750,
+      "output_width": 500
+    },
+    "warm_max_ms": 22.4588,
+    "warm_median_ms": 14.9021,
+    "warm_p95_ms": 17.8894,
+    "warm_p99_ms": 22.4588,
+    "warm_samples": 30
+  },
+  "progressive-3mp/orientation-1": {
+    "first_invocation_ms": 15.0368,
+    "geometry": {
+      "encoded_bytes": 38778,
+      "output_bytes": 3145728,
+      "output_height": 768,
+      "output_width": 1024
+    },
+    "warm_max_ms": 18.544,
+    "warm_median_ms": 14.42135,
+    "warm_p95_ms": 16.9838,
+    "warm_p99_ms": 18.544,
+    "warm_samples": 30
+  },
+  "progressive-3mp/orientation-6": {
+    "first_invocation_ms": 16.0408,
+    "geometry": {
+      "encoded_bytes": 38778,
+      "output_bytes": 3145728,
+      "output_height": 1024,
+      "output_width": 768
+    },
+    "warm_max_ms": 19.618,
+    "warm_median_ms": 15.914850000000001,
+    "warm_p95_ms": 17.3171,
+    "warm_p99_ms": 19.618,
+    "warm_samples": 30
+  }
+}
