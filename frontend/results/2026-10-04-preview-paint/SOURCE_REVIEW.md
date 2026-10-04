@@ -1,5 +1,28 @@
 # Native preview paint source review
 
+## Diagnostic followup after the first native pixel rejection
+
+**Source acceptance for the diagnostic-only changes. No correctness or house-style blockers found in this diff.**
+
+The original pixel predicate, tolerance and failure condition are unchanged. A mismatch still throws and prevents measurement completion.
+
+The added diagnostics are appropriately scoped:
+
+- Warmup logging identifies the geometry and format before the control runs.
+- Failure logging records image-versus-retirement phase, sample position, observed color, bitmap extent, arranged PictureBox bounds and image bounds.
+- The failure PNG is encoded from the **already captured bitmap**. It adds no second snapshot or native draw.
+- Snapshot-write failure is reported through `snapshot_saved`; it does not suppress the original pixel failure.
+- `State` is borrowed synchronously. The bitmap, color and encoded data remain within the existing per-warmup autorelease lifetime, with no retained foreign borrow.
+- Logging, encoding and disk writing remain outside the timed spans and occur only during warmup diagnostics. The first mismatch throws, so failure capture does not repeat through the remaining sample positions.
+
+The distinct forward/reverse filenames avoid the two CTest processes overwriting each other’s evidence. The added workflow glob matches their location in the paint build directory.
+
+Exact reviewed scope: the `check_pixels` signature, mismatch diagnostics and two call-site updates, plus warmup logging in [probe.mm](C:/Users/Shadow/file_manager/frontend/experiments/preview_paint/probe.mm); and the failure-PNG artifact pattern in [native-builds.yml](C:/Users/Shadow/file_manager/.github/workflows/native-builds.yml).
+
+This accepts the diagnostics under the complete house style; it does **not** accept the failing paint control or establish a rendering explanation. I performed no edits, builds or tests, and did not inspect the retained failed log in this review.
+
+---
+
 Read-only sibling review of the complete authored probe, CMake, protocol and
 workflow additions. Latest correction review first. Source-equivalent rebases
 do not widen this scope. Native compilation and execution remain pending.

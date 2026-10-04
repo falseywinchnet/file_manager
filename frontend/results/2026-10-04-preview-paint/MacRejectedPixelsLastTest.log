@@ -1,0 +1,37 @@
+Start testing: Oct 04 06:44 UTC
+----------------------------------------------------------
+1/2 Testing: preview_paint_forward
+1/2 Test: preview_paint_forward
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/preview-paint/build/preview_paint.app/Contents/MacOS/preview_paint" "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/preview-admission/data"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/preview-paint/build
+"preview_paint_forward" start time: Oct 04 06:44 UTC
+Output:
+----------------------------------------------------------
+workload|client=640x480|scale=1.000000|renderer=Skia CPU m152 · HarfBuzz 14.2.1 · FreeType 2.14.2 · bundled fonts (optional Unicode fallback)|samples=30|geometry_order=forward
+preview paint measurement refused: painted pixels disagree with the fixture or retirement
+<end of output>
+Test time =   0.67 sec
+----------------------------------------------------------
+Test Failed.
+"preview_paint_forward" end time: Oct 04 06:44 UTC
+"preview_paint_forward" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/2 Testing: preview_paint_reverse
+2/2 Test: preview_paint_reverse
+Command: "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/preview-paint/build/preview_paint.app/Contents/MacOS/preview_paint" "/Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/preview-admission/data" "--reverse"
+Directory: /Users/runner/work/file_manager/file_manager/.build/native-macos-arm64/preview-paint/build
+"preview_paint_reverse" start time: Oct 04 06:44 UTC
+Output:
+----------------------------------------------------------
+workload|client=640x480|scale=1.000000|renderer=Skia CPU m152 · HarfBuzz 14.2.1 · FreeType 2.14.2 · bundled fonts (optional Unicode fallback)|samples=30|geometry_order=reverse
+preview paint measurement refused: painted pixels disagree with the fixture or retirement
+<end of output>
+Test time =   0.75 sec
+----------------------------------------------------------
+Test Failed.
+"preview_paint_reverse" end time: Oct 04 06:44 UTC
+"preview_paint_reverse" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 04 06:44 UTC

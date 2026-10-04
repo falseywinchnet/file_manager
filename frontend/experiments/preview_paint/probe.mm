@@ -135,7 +135,7 @@ void check_paint(const gui_forms::MetricsSnapshot& before, const gui_forms::Wind
 
 // Snapshot and color checks are outside timers. They may trigger another draw;
 // they certify this fixture's sampled pixels, not physical screen scan-out.
-void check_pixels(NSView* const view, const bool image_expected) {
+void check_pixels(const State& state, NSView* const view, const bool image_expected) {
     NSBitmapImageRep* const bitmap = [view bitmapImageRepForCachingDisplayInRect:view.bounds];
     require(bitmap != nil, "native bitmap unavailable");
     [view cacheDisplayInRect:view.bounds toBitmapImageRep:bitmap];
@@ -148,7 +148,25 @@ void check_pixels(NSView* const view, const bool image_expected) {
             const bool match = std::abs(color.redComponent - 12.0 / 255.0) < 0.02 &&
                 std::abs(color.greenComponent - 226.0 / 255.0) < 0.02 &&
                 std::abs(color.blueComponent - 198.0 / 255.0) < 0.02 && color.alphaComponent > 0.98;
-            require(match == image_expected, "painted pixels disagree with the fixture or retirement");
+            if (match != image_expected) {
+                const gui_forms::Rect arranged = (*state.picture).arranged_bounds();
+                const gui_forms::Rect image = (*state.picture).image_bounds();
+                NSString* const filename = state.reverse
+                    ? @"preview-paint-reverse-failure.png" : @"preview-paint-forward-failure.png";
+                NSData* const encoded = [bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+                const BOOL saved = encoded != nil && [encoded writeToFile:filename atomically:YES];
+                std::cerr << "pixel-mismatch|image_expected=" << image_expected
+                          << "|sample=" << horizontal << ',' << vertical
+                          << "|rgba=" << color.redComponent << ',' << color.greenComponent
+                          << ',' << color.blueComponent << ',' << color.alphaComponent
+                          << "|bitmap=" << bitmap.pixelsWide << 'x' << bitmap.pixelsHigh
+                          << "|arranged=" << arranged.x << ',' << arranged.y << ','
+                          << arranged.width << ',' << arranged.height
+                          << "|image_bounds=" << image.x << ',' << image.y << ','
+                          << image.width << ',' << image.height
+                          << "|snapshot_saved=" << (saved == YES) << '\n';
+                throw std::runtime_error("painted pixels disagree with the fixture or retirement");
+            }
         }
     }
 }
@@ -171,7 +189,7 @@ void check_pixels(NSView* const view, const bool image_expected) {
     check_paint(before, model);
     const gui_forms::ImageRegistrySnapshot active = model.image_resource_snapshot();
     require(active.resource_count == 1U, "unexpected active registry count");
-    if (validate_pixels) check_pixels(view, true);
+    if (validate_pixels) check_pixels(state, view, true);
 
     const gui_forms::MetricsSnapshot cached_before = model.metrics_snapshot();
     const Clock::time_point cache_started = Clock::now();
@@ -191,7 +209,7 @@ void check_pixels(NSView* const view, const bool image_expected) {
     require(retired.resource_count == 0U && retired.encoded_bytes == 0U && retired.decoded_bytes == 0U,
             "registry accounting did not return to zero");
     require(!model.image_resources().find(image.image), "retired image identity remains valid");
-    if (validate_pixels) check_pixels(view, false);
+    if (validate_pixels) check_pixels(state, view, false);
     const Durations durations{
         .admission = milliseconds(started, admitted),
         .bind_and_paint = milliseconds(admitted, painted),
@@ -218,6 +236,8 @@ void run_case(State& state, NSView* const view, const Sources& sources) {
     // Complete warmup, including native pixel and blank-retirement controls.
     for (const Format format : orders[0]) {
         @autoreleasepool {
+            std::cout << "warmup|height=" << sources.height << "|format="
+                      << format_names[static_cast<std::size_t>(format)] << '\n';
             (void)measure(state, view, sources, format, true);
         }
     }

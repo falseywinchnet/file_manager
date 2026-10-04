@@ -1,6 +1,6 @@
 # Native preview paint measurement
 
-**CANDIDATE measurement, native execution pending.** This standalone macOS
+**CANDIDATE measurement, native pixel control rejected.** This standalone macOS
 consumer links the normal installed `GUIForms::Application` SDK. It changes no
 provider source, application behavior, preview format admission or deployment.
 It uses public GUI.Forms APIs and AppKit display/snapshot calls, with no private
@@ -79,3 +79,14 @@ log. No install rules or application integration are introduced.
 The complete programming house style governs this source, CMake and workflow
 scope. Scanner, independent source review and native results will be recorded
 with their exact scope; they do not certify unchanged GUI.Forms or dependencies.
+
+## First native result
+
+At source `e898c35c`, both native processes compiled and reached the Skia CPU
+host at scale 1, but the warmup pixel check failed before collecting timing
+samples. The original error did not distinguish image presence from retirement,
+format or sampled color. This is a rejected measurement, not evidence of faster
+previews or a diagnosed application bug. The next run records the exact warmup,
+expected state, sampled color, control/image bounds and a failure PNG without
+changing the pixel tolerance or accepting missing output. Rejected logs are
+retained in `../../results/2026-10-04-preview-paint/`.
