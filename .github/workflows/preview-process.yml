@@ -1,0 +1,43 @@
+name: Preview native process laboratory
+on:
+  push:
+    branches: [main, 'codex/**']
+    paths:
+      - 'orchestrator/experiments/preview_process/**'
+      - '.github/workflows/preview-process.yml'
+  pull_request:
+    paths:
+      - 'orchestrator/experiments/preview_process/**'
+      - '.github/workflows/preview-process.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: preview-process-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native-process:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, macos-26, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure native experiment
+        run: cmake -S orchestrator/experiments/preview_process -B orchestrator/.build/preview-process -DCMAKE_BUILD_TYPE=Release
+      - name: Build with warnings as errors
+        run: cmake --build orchestrator/.build/preview-process --config Release --parallel 2
+      - name: Observe process cleanup and platform memory admission
+        run: ctest --test-dir orchestrator/.build/preview-process -C Release --verbose --output-on-failure
+      - name: Preserve native observations, including explicit skips
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-process-${{ matrix.os }}
+          path: orchestrator/.build/preview-process/Testing/Temporary/LastTest.log
+          if-no-files-found: warn
