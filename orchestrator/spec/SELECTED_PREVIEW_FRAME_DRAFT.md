@@ -128,3 +128,15 @@ the bounded-copy candidate. It does not select that candidate or freeze input
 transport. The synchronous reader can block on a stalled sender, and process
 limits/cancellation must be established by a supervising host before adoption.
 See `../../frontend/results/2026-10-04-jpeg-decoder-input/README.md`.
+
+## Joined process/result feasibility
+
+`../experiments/preview_supervision/` is a disposable Rust controller connecting
+the result receiver to actual child exit. It uses bounded, incremental output
+and diagnostic draining, refuses complete frames from failed or unreaped
+processes, and exercises deadline/cancellation retirement. Its generated-file
+stdin avoids a writable-input pump; that input-progress problem remains open.
+The single-threaded Windows pipe strategy, blocking launch/final wait and absence
+of descendant containment do not establish a production asynchronous host.
+No OS memory/confinement policy, source grant, adapter or available capability
+is added by this experiment. Full semantics remain unresolved as listed above.

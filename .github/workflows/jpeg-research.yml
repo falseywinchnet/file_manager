@@ -5,11 +5,13 @@ on:
     paths:
       - 'frontend/experiments/jpeg_decode/**'
       - 'orchestrator/experiments/preview_frame/**'
+      - 'orchestrator/experiments/preview_supervision/**'
       - '.github/workflows/jpeg-research.yml'
   pull_request:
     paths:
       - 'frontend/experiments/jpeg_decode/**'
       - 'orchestrator/experiments/preview_frame/**'
+      - 'orchestrator/experiments/preview_supervision/**'
       - '.github/workflows/jpeg-research.yml'
   workflow_dispatch:
 permissions:
@@ -78,6 +80,24 @@ jobs:
             "$jpeg_producer" --emit-color-encoded "$orientation" | "$jpeg_decoder" | "$jpeg_consumer" "$orientation" linear
           done
           python frontend/experiments/jpeg_decode/verify_decoder_input.py "$jpeg_producer" "$jpeg_decoder"
+      - name: Verify bounded Rust process supervision
+        run: |
+          set -euo pipefail
+          cargo +1.87.0 fetch --manifest-path orchestrator/experiments/preview_supervision/Cargo.toml --locked
+          cargo +1.87.0 fmt --manifest-path orchestrator/experiments/preview_supervision/Cargo.toml -- --check
+          cargo +1.87.0 clippy --manifest-path orchestrator/experiments/preview_supervision/Cargo.toml --locked --offline --all-targets --all-features --jobs 2 --target-dir orchestrator/.build/preview-supervision -- -D warnings
+          cargo +1.87.0 test --manifest-path orchestrator/experiments/preview_supervision/Cargo.toml --locked --offline --jobs 2 --target-dir orchestrator/.build/preview-supervision -- --nocapture --test-threads=1
+          if [ "$RUNNER_OS" = Windows ]; then
+            jpeg_producer=.build/jpeg-research/Release/file_manager_jpeg_experiment.exe
+            jpeg_decoder=.build/jpeg-research/Release/file_manager_jpeg_decoder.exe
+            jpeg_supervisor=orchestrator/.build/preview-supervision/debug/check_decoder.exe
+          else
+            jpeg_producer=.build/jpeg-research/file_manager_jpeg_experiment
+            jpeg_decoder=.build/jpeg-research/file_manager_jpeg_decoder
+            jpeg_supervisor=orchestrator/.build/preview-supervision/debug/check_decoder
+          fi
+          "$jpeg_producer" --emit-encoded 1 > .build/supervised-jpeg-envelope.bin
+          "$jpeg_supervisor" "$jpeg_decoder" .build/supervised-jpeg-envelope.bin
       - uses: actions/upload-artifact@v4
         if: always()
         with:
