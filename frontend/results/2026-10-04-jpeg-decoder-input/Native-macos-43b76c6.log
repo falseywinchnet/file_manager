@@ -1,0 +1,44 @@
+2026-10-04T04:42:56.1651240Z 100% tests passed out of 2
+2026-10-04T04:43:09.9477110Z JPEG frame: EXIF 1, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:10.2164900Z JPEG frame: EXIF 1, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:10.3025120Z JPEG frame: EXIF 1, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:10.4720940Z JPEG frame: EXIF 1, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:10.5559040Z JPEG frame: EXIF 2, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:10.7069650Z JPEG frame: EXIF 2, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:10.8627020Z JPEG frame: EXIF 2, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:11.0454870Z JPEG frame: EXIF 2, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:11.1198790Z JPEG frame: EXIF 3, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:11.2737310Z JPEG frame: EXIF 3, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:11.3733330Z JPEG frame: EXIF 3, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:11.5822060Z JPEG frame: EXIF 3, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:11.6682780Z JPEG frame: EXIF 4, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:11.8088830Z JPEG frame: EXIF 4, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:11.9117880Z JPEG frame: EXIF 4, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:12.0883860Z JPEG frame: EXIF 4, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:12.1989010Z JPEG frame: EXIF 5, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:12.3751270Z JPEG frame: EXIF 5, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:12.4970090Z JPEG frame: EXIF 5, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:12.6742230Z JPEG frame: EXIF 5, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:12.7972220Z JPEG frame: EXIF 6, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:12.9680910Z JPEG frame: EXIF 6, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:13.0722370Z JPEG frame: EXIF 6, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:13.2669870Z JPEG frame: EXIF 6, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:13.3664160Z JPEG frame: EXIF 7, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:13.5162690Z JPEG frame: EXIF 7, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:13.6142660Z JPEG frame: EXIF 7, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:13.8371290Z JPEG frame: EXIF 7, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:13.9606240Z JPEG frame: EXIF 8, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:14.1438860Z JPEG frame: EXIF 8, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:14.2142700Z JPEG frame: EXIF 8, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:14.3820880Z JPEG frame: EXIF 8, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+2026-10-04T04:43:14.8524220Z separate decoder exactly matches direct baseline frame
+2026-10-04T04:43:14.8525080Z refused with no preview bytes: empty
+2026-10-04T04:43:14.8525500Z refused with no preview bytes: short-header
+2026-10-04T04:43:14.8525850Z refused with no preview bytes: wrong-magic
+2026-10-04T04:43:14.8526190Z refused with no preview bytes: zero-length
+2026-10-04T04:43:14.8526480Z refused with no preview bytes: oversized
+2026-10-04T04:43:14.8526810Z refused with no preview bytes: maximum-u64
+2026-10-04T04:43:14.8527070Z refused with no preview bytes: short-body
+2026-10-04T04:43:14.8527430Z refused with no preview bytes: trailing-byte
+2026-10-04T04:43:14.8527760Z refused with no preview bytes: invalid-jpeg
+2026-10-04T04:43:14.8528060Z fresh decoder after refusals exactly matches reference

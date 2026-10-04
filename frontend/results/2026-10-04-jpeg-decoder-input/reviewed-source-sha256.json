@@ -1,0 +1,42 @@
+[
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\codec_owner.hpp",
+    "Hash": "4C703E92D1C51590B72EF7F3ECBB909498DC4CB5CA781F27C2A89B447B0D725C"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\jpeg_decode.hpp",
+    "Hash": "0B1594F417CE4974F0FDF91C0E888838944A012615F63C07B15D2FC4DC45C585"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\jpeg_decode.cpp",
+    "Hash": "5146B05E0FCAAC71F421819BF651F92D639BDE1F4ED56662D7AE16AAB5DB0528"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\encoded_stream.hpp",
+    "Hash": "9C3D44921F845C88963F605C927C58508011927168CFB22B5C2A4D3C82279955"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\encoded_stream.cpp",
+    "Hash": "A364F87FF66801750888E7BBEA0C381C9A5C44FD545D0BB48DCBA4CE20C97A48"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\decoder_main.cpp",
+    "Hash": "3903414D0FF623ECF465AEE18EDAB9E63033106B87CE27BC04DC13FA2FC6EDAB"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\verify_decoder_input.py",
+    "Hash": "6ACA68C13924E78249C0D968D95902D14AB994B4855B68E07EC2D4191CCA0D17"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\jpeg_experiment.cpp",
+    "Hash": "45AE24E78D4A152A98E0959C1F2E7ED7615B20F6569487EFFB7463B3222EB349"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\frontend\\experiments\\jpeg_decode\\CMakeLists.txt",
+    "Hash": "2B4C5906A360E5F5E856571EDF9F11EB68AEBCF47E2A240A675C30B0949AD100"
+  },
+  {
+    "Path": "C:\\Users\\Shadow\\file_manager\\.github\\workflows\\jpeg-research.yml",
+    "Hash": "28ADF0E39185AAEBA291CBECDF088DF56E9220A8482DA9A20A06BA1AE05A0136"
+  }
+]

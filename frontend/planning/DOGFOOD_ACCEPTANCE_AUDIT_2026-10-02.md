@@ -81,6 +81,16 @@ preparation to byte transfer; input generation still runs in the specimen, and
 production supervision, native source authority and GUI admission remain open.
 No new downloadable preview format is claimed.
 
+**Separate decoder input follow-up:** generated JPEG input and decoding now run
+in separate executables. A 16 MiB envelope bound precedes allocation; exact body
+and EOF are required. All 32 direct/separate orientation and color streams,
+nine input refusals and fresh-process recovery pass natively on all three OSes
+at `43b76c69`. Complete scoped house-style review found no blockers. See
+`../results/2026-10-04-jpeg-decoder-input/README.md`. The decoder accepts bounded
+caller-supplied bytes, not only generated fixtures; it is presently unsupervised
+research. The shipped application remains unchanged, with JPEG/PDF, thumbnails,
+source authority and production process integration still unfinished.
+
 ## Current checkpoint — 2026-10-02
 
 **Latest delivery, 2026-10-03:**
