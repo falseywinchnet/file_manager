@@ -1,0 +1,64 @@
+correctness (windows-2022)	Verify correctness without timing claims	﻿2026-10-04T04:18:47.4107855Z ##[group]Run ctest --test-dir .build/jpeg-research -C Release --output-on-failure --timeout 60
+correctness (windows-2022)	Verify correctness without timing claims	2026-10-04T04:18:47.4108662Z ^[[36;1mctest --test-dir .build/jpeg-research -C Release --output-on-failure --timeout 60^[[0m
+correctness (windows-2022)	Verify correctness without timing claims	2026-10-04T04:18:47.4121331Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+correctness (windows-2022)	Verify correctness without timing claims	2026-10-04T04:18:47.4121746Z ##[endgroup]
+correctness (windows-2022)	Verify correctness without timing claims	2026-10-04T04:18:47.8645570Z Internal ctest changing into directory: D:/a/file_manager/file_manager/.build/jpeg-research
+correctness (windows-2022)	Verify correctness without timing claims	2026-10-04T04:18:47.9527341Z Test project D:/a/file_manager/file_manager/.build/jpeg-research
+correctness (windows-2022)	Verify correctness without timing claims	2026-10-04T04:18:47.9842591Z     Start 1: file_manager_jpeg_orientation_tests
+correctness (windows-2022)	Verify correctness without timing claims	2026-10-04T04:18:47.9980679Z 1/3 Test #1: file_manager_jpeg_orientation_tests ............   Passed    0.01 sec
+correctness (windows-2022)	Verify correctness without timing claims	2026-10-04T04:18:47.9991426Z     Start 2: file_manager_jpeg_embedded_orientation_tests
+correctness (windows-2022)	Verify correctness without timing claims	2026-10-04T04:18:48.6936874Z 2/3 Test #2: file_manager_jpeg_embedded_orientation_tests ...   Passed    0.69 sec
+correctness (windows-2022)	Verify correctness without timing claims	2026-10-04T04:18:48.6940015Z     Start 3: file_manager_jpeg_wic_control_tests
+correctness (windows-2022)	Verify correctness without timing claims	2026-10-04T04:18:49.3239792Z 3/3 Test #3: file_manager_jpeg_wic_control_tests ............   Passed    0.63 sec
+correctness (windows-2022)	Verify correctness without timing claims	2026-10-04T04:18:49.3246563Z
+correctness (windows-2022)	Verify correctness without timing claims	2026-10-04T04:18:49.3247378Z 100% tests passed, 0 tests failed out of 3
+correctness (windows-2022)	Verify correctness without timing claims	2026-10-04T04:18:49.3247769Z
+correctness (windows-2022)	Verify correctness without timing claims	2026-10-04T04:18:49.3247967Z Total Test time (real) =   1.37 sec
+correctness (windows-2022)	Build independent minimum-version frame consumer	﻿2026-10-04T04:18:49.3632594Z ##[group]Run rustup toolchain install 1.87.0 --profile minimal --component rustfmt --component clippy
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:18:49.3633419Z ^[[36;1mrustup toolchain install 1.87.0 --profile minimal --component rustfmt --component clippy^[[0m
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:18:49.3634112Z ^[[36;1mcargo +1.87.0 fmt --manifest-path orchestrator/experiments/preview_frame/Cargo.toml -- --check^[[0m
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:18:49.3635211Z ^[[36;1mcargo +1.87.0 clippy --manifest-path orchestrator/experiments/preview_frame/Cargo.toml --locked --offline --all-targets --all-features --jobs 2 --target-dir orchestrator/.build/preview-frame -- -D warnings^[[0m
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:18:49.3636540Z ^[[36;1mcargo +1.87.0 build --manifest-path orchestrator/experiments/preview_frame/Cargo.toml --locked --offline --bin check_jpeg --jobs 2 --target-dir orchestrator/.build/preview-frame^[[0m
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:18:49.3649261Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:18:49.3649665Z ##[endgroup]
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:18:49.9693583Z info: syncing channel updates for 1.87.0-x86_64-pc-windows-msvc
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:18:50.5063883Z info: latest update on 2025-05-15 for version 1.87.0 (17067e9ac 2025-05-09)
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:18:50.5112448Z info: downloading 5 components
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:18:58.5146385Z
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:18:59.5451165Z   1.87.0-x86_64-pc-windows-msvc installed - rustc 1.87.0 (17067e9ac 2025-05-09)
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:18:59.5451577Z
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:19:01.4730259Z     Checking file-manager-preview-frame-lab v0.0.0 (D:\a\file_manager\file_manager\orchestrator\experiments\preview_frame)
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:19:01.8369848Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.44s
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:19:01.9579026Z    Compiling file-manager-preview-frame-lab v0.0.0 (D:\a\file_manager\file_manager\orchestrator\experiments\preview_frame)
+correctness (windows-2022)	Build independent minimum-version frame consumer	2026-10-04T04:19:02.5405296Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.64s
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	﻿2026-10-04T04:19:02.5672627Z ##[group]Run set -euo pipefail
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.5673063Z ^[[36;1mset -euo pipefail^[[0m
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.5673353Z ^[[36;1mif [ "$RUNNER_OS" = Windows ]; then^[[0m
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.5673806Z ^[[36;1m  jpeg_producer=.build/jpeg-research/Release/file_manager_jpeg_experiment.exe^[[0m
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.5674355Z ^[[36;1m  jpeg_consumer=orchestrator/.build/preview-frame/debug/check_jpeg.exe^[[0m
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.5674756Z ^[[36;1melse^[[0m
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.5675058Z ^[[36;1m  jpeg_producer=.build/jpeg-research/file_manager_jpeg_experiment^[[0m
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.5675549Z ^[[36;1m  jpeg_consumer=orchestrator/.build/preview-frame/debug/check_jpeg^[[0m
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.5675909Z ^[[36;1mfi^[[0m
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.5676112Z ^[[36;1mfor orientation in 1 2 3 4 5 6 7 8; do^[[0m
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.5676563Z ^[[36;1m  "$jpeg_producer" --emit-frame "$orientation" | "$jpeg_consumer" "$orientation" plain^[[0m
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.5677203Z ^[[36;1m  "$jpeg_producer" --emit-color-frame "$orientation" | "$jpeg_consumer" "$orientation" linear^[[0m
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.5677687Z ^[[36;1mdone^[[0m
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.5690734Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.5691161Z ##[endgroup]
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.7043058Z JPEG frame: EXIF 1, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:02.9081644Z JPEG frame: EXIF 1, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:03.0211222Z JPEG frame: EXIF 2, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:03.2239632Z JPEG frame: EXIF 2, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:03.3414690Z JPEG frame: EXIF 3, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:03.5509911Z JPEG frame: EXIF 3, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:03.6700821Z JPEG frame: EXIF 4, plain, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:03.8794131Z JPEG frame: EXIF 4, linear, 1024x768, 3145728 bytes, independent color anchors accepted
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:03.9920653Z JPEG frame: EXIF 5, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:04.1982761Z JPEG frame: EXIF 5, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:04.3255078Z JPEG frame: EXIF 6, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:04.5357718Z JPEG frame: EXIF 6, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:04.6555491Z JPEG frame: EXIF 7, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:04.8651520Z JPEG frame: EXIF 7, linear, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:04.9827520Z JPEG frame: EXIF 8, plain, 768x1024, 3145728 bytes, independent color anchors accepted
+correctness (windows-2022)	Verify real JPEG pixels across process bytes	2026-10-04T04:19:05.1932923Z JPEG frame: EXIF 8, linear, 768x1024, 3145728 bytes, independent color anchors accepted
