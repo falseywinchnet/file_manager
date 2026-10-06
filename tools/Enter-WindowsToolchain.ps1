@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$MingwBin = $env:FILE_MANAGER_MINGW_BIN,
+    [string]$ClangBin = $env:FILE_MANAGER_CLANG_BIN,
     [string]$GoBin = $env:FILE_MANAGER_GO_BIN,
     [string]$RustBin = (Join-Path $env:USERPROFILE '.cargo\bin')
 )
@@ -9,8 +9,14 @@ param(
 $ErrorActionPreference = 'Stop'
 [string]$fileManagerRoot = Split-Path $PSScriptRoot -Parent
 [string]$fileManagerParent = Split-Path $fileManagerRoot -Parent
-if ([string]::IsNullOrWhiteSpace($MingwBin)) {
-    $MingwBin = Join-Path $fileManagerParent 'plan-paint\build-deps\msys64\mingw64\bin'
+if ([string]::IsNullOrWhiteSpace($ClangBin)) {
+    $ClangBin = Join-Path $fileManagerParent 'plan-paint\build-deps\msys64\clang64\bin'
+}
+[string]$fileManagerRequiredTool = ''
+foreach ($fileManagerRequiredTool in @('clang.exe', 'clang++.exe', 'cmake.exe', 'ninja.exe', 'python.exe')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $ClangBin $fileManagerRequiredTool) -PathType Leaf)) {
+        throw "Missing CLANG64 tool $fileManagerRequiredTool in $ClangBin. Set FILE_MANAGER_CLANG_BIN to the MSYS2 clang64 bin directory."
+    }
 }
 if ([string]::IsNullOrWhiteSpace($GoBin)) {
     $GoBin = [Environment]::GetEnvironmentVariable('FILE_MANAGER_GO_BIN', 'User')
@@ -18,7 +24,7 @@ if ([string]::IsNullOrWhiteSpace($GoBin)) {
 
 [System.Collections.Generic.List[string]]$fileManagerToolBins = [System.Collections.Generic.List[string]]::new()
 [string]$fileManagerToolBin = ''
-foreach ($fileManagerToolBin in @($MingwBin, $GoBin, $RustBin)) {
+foreach ($fileManagerToolBin in @($ClangBin, $GoBin, $RustBin)) {
     if (-not [string]::IsNullOrWhiteSpace($fileManagerToolBin) -and
         (Test-Path -LiteralPath $fileManagerToolBin -PathType Container)) {
         [System.Management.Automation.PathInfo]$fileManagerResolved = Resolve-Path -LiteralPath $fileManagerToolBin
@@ -41,13 +47,15 @@ foreach ($fileManagerToolBin in $fileManagerToolBins) {
     }
 }
 $env:PATH = [string]::Join(';', $fileManagerUniqueBins)
-$env:FILE_MANAGER_MINGW_BIN = $MingwBin
+$env:FILE_MANAGER_CLANG_BIN = $ClangBin
+$env:CC = Join-Path $ClangBin 'clang.exe'
+$env:CXX = Join-Path $ClangBin 'clang++.exe'
 if (-not [string]::IsNullOrWhiteSpace($GoBin)) {
     $env:FILE_MANAGER_GO_BIN = $GoBin
 }
 
 [string]$fileManagerToolName = ''
-foreach ($fileManagerToolName in @('cmake', 'ninja', 'g++', 'python', 'go', 'cargo', 'rustc')) {
+foreach ($fileManagerToolName in @('cmake', 'ninja', 'clang', 'clang++', 'python', 'go', 'cargo', 'rustc')) {
     [System.Management.Automation.ApplicationInfo[]]$fileManagerTools = @(Get-Command $fileManagerToolName -CommandType Application -ErrorAction SilentlyContinue)
     if ($fileManagerTools.Count -eq 0) {
         Write-Warning "$fileManagerToolName is not available in this session."

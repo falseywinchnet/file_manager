@@ -28,6 +28,11 @@ def smoke_package(executable: Path, package: Path) -> str:
         environment: dict[str, str] = os.environ.copy()
         environment.pop('GUI_FORMS_FONT_DIR', None)
         environment.pop('FILE_MANAGER_ROOT', None)
+        if platform.system() == 'Windows':
+            # A development PATH can hide missing packaged compiler runtime DLLs.
+            windows_directory: str = os.environ['SystemRoot']
+            system_directory: str = str(Path(windows_directory) / 'System32')
+            environment['PATH'] = system_directory + os.pathsep + windows_directory
         start: float = time.monotonic()
         command: list[str] = [str(executable), '--root', fixture]
         process: subprocess.Popen[bytes] = subprocess.Popen(

@@ -546,7 +546,7 @@ if(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD)
         target_link_libraries(gui_forms_file_manager_demoboard_windows PRIVATE
             gui_forms_file_manager_demoboard_model gui_forms_host_windows)
         target_link_options(gui_forms_file_manager_demoboard_windows PRIVATE
-            -static -static-libgcc -static-libstdc++)
+            -static)
         set_target_properties(gui_forms_file_manager_demoboard_windows PROPERTIES
             OUTPUT_NAME "File Manager Demoboard")
         add_custom_command(TARGET gui_forms_file_manager_demoboard_windows POST_BUILD
@@ -972,7 +972,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
     )
     target_link_options(gui_forms_windows_probe PRIVATE
-        -static -static-libgcc -static-libstdc++
+        -static
     )
     add_executable(gui_drawing_windows_probe
         tests/drawing_windows_probe.c
@@ -984,7 +984,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         gui_drawing_c_api gdi32 user32
     )
     target_link_options(gui_drawing_windows_probe PRIVATE
-        -static -static-libgcc
+        -static
     )
     if(GUI_FORMS_BUILD_TESTS)
         add_executable(gui_forms_windows_live_surface_endpoint_tests
@@ -998,7 +998,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
             gui_forms_host_windows
         )
         target_link_options(gui_forms_windows_live_surface_endpoint_tests PRIVATE
-            -static -static-libgcc -static-libstdc++
+            -static
         )
         add_test(NAME gui_forms_windows_live_surface_endpoint_tests
                  COMMAND gui_forms_windows_live_surface_endpoint_tests)
@@ -1013,7 +1013,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
             gui_forms_c_api gdi32 user32
         )
         target_link_options(gui_forms_windows_gdi_compat_shim_tests PRIVATE
-            -static -static-libgcc -static-libstdc++
+            -static
         )
         add_dependencies(gui_forms_windows_gdi_compat_shim_tests
                          gui_forms_win32_compat)
@@ -1342,7 +1342,7 @@ if(GUI_FORMS_BUILD_GALLERY)
             gui_forms_host_windows
         )
         target_link_options(gui_forms_gallery_windows PRIVATE
-            -static -static-libgcc -static-libstdc++
+            -static
         )
         set_target_properties(gui_forms_gallery_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Gallery"
@@ -1356,7 +1356,7 @@ if(GUI_FORMS_BUILD_GALLERY)
             gui_forms_host_windows
         )
         target_link_options(gui_forms_showcase_windows PRIVATE
-            -static -static-libgcc -static-libstdc++
+            -static
         )
         set_target_properties(gui_forms_showcase_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Complete Showcase"
@@ -1370,7 +1370,7 @@ if(GUI_FORMS_BUILD_GALLERY)
             gui_forms_host_windows
         )
         target_link_options(gui_forms_vsync_lab_windows PRIVATE
-            -static -static-libgcc -static-libstdc++
+            -static
         )
         set_target_properties(gui_forms_vsync_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms VSync + Waterfall Lab"
@@ -1384,7 +1384,7 @@ if(GUI_FORMS_BUILD_GALLERY)
             gui_forms_host_windows
         )
         target_link_options(gui_forms_visual_inspector_lab_windows PRIVATE
-            -static -static-libgcc -static-libstdc++
+            -static
         )
         set_target_properties(gui_forms_visual_inspector_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Visual Inspector Lab"
@@ -1398,7 +1398,7 @@ if(GUI_FORMS_BUILD_GALLERY)
             gui_forms_host_windows
         )
         target_link_options(gui_forms_layered_material_lab_windows PRIVATE
-            -static -static-libgcc -static-libstdc++
+            -static
         )
         set_target_properties(gui_forms_layered_material_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Layered Material Fidelity Lab"
@@ -1412,7 +1412,7 @@ if(GUI_FORMS_BUILD_GALLERY)
             gui_forms_host_windows
         )
         target_link_options(gui_forms_custom_chrome_lab_windows PRIVATE
-            -static -static-libgcc -static-libstdc++
+            -static
         )
         set_target_properties(gui_forms_custom_chrome_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Custom Chrome Lab"
@@ -1426,7 +1426,7 @@ if(GUI_FORMS_BUILD_GALLERY)
             gui_forms_host_windows
         )
         target_link_options(gui_forms_typography_scale_lab_windows PRIVATE
-            -static -static-libgcc -static-libstdc++
+            -static
         )
         set_target_properties(gui_forms_typography_scale_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Typography + Scale Lab"
@@ -1440,7 +1440,7 @@ if(GUI_FORMS_BUILD_GALLERY)
             gui_forms_host_windows
         )
         target_link_options(gui_forms_responsive_tracks_lab_windows PRIVATE
-            -static -static-libgcc -static-libstdc++
+            -static
         )
         set_target_properties(gui_forms_responsive_tracks_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Responsive Tracks Lab"
@@ -1454,7 +1454,7 @@ if(GUI_FORMS_BUILD_GALLERY)
             gui_forms_host_windows
         )
         target_link_options(gui_forms_connected_controls_lab_windows PRIVATE
-            -static -static-libgcc -static-libstdc++
+            -static
         )
         set_target_properties(gui_forms_connected_controls_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Connected Controls Lab"
@@ -1468,7 +1468,7 @@ if(GUI_FORMS_BUILD_GALLERY)
             gui_forms_host_windows
         )
         target_link_options(gui_forms_seam_proximity_lab_windows PRIVATE
-            -static -static-libgcc -static-libstdc++
+            -static
         )
         set_target_properties(gui_forms_seam_proximity_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Physical Seam + Proximity Lab"

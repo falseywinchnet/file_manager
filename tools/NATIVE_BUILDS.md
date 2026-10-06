@@ -30,6 +30,20 @@ Use native CMake, Ninja, C++20 tools, Python 3.11+, Go (see `engine/go.mod`) and
 Rust (see `orchestrator/Cargo.toml`). The workflow lists native OS prerequisites.
 Linux needs X11/XWayland; headless test runs use `xvfb-run`.
 
+CI explicitly selects Clang for C/C++ on all three platforms (Apple Clang on
+macOS). Windows uses MSYS2 **CLANG64**, LLVM/LLD, libc++ and UCRT. Install the
+`mingw-w64-clang-x86_64-{clang,cmake,ninja,python}` packages in MSYS2, then set
+`FILE_MANAGER_CLANG_BIN` to that installation's `clang64/bin` directory. The
+PowerShell helper otherwise looks in the adjacent Plan Paint toolchain's
+`build-deps/msys64/clang64/bin`; it does not modify that toolchain.
+`Build-Windows.ps1` uses fresh `shadow-windows-clang` build directories and
+`shadow-clang-sdk` so existing GCC artifacts are preserved. Rebuild all C++
+consumers with the same toolchain: old GCC/libstdc++ SDKs are not ABI compatible.
+Before reusing the native pipeline's existing `.build/native-windows-x64` or
+Linux build directory, move that directory aside if it was compiled with GCC;
+CMake caches compiler selection. NSIS is not used: Windows output remains a
+portable ZIP.
+
 ```powershell
 . ./tools/Enter-WindowsToolchain.ps1
 python tools/build_native.py --jobs 2
@@ -44,7 +58,7 @@ xvfb-run -a python3 tools/build_native.py --jobs 2
 To reuse an already tested native SDK on Shadow:
 
 ```powershell
-python tools/build_native.py --jobs 2 --gui-forms-sdk gui_forms/.build/shadow-sdk
+python tools/build_native.py --jobs 2 --gui-forms-sdk gui_forms/.build/shadow-clang-sdk
 ```
 
 Build outputs remain under `.build/native-<platform>-<arch>/`. The independently
@@ -68,7 +82,7 @@ cmake --install .build/native-windows-x64/frontend --component DocumentPicker
 - macOS: complete `.app`, private dylib closure rewritten to bundle paths, fonts
   and notices, ad-hoc signature verified with `codesign`. No Developer ID or
   notarization claim. The arm64 build does not promise Intel compatibility.
-- Windows: executable, GUI.Forms and MinGW DLL closure, fonts and notices.
+- Windows: executable, GUI.Forms and CLANG64 DLL closure, fonts and notices.
   Unsigned portable folder; no installer or system registration.
 - Linux: executable, GUI.Forms `.so`, fonts and notices. Ubuntu 24.04/glibc
   baseline with system X11/ATK dependencies, checked by `ldd`; `xdg-utils` supplies
