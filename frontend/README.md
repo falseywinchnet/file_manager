@@ -70,9 +70,10 @@ The measured Windows performance repair is staged separately at
 older build can remain open. See
 [`results/2026-09-29-shadow-windows/LATENCY.md`](results/2026-09-29-shadow-windows/LATENCY.md)
 for the same-application before/after results and remaining performance limits.
-The Windows manifest is
-`gui-forms-shadow-windows-x64-2026-09-29`; the original macOS snapshot remains
-separate. The application version remains `0.001-alpha`, while the independently
+The Clang helper writes its own development consumption manifest in
+`gui_forms/.build/shadow-clang-sdk/gui-forms-consumption.json`. The historical
+GCC manifest `gui-forms-shadow-windows-x64-2026-09-29` and original macOS snapshot
+remain separate. The application version remains `0.001-alpha`, while the independently
 consumed Document Picker CMake package retains its existing 1.0 contract version.
 
 The Windows adapter uses the profile directory for Home and exposes actual

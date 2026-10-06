@@ -81,8 +81,14 @@ jobs:
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
+          # Ubuntu 24.04's default Clang 18 rejects the existing in-class
+          # friend exception specifications. Use the LLVM 22 release series.
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o "$RUNNER_TEMP/llvm-key.asc"
+          sudo install -m 0644 "$RUNNER_TEMP/llvm-key.asc" /usr/share/keyrings/apt-llvm.asc
+          echo 'deb [signed-by=/usr/share/keyrings/apt-llvm.asc] https://apt.llvm.org/noble/ llvm-toolchain-noble-22 main' | sudo tee /etc/apt/sources.list.d/llvm-22.list
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build clang generate-ninja pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev xvfb xauth xdg-utils
+          sudo apt-get install -y cmake ninja-build clang-22 generate-ninja pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev xvfb xauth xdg-utils
+          echo /usr/lib/llvm-22/bin >> "$GITHUB_PATH"
       - uses: msys2/setup-msys2@v2
         if: runner.os == 'Windows'
         with:

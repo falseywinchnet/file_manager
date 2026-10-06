@@ -110,6 +110,8 @@ def main() -> None:
         sdk_validation = 'externally supplied'
         toolkit_validation = 'externally supplied SDK'
     os.environ['BUILD_JOBS'] = str(jobs)
+    os.environ.setdefault('CC', 'clang')
+    os.environ.setdefault('CXX', 'clang++')
     if supplied_sdk is None:
         build_toolkit(host, build, sdk, jobs)
     manifest: Path = build / 'gui-forms-consumption.json'

@@ -30,8 +30,11 @@ Use native CMake, Ninja, C++20 tools, Python 3.11+, Go (see `engine/go.mod`) and
 Rust (see `orchestrator/Cargo.toml`). The workflow lists native OS prerequisites.
 Linux needs X11/XWayland; headless test runs use `xvfb-run`.
 
-CI explicitly selects Clang for C/C++ on all three platforms (Apple Clang on
-macOS). Windows uses MSYS2 **CLANG64**, LLVM/LLD, libc++ and UCRT. Install the
+The native Python pipeline defaults to Clang for C/C++ and honors explicit
+`CC`/`CXX` overrides. CI explicitly selects Clang on all three platforms (Apple Clang on
+macOS). Linux installs LLVM's Clang 22 packages: Ubuntu 24.04's default Clang 18
+rejects the existing in-class friend exception specifications. Windows uses
+MSYS2 **CLANG64**, LLVM/LLD, libc++ and UCRT. Install the
 `mingw-w64-clang-x86_64-{clang,cmake,ninja,python}` packages in MSYS2, then set
 `FILE_MANAGER_CLANG_BIN` to that installation's `clang64/bin` directory. The
 PowerShell helper otherwise looks in the adjacent Plan Paint toolchain's
@@ -52,6 +55,7 @@ python tools/build_native.py --jobs 2
 ```sh
 python3 tools/build_native.py --jobs 2
 # Linux headless CI:
+export PATH="/usr/lib/llvm-22/bin:$PATH"
 xvfb-run -a python3 tools/build_native.py --jobs 2
 ```
 
