@@ -790,10 +790,11 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     std::atomic<bool> _displayTickQueued;
     BOOL _hostOccluded;
     std::vector<LiveSurfacePresentation> _pendingLivePresentations;
-    // Reuse storage across display ticks; immutable leases survive producer
-    // reconfiguration until this pass has finished consuming their pixels.
-    std::vector<gui_forms::LiveSurfaceFrame> _liveFrames{};
-    std::vector<GFRect> _opaqueLiveClips{};
+    // Objective-C++ constructs these vectors empty with the view. Reuse storage
+    // across ticks; immutable leases survive producer reconfiguration until
+    // this pass has finished consuming their pixels.
+    std::vector<gui_forms::LiveSurfaceFrame> _liveFrames;
+    std::vector<GFRect> _opaqueLiveClips;
     NSPanel* _tooltipPanel;
     NSTimer* _tooltipTimer;
     std::uint64_t _lastSemanticGeneration;
