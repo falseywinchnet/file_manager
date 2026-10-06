@@ -490,3 +490,15 @@ profile is enabled, verifies that abort retains the complete previous front
 and receipt after a partial candidate draw. Review corrections also made value
 parameters const, initialized SkPaint explicitly and marked test factories and
 pixel readers nodiscard. This is a scoped correction, not a legacy style claim.
+
+The review also required failed-batch retries to refresh current placements.
+`Window::take_live_surface_presentations(bool include_unchanged = false)`
+preserves the usual changed-generation drain, while true recomputes all eligible
+placements with current visibility/overlay rules. This avoids dropping failed
+surface A when only surface B advances, and avoids replaying cached clips over
+new overlays or hidden controls. The existing declaration and drain-condition
+change are additional reviewed scope; the core fixture exercises two surfaces,
+an unchanged failed generation, hiding and full overlay coverage.
+The independent follow-up review closed those failure-path and style findings.
+The updated core live-surface and opaque-surface fixtures pass 2/2 on Shadow
+Windows; native raster/host verification remains a separate build gate.

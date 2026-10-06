@@ -246,6 +246,9 @@ every published pixel, allowing copy composition and omission of fully covered
 retained backgrounds. `LiveSurfaceFrame::opaque()` binds that promise to its
 immutable buffer across reconfiguration. Matching consumers/libraries must be
 rebuilt because the description layout changes; the stable C ABI is unchanged.
+The existing development presentation drain gains `include_unchanged = false`;
+true refreshes all currently eligible placements for a failed-batch retry,
+retaining visibility and overlay exclusions rather than reusing stale clips.
 Provider reply and guards:
 [`GUI.Forms negotiation`](../../gui_forms/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md#opaque-live-surface-development-promise-2026-10-06).
 

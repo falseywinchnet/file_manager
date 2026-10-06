@@ -1,4 +1,5 @@
 #include "gui_forms/live_surface.hpp"
+#include "gui_forms/window.hpp"
 #include "../src/host/macos/application/live_surface_damage.hpp"
 
 #include <array>
@@ -68,10 +69,53 @@ void damage_coverage() {
     require(!detail::opaque_live_damage_covers(dirty, 0.0, adjacent, true, false), "invalid scale refused");
     require(detail::opaque_live_clip(dirty, std::numeric_limits<double>::infinity()).empty(), "nonfinite scale refused");
 }
+
+void refreshed_presentations() {
+    const std::shared_ptr<Control> root = make_control<Control>(StableId("root"));
+    const std::shared_ptr<Control> first = make_control<Control>(StableId("first"));
+    const std::shared_ptr<Control> second = make_control<Control>(StableId("second"));
+    const std::shared_ptr<Control> overlay = make_control<Control>(StableId("overlay"));
+    (*first).set_requested_bounds({0.0, 0.0, 4.0, 8.0});
+    (*second).set_requested_bounds({4.0, 0.0, 4.0, 8.0});
+    (*overlay).set_requested_bounds({0.0, 0.0, 4.0, 8.0});
+    (*overlay).set_paint_plane(PaintPlane::overlay);
+    (*overlay).set_visible(false);
+    (*root).add_child(first);
+    (*root).add_child(second);
+    (*root).add_child(overlay);
+    Window window(root, {8.0, 8.0});
+    window.perform_layout();
+    const std::shared_ptr<LiveSurface> surface_a = LiveSurface::create({.width = 4U, .height = 8U, .opaque = true});
+    const std::shared_ptr<LiveSurface> surface_b = LiveSurface::create({.width = 4U, .height = 8U, .opaque = true});
+    require(surface_a && surface_b, "retry surfaces created");
+    LiveSurfaceWriteLease write_a = (*surface_a).try_acquire_write();
+    LiveSurfaceWriteLease write_b = (*surface_b).try_acquire_write();
+    require(write_a && write_b, "retry write leases acquired");
+    for (std::byte& value : write_a.pixels()) value = std::byte{255};
+    for (std::byte& value : write_b.pixels()) value = std::byte{255};
+    const std::uint64_t generation_a = write_a.publish();
+    const std::uint64_t generation_b = write_b.publish();
+    require(generation_a != 0U && generation_b != 0U, "initial generations published");
+    require(window.queue_live_surface_presentation(first, surface_a), "first registered");
+    require(window.queue_live_surface_presentation(second, surface_b), "second registered");
+    require(window.take_live_surface_presentations().size() == 2U, "initial batch sampled");
+    require(window.take_live_surface_presentations().empty(), "unchanged drain stays empty by default");
+    // A failed to present; only B changes before the retry.
+    write_b = (*surface_b).try_acquire_write(true);
+    require(static_cast<bool>(write_b), "second replacement acquired");
+    require(write_b.publish() != 0U, "only second advances");
+    const std::vector<LiveSurfacePresentation> retry = window.take_live_surface_presentations(true);
+    require(retry.size() == 2U, "refresh retains unchanged failed surface A");
+    (*overlay).set_visible(true);
+    (*second).set_visible(false);
+    window.perform_layout();
+    require(window.take_live_surface_presentations(true).empty(), "refresh discards newly covered and hidden surfaces");
+}
 } // namespace
 
 int main() {
     description_and_frame_lifetime();
     damage_coverage();
+    refreshed_presentations();
     return 0;
 }

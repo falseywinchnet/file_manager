@@ -21,6 +21,10 @@ of blend, and need not paint what lies under it. This is a producer promise,
 not a request to scan or repair alpha bytes. It survives `create`, `reconfigure`,
 and `snapshot().description`. An acquired `LiveSurfaceFrame::opaque()` reports
 the promise for that immutable frame, even after the surface is reconfigured.
+Hosts retrying a failed batch can call
+`Window::take_live_surface_presentations(true)` to include unchanged generations
+with current visibility, destinations and overlay exclusions. The default
+false preserves the existing changed-generation drain.
 
 Skia uses opaque source-copy only when both the flag is true and drawing opacity
 is at least one. Other draws retain premultiplied source-over blending. On macOS,

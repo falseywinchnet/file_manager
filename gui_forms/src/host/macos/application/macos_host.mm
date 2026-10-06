@@ -1675,14 +1675,17 @@ private:
 - (void)displayLinkTick {
     ++_displayTickCount;
     if (!_model || self.window == nil || _hostOccluded == YES) return;
+    // A failed batch needs a fresh composition, including unchanged surfaces.
+    // Reusing cached clips could cover a newly opened popup or hidden control.
+    const bool retry = !_pendingLivePresentations.empty();
     std::vector<LiveSurfacePresentation> updates =
-        (*_model).take_live_surface_presentations();
+        (*_model).take_live_surface_presentations(retry);
+    _pendingLivePresentations = std::move(updates);
     if (!(*_model).has_live_surface_presentations()) {
         [self stopDisplayLink];
         return;
     }
-    if (updates.empty() && _pendingLivePresentations.empty()) return;
-    if (!updates.empty()) _pendingLivePresentations = std::move(updates);
+    if (_pendingLivePresentations.empty()) return;
     const double scale = self.window.backingScaleFactor;
     for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
         const GFRect clip = gui_forms::detail::align_damage_outward(
