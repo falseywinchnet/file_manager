@@ -2540,6 +2540,8 @@ if(GUI_FORMS_BUILD_TESTS)
     endif()
 
     if(TARGET gui_forms_skia)
+        add_executable(gui_forms_live_surface_benchmark EXCLUDE_FROM_ALL benchmarks/live_surface_benchmark.cpp)
+        target_link_libraries(gui_forms_live_surface_benchmark PRIVATE gui_forms_skia)
         add_executable(gui_forms_opaque_live_surface_raster_tests tests/opaque_live_surface_raster_tests.cpp)
         target_link_libraries(gui_forms_opaque_live_surface_raster_tests PRIVATE gui_forms_controls gui_forms_skia)
         add_test(NAME gui_forms_opaque_live_surface_raster_tests COMMAND gui_forms_opaque_live_surface_raster_tests)

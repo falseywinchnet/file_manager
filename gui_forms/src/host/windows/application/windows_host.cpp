@@ -1391,19 +1391,33 @@ public:
             destination, opacity);
     }
 
-    void draw_live_surface(std::shared_ptr<LiveSurface> surface,
-                           Rect destination, double opacity) override {
+    void draw_live_surface(const std::shared_ptr<LiveSurface> surface,
+                           const Rect destination, const double opacity) override {
         const PixelRect area = pixel_rect(destination);
         if (!surface || area.empty() || destination.empty() ||
             !destination.finite() ||
             !std::isfinite(opacity) || opacity <= 0.0 || memory_dc_ == nullptr) {
             return;
         }
-        LiveSurfaceFrame frame = (*surface).acquire_latest();
+        const LiveSurfaceFrame frame = (*surface).acquire_latest();
         if (!frame || frame.width() == 0U || frame.height() == 0U ||
             frame.row_bytes() != static_cast<std::uint64_t>(frame.width()) * 4U ||
             frame.pixels().empty()) {
             return;
+        }
+        const std::byte* source = frame.pixels().data();
+        if (frame.pixel_format() == LiveSurfacePixelFormat::rgba32_premultiplied_srgb) {
+            // The raster owns reusable conversion storage. Convert before any
+            // DC mutation; allocation failure leaves the active frame intact.
+            live_bgra_scratch_.resize(frame.pixels().size());
+            const std::size_t byte_count = live_bgra_scratch_.size();
+            for (std::size_t index = 0U; index < byte_count; index += 4U) {
+                live_bgra_scratch_[index] = source[index + 2U];
+                live_bgra_scratch_[index + 1U] = source[index + 1U];
+                live_bgra_scratch_[index + 2U] = source[index];
+                live_bgra_scratch_[index + 3U] = source[index + 3U];
+            }
+            source = live_bgra_scratch_.data();
         }
         const int saved = SaveDC(memory_dc_);
         IntersectClipRect(memory_dc_, area.left, area.top, area.right, area.bottom);
@@ -1440,7 +1454,6 @@ public:
                     static_cast<std::size_t>(copy_right - copy_left) * 4U;
                 const std::size_t source_stride =
                     static_cast<std::size_t>(frame.row_bytes());
-                const std::byte* source = frame.pixels().data();
                 for (int y = copy_top; y < copy_bottom; ++y) {
                     const std::size_t source_y =
                         static_cast<std::size_t>(y - destination_y);
@@ -1467,7 +1480,7 @@ public:
             memory_dc_, destination_x, destination_y,
             destination_width, destination_height, 0, 0,
             static_cast<int>(frame.width()), static_cast<int>(frame.height()),
-            frame.pixels().data(), &info, DIB_RGB_COLORS, SRCCOPY);
+            source, &info, DIB_RGB_COLORS, SRCCOPY);
         if (saved != 0) RestoreDC(memory_dc_, saved);
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
         // Finish native consumption while the LiveSurfaceFrame still owns its
@@ -2434,6 +2447,7 @@ private:
     HBITMAP bitmap_{};
     HGDIOBJ old_bitmap_{};
     std::uint32_t* pixels_{};
+    std::vector<std::byte> live_bgra_scratch_{};
 #if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT) && defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
     // Finite host frame profile: at most 64 distinct session authorities. A
     // repeated command shares its entry; ordering gives one global lock order.

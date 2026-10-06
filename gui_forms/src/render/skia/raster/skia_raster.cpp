@@ -62,6 +62,29 @@ SkRect to_sk_rect(Rect rect) noexcept {
                             static_cast<SkScalar>(rect.height));
 }
 
+// Resolve the complete canvas transform, including device scale and retained
+// translations. Exact equality deliberately refuses fractional resampling.
+bool live_surface_device_rect(const SkCanvas& canvas, const Rect destination,
+                              const LiveSurfaceFrame& frame, SkIRect& result) {
+    const SkMatrix matrix = canvas.getTotalMatrix();
+    if (!matrix.isScaleTranslate() || matrix.getScaleX() <= 0.0f ||
+        matrix.getScaleY() <= 0.0f) return false;
+    SkRect device = to_sk_rect(destination);
+    matrix.mapRect(&device);
+    if (!device.isFinite() || device.width() != static_cast<SkScalar>(frame.width()) ||
+        device.height() != static_cast<SkScalar>(frame.height())) return false;
+    const double left = device.left();
+    const double top = device.top();
+    const double right = device.right();
+    const double bottom = device.bottom();
+    if (left != std::floor(left) || top != std::floor(top) ||
+        left < std::numeric_limits<int>::min() || top < std::numeric_limits<int>::min() ||
+        right > std::numeric_limits<int>::max() || bottom > std::numeric_limits<int>::max()) return false;
+    result = SkIRect::MakeLTRB(static_cast<int>(left), static_cast<int>(top),
+                              static_cast<int>(right), static_cast<int>(bottom));
+    return true;
+}
+
 SkRRect to_sk_rrect(Rect rect, double radius) noexcept {
     const SkScalar bounded = static_cast<SkScalar>(std::clamp(
         radius, 0.0, std::max(0.0, std::min(rect.width, rect.height) * 0.5)));
@@ -956,14 +979,44 @@ bool SkiaRaster::draw_live_surface_frame(const LiveSurfaceFrame& frame,
     }
     const bool copy = frame.opaque() && opacity >= 1.0;
     const SkAlphaType alpha = copy ? kOpaque_SkAlphaType : kPremul_SkAlphaType;
+    SkColorType color_type = kUnknown_SkColorType;
+    switch (frame.pixel_format()) {
+    case LiveSurfacePixelFormat::bgra32_premultiplied_srgb:
+        color_type = kBGRA_8888_SkColorType;
+        break;
+    case LiveSurfacePixelFormat::rgba32_premultiplied_srgb:
+        color_type = kRGBA_8888_SkColorType;
+        break;
+    default: return false;
+    }
     if (fail_next_live_image_) {
         fail_next_live_image_ = false;
         return false;
     }
     const SkImageInfo info = SkImageInfo::Make(
         static_cast<int>(frame.width()), static_cast<int>(frame.height()),
-        kBGRA_8888_SkColorType, alpha,
+        color_type, alpha,
         SkColorSpace::MakeSRGB());
+    SkIRect device{};
+    const bool pixel_exact = live_surface_device_rect(*canvas, destination, frame, device);
+    if (copy && pixel_exact && (*canvas).isClipRect()) {
+        // writePixels ignores both matrix and clip. The raster's isClipRect
+        // admits only full-coverage rectangular clips; complex/AA clips must
+        // go through drawImageRect so retained overlays and edges survive.
+        SkIRect clipped = device;
+        if (!clipped.intersect((*canvas).getDeviceClipBounds())) return true;
+        const std::size_t source_y = static_cast<std::size_t>(clipped.top() - device.top());
+        const std::size_t source_x = static_cast<std::size_t>(clipped.left() - device.left());
+        const std::size_t stride = static_cast<std::size_t>(frame.row_bytes());
+        const std::size_t offset = source_y * stride + source_x * 4U;
+        // Alpha is promised 255, so it is also valid premultiplied storage.
+        // Match the raster alpha type to retain Skia's byte-copy path.
+        const SkImageInfo clipped_info = info.makeWH(clipped.width(), clipped.height());
+        const SkImageInfo copy_info = clipped_info.makeAlphaType(kPremul_SkAlphaType);
+        const bool written = (*canvas).writePixels(copy_info, frame.pixels().data() + offset,
+                                                   stride, clipped.left(), clipped.top());
+        return written;
+    }
     sk_sp<SkData> data = SkData::MakeWithoutCopy(
         frame.pixels().data(), frame.pixels().size());
     sk_sp<SkImage> image = SkImages::RasterFromData(
@@ -979,7 +1032,7 @@ bool SkiaRaster::draw_live_surface_frame(const LiveSurfaceFrame& frame,
         SkRect::MakeWH(static_cast<SkScalar>(frame.width()),
                        static_cast<SkScalar>(frame.height())),
         to_sk_rect(destination),
-        SkSamplingOptions(SkFilterMode::kLinear), &paint,
+        SkSamplingOptions(copy && pixel_exact ? SkFilterMode::kNearest : SkFilterMode::kLinear), &paint,
         SkCanvas::kStrict_SrcRectConstraint);
     return true;
 }

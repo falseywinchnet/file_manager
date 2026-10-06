@@ -44,6 +44,51 @@ void description_and_frame_lifetime() {
     require(!empty.opaque(), "empty frame grants no coverage");
 }
 
+void format_and_frame_lifetime() {
+    const LiveSurfaceDescription defaults{};
+    require(defaults.pixel_format == LiveSurfacePixelFormat::bgra32_premultiplied_srgb, "BGRA remains default");
+#if defined(_WIN32)
+    constexpr LiveSurfacePixelFormat native = LiveSurfacePixelFormat::bgra32_premultiplied_srgb;
+#else
+    constexpr LiveSurfacePixelFormat native = LiveSurfacePixelFormat::rgba32_premultiplied_srgb;
+#endif
+    require(native_live_surface_pixel_format() == native, "native query before attachment");
+    const std::array<LiveSurfacePixelFormat, 2> formats{
+        LiveSurfacePixelFormat::rgba32_premultiplied_srgb,
+        LiveSurfacePixelFormat::bgra32_premultiplied_srgb};
+    for (const LiveSurfacePixelFormat format : formats) {
+        const std::shared_ptr<LiveSurface> surface = LiveSurface::create(
+            {.width = 2U, .height = 2U, .pixel_format = format, .opaque = true});
+        require(surface && (*surface).snapshot().description.pixel_format == format, "create round trips format");
+        LiveSurfaceWriteLease write = (*surface).try_acquire_write();
+        require(static_cast<bool>(write), "format write acquired");
+        const LiveSurfacePixelFormat replacement = format == formats[0] ? formats[1] : formats[0];
+        const LiveSurfaceDescription next{.width = 2U, .height = 2U, .pixel_format = replacement};
+        require(!(*surface).reconfigure(next), "active writer prevents relabelling");
+        for (std::byte& value : write.pixels()) value = std::byte{255};
+        require(write.publish() != 0U, "format frame published");
+        const LiveSurfaceFrame old = (*surface).acquire_latest();
+        require(old.pixel_format() == format, "frame has producer format");
+        require((*surface).reconfigure(next), "same size format change accepted");
+        require((*surface).snapshot().description.pixel_format == replacement, "snapshot follows format change");
+        require(old.pixel_format() == format && old.opaque(), "old lease keeps format and alpha promise");
+        write = (*surface).try_acquire_write();
+        require(static_cast<bool>(write), "replacement format write acquired");
+        require(write.publish() != 0U, "replacement format published");
+        const LiveSurfaceFrame current = (*surface).acquire_latest();
+        require(current.pixel_format() == replacement && !current.opaque(), "new frame has new description");
+        const LiveSurfaceDescription invalid{.width = 2U, .height = 2U,
+            .pixel_format = static_cast<LiveSurfacePixelFormat>(255)};
+        require(!LiveSurface::create(invalid) && !(*surface).reconfigure(invalid), "unknown format rejected");
+        require((*surface).snapshot().description.pixel_format == replacement, "invalid format preserves state");
+        const std::shared_ptr<Control> root = make_control<Control>(StableId("native-query"));
+        Window window(root, {2.0, 2.0});
+        window.perform_layout();
+        require(window.queue_live_surface_presentation(root, surface), "format surface attached");
+        require(native_live_surface_pixel_format() == native, "native query after attachment");
+    }
+}
+
 void damage_coverage() {
     const Rect dirty{0.0, 0.0, 10.0, 8.0};
     const std::array<Rect, 2> adjacent{{{0.0, 0.0, 4.0, 8.0}, {4.0, 0.0, 6.0, 8.0}}};
@@ -70,7 +115,7 @@ void damage_coverage() {
     require(detail::opaque_live_clip(dirty, std::numeric_limits<double>::infinity()).empty(), "nonfinite scale refused");
 }
 
-void refreshed_presentations() {
+void refreshed_presentations(const LiveSurfacePixelFormat format) {
     const std::shared_ptr<Control> root = make_control<Control>(StableId("root"));
     const std::shared_ptr<Control> first = make_control<Control>(StableId("first"));
     const std::shared_ptr<Control> second = make_control<Control>(StableId("second"));
@@ -85,8 +130,8 @@ void refreshed_presentations() {
     (*root).add_child(overlay);
     Window window(root, {8.0, 8.0});
     window.perform_layout();
-    const std::shared_ptr<LiveSurface> surface_a = LiveSurface::create({.width = 4U, .height = 8U, .opaque = true});
-    const std::shared_ptr<LiveSurface> surface_b = LiveSurface::create({.width = 4U, .height = 8U, .opaque = true});
+    const std::shared_ptr<LiveSurface> surface_a = LiveSurface::create({.width = 4U, .height = 8U, .pixel_format = format, .opaque = true});
+    const std::shared_ptr<LiveSurface> surface_b = LiveSurface::create({.width = 4U, .height = 8U, .pixel_format = format, .opaque = true});
     require(surface_a && surface_b, "retry surfaces created");
     LiveSurfaceWriteLease write_a = (*surface_a).try_acquire_write();
     LiveSurfaceWriteLease write_b = (*surface_b).try_acquire_write();
@@ -115,7 +160,9 @@ void refreshed_presentations() {
 
 int main() {
     description_and_frame_lifetime();
+    format_and_frame_lifetime();
     damage_coverage();
-    refreshed_presentations();
+    refreshed_presentations(LiveSurfacePixelFormat::bgra32_premultiplied_srgb);
+    refreshed_presentations(LiveSurfacePixelFormat::rgba32_premultiplied_srgb);
     return 0;
 }
