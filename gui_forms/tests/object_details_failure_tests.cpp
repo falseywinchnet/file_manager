@@ -88,8 +88,8 @@ void* operator new[](const std::size_t bytes) {
 }
 void operator delete(void* const memory) noexcept { std::free(memory); }
 void operator delete[](void* const memory) noexcept { std::free(memory); }
-void operator delete(void* const memory, const std::size_t) noexcept { std::free(memory); }
-void operator delete[](void* const memory, const std::size_t) noexcept { std::free(memory); }
+void operator delete(void* const memory, std::size_t) noexcept { std::free(memory); }
+void operator delete[](void* const memory, std::size_t) noexcept { std::free(memory); }
 void* operator new(const std::size_t bytes, const std::align_val_t alignment) {
     void* memory = details_allocation_probe::allocate_aligned(bytes, static_cast<std::size_t>(alignment));
     return memory;
@@ -100,8 +100,8 @@ void* operator new[](const std::size_t bytes, const std::align_val_t alignment) 
 }
 void operator delete(void* const memory, const std::align_val_t) noexcept { details_allocation_probe::release_aligned(memory); }
 void operator delete[](void* const memory, const std::align_val_t) noexcept { details_allocation_probe::release_aligned(memory); }
-void operator delete(void* const memory, const std::size_t, const std::align_val_t) noexcept { details_allocation_probe::release_aligned(memory); }
-void operator delete[](void* const memory, const std::size_t, const std::align_val_t) noexcept { details_allocation_probe::release_aligned(memory); }
+void operator delete(void* const memory, std::size_t, const std::align_val_t) noexcept { details_allocation_probe::release_aligned(memory); }
+void operator delete[](void* const memory, std::size_t, const std::align_val_t) noexcept { details_allocation_probe::release_aligned(memory); }
 
 namespace {
 using namespace gui_forms;
