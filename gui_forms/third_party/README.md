@@ -1,5 +1,12 @@
 # Private third-party dependencies
 
+The shaping stack is fetched by `fetch_text_stack.sh`: HarfBuzz 14.6.0 at
+`c7a7457b7385f33178e8cf87615ca077a810bbe7` and FreeType 2.14.2 at
+`f4205da14867c5387cd6a329b90ee10a6df6eeff`. HarfBuzz's optional raster,
+vector, GPU, subset and utility targets remain disabled. The upgrade and
+compiler-warning investigation are recorded in
+[`HARFBUZZ_14_6_INTAKE_2026-10-06.md`](HARFBUZZ_14_6_INTAKE_2026-10-06.md).
+
 The source-only logical text-mask profile uses libunibreak 8.0, pinned to
 `28a2756b864c343f438cd22537d49d394d4666a5` by `fetch_linebreak.sh`. Its private
 line-break subset implements Unicode 17 UAX #14. It is excluded from normal OFF

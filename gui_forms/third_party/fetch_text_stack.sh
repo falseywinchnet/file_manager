@@ -2,7 +2,8 @@
 set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-harfbuzz_revision=56feae4035bdd48f62ba2b8d8c16232d4d89b3a4
+# HarfBuzz 14.6.0 (latest stable release verified 2026-10-06).
+harfbuzz_revision=c7a7457b7385f33178e8cf87615ca077a810bbe7
 freetype_revision=f4205da14867c5387cd6a329b90ee10a6df6eeff
 
 fetch_revision() {
