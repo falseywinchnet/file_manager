@@ -40,7 +40,7 @@ void* operator new(const std::size_t bytes) {
 }
 
 void operator delete(void* const memory) noexcept { std::free(memory); }
-void operator delete(void* const memory, const std::size_t) noexcept { std::free(memory); }
+void operator delete(void* const memory, std::size_t) noexcept { std::free(memory); }
 
 namespace file_manager {
 class ApplicationTransferProbe final {
