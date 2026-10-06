@@ -474,9 +474,39 @@ void release_loop_slot(AudioEngineState& engine, AudioLoopTransportState& transp
     if (engine.transports[slot] == &transport) { engine.transports[slot] = nullptr; }
 }
 #endif
+// miniaudio reads a generator through this: the base must come first.
+struct AudioGeneratorSource final {
+    ma_data_source_base base{};
+    AudioGenerator* generator{};
+    static ma_result read(ma_data_source* source, void* output, ma_uint64 frames, ma_uint64* frames_read) {
+        AudioGeneratorSource& self = *static_cast<AudioGeneratorSource*>(source);
+        if (output != nullptr) {
+            std::span<float> stereo(static_cast<float*>(output), static_cast<std::size_t>(frames) * 2);
+            (*self.generator).render(stereo);
+        }
+        if (frames_read != nullptr) { *frames_read = frames; }
+        return MA_SUCCESS;
+    }
+    static ma_result seek(ma_data_source*, ma_uint64) { return MA_SUCCESS; }
+    static ma_result format(ma_data_source*, ma_format* sample_format, ma_uint32* channels, ma_uint32* rate,
+                            ma_channel* channel_map, size_t channel_map_capacity) {
+        if (sample_format != nullptr) { *sample_format = ma_format_f32; }
+        if (channels != nullptr) { *channels = 2; }
+        if (rate != nullptr) { *rate = 48000; }
+        if (channel_map != nullptr) {
+            ma_channel_map_init_standard(ma_standard_channel_map_default, channel_map, channel_map_capacity, 2);
+        }
+        return MA_SUCCESS;
+    }
+};
+static ma_data_source_vtable audio_generator_vtable{
+    &AudioGeneratorSource::read, &AudioGeneratorSource::seek, &AudioGeneratorSource::format,
+    nullptr, nullptr, nullptr, 0};
 struct AudioVoiceState final {
     std::shared_ptr<AudioEngineState> engine{};
     std::shared_ptr<const AudioClip> clip{};
+    std::shared_ptr<AudioGenerator> generator{};
+    AudioGeneratorSource source{};
     ma_audio_buffer buffer{};
     ma_sound sound{};
     std::size_t slot{};
@@ -486,7 +516,12 @@ struct AudioVoiceState final {
         if (initialized) {
             // miniaudio detaches on the control thread and waits for graph readers.
             ma_sound_uninit(&sound);
-            ma_audio_buffer_uninit(&buffer);
+            if (generator) {
+                ma_data_source_uninit(&source.base);
+                generator.reset();
+            } else {
+                ma_audio_buffer_uninit(&buffer);
+            }
             initialized = false;
         }
         if (engine) { (*engine).voices[slot] = nullptr; }
@@ -644,6 +679,40 @@ AudioStatus AudioEngine::voice(std::shared_ptr<const AudioClip> clip, bool loop,
         }
         state.initialized = true;
         ma_sound_set_looping(&state.sound, loop ? MA_TRUE : MA_FALSE);
+        output.state_ = std::move(candidate);
+        engine.voices[slot] = &(*output.state_);
+        return AudioStatus::ok;
+    } catch (const std::bad_alloc&) { return AudioStatus::allocation_failed; }
+}
+AudioStatus AudioEngine::generator(std::shared_ptr<AudioGenerator> source, AudioVoice& output) {
+    if (!state_ || status() != AudioStatus::ok) { return AudioStatus::closed; }
+    if (!source) { return AudioStatus::invalid_value; }
+    AudioEngineState& engine = *state_;
+    std::size_t slot = 0;
+#ifdef GUI_FORMS_AUDIO_LOOP_TRANSPORT
+    while (slot < engine.voices.size() && (engine.voices[slot] != nullptr || engine.transports[slot] != nullptr)) { ++slot; }
+#else
+    while (slot < engine.voices.size() && engine.voices[slot] != nullptr) { ++slot; }
+#endif
+    if (slot == engine.voices.size()) { return AudioStatus::quota_exceeded; }
+    try {
+        std::unique_ptr<AudioVoiceState> candidate = std::make_unique<AudioVoiceState>();
+        AudioVoiceState& state = *candidate;
+        state.engine = state_;
+        state.slot = slot;
+        state.source.generator = &(*source);
+        ma_data_source_config config = ma_data_source_config_init();
+        config.vtable = &audio_generator_vtable;
+        const ma_result source_result = ma_data_source_init(&config, &state.source.base);
+        if (source_result != MA_SUCCESS) { return AudioStatus::backend_error; }
+        const ma_uint32 flags = MA_SOUND_FLAG_NO_SPATIALIZATION | MA_SOUND_FLAG_NO_PITCH;
+        const ma_result sound_result = ma_sound_init_from_data_source(&engine.engine, &state.source, flags, nullptr, &state.sound);
+        if (sound_result != MA_SUCCESS) {
+            ma_data_source_uninit(&state.source.base);
+            return AudioStatus::backend_error;
+        }
+        state.generator = std::move(source);
+        state.initialized = true;
         output.state_ = std::move(candidate);
         engine.voices[slot] = &(*output.state_);
         return AudioStatus::ok;
