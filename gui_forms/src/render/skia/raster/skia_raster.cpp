@@ -892,27 +892,31 @@ void SkiaRaster::draw_image(ImageId image, Rect destination, double opacity) {
     }
 }
 
-void SkiaRaster::draw_live_surface(std::shared_ptr<LiveSurface> surface,
-                                   Rect destination, double opacity) {
+void SkiaRaster::draw_live_surface(const std::shared_ptr<LiveSurface> surface,
+                                   const Rect destination, const double opacity) {
     if (!surface) return;
     const LiveSurfaceFrame frame = (*surface).acquire_latest();
-    draw_live_surface_frame(frame, destination, opacity);
+    static_cast<void>(draw_live_surface_frame(frame, destination, opacity));
 }
 
-void SkiaRaster::draw_live_surface_frame(const LiveSurfaceFrame& frame,
-                                         Rect destination, double opacity) {
-    SkCanvas* canvas = (*impl_).canvas();
+bool SkiaRaster::draw_live_surface_frame(const LiveSurfaceFrame& frame,
+                                         const Rect destination, const double opacity) {
+    SkCanvas* const canvas = (*impl_).canvas();
     if (canvas == nullptr || destination.empty() ||
         !destination.finite() || !std::isfinite(opacity) || opacity <= 0.0) {
-        return;
+        return false;
     }
     if (!frame || frame.width() == 0U || frame.height() == 0U ||
         frame.row_bytes() < static_cast<std::uint64_t>(frame.width()) * 4U ||
         frame.pixels().empty()) {
-        return;
+        return false;
     }
     const bool copy = frame.opaque() && opacity >= 1.0;
     const SkAlphaType alpha = copy ? kOpaque_SkAlphaType : kPremul_SkAlphaType;
+    if (fail_next_live_image_) {
+        fail_next_live_image_ = false;
+        return false;
+    }
     const SkImageInfo info = SkImageInfo::Make(
         static_cast<int>(frame.width()), static_cast<int>(frame.height()),
         kBGRA_8888_SkColorType, alpha,
@@ -921,9 +925,9 @@ void SkiaRaster::draw_live_surface_frame(const LiveSurfaceFrame& frame,
         frame.pixels().data(), frame.pixels().size());
     sk_sp<SkImage> image = SkImages::RasterFromData(
         info, std::move(data), static_cast<size_t>(frame.row_bytes()));
-    if (!image) return;
+    if (!image) return false;
 
-    SkPaint paint;
+    SkPaint paint{};
     if (copy) paint.setBlendMode(SkBlendMode::kSrc);
     paint.setAlphaf(static_cast<float>(std::clamp(opacity, 0.0, 1.0)));
     paint.setAntiAlias(false);
@@ -934,6 +938,7 @@ void SkiaRaster::draw_live_surface_frame(const LiveSurfaceFrame& frame,
         to_sk_rect(destination),
         SkSamplingOptions(SkFilterMode::kLinear), &paint,
         SkCanvas::kStrict_SrcRectConstraint);
+    return true;
 }
 
 void SkiaRaster::draw_image_region(ImageId image, Rect source,
