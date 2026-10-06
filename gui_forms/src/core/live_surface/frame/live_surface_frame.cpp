@@ -29,6 +29,11 @@ LiveSurfacePixelFormat LiveSurfaceFrame::pixel_format() const noexcept {
                    : LiveSurfacePixelFormat::bgra32_premultiplied_srgb;
 }
 
+bool LiveSurfaceFrame::opaque() const noexcept {
+    const bool result = buffer_ && (*buffer_).description.opaque;
+    return result;
+}
+
 std::span<const std::byte> LiveSurfaceFrame::pixels() const noexcept {
     return buffer_ ? std::span<const std::byte>((*buffer_).pixels)
                    : std::span<const std::byte>{};
