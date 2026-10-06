@@ -56,6 +56,9 @@ jobs:
             platform: windows-x64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
+    env:
+      CC: clang
+      CXX: clang++
     steps:
       - uses: actions/checkout@v4
       - name: Preserve Windows checkout line-ending policy across Git implementations
@@ -83,12 +86,25 @@ jobs:
       - uses: msys2/setup-msys2@v2
         if: runner.os == 'Windows'
         with:
-          msystem: MINGW64
+          msystem: CLANG64
           update: true
           path-type: inherit
           install: >-
-            mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-ninja mingw-w64-x86_64-python git
+            mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-cmake
+            mingw-w64-clang-x86_64-ninja mingw-w64-clang-x86_64-python git
+      - name: Identify Windows Clang toolchain
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          test "$MSYSTEM" = CLANG64
+          test "$(command -v clang)" = /clang64/bin/clang
+          test "$(command -v clang++)" = /clang64/bin/clang++
+          clang --version
+          clang++ --version
+          ld.lld --version
+          export FILE_MANAGER_CLANG_BIN="$(cygpath -w /clang64/bin)"
+          pwsh -NoProfile -Command '. ./tools/Enter-WindowsToolchain.ps1; & $env:CXX --version; if ($LASTEXITCODE -ne 0) { throw "Clang invocation failed" }'
       - name: Check reference search behavior and listener ownership
         shell: bash
         run: node gui_forms/tests/api_reference_search_tests.js

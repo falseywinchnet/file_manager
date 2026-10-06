@@ -52,15 +52,15 @@ import, and export profiles without linking the File Manager executable.
 Ordinary picker browsing does not require Engine; acceptance revalidates both
 the filesystem observation and the Orchestrator selection-session state.
 
-Native Windows development build (Shadow, 2026-09-29):
+Native Windows development build (MSYS2 CLANG64):
 
 ```powershell
 ./tools/Build-Windows.ps1 -Component Toolkit -Jobs 2 -Test
 ./tools/Build-Windows.ps1 -Component Frontend -Jobs 2 -Test
 ```
 
-Run `frontend/.build/shadow-windows/File Manager.exe` from the resulting
-build directory. CMake stages the GUI.Forms DLL, its MinGW runtime dependency
+Run `frontend/.build/shadow-windows-clang/File Manager.exe` from the resulting
+build directory. CMake stages the GUI.Forms DLL, its CLANG64 runtime dependency
 closure, fonts, and dependency notices beside the executable. This is a
 local development layout, not an installer or a release-ready distribution.
 The current ergonomic changes and native verification record are in

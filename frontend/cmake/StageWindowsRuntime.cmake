@@ -23,7 +23,8 @@ foreach(dependency IN LISTS dependencies)
 endforeach()
 
 get_filename_component(toolchain_root "${TOOLCHAIN_BIN}" DIRECTORY)
-foreach(package libgcc libstdc++ winpthreads)
+# Preserve the notices for either supported MinGW C++ runtime family.
+foreach(package libc++ libunwind compiler-rt libgcc libstdc++ winpthreads)
     if(EXISTS "${toolchain_root}/share/licenses/${package}")
         file(COPY "${toolchain_root}/share/licenses/${package}" DESTINATION "${destination}/licenses")
     endif()
