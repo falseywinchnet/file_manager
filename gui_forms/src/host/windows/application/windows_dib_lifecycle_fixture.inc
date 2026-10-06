@@ -25,6 +25,46 @@ struct DibHostFixture final {
     static void require(bool condition, const char* message) {
         if (!condition) throw std::runtime_error(message);
     }
+    static void live_format_pixels() {
+        const std::array<LiveSurfacePixelFormat, 2> formats{
+            LiveSurfacePixelFormat::bgra32_premultiplied_srgb,
+            LiveSurfacePixelFormat::rgba32_premultiplied_srgb};
+        for (const LiveSurfacePixelFormat format : formats) {
+            DibPainter raster{};
+            require(raster.resize({6.0, 4.0}, 1.0), "format DIB allocated");
+            require(raster.begin_frame(), "format DIB begun");
+            const std::shared_ptr<LiveSurface> surface = LiveSurface::create(
+                {.width = 2U, .height = 2U, .pixel_format = format, .opaque = true});
+            require(static_cast<bool>(surface), "format surface allocated");
+            LiveSurfaceWriteLease write = (*surface).try_acquire_write();
+            require(static_cast<bool>(write), "format write acquired");
+            const std::span<std::byte> bytes = write.pixels();
+            const bool rgba = format == LiveSurfacePixelFormat::rgba32_premultiplied_srgb;
+            const std::byte first = rgba ? std::byte{0xd3} : std::byte{0x25};
+            const std::byte third = rgba ? std::byte{0x25} : std::byte{0xd3};
+            for (std::size_t index = 0U; index < bytes.size(); index += 4U) {
+                bytes[index] = first;
+                bytes[index + 1U] = std::byte{0x67};
+                bytes[index + 2U] = third;
+                bytes[index + 3U] = std::byte{0xff};
+            }
+            require(write.publish() != 0U, "format frame published");
+            raster.fill_rect({0.0, 0.0, 6.0, 4.0}, Color::rgba(0, 255, 0));
+            raster.save();
+            raster.clip_rect({2.0, 1.0, 1.0, 2.0});
+            raster.draw_live_surface(surface, {1.0, 1.0, 2.0, 2.0}, 1.0);
+            raster.restore();
+            require(raster.pixels_[8] == 0xffd36725U && raster.pixels_[14] == 0xffd36725U,
+                    "1:1 DIB copy preserves exact BGRA color and alpha");
+            require((raster.pixels_[7] & 0x00ffffffU) == 0x0000ff00U, "DIB copy respects clip");
+            require(rgba || raster.live_bgra_scratch_.empty(), "BGRA memcpy does not allocate conversion storage");
+            raster.draw_live_surface(surface, {0.0, 0.0, 6.0, 4.0}, 1.0);
+            require(GdiFlush() != FALSE, "scaled DIB draw flushed");
+            for (std::size_t index = 0U; index < 24U; ++index) {
+                require((raster.pixels_[index] & 0x00ffffffU) == 0x00d36725U, "StretchDIBits preserves both formats' colors");
+            }
+        }
+    }
     static void request_paint(WindowsHostState& state) {
         InvalidateRect(state.hwnd_, nullptr, FALSE);
         SendMessageW(state.hwnd_, WM_PAINT, 0, 0);
@@ -36,7 +76,7 @@ struct DibHostFixture final {
         require(front.pixels.size() == pixels.size(), "host front extent changed");
         require(std::equal(pixels.begin(), pixels.end(), front.pixels.begin()), "host front pixels changed");
     }
-    static void exercise(WindowsHostState& state, DibFixtureControl& control) {
+    static void exercise(WindowsHostState& state, DibFixtureControl& control, const LiveSurfacePixelFormat format) {
         require(state.raster_.memory_dc_ == state.raster_.metrics_dc_ &&
                 state.raster_.metrics_dc_ != nullptr, "metrics context unavailable before first paint");
         request_paint(state);
@@ -86,7 +126,7 @@ struct DibHostFixture final {
         request_paint(state);
         request_paint(state);
 
-        std::shared_ptr<LiveSurface> surface = LiveSurface::create({.width = 4U, .height = 4U,
+        std::shared_ptr<LiveSurface> surface = LiveSurface::create({.width = 4U, .height = 4U, .pixel_format = format,
             .buffer_count = 2U});
         require(static_cast<bool>(surface), "live surface allocation");
         LiveSurfaceWriteLease write = (*surface).try_acquire_write();
@@ -167,6 +207,7 @@ struct DibHostFixture final {
         const HRESULT com_status = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         require(SUCCEEDED(com_status), "fixture COM setup");
         try {
+            live_format_pixels();
             WNDCLASSEXW native_class{};
             native_class.cbSize = sizeof(native_class);
             native_class.lpfnWndProc = window_procedure;
@@ -174,7 +215,10 @@ struct DibHostFixture final {
             native_class.lpszClassName = L"GUIForms.DibFixture.v1";
             const ATOM registered_class = RegisterClassExW(&native_class);
             require(registered_class != 0, "fixture class registration");
-            {
+            const std::array<LiveSurfacePixelFormat, 2> formats{
+                LiveSurfacePixelFormat::bgra32_premultiplied_srgb,
+                LiveSurfacePixelFormat::rgba32_premultiplied_srgb};
+            for (const LiveSurfacePixelFormat format : formats) {
                 std::shared_ptr<DibFixtureControl> control = std::make_shared<DibFixtureControl>();
                 std::unique_ptr<Window> model = std::make_unique<Window>(control, Size{80, 60});
                 WindowsHostOptions options{};
@@ -186,7 +230,7 @@ struct DibHostFixture final {
                 require(window != nullptr, "fixture native creation");
                 const bool initialized = state.initialize(window);
                 require(initialized, "fixture host initialization");
-                exercise(state, *control);
+                exercise(state, *control, format);
             }
             const BOOL class_released = UnregisterClassW(native_class.lpszClassName, native_class.hInstance);
             require(class_released != FALSE,

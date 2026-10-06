@@ -9,6 +9,14 @@
 
 namespace gui_forms {
 
+LiveSurfacePixelFormat native_live_surface_pixel_format() noexcept {
+#if defined(_WIN32)
+    return LiveSurfacePixelFormat::bgra32_premultiplied_srgb;
+#else
+    return LiveSurfacePixelFormat::rgba32_premultiplied_srgb;
+#endif
+}
+
 LiveSurface::LiveSurface(
     std::shared_ptr<detail::LiveSurfaceState> state) noexcept
     : state_(std::move(state)) {}

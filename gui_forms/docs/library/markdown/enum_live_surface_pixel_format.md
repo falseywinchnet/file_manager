@@ -9,3 +9,4 @@ declaration below is authoritative for admitted values.
 ## Declared values
 
 - `bgra32_premultiplied_srgb`
+- `rgba32_premultiplied_srgb`

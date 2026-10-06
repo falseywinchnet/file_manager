@@ -16,8 +16,10 @@ bool valid_live_surface_description(
     if (description.width == 0U || description.height == 0U ||
         description.width > maximum_dimension ||
         description.height > maximum_dimension ||
-        description.pixel_format !=
-            LiveSurfacePixelFormat::bgra32_premultiplied_srgb ||
+        (description.pixel_format !=
+            LiveSurfacePixelFormat::bgra32_premultiplied_srgb &&
+         description.pixel_format !=
+            LiveSurfacePixelFormat::rgba32_premultiplied_srgb) ||
         description.buffer_count < minimum_live_surface_buffer_count ||
         description.buffer_count > maximum_live_surface_buffer_count) {
         return false;

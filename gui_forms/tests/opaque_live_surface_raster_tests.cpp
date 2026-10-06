@@ -1,6 +1,7 @@
 #include "gui_forms/gui_forms.hpp"
 #include "skia_raster.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdlib>
 #include <iostream>
@@ -22,19 +23,21 @@ void require(const bool condition, const char* message) {
     std::exit(1);
 }
 
-[[nodiscard]] std::shared_ptr<LiveSurface> make_surface(const bool opaque, const std::byte alpha) {
+[[nodiscard]] std::shared_ptr<LiveSurface> make_surface(const bool opaque, const std::byte alpha, const LiveSurfacePixelFormat format) {
     std::shared_ptr<LiveSurface> surface = LiveSurface::create(
-        {.width = 8U, .height = 8U, .opaque = opaque});
+        {.width = 8U, .height = 8U, .pixel_format = format, .opaque = opaque});
     require(static_cast<bool>(surface), "surface created");
     LiveSurfaceWriteLease write = (*surface).try_acquire_write();
     require(static_cast<bool>(write), "write lease acquired");
     const std::span<std::byte> pixels = write.pixels();
     for (std::size_t index = 0; index < pixels.size(); index += 4U) {
-        pixels[index] = alpha;
+        pixels[index] = std::byte{0};
         pixels[index + 1U] = std::byte{0};
         pixels[index + 2U] = std::byte{0};
         pixels[index + 3U] = alpha;
     }
+    const std::size_t blue_channel = format == LiveSurfacePixelFormat::rgba32_premultiplied_srgb ? 2U : 0U;
+    for (std::size_t index = blue_channel; index < pixels.size(); index += 4U) pixels[index] = alpha;
     require(write.publish() != 0U, "frame published");
     return surface;
 }
@@ -50,13 +53,13 @@ void require(const bool condition, const char* message) {
     return result;
 }
 
-void blend_cases() {
+void blend_cases(const LiveSurfacePixelFormat format) {
     render::SkiaRaster raster{};
     require(raster.resize({8.0, 8.0}, 1.0), "raster allocated");
     DamageRegion damage{};
     damage.add({0.0, 0.0, 8.0, 8.0});
-    const std::shared_ptr<LiveSurface> opaque = make_surface(true, std::byte{255});
-    const std::shared_ptr<LiveSurface> translucent = make_surface(false, std::byte{128});
+    const std::shared_ptr<LiveSurface> opaque = make_surface(true, std::byte{255}, format);
+    const std::shared_ptr<LiveSurface> translucent = make_surface(false, std::byte{128}, format);
     raster.begin_frame(damage);
     raster.fill_rect({0.0, 0.0, 8.0, 8.0}, Color::rgba(255, 0, 0));
     raster.draw_live_surface(opaque, {0.0, 0.0, 8.0, 8.0}, 1.0);
@@ -76,12 +79,13 @@ void blend_cases() {
     raster.draw_live_surface(opaque, {0.0, 0.0, 8.0, 8.0}, 0.5);
     raster.end_frame();
     const std::array<unsigned, 4> faded = pixel(raster, 4U, 4U);
-    require(faded[0] >= 127U && faded[0] <= 128U && faded[2] >= 127U && faded[2] <= 128U, "opacity below one still blends opaque producer");
+    // Skia RGBA and BGRA source-over kernels differ by one byte in rounding.
+    require(faded[0] >= 126U && faded[0] <= 128U && faded[2] >= 127U && faded[2] <= 128U && faded[3] == 255U, "opacity below one still blends opaque producer");
 }
 
-void image_failure() {
+void image_failure(const LiveSurfacePixelFormat format) {
     render::SkiaRaster raster{};
-    const std::shared_ptr<LiveSurface> surface = make_surface(true, std::byte{255});
+    const std::shared_ptr<LiveSurface> surface = make_surface(true, std::byte{255}, format);
     const LiveSurfaceFrame frame = (*surface).acquire_latest();
     DamageRegion damage{};
     damage.add({0.0, 0.0, 8.0, 8.0});
@@ -113,6 +117,103 @@ void image_failure() {
     require(pixel(raster, 1U, 1U) == red && pixel(raster, 7U, 7U) == red, "failure does not publish cleared or partial pixels");
 }
 
+[[nodiscard]] std::shared_ptr<LiveSurface> make_pattern(const LiveSurfacePixelFormat format) {
+    const std::shared_ptr<LiveSurface> surface = LiveSurface::create(
+        {.width = 2U, .height = 2U, .pixel_format = format, .opaque = true});
+    require(static_cast<bool>(surface), "pattern allocated");
+    LiveSurfaceWriteLease write = (*surface).try_acquire_write();
+    require(static_cast<bool>(write), "pattern write acquired");
+    const std::array<std::byte, 16> rgba{
+        std::byte{255}, std::byte{0}, std::byte{0}, std::byte{255},
+        std::byte{0}, std::byte{0}, std::byte{255}, std::byte{255},
+        std::byte{17}, std::byte{63}, std::byte{129}, std::byte{255},
+        std::byte{211}, std::byte{151}, std::byte{31}, std::byte{255}};
+    const std::span<std::byte> bytes = write.pixels();
+    std::copy(rgba.begin(), rgba.end(), bytes.begin());
+    if (format == LiveSurfacePixelFormat::bgra32_premultiplied_srgb) {
+        for (std::size_t offset = 0U; offset < bytes.size(); offset += 4U) {
+            std::swap(bytes[offset], bytes[offset + 2U]);
+        }
+    }
+    require(write.publish() != 0U, "pattern published");
+    return surface;
+}
+
+void geometry_and_lease_cases(const LiveSurfacePixelFormat format) {
+    const std::shared_ptr<LiveSurface> surface = make_pattern(format);
+    const LiveSurfaceFrame frame = (*surface).acquire_latest();
+    const LiveSurfacePixelFormat replacement = format == LiveSurfacePixelFormat::rgba32_premultiplied_srgb
+        ? LiveSurfacePixelFormat::bgra32_premultiplied_srgb : LiveSurfacePixelFormat::rgba32_premultiplied_srgb;
+    require((*surface).reconfigure({.width = 2U, .height = 2U, .pixel_format = replacement}), "reconfigure before old lease draw");
+    render::SkiaRaster raster{};
+    require(raster.resize({4.0, 3.0}, 2.0), "device-scaled raster allocated");
+    DamageRegion damage{};
+    damage.add({0.0, 0.0, 4.0, 3.0});
+    raster.begin_frame(damage);
+    raster.fill_rect({0.0, 0.0, 4.0, 3.0}, Color::rgba(0, 255, 0));
+    raster.translate({0.5, 0.5});
+    require(raster.draw_live_surface_frame(frame, {0.5, 0.0, 1.0, 1.0}, 1.0), "old lease copied at device 1:1");
+    raster.end_frame();
+    const std::array<std::array<unsigned, 4>, 4> expected{{
+        {255U, 0U, 0U, 255U}, {0U, 0U, 255U, 255U},
+        {17U, 63U, 129U, 255U}, {211U, 151U, 31U, 255U}}};
+    const std::array<unsigned, 4> green{0U, 255U, 0U, 255U};
+    for (std::size_t y = 0U; y < 6U; ++y) {
+        for (std::size_t x = 0U; x < 8U; ++x) {
+            const bool inside = x >= 2U && x < 4U && y >= 1U && y < 3U;
+            if (inside) require(pixel(raster, x, y) == expected[(y - 1U) * 2U + x - 2U], "all RGBA bytes exact after transform and reconfigure");
+            else require(pixel(raster, x, y) == green, "copy stays inside destination");
+        }
+    }
+    raster.begin_frame(damage);
+    raster.fill_rect({0.0, 0.0, 4.0, 3.0}, Color::rgba(0, 255, 0));
+    raster.clip_rect({0.5, 0.5, 0.5, 0.5});
+    require(raster.draw_live_surface_frame(frame, {0.0, 0.0, 1.0, 1.0}, 1.0), "partial rectangular copy");
+    raster.end_frame();
+    require(pixel(raster, 1U, 1U) == expected[3] && pixel(raster, 0U, 0U) == green, "clip offsets source and preserves outside");
+
+    DamageRegion disjoint{};
+    disjoint.add({0.0, 0.0, 0.5, 0.5});
+    disjoint.add({0.5, 0.5, 0.5, 0.5});
+    raster.begin_frame(damage);
+    raster.fill_rect({0.0, 0.0, 4.0, 3.0}, Color::rgba(0, 255, 0));
+    raster.end_frame();
+    raster.begin_frame(disjoint);
+    require(raster.draw_live_surface_frame(frame, {0.0, 0.0, 1.0, 1.0}, 1.0), "complex clip draw");
+    raster.end_frame();
+    require(pixel(raster, 0U, 0U) == expected[0] && pixel(raster, 1U, 1U) == expected[3], "complex clip draws admitted pixels");
+    require(pixel(raster, 1U, 0U) == green && pixel(raster, 0U, 1U) == green, "complex clip holes preserved");
+}
+
+void filtering_and_rounded_clip(const LiveSurfacePixelFormat format) {
+    const std::shared_ptr<LiveSurface> pattern = make_pattern(format);
+    render::SkiaRaster raster{};
+    require(raster.resize({8.0, 8.0}, 1.0), "filter raster allocated");
+    DamageRegion damage{};
+    damage.add({0.0, 0.0, 8.0, 8.0});
+    raster.begin_frame(damage);
+    raster.draw_live_surface(pattern, {0.0, 0.0, 4.0, 4.0}, 1.0);
+    raster.end_frame();
+    const std::array<unsigned, 4> scaled = pixel(raster, 1U, 0U);
+    require(scaled[0] > 150U && scaled[0] < 220U && scaled[2] > 30U && scaled[2] < 100U, "scaled draw linearly mixes red and blue");
+    raster.begin_frame(damage);
+    raster.draw_live_surface(pattern, {0.5, 0.0, 2.0, 2.0}, 1.0);
+    raster.end_frame();
+    const std::array<unsigned, 4> fractional = pixel(raster, 1U, 0U);
+    require(fractional[0] >= 127U && fractional[0] <= 128U && fractional[2] >= 127U && fractional[2] <= 128U, "fractional translation still filters");
+    const std::shared_ptr<LiveSurface> solid = make_surface(true, std::byte{255}, format);
+    raster.begin_frame(damage);
+    raster.fill_rect({0.0, 0.0, 8.0, 8.0}, Color::rgba(255, 0, 0));
+    raster.clip_rounded_rect({0.0, 0.0, 8.0, 8.0}, 4.0);
+    raster.draw_live_surface(solid, {0.0, 0.0, 8.0, 8.0}, 1.0);
+    raster.end_frame();
+    const std::array<unsigned, 4> red{255U, 0U, 0U, 255U};
+    const std::array<unsigned, 4> blue{0U, 0U, 255U, 255U};
+    require(pixel(raster, 0U, 0U) == red && pixel(raster, 4U, 4U) == blue, "rounded clip preserved");
+    const std::array<unsigned, 4> edge = pixel(raster, 2U, 0U);
+    require(edge[0] > 0U && edge[2] > 0U, "antialiased clip edge blends coverage");
+}
+
 class SolidControl final : public Control {
 public:
     SolidControl(StableId id, const Color color) : Control(std::move(id)), color_(color) {}
@@ -123,7 +224,7 @@ private:
     Color color_{};
 };
 
-void retained_overlay() {
+void retained_overlay(const LiveSurfacePixelFormat format) {
     const std::shared_ptr<SolidControl> root = make_control<SolidControl>(StableId("root"), Color::rgba(255, 0, 0));
     const std::shared_ptr<Control> live = make_control<Control>(StableId("live"));
     const std::shared_ptr<SolidControl> overlay = make_control<SolidControl>(StableId("overlay"), Color::rgba(0, 255, 0));
@@ -134,7 +235,7 @@ void retained_overlay() {
     (*root).add_child(overlay);
     Window window(root, {8.0, 8.0});
     window.perform_layout();
-    const std::shared_ptr<LiveSurface> surface = make_surface(true, std::byte{255});
+    const std::shared_ptr<LiveSurface> surface = make_surface(true, std::byte{255}, format);
     require(window.queue_live_surface_presentation(live, surface), "live presentation registered");
     render::SkiaRaster raster{};
     require(raster.resize({8.0, 8.0}, 1.0), "overlay raster allocated");
@@ -163,8 +264,15 @@ void retained_overlay() {
 } // namespace
 
 int main() {
-    blend_cases();
-    image_failure();
-    retained_overlay();
+    const std::array<LiveSurfacePixelFormat, 2> formats{
+        LiveSurfacePixelFormat::bgra32_premultiplied_srgb,
+        LiveSurfacePixelFormat::rgba32_premultiplied_srgb};
+    for (const LiveSurfacePixelFormat format : formats) {
+        geometry_and_lease_cases(format);
+        filtering_and_rounded_clip(format);
+        blend_cases(format);
+        image_failure(format);
+        retained_overlay(format);
+    }
     return 0;
 }

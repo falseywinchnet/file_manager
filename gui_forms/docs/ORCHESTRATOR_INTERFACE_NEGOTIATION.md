@@ -502,3 +502,62 @@ an unchanged failed generation, hiding and full overlay coverage.
 The independent follow-up review closed those failure-path and style findings.
 The updated core live-surface and opaque-surface fixtures pass 2/2 on Shadow
 Windows; native raster/host verification remains a separate build gate.
+
+### Native-order live-surface development formats (2026-10-06)
+
+**GIVEN:** the owner requests RGBA32 alongside the existing default BGRA32,
+an attachment-independent native-format query, and pixel-exact opaque 1:1
+presentation. This extends the same ORC-GUI-001 development C++ projection.
+The existing immutable buffer description already owns each frame's format;
+format changes replace the pool, refuse active writers, and cannot relabel an
+outstanding read lease. Consumers rebuild matching headers and libraries.
+
+**OBSERVED:** `native_live_surface_pixel_format()` reports RGBA for macOS/Linux
+Skia hosts and BGRA for Windows DIB. Skia resolves device scale and translation,
+uses clipped `writePixels` for opaque/full-opacity 1:1 integer geometry with a
+full-coverage rectangular clip, and uses nearest/source-copy for that geometry
+under complex clips. Scaled/fractionally translated draws remain linear;
+translucent/reduced-opacity draws retain source-over. The pinned raster Skia
+implementation's `isClipRect` excludes partial-coverage AA edges and clip
+shaders. Windows converts RGBA into reusable host-owned BGRA scratch before DC
+mutation; BGRA still reads directly from the lease through the existing
+`memcpy` / `StretchDIBits` realization. Retry, coverage, and commit authorities
+are unchanged. See `CURRENT_API_REFERENCE.md` for the producer contract.
+
+Source review against `planning/PROGRAMMING_HOUSE_STYLE.md` covers the enum and
+query declaration/definition, format validation condition, Skia geometry helper
+and live-frame draw changes, Windows conversion and scratch owner, added cases
+in both opaque fixtures and the Windows DIB lifecycle fixture, and the new
+benchmark/CMake target. Review checked explicit types, named execution,
+initialization, integer bounds, frame borrows, clipping before raw writes,
+format selection outside pixel loops, reusable scratch, allocation before DC
+mutation, and failure propagation. No violations were identified in this changed
+scope; legacy/vendored source outside it is not claimed compliant. The complete
+small header, opaque fixtures, and benchmark pass the spelling scanner.
+
+**MEASURED locally:** macOS 26.5 (25F71), Apple M4 arm64, Apple Clang 21.0.0,
+Release build, pinned Skia `2a9b593bab4b2fd019fa494c8d401ff1fab0b883`.
+The default native GUI.Forms suite passes 85/85. The prepared-text raster,
+Skia, display, and opaque rollback fixtures also pass 4/4 with both development
+profiles enabled. Windows/Linux validation is delegated to the native CI matrix.
+The benchmark target
+`gui_forms_live_surface_benchmark` measures an opaque 1060x618 immutable lease
+at scale 1, full rectangular clip, full opacity, without retained painting or
+CoreGraphics presentation. Each result is the median of nine batches of 300
+synchronous draws after warmup; new formats alternate batch order.
+
+| Raster implementation / format | Median ms/draw | Batch minimum–maximum |
+|---|---:|---:|
+| Main `63e7128` raster, BGRA, before new run | 0.160917 | 0.159368–0.166966 |
+| Updated raster, BGRA | 0.040145 | 0.039531–0.040414 |
+| Updated raster, native RGBA | 0.028603 | 0.028160–0.028836 |
+| Main `63e7128` raster, BGRA, after new run | 0.159955 | 0.158378–0.163542 |
+
+The baseline substitutes only `63e7128`'s original `skia_raster.cpp` object in a
+copy of the same renderer archive, with identical compiler options and pinned
+dependencies; the benchmark runs `--bgra-only`. Core lease code and the harness
+are shared. Builds/tests were idle during these recorded runs. Reproduce the
+updated comparison with `cmake --build <build> --target
+gui_forms_live_surface_benchmark` then `<build>/gui_forms_live_surface_benchmark`.
+These are draw-only measurements, not PlaySuite/Stillwater frame timings or a
+claim about the complete native presentation pipeline.

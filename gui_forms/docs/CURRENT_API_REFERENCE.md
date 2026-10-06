@@ -15,25 +15,43 @@ Language level: C++20. Public platform objects and renderer types are absent.
 ## Live surfaces
 
 `LiveSurfaceDescription` describes width, height, premultiplied sRGB BGRA32
-pixels, buffer count, and `bool opaque{}` (default false). When `opaque` is true,
+(default) or RGBA32 pixels, buffer count, and `bool opaque{}` (default false). When `opaque` is true,
 the producer promises every pixel has alpha 255; the presenter may copy instead
 of blend, and need not paint what lies under it. This is a producer promise,
 not a request to scan or repair alpha bytes. It survives `create`, `reconfigure`,
 and `snapshot().description`. An acquired `LiveSurfaceFrame::opaque()` reports
 the promise for that immutable frame, even after the surface is reconfigured.
+`LiveSurfaceFrame::pixel_format()` likewise retains the format of its own buffer.
+Changing format through `reconfigure` replaces the pool and clears the current
+frame; it cannot relabel old read leases and is refused while a writer is active.
+
+`native_live_surface_pixel_format() noexcept` is a cheap, attachment-independent
+query: RGBA32 on macOS/Linux Skia hosts, BGRA32 on the Windows DIB host. Assign its
+result to `LiveSurfaceDescription::pixel_format` and write bytes in that order.
+Native-order opaque frames at full drawing opacity permit a straight copy when
+the destination is 1:1 in device pixels with integer translation. An 800-pixel
+frame at scale 2 therefore needs a 400-logical-unit destination. Other formats
+are accepted everywhere; the presenter converts their channel order.
 Hosts retrying a failed batch can call
 `Window::take_live_surface_presentations(true)` to include unchanged generations
 with current visibility, destinations and overlay exclusions. The default
 false preserves the existing changed-generation drain.
 
 Skia uses opaque source-copy only when both the flag is true and drawing opacity
-is at least one. Other draws retain premultiplied source-over blending. On macOS,
+is at least one. Pixel-aligned 1:1 draws use nearest sampling and, for hard
+rectangular clips, a clipped `writePixels` copy. Complex or antialiased clips
+retain Skia composition, preserving overlays and edge coverage. Scaled and
+fractionally translated draws retain linear filtering. Other draws retain
+premultiplied source-over blending. On macOS,
 live-only redraws can omit retained painting when an existing raster is valid,
 the model is clean, and opaque clips cover every damaged device pixel. Overlay
 holes, retained damage, initial frames, resize/scale changes, and occlusion
 recovery retain the ordinary paint path. Damage rounds outward to device pixels;
 coverage counts only whole pixels inside live clips, conservatively refusing
 fractional boundary gaps. Windows live presentation already copies pixels.
+Its default BGRA `memcpy` / `StretchDIBits` path is unchanged; RGBA frames first
+convert into host-owned reusable BGRA storage, including for scaled draws.
+The existing Windows live-surface opacity/composition behavior is unchanged.
 
 This additive development C++ source API changes description layout: rebuild
 consumers and their matching GUI.Forms libraries together. No stable C ABI change
