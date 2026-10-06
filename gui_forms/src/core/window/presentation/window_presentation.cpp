@@ -350,7 +350,7 @@ std::vector<Rect> Window::subtract_rectangle(Rect source, Rect cover) {
 }
 
 std::vector<LiveSurfacePresentation>
-Window::take_live_surface_presentations() {
+Window::take_live_surface_presentations(const bool include_unchanged) {
     require_ui_thread("live-surface presentation drain");
     std::vector<LiveSurfacePresentation> result;
     result.reserve(live_surface_registrations_.size());
@@ -429,7 +429,7 @@ Window::take_live_surface_presentations() {
                 (*iterator).second.sampled_epoch == snapshot.epoch &&
                 (*iterator).second.sampled_generation ==
                     snapshot.published_generation;
-            if (!same_generation || clipped_by_overlay ||
+            if (include_unchanged || !same_generation || clipped_by_overlay ||
                 (*iterator).second.sampled_with_overlay_clip) {
                 for (const Rect& visible_clip : clips) {
                     result.push_back(LiveSurfacePresentation{

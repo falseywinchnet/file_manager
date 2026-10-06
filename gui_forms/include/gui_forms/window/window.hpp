@@ -310,8 +310,10 @@ public:
 
     [[nodiscard]] bool queue_live_surface_presentation(
         const Control::Ptr& control, std::shared_ptr<LiveSurface> surface);
+    // Failed native batches request unchanged generations too, with current
+    // visibility and overlay clips; callers must not retry stale placements.
     [[nodiscard]] std::vector<LiveSurfacePresentation>
-        take_live_surface_presentations();
+        take_live_surface_presentations(bool include_unchanged = false);
     // A registration is retained while its control remains attached. Native
     // display clocks use this to stay armed without polling the control tree or
     // requiring one UI callback per producer publication.
