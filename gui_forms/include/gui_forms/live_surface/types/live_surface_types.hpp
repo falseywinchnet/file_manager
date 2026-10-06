@@ -23,6 +23,9 @@ struct LiveSurfaceDescription final {
     // A smaller pool favors latency and memory; a larger pool tolerates more
     // compositor-held read leases before a producer must drop a frame.
     std::size_t buffer_count{default_live_surface_buffer_count};
+    // The producer promises every pixel has alpha 255; the presenter may copy
+    // instead of blend, and need not paint what lies under it.
+    bool opaque{};
 };
 
 struct LiveSurfaceSnapshot final {

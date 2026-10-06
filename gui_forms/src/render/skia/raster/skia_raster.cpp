@@ -894,20 +894,28 @@ void SkiaRaster::draw_image(ImageId image, Rect destination, double opacity) {
 
 void SkiaRaster::draw_live_surface(std::shared_ptr<LiveSurface> surface,
                                    Rect destination, double opacity) {
+    if (!surface) return;
+    const LiveSurfaceFrame frame = (*surface).acquire_latest();
+    draw_live_surface_frame(frame, destination, opacity);
+}
+
+void SkiaRaster::draw_live_surface_frame(const LiveSurfaceFrame& frame,
+                                         Rect destination, double opacity) {
     SkCanvas* canvas = (*impl_).canvas();
-    if (canvas == nullptr || !surface || destination.empty() ||
+    if (canvas == nullptr || destination.empty() ||
         !destination.finite() || !std::isfinite(opacity) || opacity <= 0.0) {
         return;
     }
-    LiveSurfaceFrame frame = (*surface).acquire_latest();
     if (!frame || frame.width() == 0U || frame.height() == 0U ||
         frame.row_bytes() < static_cast<std::uint64_t>(frame.width()) * 4U ||
         frame.pixels().empty()) {
         return;
     }
+    const bool copy = frame.opaque() && opacity >= 1.0;
+    const SkAlphaType alpha = copy ? kOpaque_SkAlphaType : kPremul_SkAlphaType;
     const SkImageInfo info = SkImageInfo::Make(
         static_cast<int>(frame.width()), static_cast<int>(frame.height()),
-        kBGRA_8888_SkColorType, kPremul_SkAlphaType,
+        kBGRA_8888_SkColorType, alpha,
         SkColorSpace::MakeSRGB());
     sk_sp<SkData> data = SkData::MakeWithoutCopy(
         frame.pixels().data(), frame.pixels().size());
@@ -916,6 +924,7 @@ void SkiaRaster::draw_live_surface(std::shared_ptr<LiveSurface> surface,
     if (!image) return;
 
     SkPaint paint;
+    if (copy) paint.setBlendMode(SkBlendMode::kSrc);
     paint.setAlphaf(static_cast<float>(std::clamp(opacity, 0.0, 1.0)));
     paint.setAntiAlias(false);
     (*canvas).drawImageRect(

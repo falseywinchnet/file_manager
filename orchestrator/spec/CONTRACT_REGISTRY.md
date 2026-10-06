@@ -240,6 +240,15 @@ advertisements. Existing frozen FM0 manifests are unchanged.
 - [`contracts/HANDLERS_COMMANDS_AND_PLATFORM.md`](contracts/HANDLERS_COMMANDS_AND_PLATFORM.md)
 - [`contracts/CLI_AI_AND_FEDERATION.md`](contracts/CLI_AI_AND_FEDERATION.md)
 
+**GIVEN, 2026-10-06:** owner-requested ORC-GUI-001 development C++ addition:
+`LiveSurfaceDescription::opaque` defaults false; true promises alpha 255 in
+every published pixel, allowing copy composition and omission of fully covered
+retained backgrounds. `LiveSurfaceFrame::opaque()` binds that promise to its
+immutable buffer across reconfiguration. Matching consumers/libraries must be
+rebuilt because the description layout changes; the stable C ABI is unchanged.
+Provider reply and guards:
+[`GUI.Forms negotiation`](../../gui_forms/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md#opaque-live-surface-development-promise-2026-10-06).
+
 Application-backbone families remain proposal-only in
 [`../proposals/application_backbone/DOCUMENT_PICKER_HELP_AND_TRANSFER.md`](../proposals/application_backbone/DOCUMENT_PICKER_HELP_AND_TRANSFER.md)
 until project-local replies permit canonical contract files.

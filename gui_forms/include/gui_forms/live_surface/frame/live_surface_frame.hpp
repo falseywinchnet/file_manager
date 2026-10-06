@@ -33,6 +33,8 @@ public:
     [[nodiscard]] std::uint32_t height() const noexcept;
     [[nodiscard]] std::uint64_t row_bytes() const noexcept;
     [[nodiscard]] LiveSurfacePixelFormat pixel_format() const noexcept;
+    // This frame's promise remains valid across surface reconfiguration.
+    [[nodiscard]] bool opaque() const noexcept;
     [[nodiscard]] std::uint64_t epoch() const noexcept { return epoch_; }
     [[nodiscard]] std::uint64_t generation() const noexcept {
         return generation_;

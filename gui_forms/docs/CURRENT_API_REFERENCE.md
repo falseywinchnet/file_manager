@@ -12,6 +12,29 @@ Umbrella include:
 
 Language level: C++20. Public platform objects and renderer types are absent.
 
+## Live surfaces
+
+`LiveSurfaceDescription` describes width, height, premultiplied sRGB BGRA32
+pixels, buffer count, and `bool opaque{}` (default false). When `opaque` is true,
+the producer promises every pixel has alpha 255; the presenter may copy instead
+of blend, and need not paint what lies under it. This is a producer promise,
+not a request to scan or repair alpha bytes. It survives `create`, `reconfigure`,
+and `snapshot().description`. An acquired `LiveSurfaceFrame::opaque()` reports
+the promise for that immutable frame, even after the surface is reconfigured.
+
+Skia uses opaque source-copy only when both the flag is true and drawing opacity
+is at least one. Other draws retain premultiplied source-over blending. On macOS,
+live-only redraws can omit retained painting when an existing raster is valid,
+the model is clean, and opaque clips cover every damaged device pixel. Overlay
+holes, retained damage, initial frames, resize/scale changes, and occlusion
+recovery retain the ordinary paint path. Damage rounds outward to device pixels;
+coverage counts only whole pixels inside live clips, conservatively refusing
+fractional boundary gaps. Windows live presentation already copies pixels.
+
+This additive development C++ source API changes description layout: rebuild
+consumers and their matching GUI.Forms libraries together. No stable C ABI change
+or consumer opt-in is implied; existing producers keep `opaque == false`.
+
 ## GUI.Drawing renderer-free core
 
 `drawing.hpp` defines the drawing substrate independently of the Forms tree. It

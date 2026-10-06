@@ -1917,6 +1917,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_live_surface_tests tests/live_surface_tests.cpp)
     target_link_libraries(gui_forms_live_surface_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_live_surface_tests COMMAND gui_forms_live_surface_tests)
+    add_executable(gui_forms_opaque_live_surface_tests tests/opaque_live_surface_tests.cpp)
+    target_link_libraries(gui_forms_opaque_live_surface_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_opaque_live_surface_tests COMMAND gui_forms_opaque_live_surface_tests)
 
     add_executable(gui_forms_text_store_tests tests/text_store_tests.cpp)
     target_link_libraries(gui_forms_text_store_tests PRIVATE gui_forms_core)
@@ -2537,6 +2540,9 @@ if(GUI_FORMS_BUILD_TESTS)
     endif()
 
     if(TARGET gui_forms_skia)
+        add_executable(gui_forms_opaque_live_surface_raster_tests tests/opaque_live_surface_raster_tests.cpp)
+        target_link_libraries(gui_forms_opaque_live_surface_raster_tests PRIVATE gui_forms_controls gui_forms_skia)
+        add_test(NAME gui_forms_opaque_live_surface_raster_tests COMMAND gui_forms_opaque_live_surface_raster_tests)
         add_executable(gui_forms_skia_smoke src/render/skia/skia_raster_smoke.cpp)
         target_compile_definitions(gui_forms_skia_smoke PRIVATE
             GUI_FORMS_TEST_CONTROL_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf"

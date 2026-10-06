@@ -453,3 +453,28 @@ are frozen for the consumer handoff. The previous `shadow-sdk` DLL remains
 existing application stages and the published File Manager release were not
 replaced. This is a Windows development SDK publication, not a stable ABI or
 new three-platform application release.
+
+### Opaque live-surface development promise (2026-10-06)
+
+**GIVEN:** the owner explicitly requests `LiveSurfaceDescription::opaque`,
+default false, as the producer's alpha-255 promise for copy composition and
+occluded-background omission. This extends the existing ORC-GUI-001 development
+C++ live-surface consumption projection; it does not change a stable C ABI.
+`LiveSurfaceFrame::opaque()` retains the promise with the frame's immutable
+buffer so reconfiguration cannot change an in-flight renderer's interpretation.
+Consumers must rebuild against the matching library and explicitly opt in.
+The field and host guards are documented in `CURRENT_API_REFERENCE.md`.
+
+Source review against `planning/PROGRAMMING_HOUSE_STYLE.md` covers the new
+description field and frame accessor; Skia's two live draw methods and internal
+lease overload declaration; the new `live_surface_damage.hpp`; Mac live-frame
+storage, recovery invalidation, draw exception cleanup and changed
+`drawRetainedRect:` blocks; both `opaque_live_surface*_tests.cpp` files; and
+their CMake registration. Types, initialization, conversion bounds, named
+behavior, immutable lease ownership, synchronous raster borrows, failure
+cleanup and reusable per-view storage were reviewed. Coverage uses a rectangle
+sweep, not a per-pixel scan or per-frame scratch allocation. No violations were
+identified in that changed scope. The rest of the legacy Mac/Skia sources and
+vendored dependencies are not claimed compliant. The six complete small
+source/header/test files also passed the spelling scanner; that is not a
+substitute for this review.

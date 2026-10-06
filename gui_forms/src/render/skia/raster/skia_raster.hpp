@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/resources.hpp"
+#include "gui_forms/live_surface/frame/live_surface_frame.hpp"
 #if defined(GUI_FORMS_PREPARED_TEXT)
 #include "gui_forms/prepared_text.hpp"
 #include "gui_forms/control.hpp"
@@ -96,6 +97,10 @@ public:
     void draw_image(ImageId image, Rect destination, double opacity) override;
     void draw_live_surface(std::shared_ptr<LiveSurface> surface,
                            Rect destination, double opacity) override;
+    // Internal host seam: keep the coverage promise and sampled pixels in the
+    // same read lease through rasterization, even during producer reconfigure.
+    void draw_live_surface_frame(const LiveSurfaceFrame& frame,
+                                 Rect destination, double opacity);
     void draw_image_region(ImageId image, Rect source, Rect destination,
                            double opacity) override;
     void draw_image_region_sampled(ImageId image, Rect source,

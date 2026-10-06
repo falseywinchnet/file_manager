@@ -4,6 +4,7 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #include "macos_host.hpp"
+#include "live_surface_damage.hpp"
 #include "gui_forms/text/types/text_types.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
 #include "../../../render/skia/raster/skia_raster.hpp"
@@ -789,6 +790,10 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     std::atomic<bool> _displayTickQueued;
     BOOL _hostOccluded;
     std::vector<LiveSurfacePresentation> _pendingLivePresentations;
+    // Reuse storage across display ticks; immutable leases survive producer
+    // reconfiguration until this pass has finished consuming their pixels.
+    std::vector<gui_forms::LiveSurfaceFrame> _liveFrames{};
+    std::vector<GFRect> _opaqueLiveClips{};
     NSPanel* _tooltipPanel;
     NSTimer* _tooltipTimer;
     std::uint64_t _lastSemanticGeneration;
@@ -1330,6 +1335,7 @@ private:
         [self stopDisplayLink];
         [self armWakeTimer];
     } else {
+        _pendingDamage.add(GFRect{0.0, 0.0, self.bounds.size.width, self.bounds.size.height});
         [self collectDamage];
         // AppKit may consume a display request while our model is still hidden.
         // Rearm native presentation even when no new model damage was produced.
@@ -1842,12 +1848,14 @@ private:
         [self drawRetainedRect:dirtyRect];
     } catch (const std::exception& error) {
         _raster.end_frame();
+        _liveFrames.clear();
 #if defined(GUI_FORMS_PREPARED_TEXT)
         _raster.abort_prepared_frame();
 #endif
         [self recordNativeCallbackFault:"draw" message:error.what()];
     } catch (...) {
         _raster.end_frame();
+        _liveFrames.clear();
 #if defined(GUI_FORMS_PREPARED_TEXT)
         _raster.abort_prepared_frame();
 #endif
@@ -1878,8 +1886,32 @@ private:
         _pendingDamage.add(GFRect{0.0, 0.0, logicalSize.width, logicalSize.height});
     }
 #endif
-    _pendingDamage.add(GFRect{dirtyRect.origin.x, dirtyRect.origin.y,
-                             dirtyRect.size.width, dirtyRect.size.height});
+    _liveFrames.clear();
+    _opaqueLiveClips.clear();
+    _liveFrames.reserve(_pendingLivePresentations.size());
+    _opaqueLiveClips.reserve(_pendingLivePresentations.size());
+    for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
+        gui_forms::LiveSurfaceFrame frame{};
+        if (update.surface) frame = (*update.surface).acquire_latest();
+        if (frame && frame.opaque()) {
+            const GFRect covered = gui_forms::detail::opaque_live_clip(
+                GFRect::intersection(update.clip, update.destination), scale);
+            if (!covered.empty()) _opaqueLiveClips.push_back(covered);
+        }
+        _liveFrames.push_back(std::move(frame));
+    }
+    const GFRect nativeDamage{dirtyRect.origin.x, dirtyRect.origin.y,
+                              dirtyRect.size.width, dirtyRect.size.height};
+    const bool modelClean = (*_model).paint_lease_snapshot().state ==
+        gui_forms::PaintLeaseState::clean;
+    bool reusableRaster = _rasterHasContent == YES && _hostOccluded == NO && modelClean;
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    reusableRaster = reusableRaster && _raster.prepared_front_matches(logicalSize, scale);
+    const PaintReceipt previousReceipt = _raster.prepared_front_receipt();
+#endif
+    bool liveOnly = gui_forms::detail::opaque_live_damage_covers(
+        nativeDamage, scale, _opaqueLiveClips, reusableRaster, !_pendingDamage.empty());
+    if (!liveOnly) _pendingDamage.add(nativeDamage);
 
 #if defined(GUI_FORMS_PREPARED_TEXT)
     const bool imagesReady = _raster.synchronize_images((*_model).image_resources());
@@ -1899,7 +1931,13 @@ private:
     if (frameReady) {
         // Admission can require a full repaint after resize or revocation.
         // Keep that damage until this exact candidate reaches native presentation.
-        for (const GFRect rectangle : frameDamage.rectangles()) _pendingDamage.add(rectangle);
+        if (liveOnly) {
+            liveOnly = gui_forms::detail::opaque_live_damage_covers(
+                frameDamage.bounds(), scale, _opaqueLiveClips, reusableRaster, false);
+        }
+        if (!liveOnly) {
+            for (const GFRect rectangle : frameDamage.rectangles()) _pendingDamage.add(rectangle);
+        }
     }
 #else
     _raster.begin_frame(frameDamage);
@@ -1920,18 +1958,22 @@ private:
     const std::chrono::steady_clock::time_point finishStarted =
         std::chrono::steady_clock::now();
     if (frameReady) {
-        for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
+        for (std::size_t index = 0; index < _pendingLivePresentations.size(); ++index) {
+            const LiveSurfacePresentation& update = _pendingLivePresentations[index];
             _raster.save();
             _raster.clip_rect(update.clip);
-            _raster.draw_live_surface(update.surface, update.destination, 1.0);
+            _raster.draw_live_surface_frame(_liveFrames[index], update.destination, 1.0);
             _raster.restore();
         }
         _raster.end_frame();
     }
 #if defined(GUI_FORMS_PREPARED_TEXT)
     bool committed{false};
-    if (frameReady && receipt) {
-        const gui_forms::PreparedTextStatus publication = _raster.commit_prepared_frame(*receipt);
+    if (frameReady && (receipt || liveOnly)) {
+        // Live-only pixels retain the same coherent retained-tree revision.
+        // Do not manufacture or acknowledge another model paint transaction.
+        const PaintReceipt publicationReceipt = receipt ? *receipt : previousReceipt;
+        const gui_forms::PreparedTextStatus publication = _raster.commit_prepared_frame(publicationReceipt);
         committed = publication == gui_forms::PreparedTextStatus::success;
     }
     if (!committed) {
@@ -1939,6 +1981,7 @@ private:
         receipt.reset();
     }
 #endif
+    _liveFrames.clear();
     const std::chrono::steady_clock::time_point finishEnded =
         std::chrono::steady_clock::now();
     _rasterFinishPhase.record(finishStarted, finishEnded);
