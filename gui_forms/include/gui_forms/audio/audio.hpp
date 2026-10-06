@@ -49,6 +49,21 @@ private:
     std::uint64_t charged_bytes_{};
 };
 
+// A live source: the mixer pulls interleaved L,R 48 kHz frames from it instead of
+// reading a clip. render() runs on the device callback (or inside offline
+// AudioEngine::render), never on the control thread: it must fill the whole span
+// with finite samples and must not block, allocate, lock or throw. Hand it its
+// controls through atomics. It is mixed like a clip and the mix is clamped to
+// [-1,1]. It is only pulled while its voice plays; a paused voice freezes it.
+#define GUI_FORMS_AUDIO_GENERATOR 1
+class AudioGenerator {
+public:
+    virtual void render(std::span<float> stereo) noexcept = 0;
+protected:
+    AudioGenerator() = default;
+    ~AudioGenerator() = default;
+};
+
 struct AudioEngineState;
 struct AudioVoiceState;
 class AudioVoice final {
@@ -61,7 +76,7 @@ public:
     AudioVoice& operator=(const AudioVoice&) = delete;
     AudioStatus play(); // Resume; at EOF seek to zero before replaying.
     AudioStatus pause(); // Retain cursor.
-    AudioStatus stop(); // Pause and rewind to frame zero.
+    AudioStatus stop(); // Pause and rewind to frame zero. A generator only pauses.
     AudioStatus set_gain(double gain); // Finite [0,1]. Mix clips to [-1,1].
     AudioStatus set_rate(double rate); // Finite [.25,4], linear interpolation.
     bool playing() const;
@@ -72,7 +87,8 @@ private:
 
 // All public engine/voice operations belong to one control thread. The device
 // callback is private. Offline render is exclusive with controls and device use.
-// At most 64 live voice objects, including paused/stopped voices. No streaming.
+// At most 64 live voice objects, including paused/stopped voices. Files are not
+// streamed; a generator voice synthesizes as it plays.
 class AudioEngine final {
 public:
     AudioEngine();
@@ -84,6 +100,9 @@ public:
     // Fixed-rate voices bypass it, preserving exact PCM sample positions.
     AudioStatus voice(std::shared_ptr<const AudioClip> clip, bool loop, AudioVoice& output,
                       bool pitch_enabled = false);
+    // Fixed rate, no seek, no loop point. The voice shares ownership of the source
+    // and releases it, after the mixer has stopped reading, when closed.
+    AudioStatus generator(std::shared_ptr<AudioGenerator> source, AudioVoice& output);
 #ifdef GUI_FORMS_AUDIO_LOOP_TRANSPORT
     [[nodiscard]] AudioLoopStatus loop_transport(AudioLoopTransport& output);
 #endif

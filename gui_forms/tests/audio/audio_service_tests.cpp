@@ -1,5 +1,7 @@
 #include "gui_forms/audio/audio.hpp"
 #include <array>
+#include <memory>
+#include <span>
 #include <cmath>
 #include <chrono>
 #include <fstream>
@@ -127,6 +129,55 @@ void quotas_and_values() {
     require(invalid_pcm.status == AudioStatus::invalid_value, "infinite PCM rejected");
     const gui_forms::AudioClipResult empty_pcm = gui_forms::AudioClip::copy({});
     require(empty_pcm.status == AudioStatus::invalid_format, "empty PCM rejected");
+}
+// A ramp source: each frame is its index / 10000 on both channels, and it counts
+// how many frames the mixer has pulled.
+class RampGenerator final : public gui_forms::AudioGenerator {
+public:
+    std::uint64_t pulled{};
+    void render(std::span<float> stereo) noexcept override {
+        for (std::size_t i = 0; i + 1 < stereo.size(); i += 2) {
+            const float value = static_cast<float>(pulled % 5000U) / 10000.0f;
+            stereo[i] = value;
+            stereo[i + 1] = -value;
+            ++pulled;
+        }
+    }
+};
+void generator_voices() {
+    using gui_forms::AudioStatus;
+    gui_forms::AudioEngine engine{};
+    require(engine.open(true) == AudioStatus::ok, "offline engine for generators");
+    gui_forms::AudioVoice rejected{};
+    require(engine.generator(nullptr, rejected) == AudioStatus::invalid_value, "a generator is required");
+    std::shared_ptr<RampGenerator> ramp = std::make_shared<RampGenerator>();
+    {
+        gui_forms::AudioVoice voice{};
+        require(engine.generator(ramp, voice) == AudioStatus::ok, "generator admitted");
+        std::array<float, 16> result{};
+        require(engine.render(result) == AudioStatus::ok, "render before play");
+        require((*ramp).pulled == 0, "a voice that is not playing is not pulled");
+        for (float sample : result) { require(sample == 0, "silent before play"); }
+        require(voice.play() == AudioStatus::ok, "generator plays");
+        require(engine.render(result) == AudioStatus::ok, "generator render");
+        require((*ramp).pulled == 8, "pulled frame for frame");
+        for (std::size_t i = 0; i < result.size(); i += 2) {
+            const float expected = static_cast<float>(i / 2) / 10000.0f;
+            require(std::abs(result[i] - expected) < 1e-6f && std::abs(result[i + 1] + expected) < 1e-6f, "generator samples pass through");
+        }
+        require(voice.set_gain(0.5) == AudioStatus::ok, "generator gain");
+        require(engine.render(result) == AudioStatus::ok, "render at half gain");
+        require(std::abs(result[0] - 0.5f * 8.0f / 10000.0f) < 1e-6f, "gain scales a generator");
+        require(voice.pause() == AudioStatus::ok, "generator pauses");
+        const std::uint64_t before_pause = (*ramp).pulled;
+        require(engine.render(result) == AudioStatus::ok, "paused generator render");
+        require((*ramp).pulled == before_pause, "a paused generator is frozen");
+        for (float sample : result) { require(sample == 0, "paused generator is silent"); }
+        require(voice.stop() == AudioStatus::ok && voice.play() == AudioStatus::ok, "stop only pauses a generator");
+        require(engine.render(result) == AudioStatus::ok, "resumed generator render");
+        require(std::abs(result[0] - 0.5f * static_cast<float>(before_pause) / 10000.0f) < 1e-6f, "a generator resumes where it stopped");
+    }
+    require(ramp.use_count() == 1, "a destroyed voice releases its generator");
 }
 void write_bytes(std::ostream& stream, std::uint32_t value, int count) {
     for (int i = 0; i < count; ++i) { stream.put(static_cast<char>((value >> (i * 8)) & 255)); }
@@ -450,9 +501,10 @@ int main() {
 #endif
         controls_and_lifetime();
         quotas_and_values();
+        generator_voices();
         wav_loader();
         vorbis_loader();
-        std::cout << "PCM validation, exact loops, controls, quotas and shutdown pass.\n";
+        std::cout << "PCM validation, exact loops, controls, quotas, generators and shutdown pass.\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
