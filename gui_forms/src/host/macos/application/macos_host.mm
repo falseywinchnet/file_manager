@@ -5,6 +5,7 @@
 
 #include "macos_host.hpp"
 #include "live_surface_damage.hpp"
+#include "gui_forms/live_surface.hpp"
 #include "gui_forms/text/types/text_types.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
 #include "../../../render/skia/raster/skia_raster.hpp"
