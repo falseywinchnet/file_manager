@@ -2254,6 +2254,14 @@ if(GUI_FORMS_BUILD_TESTS)
 
     add_executable(gui_forms_c_api_c11_tests tests/c_api_c11_tests.c)
     target_link_libraries(gui_forms_c_api_c11_tests PRIVATE gui_forms_c_api)
+    # This C fixture calls pthread_create/join directly. CLANG64's libc++ uses
+    # native Windows threads and does not supply an implicit pthread dependency.
+    if(MINGW)
+        target_link_libraries(gui_forms_c_api_c11_tests PRIVATE winpthread)
+    else()
+        find_package(Threads REQUIRED)
+        target_link_libraries(gui_forms_c_api_c11_tests PRIVATE Threads::Threads)
+    endif()
     add_test(NAME gui_forms_c_api_c11_tests COMMAND gui_forms_c_api_c11_tests)
 
     add_executable(gui_forms_c_api_cpp_tests tests/c_api_cpp_tests.cpp)
