@@ -1681,9 +1681,8 @@ private:
         [self stopDisplayLink];
         return;
     }
-    if (updates.empty()) return;
-
-    _pendingLivePresentations = std::move(updates);
+    if (updates.empty() && _pendingLivePresentations.empty()) return;
+    if (!updates.empty()) _pendingLivePresentations = std::move(updates);
     const double scale = self.window.backingScaleFactor;
     for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
         const GFRect clip = gui_forms::detail::align_damage_outward(
@@ -1958,19 +1957,25 @@ private:
     }
     const std::chrono::steady_clock::time_point finishStarted =
         std::chrono::steady_clock::now();
+    bool liveDrawsSucceeded{true};
     if (frameReady) {
         for (std::size_t index = 0; index < _pendingLivePresentations.size(); ++index) {
             const LiveSurfacePresentation& update = _pendingLivePresentations[index];
+            // Reconfiguration can retire the last frame before a replacement
+            // is published. Its clip granted no opaque coverage above.
+            if (!_liveFrames[index]) continue;
             _raster.save();
             _raster.clip_rect(update.clip);
-            _raster.draw_live_surface_frame(_liveFrames[index], update.destination, 1.0);
+            liveDrawsSucceeded = _raster.draw_live_surface_frame(
+                _liveFrames[index], update.destination, 1.0);
             _raster.restore();
+            if (!liveDrawsSucceeded) break;
         }
         _raster.end_frame();
     }
 #if defined(GUI_FORMS_PREPARED_TEXT)
     bool committed{false};
-    if (frameReady && (receipt || liveOnly)) {
+    if (frameReady && liveDrawsSucceeded && (receipt || liveOnly)) {
         // Live-only pixels retain the same coherent retained-tree revision.
         // Do not manufacture or acknowledge another model paint transaction.
         const PaintReceipt publicationReceipt = receipt ? *receipt : previousReceipt;
@@ -2003,7 +2008,7 @@ private:
     // Native exposure/snapshot callbacks can precede unocclusion. The model
     // intentionally declines painting then; the last complete raster is still
     // valid and must be copied into AppKit's newly supplied backing context.
-    if (_rasterHasContent == YES && pixels != nullptr) {
+    if (_rasterHasContent == YES && pixels != nullptr && liveDrawsSucceeded) {
         const std::chrono::steady_clock::time_point setupStarted =
             std::chrono::steady_clock::now();
         CGDataProviderRef provider = CGDataProviderCreateWithData(

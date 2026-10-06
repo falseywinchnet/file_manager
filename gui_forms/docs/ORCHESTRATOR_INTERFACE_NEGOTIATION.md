@@ -478,3 +478,15 @@ identified in that changed scope. The rest of the legacy Mac/Skia sources and
 vendored dependencies are not claimed compliant. The six complete small
 source/header/test files also passed the spelling scanner; that is not a
 substitute for this review.
+
+The independent review caught an image-allocation failure that could have
+published an incomplete prepared candidate after retained paint was skipped.
+The internal frame-draw seam now reports success: failed live compositions are
+not presented or committed, and pending presentations retry on later display
+ticks even without a new generation. Reconfigured surfaces with no current
+frame grant no coverage and leave the ordinary retained background visible.
+The raster test includes a private image-factory refusal and, when the prepared
+profile is enabled, verifies that abort retains the complete previous front
+and receipt after a partial candidate draw. Review corrections also made value
+parameters const, initialized SkPaint explicitly and marked test factories and
+pixel readers nodiscard. This is a scoped correction, not a legacy style claim.

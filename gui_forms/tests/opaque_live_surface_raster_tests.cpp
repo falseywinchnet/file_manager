@@ -5,6 +5,14 @@
 #include <cstdlib>
 #include <iostream>
 
+namespace gui_forms::render {
+struct SkiaLiveSurfaceTestAccess final {
+    static void reject_next_image(SkiaRaster& raster) {
+        raster.fail_next_live_image_ = true;
+    }
+};
+} // namespace gui_forms::render
+
 namespace {
 using namespace gui_forms;
 
@@ -14,7 +22,7 @@ void require(const bool condition, const char* message) {
     std::exit(1);
 }
 
-std::shared_ptr<LiveSurface> make_surface(const bool opaque, const std::byte alpha) {
+[[nodiscard]] std::shared_ptr<LiveSurface> make_surface(const bool opaque, const std::byte alpha) {
     std::shared_ptr<LiveSurface> surface = LiveSurface::create(
         {.width = 8U, .height = 8U, .opaque = opaque});
     require(static_cast<bool>(surface), "surface created");
@@ -31,7 +39,7 @@ std::shared_ptr<LiveSurface> make_surface(const bool opaque, const std::byte alp
     return surface;
 }
 
-std::array<unsigned, 4> pixel(const render::SkiaRaster& raster, const std::size_t x, const std::size_t y) {
+[[nodiscard]] std::array<unsigned, 4> pixel(const render::SkiaRaster& raster, const std::size_t x, const std::size_t y) {
     const std::byte* const bytes = static_cast<const std::byte*>(raster.pixels());
     require(bytes != nullptr, "raster readable");
     const std::size_t offset = y * raster.row_bytes() + x * 4U;
@@ -69,6 +77,40 @@ void blend_cases() {
     raster.end_frame();
     const std::array<unsigned, 4> faded = pixel(raster, 4U, 4U);
     require(faded[0] >= 127U && faded[0] <= 128U && faded[2] >= 127U && faded[2] <= 128U, "opacity below one still blends opaque producer");
+}
+
+void image_failure() {
+    render::SkiaRaster raster{};
+    const std::shared_ptr<LiveSurface> surface = make_surface(true, std::byte{255});
+    const LiveSurfaceFrame frame = (*surface).acquire_latest();
+    DamageRegion damage{};
+    damage.add({0.0, 0.0, 8.0, 8.0});
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    require(raster.begin_prepared_frame({8.0, 8.0}, 1.0, damage) == PreparedTextStatus::success, "initial prepared frame admitted");
+#else
+    require(raster.resize({8.0, 8.0}, 1.0), "failure raster allocated");
+    raster.begin_frame(damage);
+#endif
+    raster.fill_rect({0.0, 0.0, 8.0, 8.0}, Color::rgba(255, 0, 0));
+    raster.end_frame();
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    const PaintReceipt previous{1U, 1U};
+    require(raster.commit_prepared_frame(previous) == PreparedTextStatus::success, "previous complete frame published");
+    require(raster.begin_prepared_frame({8.0, 8.0}, 1.0, damage) == PreparedTextStatus::success, "full live candidate admitted");
+    require(raster.draw_live_surface_frame(frame, {0.0, 0.0, 4.0, 8.0}, 1.0), "first live fragment succeeds");
+#else
+    raster.begin_frame(damage);
+#endif
+    render::SkiaLiveSurfaceTestAccess::reject_next_image(raster);
+    const bool drawn = raster.draw_live_surface_frame(frame, {0.0, 0.0, 8.0, 8.0}, 1.0);
+    require(!drawn, "image failure reported to host");
+    raster.end_frame();
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    raster.abort_prepared_frame();
+    require(raster.prepared_front_receipt() == previous, "failed live composition retains previous receipt");
+#endif
+    const std::array<unsigned, 4> red{255U, 0U, 0U, 255U};
+    require(pixel(raster, 1U, 1U) == red && pixel(raster, 7U, 7U) == red, "failure does not publish cleared or partial pixels");
 }
 
 class SolidControl final : public Control {
@@ -122,6 +164,7 @@ void retained_overlay() {
 
 int main() {
     blend_cases();
+    image_failure();
     retained_overlay();
     return 0;
 }

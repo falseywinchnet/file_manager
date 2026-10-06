@@ -95,12 +95,12 @@ public:
     [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(
         std::string_view text, FontSpec font) override;
     void draw_image(ImageId image, Rect destination, double opacity) override;
-    void draw_live_surface(std::shared_ptr<LiveSurface> surface,
-                           Rect destination, double opacity) override;
+    void draw_live_surface(const std::shared_ptr<LiveSurface> surface,
+                           const Rect destination, const double opacity) override;
     // Internal host seam: keep the coverage promise and sampled pixels in the
     // same read lease through rasterization, even during producer reconfigure.
-    void draw_live_surface_frame(const LiveSurfaceFrame& frame,
-                                 Rect destination, double opacity);
+    [[nodiscard]] bool draw_live_surface_frame(const LiveSurfaceFrame& frame,
+                                               const Rect destination, const double opacity);
     void draw_image_region(ImageId image, Rect source, Rect destination,
                            double opacity) override;
     void draw_image_region_sampled(ImageId image, Rect source,
@@ -111,8 +111,10 @@ public:
                             ImagePatternWrap wrap, double opacity) override;
 
 private:
+    friend struct SkiaLiveSurfaceTestAccess;
     class Impl;
     std::unique_ptr<Impl> impl_;
+    bool fail_next_live_image_{};
 };
 
 } // namespace gui_forms::render
