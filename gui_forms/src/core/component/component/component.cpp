@@ -10,7 +10,15 @@ namespace {
 struct ExpiredRevocable final {
     [[nodiscard]] bool operator()(
         const std::weak_ptr<detail::Revocable>& candidate) const noexcept {
-        return candidate.expired();
+        const bool expired = candidate.expired();
+        return expired;
+    }
+};
+
+struct DisconnectedSubscription final {
+    [[nodiscard]] bool operator()(const SubscriptionToken& token) const noexcept {
+        const bool disconnected = !token.connected();
+        return disconnected;
     }
 };
 
@@ -19,7 +27,9 @@ struct ExpiredRevocable final {
 Component::~Component() {
     // Natural C++ destruction ends subscriptions just as explicit disposal
     // does. Do not call virtual disposal hooks after derived members are gone.
+    state_ = ComponentState::disposing;
     revoke_owned_work();
+    state_ = ComponentState::disposed;
 }
 
 void Component::dispose() {
@@ -41,14 +51,30 @@ void Component::own_revocable(
         }
         return;
     }
-    owned_revocables_.erase(
+    const std::vector<std::weak_ptr<detail::Revocable>>::iterator retained_end =
         std::remove_if(owned_revocables_.begin(), owned_revocables_.end(),
-                       ExpiredRevocable{}),
-        owned_revocables_.end());
+                       ExpiredRevocable{});
+    owned_revocables_.erase(retained_end, owned_revocables_.end());
     owned_revocables_.push_back(revocable);
 }
 
 void Component::verify_dispose_thread() {}
+
+void Component::own_subscription(SubscriptionToken subscription) {
+    if (!is_alive() || !subscription.connected()) {
+        return;
+    }
+    if (!owned_subscriptions_) {
+        owned_subscriptions_ = std::make_unique<std::vector<SubscriptionToken>>();
+    }
+    std::vector<SubscriptionToken>& subscriptions = *owned_subscriptions_;
+    const std::vector<SubscriptionToken>::iterator retained_end = std::remove_if(
+        subscriptions.begin(), subscriptions.end(),
+        DisconnectedSubscription{});
+    subscriptions.erase(retained_end, subscriptions.end());
+    own_revocable(subscription.revocable_);
+    subscriptions.push_back(std::move(subscription));
+}
 
 void Component::on_dispose() noexcept {}
 
@@ -63,6 +89,7 @@ void Component::revoke_owned_work() noexcept {
             (*revocable).disconnect();
         }
     }
+    owned_subscriptions_.reset();
 }
 
 } // namespace gui_forms

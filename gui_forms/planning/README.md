@@ -29,6 +29,9 @@ absorb the other's authority.
 
 ## Existing program records
 
+- [`CONCISE_AUTHORING_AVAILABILITY.md`](CONCISE_AUTHORING_AVAILABILITY.md) —
+  GUI.Forms response to the October concise-controls proposal, provider-owned
+  deliverables, availability and verification gates.
 - [`MASTER_IMPLEMENTATION_PLAN.md`](MASTER_IMPLEMENTATION_PLAN.md)
 - [`CONTROL_COMPLETENESS_MATRIX.md`](CONTROL_COMPLETENESS_MATRIX.md)
 - [`FILE_MANAGER_CONSUMER_CAPABILITY_PROFILE.md`](FILE_MANAGER_CONSUMER_CAPABILITY_PROFILE.md)

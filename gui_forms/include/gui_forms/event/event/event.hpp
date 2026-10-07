@@ -7,45 +7,12 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <stdexcept>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 namespace gui_forms {
-
-class SubscriptionToken final {
-public:
-    SubscriptionToken() = default;
-    ~SubscriptionToken() { disconnect(); }
-    SubscriptionToken(SubscriptionToken&& other) noexcept
-        : revocable_(std::move(other.revocable_)) {}
-    SubscriptionToken& operator=(SubscriptionToken&& other) noexcept {
-        if (this != &other) {
-            disconnect();
-            revocable_ = std::move(other.revocable_);
-        }
-        return *this;
-    }
-    SubscriptionToken(const SubscriptionToken&) = delete;
-    SubscriptionToken& operator=(const SubscriptionToken&) = delete;
-
-    void disconnect() noexcept {
-        if (revocable_) {
-            (*revocable_).disconnect();
-            revocable_.reset();
-        }
-    }
-    [[nodiscard]] bool connected() const noexcept {
-        return revocable_ != nullptr && (*revocable_).connected();
-    }
-
-private:
-    template <typename... Arguments>
-    friend class Event;
-    explicit SubscriptionToken(std::shared_ptr<detail::Revocable> revocable)
-        : revocable_(std::move(revocable)) {}
-
-    std::shared_ptr<detail::Revocable> revocable_;
-};
 
 struct EventStatistics {
     std::uint64_t subscriptions_connected{};
@@ -71,20 +38,24 @@ public:
     Event& operator=(const Event&) = delete;
 
     [[nodiscard]] SubscriptionToken subscribe(Callback callback) {
-        return subscribe_impl(nullptr, std::move(callback));
+        SubscriptionToken token = subscribe_impl(nullptr, std::move(callback));
+        return token;
     }
 
     [[nodiscard]] SubscriptionToken subscribe(DelegateCallback callback) {
-        return subscribe_impl(nullptr, callback);
+        SubscriptionToken token = subscribe_impl(nullptr, callback);
+        return token;
     }
 
     [[nodiscard]] SubscriptionToken subscribe(Component& owner, Callback callback) {
-        return subscribe_impl(&owner, std::move(callback));
+        SubscriptionToken token = subscribe_impl(&owner, std::move(callback));
+        return token;
     }
 
     [[nodiscard]] SubscriptionToken subscribe(Component& owner,
                                               DelegateCallback callback) {
-        return subscribe_impl(&owner, callback);
+        SubscriptionToken token = subscribe_impl(&owner, callback);
+        return token;
     }
 
     void emit(Arguments... arguments) {
@@ -119,9 +90,16 @@ public:
     }
 
 private:
+    template <typename Owner, typename Target, typename... EventArguments>
+    friend void on(Event<EventArguments...>& event, Owner& owner,
+                   void (Target::*method)(EventArguments...));
+    template <typename Owner, typename Target, typename... EventArguments>
+    friend void on(Event<EventArguments...>& event, Owner& owner,
+                   void (Target::*method)(EventArguments...) const);
+
     struct State;
 
-    struct Slot final : detail::Revocable {
+    struct Slot : detail::Revocable {
         Slot(std::weak_ptr<State> event_state, Callback event_callback)
             : state(std::move(event_state)), callback(std::move(event_callback)),
               kind(CallbackKind::owning) {}
@@ -145,7 +123,7 @@ private:
 
         [[nodiscard]] bool connected() const noexcept override { return connected_; }
 
-        void invoke(Arguments&... arguments) {
+        virtual void invoke(Arguments&... arguments) {
             if (kind == CallbackKind::delegate) {
                 const DelegateCallback local_delegate = delegate;
                 local_delegate(arguments...);
@@ -162,16 +140,35 @@ private:
             delegate,
         };
 
-        std::weak_ptr<State> state;
-        Callback callback;
-        DelegateCallback delegate;
+        std::weak_ptr<State> state{};
+        Callback callback{};
+        DelegateCallback delegate{};
         CallbackKind kind{CallbackKind::owning};
-        bool connected_{true};
+        bool connected_{};
+    };
+
+    // The event retains this named member-binding state in the same allocation
+    // as its slot. emit() holds the slot across revocation, so invoking the
+    // member neither copies an owning callable nor allocates. The owner is
+    // borrowed: registration never extends its lifetime or forms a cycle.
+    template <typename Owner, typename Method>
+    struct MemberSlot final : Slot {
+        MemberSlot(const std::shared_ptr<State>& event_state, Owner& owner,
+                   const Method method)
+            : Slot(event_state, DelegateCallback{}), owner_(owner),
+              method_(method) {}
+
+        void invoke(Arguments&... arguments) override {
+            (owner_.*method_)(arguments...);
+        }
+
+        Owner& owner_;
+        Method method_;
     };
 
     struct State final {
-        std::vector<std::shared_ptr<Slot>> slots;
-        EventStatistics statistics;
+        std::vector<std::shared_ptr<Slot>> slots{};
+        EventStatistics statistics{};
         std::size_t emission_depth{};
     };
 
@@ -198,8 +195,9 @@ private:
         }
         const std::shared_ptr<Slot> slot =
             std::make_shared<Slot>(state_, std::move(callback));
+        SubscriptionToken token(slot);
         connect(owner, slot);
-        return SubscriptionToken(slot);
+        return token;
     }
 
     [[nodiscard]] SubscriptionToken subscribe_impl(Component* owner,
@@ -209,12 +207,25 @@ private:
         }
         const std::shared_ptr<Slot> slot =
             std::make_shared<Slot>(state_, callback);
+        SubscriptionToken token(slot);
         connect(owner, slot);
-        return SubscriptionToken(slot);
+        return token;
+    }
+
+    template <typename Owner, typename Method>
+    [[nodiscard]] SubscriptionToken subscribe_member(Owner& owner,
+                                                      const Method method) {
+        const std::shared_ptr<Slot> slot =
+            std::make_shared<MemberSlot<Owner, Method>>(state_, owner, method);
+        SubscriptionToken token(slot);
+        connect(nullptr, slot);
+        return token;
     }
 
     void connect(Component* owner, const std::shared_ptr<Slot>& slot) {
+        compact(*state_);
         (*state_).slots.push_back(slot);
+        (*slot).connected_ = true;
         ++(*state_).statistics.subscriptions_connected;
         if (owner != nullptr) {
             (*owner).own_revocable(slot);
@@ -224,19 +235,61 @@ private:
     struct SlotDisconnected final {
         [[nodiscard]] bool operator()(
             const std::shared_ptr<Slot>& slot) const noexcept {
-            return !(*slot).connected_;
+            const bool disconnected = !(*slot).connected_;
+            return disconnected;
         }
     };
 
     static void compact(State& state) noexcept {
         if (state.emission_depth != 0U) return;
         std::vector<std::shared_ptr<Slot>>& slots = state.slots;
-        slots.erase(std::remove_if(slots.begin(), slots.end(),
-                                   SlotDisconnected{}),
-                    slots.end());
+        const typename std::vector<std::shared_ptr<Slot>>::iterator retained_end =
+            std::remove_if(slots.begin(), slots.end(), SlotDisconnected{});
+        slots.erase(retained_end, slots.end());
     }
 
     std::shared_ptr<State> state_;
 };
+
+// Owner-held named member subscription. Owner must explicitly participate in
+// Component lifecycle; Target may be Owner or one of its bases. A disposed
+// owner is a no-op; a null member is rejected even for a disposed owner.
+// Registration may allocate/throw. Emission adds no allocation or idle work.
+// Owner and publisher obey the existing Event execution-thread contract.
+template <typename Owner, typename Target, typename... Arguments>
+void on(Event<Arguments...>& event, Owner& owner,
+        void (Target::*method)(Arguments...)) {
+    static_assert(std::is_base_of_v<Component, Owner>,
+                  "gui_forms::on requires a Component owner");
+    static_assert(std::is_base_of_v<Target, Owner>,
+                  "the handler must belong to the owner or one of its bases");
+    if (method == nullptr) {
+        throw std::invalid_argument("gui_forms::on requires a non-null member");
+    }
+    Component& component = owner;
+    if (!component.is_alive()) {
+        return;
+    }
+    SubscriptionToken token = event.subscribe_member(owner, method);
+    component.own_subscription(std::move(token));
+}
+
+template <typename Owner, typename Target, typename... Arguments>
+void on(Event<Arguments...>& event, Owner& owner,
+        void (Target::*method)(Arguments...) const) {
+    static_assert(std::is_base_of_v<Component, Owner>,
+                  "gui_forms::on requires a Component owner");
+    static_assert(std::is_base_of_v<Target, Owner>,
+                  "the handler must belong to the owner or one of its bases");
+    if (method == nullptr) {
+        throw std::invalid_argument("gui_forms::on requires a non-null member");
+    }
+    Component& component = owner;
+    if (!component.is_alive()) {
+        return;
+    }
+    SubscriptionToken token = event.subscribe_member(owner, method);
+    component.own_subscription(std::move(token));
+}
 
 } // namespace gui_forms

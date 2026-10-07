@@ -121,6 +121,56 @@ Windows qualification and Linux host packaging remain open.
 - `subscribe(Component& owner, callback)` lets component disposal revoke the
   subscription without creating a visual ownership edge.
 
+### `on(event, owner, &Owner::method)` — owner-held named handlers
+
+Available from `<gui_forms/event.hpp>` and the main umbrella. The owner must
+derive from `Component`. The event arguments and member target type are deduced;
+ordinary, `const`, `noexcept`, and inherited members are supported. The member
+returns `void` and matches the event's argument types, including references.
+
+```cpp
+gui_forms::on(run.clicked(), *this, &Actions::on_run);
+
+void Actions::on_run(gui_forms::ButtonBase&) {
+    ++runs_;
+}
+```
+
+The complete [compiled example](../examples/reference/owned_events.cpp) shows
+the owning class. Its standalone CMake project uses `find_package(GUIForms)`
+and runs against an installed SDK. Each call creates one subscription and transfers its token
+into the owner; the caller keeps no token or subscription vector. Repeated calls
+create repeated subscriptions. `dispose()` disconnects them before `on_dispose`,
+and natural `Component` destruction disconnects them as well. If a derived
+destructor emits events or releases members needed by its handlers, call
+`dispose()` before that teardown begins. The binding borrows the owner and does
+not keep it or the publisher alive.
+
+An already disposing/disposed owner is a no-op. A null member pointer throws
+`std::invalid_argument`, including when the owner is disposed. Allocation
+failure during registration propagates and leaves no connected handler.
+Register, emit, and dispose on the event's owning execution thread; this helper
+does not add cross-thread synchronization or change host thread checks.
+
+Handlers retain the existing registration order and nested-emission rules.
+Disposing an owner or destroying a publisher inside a callback cancels pending
+handlers. The active binding remains valid until that callback returns; this
+does not authorize accessing an owner after it has been destroyed. Callback
+exceptions propagate under the existing `Event` contract. Registration may
+allocate; member dispatch does not allocate or add idle scheduler work.
+
+`Component::own_subscription(SubscriptionToken)` is the explicit transfer seam
+when a caller already has a token. Pass `std::move(token)`; the former token
+becomes empty. A dead component, or a failed transfer, disconnects that token.
+Disconnected retained tokens are reclaimed on the next transfer or owner
+disposal. Ordinary `subscribe(...)` remains caller-owned: dropping its returned
+token still disconnects immediately. Use it for an independently cancellable
+connection; `on` deliberately returns no second cancellation owner.
+
+This development C++ addition changes `Component` layout and private event
+storage. Rebuild GUI.Forms and all C++ consumers together. It does not add a C
+ABI entry or change the frozen FM0 availability manifest.
+
 Core control events are synchronous on the UI thread that caused the mutation;
 the event template does not imply background delivery.
 
