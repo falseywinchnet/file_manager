@@ -1,9 +1,0 @@
-{
-  "gui_forms/src/core/text/prepared_window/prepared_window_batch.hpp": "a96cd0855150d90248bf64fc43d236e25de6d4af03c891fecce3834345038747",
-  "gui_forms/src/render/text/prepared_window_shape.cpp": "2c1cad3921fdc1206416708d50011ae258f59731d3f49ebed04c605813359f77",
-  "gui_forms/src/render/text/harfbuzz/harfbuzz_font_engine.hpp": "2ab611fe51b3e347058ab54e0a881961ed78e73f336575d7806a4889f48b2494",
-  "gui_forms/src/render/text/harfbuzz/harfbuzz_font_engine.cpp": "b5da411e5579a907ecb7aabfdfe2937cfe860c793d17c63e0359575e4129ebf4",
-  "gui_forms/tests/prepared_window_shape_tests.cpp": "a6c016c08f8cb2ab7317e80f23c8607a93c3fb3a8f7ce57ef596abc8fbd577e5",
-  "gui_forms/CMakeLists.txt": "ca2186b452d85bd31838bf63d1f42e27ac8cf208afac5582fb4f7fdbf56bd30c",
-  ".github/workflows/native-builds.yml": "52e5891637f45fd62ec346be7ac96645a802f5ce41f5acb889af80708a1d9193"
-}

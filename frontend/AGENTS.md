@@ -28,7 +28,7 @@ Before editing, read:
 8. `planning/DOGFOOD_SEQUENCE.md`
 9. `planning/CONTEXTUAL_BUILTIN_COMMANDS.md`
 10. `planning/DESKTOP_INTEGRATION_BOUNDARY.md`
-11. `../orchestrator/spec/CONTRACT_REGISTRY.md`
+11. `../backend/orchestrator/spec/CONTRACT_REGISTRY.md`
 12. the accepted root ADRs and relevant parent planning records.
 13. `planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md` for the frontend client edge.
 14. `planning/OWNER_DIRECTION_2026-08-10.md` and root ADR-016 for the active

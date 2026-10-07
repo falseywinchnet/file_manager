@@ -1,3 +1,0 @@
-workload=one-face-Cousine-16px-gray-tiny-label first_request_us=1686.4 unique_samples=64 p50_us=927.4 p95_us=1006 p99_us=1033 max_us=1033 cached_lookup_mean_us=0.91017 peak_shaping_bytes=5242880 peak_workspace_bytes=15443
-workload=one-face-Cousine-16px-gray-tiny-label first_request_us=1718.5 unique_samples=64 p50_us=952.1 p95_us=1041.4 p99_us=1131.8 max_us=1131.8 cached_lookup_mean_us=0.85444 peak_shaping_bytes=5242880 peak_workspace_bytes=15443
-workload=one-face-Cousine-16px-gray-tiny-label first_request_us=1359.5 unique_samples=64 p50_us=943.1 p95_us=1045.1 p99_us=1259.5 max_us=1259.5 cached_lookup_mean_us=0.82643 peak_shaping_bytes=5242880 peak_workspace_bytes=15443

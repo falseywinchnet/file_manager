@@ -1,0 +1,22 @@
+{
+  "backend": {
+    "repository": "falseywinchnet/backend",
+    "revision": "6eb51f84260984b4b293156ed7fefb057267bce5",
+    "release": "build-6eb51f84260984b4b293156ed7fefb057267bce5",
+    "sha256": {
+      "windows-x64": "31eb0268319844b66851e025a1d2deddb8a8c6d06ac5714475eb6bca63e1e89f",
+      "linux-x64": "474597e1a66ebca747553791e94b47d59fb125f415513a8ef13122ca432f0d14",
+      "macos-arm64": "6f57fc5eb9ef904eb9e35f5270ce81144e3c91780188d3cf3c7146cf01d79246"
+    }
+  },
+  "gui_forms": {
+    "repository": "falseywinchnet/gui_forms",
+    "revision": "c90eacf36652e2c30a94201e6621f91b2026a865",
+    "release": "build-c90eacf36652e2c30a94201e6621f91b2026a865",
+    "sha256": {
+      "macos-arm64": "4dc6db6130b9211003aad0911e4ca4a8b0c66b9eea0323a1193c6047bca3db38",
+      "linux-x64": "3134defea3c76698c4ed208a7350c28b77780094c037a9576a6161b42a0600ea",
+      "windows-x64": "25f11b9224cfd994a0fd1ed260400f2ba8a046d3a9bc33c36258cd61f8e6dd46"
+    }
+  }
+}

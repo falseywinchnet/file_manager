@@ -1,7 +1,0 @@
-host_boundary_audit=passed
-core_bytes=309896
-headless_host_bytes=76512
-dependencies:
-/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-release/gui_forms_host_protocol_tests:
-	/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 1800.105.0)
-	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1351.0.0)

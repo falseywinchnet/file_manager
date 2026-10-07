@@ -1,6 +1,0 @@
-workload,source_bytes,samples,p50_us,p95_us,p99_us,max_us,resolve_calls,resolve_bytes,width,height
-fixed-words,65536,100,0.000,0.100,0.100,0.100,0,0,190.000,108.000
-fixed-unbroken,65536,100,0.000,0.100,0.100,0.100,0,0,190.000,108.000
-fixed-short,18,100,0.000,0.100,0.100,0.100,0,0,190.000,108.000
-content-height-control,18,100,502.600,596.100,645.200,797.300,900,7000,80.000,46.500
-content-width-control,18,100,455.900,544.900,702.100,815.800,800,7100,103.438,40.000

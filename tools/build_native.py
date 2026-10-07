@@ -12,6 +12,8 @@ import shutil
 import sys
 from native_build_support import ROOT, BuildValidation, git_output, record_source_state
 from native_build_support import run, sdk_fingerprint
+from backend_bundle import install_bundle
+from fetch_build_inputs import verify_source_pins
 
 
 @dataclass(frozen=True)
@@ -55,6 +57,9 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int) -> None:
         else:
             skia_out.mkdir(exist_ok=True)
             shutil.copy2(ROOT / 'gui_forms/third_party/skia_cpu_args.gn', skia_out / 'args.gn')
+            if os.environ.get('CMAKE_CXX_COMPILER_LAUNCHER') == 'ccache':
+                arguments: Path = skia_out / 'args.gn'
+                arguments.write_text(arguments.read_text(encoding='utf-8') + '\ncc_wrapper = "ccache"\n', encoding='utf-8')
             skia_root: Path = ROOT / 'gui_forms/third_party/skia'
             run(skia_root / 'bin/gn', 'gen', skia_out, '--root=' + str(skia_root))
             run(skia_root / 'third_party/ninja/ninja', '-C', skia_out, '-j', jobs, 'skia')
@@ -70,25 +75,12 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int) -> None:
     run('cmake', '--install', toolkit)
 
 
-def build_components(host: str, build: Path, jobs: int) -> None:
-    suffix: str = ''
-    if host == 'windows':
-        suffix = '.exe'
-    services: Path = build / 'components'
-    services.mkdir(exist_ok=True)
-    engine_executable: Path = services / ('fileman-engine' + suffix)
-    run('go', 'build', '-trimpath', '-o', engine_executable,
-        './cmd/fileman-engine', cwd=ROOT / 'engine')
-    run('cargo', 'build', '--locked', '--release', '--bin', 'orchestrator',
-        '--target-dir', build / 'rust', '--jobs', jobs, cwd=ROOT / 'orchestrator')
-    orchestrator_executable: Path = build / 'rust/release' / ('orchestrator' + suffix)
-    shutil.copy2(orchestrator_executable, services)
-
 
 def main() -> None:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--jobs', type=int, default=2)
     parser.add_argument('--gui-forms-sdk', type=Path, help='Reuse an already tested native SDK')
+    parser.add_argument('--backend-bundle', type=Path, help='Pinned backend archive; defaults to .build/inputs/<platform>')
     parser.add_argument('--skip-components', action='store_true', help='Explicit frontend-only development package')
     arguments: argparse.Namespace = parser.parse_args()
     jobs: int = arguments.jobs
@@ -102,6 +94,10 @@ def main() -> None:
     build: Path = ROOT / '.build' / f'native-{host}-{architecture}'
     build.mkdir(parents=True, exist_ok=True)
     record_source_state(build, 'before-build')
+    lock: dict[str, dict[str, object]] = {}
+    if not skip_components:
+        lock = json.loads((ROOT / 'dependencies.lock.json').read_text(encoding='utf-8'))
+        verify_source_pins(lock, ROOT)
     sdk: Path = build / 'gui-forms-sdk'
     sdk_validation: str = 'native build and CTest passed'
     toolkit_validation: str = 'passed'
@@ -112,13 +108,25 @@ def main() -> None:
     os.environ['BUILD_JOBS'] = str(jobs)
     os.environ.setdefault('CC', 'clang')
     os.environ.setdefault('CXX', 'clang++')
+    if not skip_components:
+        target: str = host + '-' + architecture
+        backend: dict[str, object] = lock['backend']
+        hashes: object = backend['sha256']
+        if not isinstance(hashes, dict):
+            raise RuntimeError('Backend hashes missing from dependency lock')
+        bundle: Path = ROOT / '.build/inputs' / target / ('backend-' + target + '.tar.gz')
+        if arguments.backend_bundle is not None:
+            bundle = arguments.backend_bundle
+        install_bundle(bundle, build / 'components', target,
+                       str(backend['revision']), str(hashes[target]))
     if supplied_sdk is None:
         build_toolkit(host, build, sdk, jobs)
     manifest: Path = build / 'gui-forms-consumption.json'
     revision: str = git_output('rev-parse', 'HEAD')
+    toolkit_revision: str = git_output('-C', str(ROOT / 'gui_forms'), 'rev-parse', 'HEAD')
     manifest_record: dict[str, object] = {
-        'identity': {'id': f'gui-forms-development-{host}-{architecture}-{revision[:12]}',
-                     'state': 'development', 'source_revision': revision},
+        'identity': {'id': f'gui-forms-development-{host}-{architecture}-{toolkit_revision[:12]}',
+                     'state': 'development', 'source_revision': toolkit_revision},
         'validation': {'sdk': sdk_validation},
         'limits': ['No platform promotion or installed service claim; see package receipt']}
     manifest_text: str = json.dumps(manifest_record, indent=2) + '\n'
@@ -126,7 +134,8 @@ def main() -> None:
     frontend: Path = build / 'frontend'
     sdk_identity: str = sdk_fingerprint(sdk)
     run('cmake', '-S', ROOT / 'frontend', '-B', frontend, '-G', 'Ninja',
-        '-DCMAKE_BUILD_TYPE=Release', f'-DGUIForms_DIR={sdk}/lib/cmake/GUIForms',
+        '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_NO_SYSTEM_FROM_IMPORTED=ON',
+        f'-DGUIForms_DIR={sdk}/lib/cmake/GUIForms',
         f'-DFILE_MANAGER_GUI_FORMS_MANIFEST={manifest}',
         f'-DCMAKE_INSTALL_PREFIX={build}/frontend-sdk')
     sdk_stamp: Path = frontend / 'sdk-fingerprint.txt'
@@ -144,8 +153,6 @@ def main() -> None:
         raise RuntimeError('GUI.Forms SDK changed during frontend build/tests; rebuild against a stable SDK')
     sdk_stamp.write_text(sdk_identity + '\n', encoding='utf-8')
     run('cmake', '--install', frontend)
-    if not skip_components:
-        build_components(host, build, jobs)
     validation: BuildValidation = {
         'source_revision': revision, 'frontend_ctest': 'passed',
         'gui_forms_sdk_sha256': sdk_identity, 'gui_forms_ctest': toolkit_validation}

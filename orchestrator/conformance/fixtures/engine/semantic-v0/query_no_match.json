@@ -1,9 +1,0 @@
-{
-  "contract": {"id": "ORC-ENG-001", "major": 0, "minor": 1},
-  "terminal": "success",
-  "generation": 42,
-  "results": [],
-  "stale_roots": [],
-  "unavailable_channels": [],
-  "warnings": []
-}

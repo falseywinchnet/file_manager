@@ -26,6 +26,8 @@ and existing implementation do not silently create decisions.
 | [`ADR-019-CONTAINED-ENGINE-ADAPTER-AND-IDENTITY-BOUND-SERVICE-CONTROLS.md`](ADR-019-CONTAINED-ENGINE-ADAPTER-AND-IDENTITY-BOUND-SERVICE-CONTROLS.md) | accepted for File Manager 1.0 contained M4 dogfood | Host-bound contained Engine deployment, installed authenticated adapter, typed service snapshots, and instance-bound closed administrative commands |
 | [`ADR-020-FILE-MANAGER-TRUSTED-LOCAL-ACTIONS-PREVIEWS-AND-PICKER-PACKAGE.md`](ADR-020-FILE-MANAGER-TRUSTED-LOCAL-ACTIONS-PREVIEWS-AND-PICKER-PACKAGE.md) | accepted for File Manager 1.0 protected-root implementation and M4 dogfood | Bounded first-party SHA-256/preview/native launch actions, source-bound Engine pagination, and independently installed GUI.Forms Document Picker package |
 
+| [`ADR-021-COMPONENT-REPOSITORIES-AND-BUILD-REUSE.md`](ADR-021-COMPONENT-REPOSITORIES-AND-BUILD-REUSE.md) | accepted for implementation | Three repositories, GUI.Forms source/cache consumption, and pinned Rust/Go backend bundles |
+
 Each record retains its alternatives, consequences, reversal path, and
 unresolved implementation edges. Engine workers consume ADR-001 through
 `../engine/docs/ARCHITECT_HANDOFF_001.md`, the retained Kolmogrov/semantic

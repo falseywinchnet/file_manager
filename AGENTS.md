@@ -288,3 +288,14 @@ applicable WASAPI input/output names.
 
 Be direct, curious, and exact. Name the object, its status, its evidence, and
 its unresolved edge. Prefer a precise exclusion over speculative feature creep.
+
+## Three-repository build ownership (2026-10-07)
+
+ADR-021 supersedes historical physical paths above. `gui_forms/` is the pinned
+GUI.Forms source submodule; `backend/engine/` and `backend/orchestrator/` are
+the pinned backend submodule. Provider implementation belongs in its own PR
+against provider main. File Manager CI consumes tested backend binaries and
+compiles GUI.Forms source through ccache. Do not silently update dependency
+pins, skip consumer tests on cache hits, or claim per-function caching. The
+backend registry retains cross-project semantic authority. Historical evidence
+and old host instructions remain historical, not current path definitions.

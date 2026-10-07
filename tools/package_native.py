@@ -153,6 +153,13 @@ def main() -> None:
     components: list[dict[str, str]] = []
     name: str = ''
     if not args.skip_components:
+        backend_receipt: Path = build / 'backend-consumption.json'
+        backend_manifest: dict[str, object] = json.loads(backend_receipt.read_text(encoding='utf-8'))
+        backend_revision: str = str(backend_manifest['revision'])
+        backend_files: object = backend_manifest.get('files')
+        if not isinstance(backend_files, dict):
+            raise RuntimeError('Backend file hashes are missing')
+        shutil.copy2(backend_receipt, package)
         suffix: str = '.exe' if host == 'windows' else ''
         component_dir: Path = package / 'components'
         component_dir.mkdir()
@@ -160,6 +167,8 @@ def main() -> None:
             source: Path = build / 'components' / (name + suffix)
             if not source.is_file():
                 raise RuntimeError(f'Missing component binary: {source}')
+            if sha256(source) != backend_files.get(name + suffix):
+                raise RuntimeError('Backend binary changed after bundle validation: ' + name)
             shutil.copy2(source, component_dir)
             components.append({'name': name, 'state': 'bundled, not installed or activated'})
         if host == 'windows':
@@ -167,8 +176,8 @@ def main() -> None:
             launcher_notes_path: Path = ROOT / 'tools/WINDOWS_SEARCH_LAUNCH.md'
             launcher_notes: str = launcher_notes_path.read_text(encoding='utf-8')
             launcher_notes = launcher_notes.replace(
-                '`../orchestrator/conformance/evidence/SHADOW_WINDOWS_PIPES_2026-09-29.md`',
-                '[Orchestrator evidence](https://github.com/falseywinchnet/file_manager/blob/' + revision +
+                '`../backend/orchestrator/conformance/evidence/SHADOW_WINDOWS_PIPES_2026-09-29.md`',
+                '[Orchestrator evidence](https://github.com/falseywinchnet/backend/blob/' + backend_revision +
                 '/orchestrator/conformance/evidence/SHADOW_WINDOWS_PIPES_2026-09-29.md)')
             packaged_notes: Path = package / 'WINDOWS_SEARCH_LAUNCH.md'
             packaged_notes.write_text(launcher_notes, encoding='utf-8')

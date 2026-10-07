@@ -44,9 +44,9 @@ GUI framework, index store, semantic pipeline, or plugin ABI.
 | `../decisions/ADR-006-ORCHESTRATOR-CORE-1-0-FRONTEND-BOOTSTRAP.md` | Accepted headless Core 1.0 target and live-Orchestrator frontend bootstrap dependency |
 | `../decisions/ADR-007-ENGINE-ORCHESTRATOR-SEMANTIC-V0-AND-CAPABILITY-GATES.md` | Accepted Engine semantic v0 and capability-gated Orchestrator integration boundary |
 | `../decisions/ADR-008-CATALOGUE-INDEPENDENT-LIVE-SEARCH.md` | Accepted requirement for bounded Engine search without a catalogue and the independent live-query contract |
-| `../engine/` | Standalone Go search/index engine workstream; implementation may proceed behind its API and evidence gates without selecting parent integration architecture |
+| `../backend/engine/` | Standalone Go search/index engine workstream; implementation may proceed behind its API and evidence gates without selecting parent integration architecture |
 | `../kolmogrov/` | Independent ConeDAG, complexity, exhaustive-breakdown, and fixed-width perceptual-hashing research program |
-| `../orchestrator/` | Active Orchestrator integration authority, Rust bootstrap kernel, contract registry, and negotiation program |
+| `../backend/orchestrator/` | Active Orchestrator integration authority, Rust bootstrap kernel, contract registry, and negotiation program |
 | `../frontend/` | Visual end-user frontend; architect direction recorded 2026-08-07; Frontend 001 waits for Core 1.0 and GUI.Forms go-ahead |
 | `../paint/` | Interview-first Paint planning subproject; implementation waits on its GUI.Forms/Orchestrator/picker/transfer gates and owner direction |
 | `../text_editor/` | Interview-first Text Editor planning subproject; implementation waits on its text/Orchestrator/picker gates and owner direction |

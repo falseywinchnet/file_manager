@@ -1,1 +1,0 @@
-{"id":"fixture-cancellation","status":"unsupported","error":{"code":"CANCELLATION_UNSUPPORTED","status":"unsupported","message":"Core bootstrap operations are atomic and do not admit cancellation"}}
