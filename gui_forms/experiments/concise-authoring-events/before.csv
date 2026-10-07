@@ -1,9 +1,0 @@
-component_bytes,40
-kind,trial,iterations,total_ns,ns_per_emit,callbacks
-caller_owned_delegate,0,1000000,8252250,8.25225,1000000
-caller_owned_delegate,1,1000000,8219458,8.21946,1000000
-caller_owned_delegate,2,1000000,8233292,8.23329,1000000
-caller_owned_delegate,3,1000000,8245375,8.24537,1000000
-caller_owned_delegate,4,1000000,8280792,8.28079,1000000
-caller_owned_delegate,5,1000000,8274959,8.27496,1000000
-caller_owned_delegate,6,1000000,8289292,8.28929,1000000

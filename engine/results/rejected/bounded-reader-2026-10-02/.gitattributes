@@ -1,3 +1,0 @@
-# Preserve patch checksums; context prefixes intentionally precede Go tabs and
-# empty lines. These are archived evidence, not admitted implementation files.
-*.patch -text -whitespace

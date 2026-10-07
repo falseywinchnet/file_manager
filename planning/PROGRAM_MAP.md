@@ -10,6 +10,10 @@ identity/release horizons established by
 [`ADR-012`](../decisions/ADR-012-MALKUTH-SUITE-IDENTITY-AND-RELEASE-HORIZONS.md),
 with future utility scope and surface topology established by
 [`ADR-013`](../decisions/ADR-013-FUTURE-UTILITY-SCOPE-AND-SURFACE-TOPOLOGY.md).
+ADR-021 supersedes physical repository ownership: GUI.Forms is a pinned
+source submodule; Engine and Orchestrator share the backend repository. Their
+semantic ownership and capability gates remain unchanged.
+
 This is the parent routing document; component details remain governed by each
 subproject's records and evidence gates.
 
@@ -19,9 +23,9 @@ subproject's records and evidence gates.
 |---|---|---|---|
 | GUI.Forms | `../gui_forms/` | Retained custom-rendered C++ UI framework and bindings | Active implementation toward a semicomplete, inspectable framework release |
 | Web.Forms | `../web_forms/` | Bounded browser-valid HTML/CSS authoring profile and two-stage Python generator of C++17-compatible code over public GUI.Forms | Stage 1/descriptor Stage 2 dogfood open under Web.Forms ADR-003; production GUI.Forms adapter remains gated |
-| Engine | `../engine/` | Go catalogue-independent live search, exact catalogue, index, retrieval, and core Kolmogrov candidate integration | Active implementation toward a mostly running standalone service; required live-query lane open under ADR-008 |
+| Engine | `../backend/engine/` | Go catalogue-independent live search, exact catalogue, index, retrieval, and core Kolmogrov candidate integration | Active implementation toward a mostly running standalone service; required live-query lane open under ADR-008 |
 | Kolmogrov | `../kolmogrov/` | Formal and empirical fixed-width perceptual-similarity program | Active independent research and conformance work |
-| Orchestrator | `../orchestrator/` | Headless Rust integration authority, capability/availability map, control plane, hives, settings, handlers, command/CLI authority, plugin supervision, and platform policy | Active implementation toward Orchestrator Core 1.0; independent of GUI.Forms |
+| Orchestrator | `../backend/orchestrator/` | Headless Rust integration authority, capability/availability map, control plane, hives, settings, handlers, command/CLI authority, plugin supervision, and platform policy | Active implementation toward Orchestrator Core 1.0; independent of GUI.Forms |
 | File Manager frontend | `../frontend/` | Visual C++ end-user program built on GUI.Forms and bootstrapped by Orchestrator | Architect direction recorded 2026-08-07; Frontend 001 waits for Orchestrator Core 1.0 and GUI.Forms FM0 go-ahead |
 | Plugin Runtime research | `../plugin_runtime/` | Earlier containment and capability study | Frozen source material; implementation moves into Orchestrator's plugin-supervisor work |
 | Malkuth release program | `../malkuth/` | Suite manifest, public mission, documentation, installers, website and release acceptance | Planning open; implementation waits on dogfood/release-artifact gates |
@@ -106,7 +110,7 @@ membership remain separate explicit gates.
    silently widen or block File Manager 1.0.
 
 The exact gates and artifacts are in
-[`orchestrator/planning/DELIVERY_SEQUENCE.md`](../orchestrator/planning/DELIVERY_SEQUENCE.md)
+[`orchestrator/planning/DELIVERY_SEQUENCE.md`](../backend/orchestrator/planning/DELIVERY_SEQUENCE.md)
 and [`frontend/planning/DEPENDENCY_GATES.md`](../frontend/planning/DEPENDENCY_GATES.md).
 
 ## Cross-project change rule

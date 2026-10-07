@@ -1,6 +1,0 @@
-headless_capabilities={"protocol_version":1,"platform":"headless-reference","available_bits":1791,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","cursor","clipboard"]}
-service=monitors error=none count=1 primary=headless.primary
-service=cursor error=none value=text
-service=clipboard_write error=none
-service=clipboard_read error=none generation=1 text=service Ω
-snapshot={"capabilities":{"protocol_version":1,"platform":"headless-reference","available_bits":1791,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","cursor","clipboard"]},"cursor":"text","monitor_queries":1,"cursor_updates":1,"clipboard_reads":1,"clipboard_writes":1,"clipboard_generation":1,"rejected_requests":0,"shutdown":false}

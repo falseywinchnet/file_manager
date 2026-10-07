@@ -1,0 +1,6 @@
+[submodule "gui_forms"]
+	path = gui_forms
+	url = https://github.com/falseywinchnet/gui_forms.git
+[submodule "backend"]
+	path = backend
+	url = https://github.com/falseywinchnet/backend.git

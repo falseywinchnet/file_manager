@@ -1,4 +1,0 @@
-Execution receipt, not captured diagnostic text:
-2026-10-03 Shadow Windows Go 1.27.1, GOMAXPROCS=2
-go vet -p 1 ./...
-Exit status: 0. No diagnostic output; Tee-Object produced no empty output file.

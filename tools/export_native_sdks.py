@@ -45,13 +45,15 @@ def verify_consumers(bundle: Path, scratch: Path) -> None:
     shutil.copytree(ROOT / 'frontend/examples/document_picker_consumer', picker_source)
     prefix: str = str(bundle / 'gui-forms-sdk') + ';' + str(bundle / 'picker-sdk')
     run('cmake', '-S', picker_source, '-B', scratch / 'picker-build', '-G', 'Ninja',
-        '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_PREFIX_PATH=' + prefix)
+        '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_NO_SYSTEM_FROM_IMPORTED=ON',
+        '-DCMAKE_PREFIX_PATH=' + prefix)
     run('cmake', '--build', scratch / 'picker-build', '--parallel', 2)
     # Native Application verification links the host library but does not launch UI.
     application_source: Path = scratch / 'application-consumer'
     shutil.copytree(ROOT / 'gui_forms/examples/paint_contract', application_source)
     run('cmake', '-S', application_source, '-B', scratch / 'application-build', '-G', 'Ninja',
-        '-DCMAKE_BUILD_TYPE=Release', '-DGUI_FORMS_EXAMPLE_NATIVE=ON',
+        '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_NO_SYSTEM_FROM_IMPORTED=ON',
+        '-DGUI_FORMS_EXAMPLE_NATIVE=ON',
         '-DCMAKE_PREFIX_PATH=' + prefix)
     run('cmake', '--build', scratch / 'application-build', '--parallel', 2)
 
@@ -79,6 +81,8 @@ def export(build: Path, platform: str, revision: str) -> Path:
         verify_consumers(bundle, scratch)
         manifest: dict[str, object] = {
             'schema': 1, 'provider_revision': revision, 'platform': platform,
+            'gui_forms_source_revision': git_output('-C', str(ROOT / 'gui_forms'), 'rev-parse', 'HEAD'),
+            'backend_source_revision': git_output('-C', str(ROOT / 'backend'), 'rev-parse', 'HEAD'),
             'build_options': cache_options(build),
             'gui_forms_sha256': sdk_fingerprint(gui),
             'picker_sha256': sdk_fingerprint(picker),

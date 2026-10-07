@@ -1,9 +1,0 @@
-[package]
-name = "file-manager-preview-frame-lab"
-version = "0.0.0"
-edition = "2021"
-rust-version = "1.87"
-publish = false
-
-# Disposable byte-contract fixture. Not linked into the daemon or frontend.
-[workspace]

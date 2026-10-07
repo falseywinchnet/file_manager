@@ -1,1 +1,0 @@
-{"id":"fixture-version-mismatch","status":"version_mismatch","error":{"code":"VERSION_MISMATCH","status":"version_mismatch","message":"orchestrator.status requires ORC-LIF-001 1.0; received ORC-LIF-001 0.1"}}

@@ -1,9 +1,0 @@
-{
-  "encoding": "UTF-8 without BOM, normalized LF",
-  "sha256": {
-    "gui_forms/tests/prepared_window_shape_bench.cpp": "a3f236c89fc804a855265dad5c903d81406642b1ebc0ae5e3de92d307d7da0bf",
-    "gui_forms/CMakeLists.txt": "33548449013e10581f241fbc67b4166e00912abbb0504a927d13c6f5beac41b2"
-  },
-  "measured_benchmark_normalized_sha256": "a4f0fb9caa70d2bf73f1a96e5df60758ed2b2907ea44281d17ad0b1c07d25d8d",
-  "postmeasurement_change": "Removed one extra blank line at EOF only; no executable change."
-}

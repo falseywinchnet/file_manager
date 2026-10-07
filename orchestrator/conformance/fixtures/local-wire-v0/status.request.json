@@ -1,5 +1,0 @@
-{
-  "id": "fixture-local-status",
-  "method": "orchestrator.status",
-  "params": {}
-}

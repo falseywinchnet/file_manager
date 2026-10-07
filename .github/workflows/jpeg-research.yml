@@ -1,17 +1,15 @@
 name: JPEG research correctness
 on:
   push:
-    branches: [main, 'codex/**']
+    branches: [main]
     paths:
       - 'frontend/experiments/jpeg_decode/**'
-      - 'orchestrator/experiments/preview_frame/**'
-      - 'orchestrator/experiments/preview_supervision/**'
+      - 'backend'
       - '.github/workflows/jpeg-research.yml'
   pull_request:
     paths:
       - 'frontend/experiments/jpeg_decode/**'
-      - 'orchestrator/experiments/preview_frame/**'
-      - 'orchestrator/experiments/preview_supervision/**'
+      - 'backend'
       - '.github/workflows/jpeg-research.yml'
   workflow_dispatch:
 permissions:
@@ -32,6 +30,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Check authored C++ spelling
         run: |
           python tools/check_house_style.py frontend/experiments/jpeg_decode
@@ -58,20 +58,20 @@ jobs:
       - name: Build independent minimum-version frame consumer
         run: |
           rustup toolchain install 1.87.0 --profile minimal --component rustfmt --component clippy
-          cargo +1.87.0 fmt --manifest-path orchestrator/experiments/preview_frame/Cargo.toml -- --check
-          cargo +1.87.0 clippy --manifest-path orchestrator/experiments/preview_frame/Cargo.toml --locked --offline --all-targets --all-features --jobs 2 --target-dir orchestrator/.build/preview-frame -- -D warnings
-          cargo +1.87.0 build --manifest-path orchestrator/experiments/preview_frame/Cargo.toml --locked --offline --bin check_jpeg --jobs 2 --target-dir orchestrator/.build/preview-frame
+          cargo +1.87.0 fmt --manifest-path backend/orchestrator/experiments/preview_frame/Cargo.toml -- --check
+          cargo +1.87.0 clippy --manifest-path backend/orchestrator/experiments/preview_frame/Cargo.toml --locked --offline --all-targets --all-features --jobs 2 --target-dir backend/orchestrator/.build/preview-frame -- -D warnings
+          cargo +1.87.0 build --manifest-path backend/orchestrator/experiments/preview_frame/Cargo.toml --locked --offline --bin check_jpeg --jobs 2 --target-dir backend/orchestrator/.build/preview-frame
       - name: Verify real JPEG pixels across process bytes
         run: |
           set -euo pipefail
           if [ "$RUNNER_OS" = Windows ]; then
             jpeg_producer=.build/jpeg-research/Release/file_manager_jpeg_experiment.exe
             jpeg_decoder=.build/jpeg-research/Release/file_manager_jpeg_decoder.exe
-            jpeg_consumer=orchestrator/.build/preview-frame/debug/check_jpeg.exe
+            jpeg_consumer=backend/orchestrator/.build/preview-frame/debug/check_jpeg.exe
           else
             jpeg_producer=.build/jpeg-research/file_manager_jpeg_experiment
             jpeg_decoder=.build/jpeg-research/file_manager_jpeg_decoder
-            jpeg_consumer=orchestrator/.build/preview-frame/debug/check_jpeg
+            jpeg_consumer=backend/orchestrator/.build/preview-frame/debug/check_jpeg
           fi
           for orientation in 1 2 3 4 5 6 7 8; do
             "$jpeg_producer" --emit-frame "$orientation" | "$jpeg_consumer" "$orientation" plain
@@ -83,18 +83,18 @@ jobs:
       - name: Verify bounded Rust process supervision
         run: |
           set -euo pipefail
-          cargo +1.87.0 fetch --manifest-path orchestrator/experiments/preview_supervision/Cargo.toml --locked
-          cargo +1.87.0 fmt --manifest-path orchestrator/experiments/preview_supervision/Cargo.toml -- --check
-          cargo +1.87.0 clippy --manifest-path orchestrator/experiments/preview_supervision/Cargo.toml --locked --offline --all-targets --all-features --jobs 2 --target-dir orchestrator/.build/preview-supervision -- -D warnings
-          cargo +1.87.0 test --manifest-path orchestrator/experiments/preview_supervision/Cargo.toml --locked --offline --jobs 2 --target-dir orchestrator/.build/preview-supervision -- --nocapture --test-threads=1
+          cargo +1.87.0 fetch --manifest-path backend/orchestrator/experiments/preview_supervision/Cargo.toml --locked
+          cargo +1.87.0 fmt --manifest-path backend/orchestrator/experiments/preview_supervision/Cargo.toml -- --check
+          cargo +1.87.0 clippy --manifest-path backend/orchestrator/experiments/preview_supervision/Cargo.toml --locked --offline --all-targets --all-features --jobs 2 --target-dir backend/orchestrator/.build/preview-supervision -- -D warnings
+          cargo +1.87.0 test --manifest-path backend/orchestrator/experiments/preview_supervision/Cargo.toml --locked --offline --jobs 2 --target-dir backend/orchestrator/.build/preview-supervision -- --nocapture --test-threads=1
           if [ "$RUNNER_OS" = Windows ]; then
             jpeg_producer=.build/jpeg-research/Release/file_manager_jpeg_experiment.exe
             jpeg_decoder=.build/jpeg-research/Release/file_manager_jpeg_decoder.exe
-            jpeg_supervisor=orchestrator/.build/preview-supervision/debug/check_decoder.exe
+            jpeg_supervisor=backend/orchestrator/.build/preview-supervision/debug/check_decoder.exe
           else
             jpeg_producer=.build/jpeg-research/file_manager_jpeg_experiment
             jpeg_decoder=.build/jpeg-research/file_manager_jpeg_decoder
-            jpeg_supervisor=orchestrator/.build/preview-supervision/debug/check_decoder
+            jpeg_supervisor=backend/orchestrator/.build/preview-supervision/debug/check_decoder
           fi
           "$jpeg_producer" --emit-encoded 1 > .build/supervised-jpeg-envelope.bin
           "$jpeg_supervisor" "$jpeg_decoder" .build/supervised-jpeg-envelope.bin

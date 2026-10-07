@@ -14,3 +14,7 @@ __pycache__/
 
 # Fetched source repositories are reference material, not workspace contents.
 /third_party/*/
+
+# Disposable compiler objects restored from provider artifacts.
+.ccache/
+cache-manifest.json

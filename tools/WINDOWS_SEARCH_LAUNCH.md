@@ -57,4 +57,4 @@ Unicode Omega paths also passed. The ordinary GUI path opened its owned packaged
 frontend, stayed alive, accepted an owned-window close, exited zero and removed
 both service discovery records. This tests process/environment/lifetime wiring;
 actual frontend live/indexed query evidence is recorded separately in
-`../orchestrator/conformance/evidence/SHADOW_WINDOWS_PIPES_2026-09-29.md`.
+`../backend/orchestrator/conformance/evidence/SHADOW_WINDOWS_PIPES_2026-09-29.md`.

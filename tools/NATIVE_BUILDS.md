@@ -6,14 +6,16 @@ archives, not a Malkuth production release or installer promotion.
 
 The GitHub Actions workflow `native-builds.yml` runs native Windows x64,
 macOS arm64 and Ubuntu 24.04 x64 jobs. Each builds GUI.Forms from this checkout,
-runs its CTests, installs an isolated SDK, builds and tests the frontend, builds
-the Go Engine and Rust Orchestrator, then packages and checks a generated-empty-
+runs its CTests, installs an isolated SDK, builds and tests the frontend, verifies
+the pinned backend bundle, then packages and checks a generated-empty-
 root startup. The jobs publish archives only after those steps pass. Failed job
 test/configure logs are separate artifacts. A successful process-liveness check
 does not establish rendering, interaction, search, accessibility or daily-root
 acceptance. The exact build revision, dirty state, platform, packaged file hashes
 and test/startup result travel in `build-receipt.json`.
 
+The consumer gives its selected imported SDK ordinary include-path priority,
+so an older global `/usr/local/include/gui_forms` cannot shadow the verified SDK.
 The build fingerprints installed SDK headers, libraries, runtime, resources and
 configuration. A changed or unknown fingerprint forces a clean frontend build:
 installation can preserve header timestamps, so timestamp-only incremental
@@ -26,8 +28,8 @@ This workflow uploads Actions artifacts and does not create a public release.
 
 ## Local reproduction
 
-Use native CMake, Ninja, C++20 tools, Python 3.11+, Go (see `engine/go.mod`) and
-Rust (see `orchestrator/Cargo.toml`). The workflow lists native OS prerequisites.
+Use native CMake, Ninja, C++20 tools, Python 3.11+, GitHub CLI and initialized source submodules. Go/Rust are required only in the
+backend repository. Fetch platform inputs with `tools/fetch_build_inputs.py`. The workflow lists native OS prerequisites.
 Linux needs X11/XWayland; headless test runs use `xvfb-run`.
 
 The native Python pipeline defaults to Clang for C/C++ and honors explicit
@@ -49,13 +51,16 @@ portable ZIP.
 
 ```powershell
 . ./tools/Enter-WindowsToolchain.ps1
+python tools/fetch_build_inputs.py --platform windows-x64
 python tools/build_native.py --jobs 2
 ```
 
 ```sh
+python3 tools/fetch_build_inputs.py --platform macos-arm64
 python3 tools/build_native.py --jobs 2
 # Linux headless CI:
 export PATH="/usr/lib/llvm-22/bin:$PATH"
+python3 tools/fetch_build_inputs.py --platform linux-x64
 xvfb-run -a python3 tools/build_native.py --jobs 2
 ```
 
@@ -292,3 +297,18 @@ contracts in its default destination. Inspection established that
 attempt was moved intact to `.build/house-style-tooling/reference-current`.
 The coordinator explicitly declined admitting a new reference tree. No tracked
 inventory, existing library atlas, SDK or published artifact was changed.
+
+## Independent component consumption
+
+ADR-021 moves provider ownership to `falseywinchnet/gui_forms` and
+`falseywinchnet/backend`. `dependencies.lock.json` pins release assets, source
+revisions and archive hashes. `gui_forms/` and `backend/` are source submodules;
+the latter supplies the C++ wire client and fixtures, not a frontend-triggered
+Go/Rust build. Normal native builds require the downloaded backend archive.
+
+Ccache is enabled for C, C++ and Objective-C++ on CI, uses compiler-content
+validation and a 500 MB bound, and retains statistics even after failures.
+Provider seeds are optional; unavailable seeds fall back to ordinary compilation.
+Consumer CTest and package verification always run. Toolkit development-only
+profile tests now belong to the provider workflow. No linker policy or runtime
+feature changed as a consequence of caching.

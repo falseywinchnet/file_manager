@@ -46,18 +46,33 @@ Start with:
 The fetched Modern.Forms reference is pinned in
 [`third_party/README.md`](third_party/README.md).
 
+## Source and build dependencies
+
+Clone with `git clone --recurse-submodules`, or run
+`git submodule update --init --recursive` after pulling. GUI.Forms and backend source are pinned submodules
+owned by [GUI.Forms](https://github.com/falseywinchnet/gui_forms) and
+[backend](https://github.com/falseywinchnet/backend). Make provider changes in
+those repositories; update their pins here through a PR against main.
+
+File Manager compiles pinned GUI.Forms source using an optional provider ccache
+seed. It consumes exact tested backend binaries instead of rebuilding Go/Rust.
+Run `python3 tools/fetch_build_inputs.py --platform macos-arm64` (or `linux-x64`,
+`windows-x64`) before `python3 tools/build_native.py --jobs 2`. GitHub CLI is
+required for fetching. The lock verifies backend archive and executable hashes.
+See [ADR-021](decisions/ADR-021-COMPONENT-REPOSITORIES-AND-BUILD-REUSE.md).
+
 ## Program repositories
 
 - [`gui_forms/`](gui_forms/) — independently buildable retained C++ GUI
   framework, currently advancing first toward a semicomplete snapshot.
-- [`engine/`](engine/) — purpose-built, standalone Go catalogue/index/search
+- [`backend/engine/`](backend/engine/) — purpose-built, standalone Go catalogue/index/search
   service with a narrow versioned API, mandatory sandbox, exact-identity oracle,
   crash/corruption testing, and comparison benchmarks against mature stores.
 - [`kolmogrov/`](kolmogrov/) — independent formal and experimental program for
   ConeDAG successors, practical algorithmic-information measures, exhaustive
   breakdown, and fixed-width multi-channel perceptual hashes. It pursues proof
   closure and adversarial measurement before production promotion.
-- [`orchestrator/`](orchestrator/) — the active user-scoped Rust Orchestrator:
+- [`backend/orchestrator/`](backend/orchestrator/) — the active user-scoped Rust Orchestrator:
   canonical integration authority, contract and availability registry, CLI,
   and future owner of hives, settings, handlers, commands, platform policy, and
   hostile plugin supervision. It advances headlessly toward Core 1.0 without a
