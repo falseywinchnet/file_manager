@@ -40,6 +40,7 @@ jobs:
           python3 -B tools/check_house_style.py gui_forms/include/gui_forms/text_mask.hpp gui_forms/include/gui_forms/text_mask gui_forms/src/core/text/text_mask gui_forms/src/render/text/text_mask gui_forms/tests/text_mask_lifecycle_tests.cpp gui_forms/tests/text_mask_native_tests.cpp gui_forms/tests/text_mask_wrapping_tests.cpp gui_forms/tests/text_mask_cost_probe.cpp
           python3 -B tools/check_house_style.py gui_forms/src/core/text/prepared_window gui_forms/tests/prepared_window_input_tests.cpp gui_forms/tests/prepared_window_batch_tests.cpp
           python3 -B tools/check_house_style.py gui_forms/src/render/text/harfbuzz/harfbuzz_font_engine.hpp gui_forms/src/render/text/harfbuzz/harfbuzz_font_engine.cpp
+          python3 -B tools/check_house_style.py gui_forms/include/gui_forms/component/component/component.hpp gui_forms/src/core/component/component/component.cpp gui_forms/include/gui_forms/event/event/event.hpp gui_forms/include/gui_forms/event/subscription_token/subscription_token.hpp gui_forms/tests/owned_event_tests.cpp gui_forms/examples/reference/owned_events.cpp gui_forms/tools/owned_event_lab.cpp
           python3 -B tools/check_house_style.py gui_forms/src/render/text/prepared_window_shape.hpp gui_forms/src/render/text/prepared_window_shape.cpp gui_forms/tests/prepared_window_shape_tests.cpp gui_forms/src/render/text/prepared_window_session.hpp gui_forms/src/render/text/prepared_window_session.cpp gui_forms/tests/prepared_window_session_tests.cpp gui_forms/src/core/text/prepared/prepared_storage.hpp gui_forms/src/core/text/prepared/prepared_storage.cpp gui_forms/src/render/text/prepared_service.cpp gui_forms/tests/prepared_text_service_tests.cpp
   native:
     name: ${{ matrix.platform }}
@@ -163,6 +164,20 @@ jobs:
           xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" python3 tools/build_native.py --jobs 2
           python3 -B tools/export_native_sdks_tests.py
           python3 -B tools/export_native_sdks.py
+      - name: Verify installed owner-held event example on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          cmake -S gui_forms/examples/reference -B .build/native-${{ matrix.platform }}/owned-events -G Ninja -DCMAKE_BUILD_TYPE=Release -DGUIForms_DIR="$PWD/.build/native-${{ matrix.platform }}/gui-forms-sdk/lib/cmake/GUIForms"
+          cmake --build .build/native-${{ matrix.platform }}/owned-events --parallel 2
+          ctest --test-dir .build/native-${{ matrix.platform }}/owned-events --output-on-failure
+      - name: Verify installed owner-held event example on macOS and Linux
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cmake -S gui_forms/examples/reference -B .build/native-${{ matrix.platform }}/owned-events -G Ninja -DCMAKE_BUILD_TYPE=Release -DGUIForms_DIR="$PWD/.build/native-${{ matrix.platform }}/gui-forms-sdk/lib/cmake/GUIForms"
+          cmake --build .build/native-${{ matrix.platform }}/owned-events --parallel 2
+          ctest --test-dir .build/native-${{ matrix.platform }}/owned-events --output-on-failure
       - name: Measure consumer image admission on Windows
         if: runner.os == 'Windows'
         shell: msys2 {0}

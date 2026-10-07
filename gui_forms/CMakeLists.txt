@@ -1810,6 +1810,7 @@ if(GUI_FORMS_BUILD_TESTS)
     endif()
     add_library(gui_forms_reference_examples OBJECT
         examples/reference/clipboard_image.cpp
+        examples/reference/owned_events.cpp
     )
     target_link_libraries(gui_forms_reference_examples PRIVATE gui_forms_core)
 
@@ -1910,9 +1911,16 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_callback_lab tools/callback_lab.cpp)
     target_link_libraries(gui_forms_callback_lab PRIVATE gui_forms_core)
 
+    add_executable(gui_forms_owned_event_lab tools/owned_event_lab.cpp)
+    target_link_libraries(gui_forms_owned_event_lab PRIVATE gui_forms_core)
+
     add_executable(gui_forms_delegate_event_tests tests/delegate_event_tests.cpp)
     target_link_libraries(gui_forms_delegate_event_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_delegate_event_tests COMMAND gui_forms_delegate_event_tests)
+
+    add_executable(gui_forms_owned_event_tests tests/owned_event_tests.cpp)
+    target_link_libraries(gui_forms_owned_event_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_owned_event_tests COMMAND gui_forms_owned_event_tests)
 
     add_executable(gui_forms_live_surface_tests tests/live_surface_tests.cpp)
     target_link_libraries(gui_forms_live_surface_tests PRIVATE gui_forms_core)
