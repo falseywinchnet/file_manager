@@ -1,5 +1,34 @@
 # Orchestrator ↔ GUI.Forms interface negotiation
 
+## Concise authoring development reply — 2026-10-07
+
+**GIVEN:** the owner directed GUI.Forms to work toward availability of the
+2026-10-06 concise-authoring proposal. Consumer application changes remain with
+their managers; this work does not modify PlaySuite. Owning control handles are
+acceptable when they conform to the house style and retained-tree lifetime
+rules.
+
+**OBSERVED implementation:** the additive C++ `on(Event<...>&, owner,
+&Owner::method)` helper retains its token on the `Component` owner. Named member
+binding is stored with the event slot. `Component::own_subscription` transfers
+an existing token explicitly. Existing caller-owned subscriptions, callback
+order, nested emission and disposal authority remain intact. Registration
+failure disconnects the candidate, and member emission adds no allocation.
+The portable contract and tests are in `CURRENT_API_REFERENCE.md` and
+`tests/owned_event_tests.cpp`; the API example is compiled by the lower build.
+
+This is a provider development source addition under ORC-GUI-001, pending
+canonical reconciliation. `Component` object layout and private event slot
+layout change: rebuild every C++ consumer with the matching library. No C ABI,
+host protocol, external service capability, frozen FM0 manifest, or Web.Forms
+grammar changes here.
+
+`planning/CONCISE_AUTHORING_AVAILABILITY.md` records the remaining grid, form,
+skin and generator-facing requirements with their actual availability. It is
+a proposal and execution plan, not an accepted replacement for the retained
+ownership or design-language decisions. GUI.Forms will publish provider
+evidence before a consumer is asked to adopt a new contract.
+
 ## Details semantic item focus correction — 2026-10-03
 
 The existing Details input contract now explicitly requires an item-addressed

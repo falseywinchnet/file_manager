@@ -2,6 +2,7 @@
 
 #include "gui_forms/component/revocable/revocable.hpp"
 #include "gui_forms/component/types/component_types.hpp"
+#include "gui_forms/event/subscription_token/subscription_token.hpp"
 
 #include <memory>
 #include <vector>
@@ -20,14 +21,22 @@ public:
     void dispose();
     [[nodiscard]] ComponentState component_state() const noexcept { return state_; }
     [[nodiscard]] bool is_alive() const noexcept {
-        return state_ == ComponentState::alive;
+        const bool alive = state_ == ComponentState::alive;
+        return alive;
     }
     [[nodiscard]] bool is_disposed() const noexcept {
-        return state_ == ComponentState::disposed;
+        const bool disposed = state_ == ComponentState::disposed;
+        return disposed;
     }
 
-    // The component owns revocation authority, never the subscription itself.
+    // Observes revocation authority; the caller retains its subscription token.
     void own_revocable(const std::weak_ptr<detail::Revocable>& revocable);
+
+    // Transfers the token into this component. Disposal/destruction disconnects
+    // it; no ownership of the event publisher or callback target is introduced.
+    // A dead component disconnects immediately. Failure also disconnects the
+    // transferred token. Like event dispatch, this is execution-thread confined.
+    void own_subscription(SubscriptionToken subscription);
 
 protected:
     virtual void verify_dispose_thread();
@@ -36,7 +45,9 @@ protected:
 
 private:
     ComponentState state_{ComponentState::alive};
-    std::vector<std::weak_ptr<detail::Revocable>> owned_revocables_;
+    std::vector<std::weak_ptr<detail::Revocable>> owned_revocables_{};
+    // Components that only use caller-owned tokens do not allocate this store.
+    std::unique_ptr<std::vector<SubscriptionToken>> owned_subscriptions_{};
 };
 
 } // namespace gui_forms
