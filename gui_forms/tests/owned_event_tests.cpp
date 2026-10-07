@@ -118,10 +118,10 @@ void require(const bool condition, const char* message) {
 class Recorder : public gf::Component {
 public:
     explicit Recorder(int& total) : total_(total) {}
-    virtual void add(int value) { total_ += value; }
-    void add_const(int value) const { total_ += value; }
-    void add_noexcept(int value) noexcept { total_ += value; }
-    void add_const_noexcept(int value) const noexcept { total_ += value; }
+    virtual void add(const int value) { total_ += value; }
+    void add_const(const int value) const { total_ += value; }
+    void add_noexcept(const int value) noexcept { total_ += value; }
+    void add_const_noexcept(const int value) const noexcept { total_ += value; }
     void change(std::string& text, const int& value) { text += std::to_string(value); }
     void clicked(gf::ButtonBase&) { ++total_; }
     void text_changed(const std::string&) { ++total_; }
@@ -134,7 +134,7 @@ private:
 class DerivedRecorder final : public Recorder {
 public:
     explicit DerivedRecorder(int& total) : Recorder(total) {}
-    void add(int value) override { Recorder::add(value * 2); }
+    void add(const int value) override { Recorder::add(value * 2); }
 };
 
 class ShadowingOwner final : public gf::Component {
@@ -150,7 +150,7 @@ public:
 class NestedOwner final : public gf::Component {
 public:
     explicit NestedOwner(gf::Event<int>& event) : event_(event) {}
-    void first(int depth) {
+    void first(const int depth) {
         order[count] = 10 + depth;
         ++count;
         if (depth == 0) {
@@ -158,11 +158,11 @@ public:
             event_.emit(1);
         }
     }
-    void second(int depth) {
+    void second(const int depth) {
         order[count] = 20 + depth;
         ++count;
     }
-    void third(int depth) {
+    void third(const int depth) {
         order[count] = 30 + depth;
         ++count;
     }
