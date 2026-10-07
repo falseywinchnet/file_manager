@@ -42,7 +42,7 @@ public:
         return token;
     }
 
-    [[nodiscard]] SubscriptionToken subscribe(DelegateCallback callback) {
+    [[nodiscard]] SubscriptionToken subscribe(const DelegateCallback callback) {
         SubscriptionToken token = subscribe_impl(nullptr, callback);
         return token;
     }
@@ -53,7 +53,7 @@ public:
     }
 
     [[nodiscard]] SubscriptionToken subscribe(Component& owner,
-                                              DelegateCallback callback) {
+                                              const DelegateCallback callback) {
         SubscriptionToken token = subscribe_impl(&owner, callback);
         return token;
     }
@@ -92,10 +92,10 @@ public:
 private:
     template <typename Owner, typename Target, typename... EventArguments>
     friend void on(Event<EventArguments...>& event, Owner& owner,
-                   void (Target::*method)(EventArguments...));
+                   void (Target::*const method)(EventArguments...));
     template <typename Owner, typename Target, typename... EventArguments>
     friend void on(Event<EventArguments...>& event, Owner& owner,
-                   void (Target::*method)(EventArguments...) const);
+                   void (Target::*const method)(EventArguments...) const);
 
     struct State;
 
@@ -104,7 +104,7 @@ private:
             : state(std::move(event_state)), callback(std::move(event_callback)),
               kind(CallbackKind::owning) {}
 
-        Slot(std::weak_ptr<State> event_state, DelegateCallback event_delegate)
+        Slot(std::weak_ptr<State> event_state, const DelegateCallback event_delegate)
             : state(std::move(event_state)), delegate(event_delegate),
               kind(CallbackKind::delegate) {}
 
@@ -189,7 +189,7 @@ private:
         std::shared_ptr<State> state_;
     };
 
-    [[nodiscard]] SubscriptionToken subscribe_impl(Component* owner, Callback callback) {
+    [[nodiscard]] SubscriptionToken subscribe_impl(Component* const owner, Callback callback) {
         if (!callback) {
             return {};
         }
@@ -201,7 +201,7 @@ private:
     }
 
     [[nodiscard]] SubscriptionToken subscribe_impl(Component* owner,
-                                                   DelegateCallback callback) {
+                                                   const DelegateCallback callback) {
         if (!callback) {
             return {};
         }
@@ -222,7 +222,7 @@ private:
         return token;
     }
 
-    void connect(Component* owner, const std::shared_ptr<Slot>& slot) {
+    void connect(Component* const owner, const std::shared_ptr<Slot>& slot) {
         compact(*state_);
         (*state_).slots.push_back(slot);
         (*slot).connected_ = true;
@@ -258,7 +258,7 @@ private:
 // Owner and publisher obey the existing Event execution-thread contract.
 template <typename Owner, typename Target, typename... Arguments>
 void on(Event<Arguments...>& event, Owner& owner,
-        void (Target::*method)(Arguments...)) {
+        void (Target::*const method)(Arguments...)) {
     static_assert(std::is_base_of_v<Component, Owner>,
                   "gui_forms::on requires a Component owner");
     static_assert(std::is_base_of_v<Target, Owner>,
@@ -276,7 +276,7 @@ void on(Event<Arguments...>& event, Owner& owner,
 
 template <typename Owner, typename Target, typename... Arguments>
 void on(Event<Arguments...>& event, Owner& owner,
-        void (Target::*method)(Arguments...) const) {
+        void (Target::*const method)(Arguments...) const) {
     static_assert(std::is_base_of_v<Component, Owner>,
                   "gui_forms::on requires a Component owner");
     static_assert(std::is_base_of_v<Target, Owner>,

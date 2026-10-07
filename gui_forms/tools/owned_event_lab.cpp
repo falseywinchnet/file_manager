@@ -9,7 +9,7 @@ namespace {
 
 class Counter final : public gui_forms::Component {
 public:
-    void add(std::uint64_t value) noexcept { total_ += value; }
+    void add(const std::uint64_t value) noexcept { total_ += value; }
     [[nodiscard]] std::uint64_t total() const noexcept { return total_; }
 
 private:
